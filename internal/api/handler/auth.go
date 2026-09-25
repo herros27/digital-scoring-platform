@@ -20,17 +20,17 @@ func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
         PIN           string `json:"pin"`
     }
     if err := Decode(r, &req); err != nil {
-        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
         return
     }
     if req.CompetitionID == "" || req.ArenaID == "" || req.PIN == "" {
-        Fail(w, http.StatusBadRequest, "BAD_REQUEST", "competition_id, arena_id, pin required")
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", "competition_id, arena_id, pin required", nil)
         return
     }
 
     token, record, err := h.Pins.LoginWithPIN(req.CompetitionID, req.ArenaID, req.PIN)
     if err != nil {
-        Fail(w, http.StatusUnauthorized, "INVALID_PIN", "pin not found or expired")
+        Fail(w, http.StatusUnauthorized, "INVALID_PIN", "pin not found or expired", nil)
         return
     }
 
@@ -53,7 +53,7 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
         TTLHours      int    `json:"ttl_hours"`
     }
     if err := Decode(r, &req); err != nil {
-        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
         return
     }
     if req.TTLHours == 0 {
@@ -63,7 +63,7 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
     ttl := time.Duration(req.TTLHours) * time.Hour
     record, err := h.Pins.CreatePIN(req.CompetitionID, req.ArenaID, req.Role, req.PIN, ttl)
     if err != nil {
-        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
         return
     }
     Ok(w, record)

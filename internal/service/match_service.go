@@ -5,9 +5,9 @@ import (
 
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/orchestrator"
+	"github.com/herros27/digital-scoring/internal/rules"
 	"github.com/herros27/digital-scoring/internal/statemachine"
 	"github.com/herros27/digital-scoring/internal/store"
-	"github.com/herros27/digital-scoring/internal/rules"
 )
 
 type MatchRepository interface {
@@ -25,7 +25,7 @@ type MatchService struct {
 	scoreStore *store.MatchScoreStore
 	matchStore *store.MatchStore
 
-	// activeOrchestrators menyimpan match yang sedang live di arena: map[arenaID]*Orchestrator
+	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
 }
 
@@ -70,36 +70,63 @@ func (s *MatchService) CreateMatch(m *store.Match) error {
 	return s.matchRepo.Create(m)
 }
 
-// LoadMatchToArena menginisialisasi Orchestrator untuk pertandingan yang akan bertanding di gelanggang/arena
+// LoadMatchToArena menginisialisasi Orchestrator untuk pertandingan yang akan bertanding di arena
 func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) error {
-	match, err := s.matchRepo.GetByID(matchID)
-	if err != nil || match == nil {
-		return errors.New("match not found")
+	if _, ok := s.activeOrchestrators[matchID]; ok {
+		return errors.New("match already loaded to arena")
 	}
-	if rulesetPath == "" {
-		rulesetPath = "rulesets/ipsi_2024.json" // default
-	}
-	// 1. Load Ruleset
-	ruleset, err := rules.LoadRuleset(rulesetPath)
-	if err != nil {
-		return errors.New("failed to load ruleset: " + err.Error())
-	}
-	// 2. Buat StateMachine baru
+	// Buat state machine dan ruleset baru
 	sm := statemachine.New(matchID)
-	// 3. Dapatkan Arena Hub
-	arenaHub := s.hubManager.GetOrCreate(arenaID)
-	// 4. Inisialisasi Orchestrator
-	orch := orchestrator.New(
-		matchID,
-		arenaID,
-		sm,
-		ruleset,
-		arenaHub,
-		s.matchStore,
-		s.eventStore,
-		s.scoreStore,
-	)
-	s.activeOrchestrators[arenaID] = orch
-	// 5. Update status match di DB menjadi 'ready'
-	return s.matchRepo.UpdateStatus(matchID, "ready")
+	r, err := rules.LoadRuleset(rulesetPath)
+	if err != nil {
+		return err
+	}
+	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), s.matchStore, s.eventStore, s.scoreStore)
+	s.activeOrchestrators[matchID] = orch
+	return nil
+}
+
+// GetOrchestrator mengambil Orchestrator berdasarkan matchID
+func (s *MatchService) GetOrchestrator(matchID string) (*orchestrator.Orchestrator, error) {
+	o, ok := s.activeOrchestrators[matchID]
+	if !ok {
+		return nil, errors.New("match not loaded to arena")
+	}
+	return o, nil
+}
+
+func (s *MatchService) StartMatch(matchID string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	o.Start()
+	return nil
+}
+
+func (s *MatchService) PauseMatch(matchID string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	o.Pause()
+	return nil
+}
+
+func (s *MatchService) ResumeMatch(matchID string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	o.Resume()
+	return nil
+}
+
+func (s *MatchService) FinishMatch(matchID string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	o.Finish()
+	return nil
 }

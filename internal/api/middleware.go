@@ -17,12 +17,12 @@ func AuthMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         header := r.Header.Get("Authorization")
         if !strings.HasPrefix(header, "Bearer ") {
-            handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing token")
+            handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing token", nil)
             return
         }
         claims, err := auth.ParseToken(strings.TrimPrefix(header, "Bearer "))
         if err != nil {
-            handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error())
+            handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
             return
         }
         ctx := context.WithValue(r.Context(), claimsKey, claims)

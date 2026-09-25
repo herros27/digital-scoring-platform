@@ -22,18 +22,18 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Decode(r, &req); err != nil {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
 	if req.WeightClass == "" || req.Gender == "" || len(req.ParticipantIDs) < 2 {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class, gender, and at least 2 participants required")
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class, gender, and at least 2 participants required", nil)
 		return
 	}
 
 	slots, err := h.Service.GenerateBracket(compID, req.WeightClass, req.Gender, req.ParticipantIDs)
 	if err != nil {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
@@ -48,13 +48,13 @@ func (h *BracketHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 	gender := r.URL.Query().Get("gender")
 
 	if weightClass == "" || gender == "" {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class and gender query parameters required")
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class and gender query parameters required", nil)
 		return
 	}
 
 	tree, err := h.Service.GetBracketTree(compID, weightClass, gender)
 	if err != nil {
-		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
 

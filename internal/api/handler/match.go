@@ -10,7 +10,7 @@ import (
 )
 
 type MatchHandler struct {
-    Service      *service.MatchService
+    Service *service.MatchService
     HubManager *hub.Manager
 }
 
@@ -26,7 +26,7 @@ func (h *MatchHandler) Get(w http.ResponseWriter, r *http.Request) {
     id := r.PathValue("id")
     m, err := h.Service.GetMatchByID(id)
     if err != nil {
-        Fail(w, http.StatusNotFound, "NOT_FOUND", "match not found")
+        Fail(w, http.StatusNotFound, "NOT_FOUND", "match not found", nil)
         return
     }
     Ok(w, m)
@@ -36,14 +36,14 @@ func (h *MatchHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Create(w http.ResponseWriter, r *http.Request) {
     var m store.Match
     if err := Decode(r, &m); err != nil {
-        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
         return
     }
     m.CompetitionID = r.PathValue("comp_id")
     m.Status = "idle"
     m.CurrentRound = 1
     if err := h.Service.CreateMatch(&m); err != nil {
-        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
         return
     }
     w.WriteHeader(http.StatusCreated)
@@ -57,17 +57,17 @@ func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 
     tokenStr := r.URL.Query().Get("token")
     if tokenStr == "" {
-        Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing token")
+        Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing token", nil)
         return
     }
     claims, err := auth.ParseToken(tokenStr)
     if err != nil {
-        Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error())
+        Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
         return
     }
     // pastikan token scoped ke arena yang benar
     if claims.ArenaID != arenaID {
-        Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch")
+        Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch", nil)
         return
     }
 
@@ -85,17 +85,17 @@ func (h *MatchHandler) LoadArena(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Decode(r, &req); err != nil {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
 	if req.ArenaID == "" {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "arena_id is required")
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "arena_id is required", nil)
 		return
 	}
 
 	if err := h.Service.LoadMatchToArena(matchID, req.ArenaID, req.RulesetPath); err != nil {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
@@ -104,4 +104,44 @@ func (h *MatchHandler) LoadArena(w http.ResponseWriter, r *http.Request) {
 		"arena_id": req.ArenaID,
 		"status":   "ready",
 	})
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/start
+func (h *MatchHandler) Start(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	if err := h.Service.StartMatch(matchID); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "running"})
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/pause
+func (h *MatchHandler) Pause(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	if err := h.Service.PauseMatch(matchID); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "paused"})
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/resume
+func (h *MatchHandler) Resume(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	if err := h.Service.ResumeMatch(matchID); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "running"})
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/finish
+func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	if err := h.Service.FinishMatch(matchID); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "finished"})
 }
