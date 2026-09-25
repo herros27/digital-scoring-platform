@@ -10,13 +10,22 @@ func Ok(w http.ResponseWriter, data any) {
     json.NewEncoder(w).Encode(map[string]any{"success": true, "data": data})
 }
 
-func Fail(w http.ResponseWriter, status int, code, message string) {
+func Fail(w http.ResponseWriter, status int, code, message string, details any) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(status)
     json.NewEncoder(w).Encode(map[string]any{
         "success": false,
-        "error":   map[string]string{"code": code, "message": message},
+        "error": map[string]any{
+            "code":    code,
+            "message": message,
+            "details": details,
+        },
     })
+}
+
+// FailMsg — shorthand tanpa details
+func FailMsg(w http.ResponseWriter, status int, code, message string) {
+    Fail(w, status, code, message, nil)
 }
 
 func Decode(r *http.Request, dst any) error {

@@ -87,3 +87,30 @@ type JudgePin struct {
 	ExpiresAt     time.Time `json:"expires_at"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+type Athlete struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Gender    string    `json:"gender"`
+	Team      string    `json:"team"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Category struct {
+	ID          string    `json:"id"`
+	CompetitionID string  `json:"competition_id"`
+	Name        string    `json:"name"`
+	Gender      string    `json:"gender"`
+	WeightClass string    `json:"weight_class"`
+	RulesetID   *string   `json:"ruleset_id,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Ruleset struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Version   string    `json:"version"`
+	Scoring   any       `json:"scoring"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}

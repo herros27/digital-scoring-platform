@@ -66,6 +66,21 @@ func New(
 	return o
 }
 
+func decodePayload(payload interface{}, dest interface{}) error {
+	switch v := payload.(type) {
+	case []byte:
+		return json.Unmarshal(v, dest)
+	case map[string]interface{}:
+		data, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, dest)
+	default:
+		return fmt.Errorf("unsupported payload type: %T", payload)
+	}
+}
+
 func (o *Orchestrator) handleMessage(arenaID string, client *hub.Client, msg hub.Message) {
 	switch msg.Type {
 	case hub.MsgJudgeInput:
@@ -92,7 +107,7 @@ func (o *Orchestrator) handleControl(client *hub.Client, msg hub.Message) {
 	}
 
 	var p controlPayload
-	if err := unmarshal(msg.Payload, &p); err != nil {
+	if err := decodePayload(msg.Payload, &p); err != nil {
 		o.sendError(client, "BAD_PAYLOAD", err.Error())
 		return
 	}
@@ -190,7 +205,7 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	}
 
 	var p judgeInputPayload
-	if err := unmarshal(msg.Payload, &p); err != nil {
+	if err := decodePayload(msg.Payload, &p); err != nil {
 		o.sendError(client, "BAD_PAYLOAD", err.Error())
 		return
 	}
@@ -289,7 +304,7 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 	}
 
 	var p penaltyPayload
-	if err := unmarshal(msg.Payload, &p); err != nil {
+	if err := decodePayload(msg.Payload, &p); err != nil {
 		o.sendError(client, "BAD_PAYLOAD", err.Error())
 		return
 	}
@@ -481,11 +496,22 @@ func (o *Orchestrator) appendEvent(eventType string, payload map[string]any, jud
 	}
 }
 
-// helper unmarshal dari interface{} (payload dari hub.Message bisa berupa map atau []byte)
-func unmarshal(v any, dst any) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, dst)
+func (o *Orchestrator) GetMatchID() string {
+	return o.matchID
+}
+
+func (o *Orchestrator) Start() {
+	o.doStart()
+}
+
+func (o *Orchestrator) Pause() {
+	o.doPause()
+}
+
+func (o *Orchestrator) Resume() {
+	o.doResume()
+}
+
+func (o *Orchestrator) Finish() {
+	o.doFinish()
 }

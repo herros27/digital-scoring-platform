@@ -15,7 +15,7 @@ type CompetitionHandler struct {
 func (h *CompetitionHandler) List(w http.ResponseWriter, r *http.Request) {
     list, err := h.Service.GetAllCompetitions()
     if err != nil {
-        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
         return
     }
     Ok(w, list)
@@ -26,7 +26,7 @@ func (h *CompetitionHandler) Get(w http.ResponseWriter, r *http.Request) {
     id := r.PathValue("id")
     c, err := h.Service.GetCompetitionByID(id)
     if err != nil {
-        Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+        Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
         return
     }
     Ok(w, c)
@@ -36,13 +36,13 @@ func (h *CompetitionHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *CompetitionHandler) Create(w http.ResponseWriter, r *http.Request) {
     var c store.Competition
     if err := Decode(r, &c); err != nil {
-        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
         return
     }
 
     // Biarkan Service yang menangani default value dan aturan bisnisnya
     if err := h.Service.CreateCompetition(&c); err != nil {
-        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
         return
     }
 
@@ -54,7 +54,7 @@ func (h *CompetitionHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *CompetitionHandler) Activate(w http.ResponseWriter, r *http.Request) {
     id := r.PathValue("id")
     if err := h.Service.ActivateCompetition(id); err != nil {
-        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
         return
     }
     Ok(w, map[string]string{"status": "active"})
