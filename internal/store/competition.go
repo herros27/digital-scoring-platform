@@ -1,0 +1,46 @@
+package store
+
+import "database/sql"
+
+type CompetitionStore struct {
+	DB *sql.DB
+}
+
+func (s *CompetitionStore) Create(c *Competition) error {
+	query := `
+		INSERT INTO competitions (name, location, start_date, end_date, ruleset_name, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at`
+	return s.DB.QueryRow(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, c.Status).
+		Scan(&c.ID, &c.CreatedAt)
+}
+
+func (s *CompetitionStore) GetByID(id string) (*Competition, error) {
+	c := &Competition{}
+	query := `SELECT id, name, location, start_date, end_date, ruleset_name, status, created_at FROM competitions WHERE id = $1`
+	err := s.DB.QueryRow(query, id).Scan(
+		&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &c.Status, &c.CreatedAt,
+	)
+	return c, err
+}
+
+func (s *CompetitionStore) List() ([]Competition, error) {
+	rows, err := s.DB.Query(`SELECT id, name, location, start_date, end_date, ruleset_name, status, created_at FROM competitions ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Competition
+	for rows.Next() {
+		var c Competition
+		rows.Scan(&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &c.Status, &c.CreatedAt)
+		list = append(list, c)
+	}
+	return list, rows.Err()
+}
+
+func (s *CompetitionStore) UpdateStatus(id, status string) error {
+	_, err := s.DB.Exec(`UPDATE competitions SET status = $1 WHERE id = $2`, status, id)
+	return err
+}

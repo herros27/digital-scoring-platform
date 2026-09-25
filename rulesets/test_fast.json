@@ -1,0 +1,14 @@
+{
+  "name": "TEST FAST",
+  "version": "1.0",
+  "scoring": {
+    "technique_points": 1,
+    "knockdown_points": 2,
+    "fall_points": 3,
+    "max_penalties": 3,
+    "penalty_threshold": 1,
+    "round_duration": 10,
+    "break_duration": 5,
+    "total_rounds": 3
+  }
+}

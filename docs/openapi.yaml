@@ -1,0 +1,415 @@
+openapi: 3.0.3
+info:
+  title: Pencak Silat Digital Scoring System API
+  description: |
+    API Backend untuk Digital Scoring Pencak Silat (Kategori Tanding).
+    Mendukung Real-Time WebSocket Scoring, Konsensus Juri, Manajemen Gelanggang (Arena),
+    Bagan Turnamen (Single Elimination), dan Event Sourcing Audit Trail.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+paths:
+  # -------------------------------------------------------
+  # AUTHENTICATION
+  # -------------------------------------------------------
+  /api/v1/auth/judge-login:
+    post:
+      summary: Login Tablet Juri / Wasit menggunakan PIN
+      description: Memvalidasi 6-digit PIN juri untuk arena tertentu dan mengembalikan token JWT untuk koneksi WebSocket.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [competition_id, arena_id, pin]
+              properties:
+                competition_id:
+                  type: string
+                  format: uuid
+                  example: "3de882af-1b3e-4026-beb2-0d08e7e1c57d"
+                arena_id:
+                  type: string
+                  format: uuid
+                  example: "c48ee982-dccc-4f27-8ba4-f9672d1827bb"
+                pin:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: Login berhasil, token JWT diberikan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      role:
+                        type: string
+                        example: "judge_1"
+                      arena_id:
+                        type: string
+                        format: uuid
+                      competition_id:
+                        type: string
+                        format: uuid
+        '401':
+          description: PIN salah atau kadaluarsa
+
+  /api/v1/auth/create-pin:
+    post:
+      summary: Generate PIN Baru untuk Petugas Pertandingan
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [competition_id, arena_id, role, pin]
+              properties:
+                competition_id:
+                  type: string
+                  format: uuid
+                arena_id:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [judge_1, judge_2, judge_3, judge_4, judge_5, referee]
+                  example: "judge_1"
+                pin:
+                  type: string
+                  example: "123456"
+                ttl_hours:
+                  type: integer
+                  default: 12
+                  example: 12
+      responses:
+        '200':
+          description: PIN berhasil dibuat
+
+  # -------------------------------------------------------
+  # COMPETITIONS
+  # -------------------------------------------------------
+  /api/v1/competitions:
+    get:
+      summary: Daftar Seluruh Kejuaraan
+      tags:
+        - Competition
+      responses:
+        '200':
+          description: List kompetisi berhasil diambil
+    post:
+      summary: Buat Kejuaraan Baru
+      tags:
+        - Competition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, location, start_date, end_date, ruleset_name]
+              properties:
+                name:
+                  type: string
+                  example: "Kejuaraan Nasional Silat 2026"
+                location:
+                  type: string
+                  example: "Jakarta"
+                start_date:
+                  type: string
+                  format: date
+                  example: "2026-10-01"
+                end_date:
+                  type: string
+                  format: date
+                  example: "2026-10-05"
+                ruleset_name:
+                  type: string
+                  example: "IPSI 2024"
+      responses:
+        '201':
+          description: Kompetisi dibuat
+
+  /api/v1/competitions/{id}:
+    get:
+      summary: Detail Kejuaraan
+      tags:
+        - Competition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail kompetisi
+
+  /api/v1/competitions/{id}/activate:
+    put:
+      summary: Aktifkan Status Kejuaraan
+      tags:
+        - Competition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status diubah menjadi active
+
+  # -------------------------------------------------------
+  # ARENAS
+  # -------------------------------------------------------
+  /api/v1/competitions/{comp_id}/arenas:
+    get:
+      summary: Daftar Gelanggang / Arena pada Kompetisi
+      tags:
+        - Arena
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List gelanggang
+    post:
+      summary: Tambah Gelanggang Baru
+      tags:
+        - Arena
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Gelanggang A"
+      responses:
+        '201':
+          description: Gelanggang berhasil ditambahkan
+
+  # -------------------------------------------------------
+  # MATCHES
+  # -------------------------------------------------------
+  /api/v1/competitions/{comp_id}/matches:
+    post:
+      summary: Buat Partai Pertandingan Baru
+      tags:
+        - Match
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [athlete_red_id, athlete_blue_id]
+              properties:
+                arena_id:
+                  type: string
+                  format: uuid
+                bracket_slot_id:
+                  type: string
+                  format: uuid
+                athlete_red_id:
+                  type: string
+                  format: uuid
+                athlete_blue_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Match dibuat
+
+  /api/v1/competitions/{comp_id}/matches/{id}/load-arena:
+    post:
+      summary: Muat dan Aktifkan Match ke Arena Tertentu
+      description: Menginisialisasi Match Orchestrator, Rules Engine, Timer, dan mengubah status match menjadi READY.
+      tags:
+        - Match
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [arena_id]
+              properties:
+                arena_id:
+                  type: string
+                  format: uuid
+                ruleset_path:
+                  type: string
+                  default: "ipsi_2024"
+                  example: "ipsi_2024"
+      responses:
+        '200':
+          description: Match siap di arena
+
+  # -------------------------------------------------------
+  # BRACKETS / TOURNAMENT DRAW
+  # -------------------------------------------------------
+  /api/v1/competitions/{comp_id}/brackets/generate:
+    post:
+      summary: Generate Bagan Pertandingan (Single Elimination)
+      tags:
+        - Bracket
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weight_class, gender, participant_ids]
+              properties:
+                weight_class:
+                  type: string
+                  example: "A"
+                gender:
+                  type: string
+                  enum: [male, female]
+                  example: "male"
+                participant_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '201':
+          description: Bagan berhasil di-generate beserta slot BYE-nya
+
+  /api/v1/competitions/{comp_id}/brackets:
+    get:
+      summary: Ambil Struktur Pohon Bagan Pertandingan
+      tags:
+        - Bracket
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: weight_class
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "A"
+        - name: gender
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "male"
+      responses:
+        '200':
+          description: Pohon bagan pertandingan
+
+  # -------------------------------------------------------
+  # LIVE SCOREBOARD (PUBLIC)
+  # -------------------------------------------------------
+  /api/v1/live/scoreboard/{arena_id}:
+    get:
+      summary: Live Scoreboard Feed (Publik / Layar Penonton)
+      tags:
+        - Live Scoreboard
+      parameters:
+        - name: arena_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status live scoring gelanggang saat ini
+
+  # -------------------------------------------------------
+  # WEBSOCKET
+  # -------------------------------------------------------
+  /ws/arena/{arena_id}:
+    get:
+      summary: Real-Time WebSocket Channel Arena
+      description: |
+        Endpoint WebSocket dua arah untuk sinkronisasi live match, scoring konsensus juri, kontrol wasit, dan timer.
+        **Autentikasi**: Menggunakan Query Param `?token=<JWT_TOKEN>`.
+      tags:
+        - WebSocket Real-Time
+      parameters:
+        - name: arena_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: token
+          in: query
+          required: true
+          description: JWT Token yang didapatkan dari POST /api/v1/auth/judge-login
+          schema:
+            type: string
+      responses:
+        '101':
+          description: Switching Protocols to WebSocket

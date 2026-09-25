@@ -1,0 +1,14 @@
+{
+  "name": "IPSI 2024",
+  "version": "2024.1",
+  "scoring": {
+    "technique_points": 1,
+    "knockdown_points": 2,
+    "fall_points": 3,
+    "max_penalties": 3,
+    "penalty_threshold": 1,
+    "round_duration": 120,
+    "break_duration": 60,
+    "total_rounds": 3
+  }
+}
