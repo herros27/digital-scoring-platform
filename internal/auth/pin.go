@@ -1,11 +1,11 @@
 package auth
 
 import (
-    "database/sql"
-    "errors"
-    "time"
+	"database/sql"
+	"errors"
+	"time"
 
-    "golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const bcryptCost = 12
@@ -52,9 +52,25 @@ func (s *PinStore) GetByCompAndArena(competitionID, arenaID string) ([]PinRecord
     var list []PinRecord
     for rows.Next() {
         var r PinRecord
-        rows.Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.PinHash, &r.ExpiresAt)
+        if err := rows.Scan(
+                &r.ID,
+                &r.CompetitionID,
+                &r.ArenaID,
+                &r.Role,
+                &r.PinHash,
+                &r.ExpiresAt,
+            ); 
+        err != nil {
+            return nil, err
+        }
+
         list = append(list, r)
     }
+       
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
+    
     return list, nil
 }
 

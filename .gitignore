@@ -3,3 +3,7 @@
 IDEA.md
 
 internal/docs
+
+# Environment
+.env
+.env.example
