@@ -65,6 +65,13 @@ type MatchScore struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type MatchScoreDetail struct {
+	MatchID   string       `json:"match_id"`
+	TotalRed  int          `json:"total_red"`
+	TotalBlue int          `json:"total_blue"`
+	Rounds    []MatchScore `json:"rounds"`
+}
+
 type BracketSlot struct {
 	ID            string  `json:"id"`
 	CompetitionID string  `json:"competition_id"`

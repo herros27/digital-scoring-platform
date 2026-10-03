@@ -2,7 +2,9 @@ package service
 
 import (
 	"errors"
+	"sync"
 
+	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/orchestrator"
 	"github.com/herros27/digital-scoring/internal/rules"
@@ -18,12 +20,14 @@ type MatchRepository interface {
 }
 
 type MatchService struct {
-	matchRepo MatchRepository
-	compRepo  CompetitionRepository
+	mu         sync.RWMutex
+	matchRepo  MatchRepository
+	compRepo   CompetitionRepository
 	hubManager *hub.Manager
 	eventStore *store.MatchEventStore
 	scoreStore *store.MatchScoreStore
 	matchStore *store.MatchStore
+	bracketStore orchestrator.BracketAdvancer
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
@@ -36,6 +40,7 @@ func NewMatchService(
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
 	matchStore *store.MatchStore,
+	bracketStore orchestrator.BracketAdvancer,
 ) *MatchService {
 	return &MatchService{
 		matchRepo:           matchRepo,
@@ -44,13 +49,14 @@ func NewMatchService(
 		eventStore:          eventStore,
 		scoreStore:          scoreStore,
 		matchStore:          matchStore,
+		bracketStore:        bracketStore,
 		activeOrchestrators: make(map[string]*orchestrator.Orchestrator),
 	}
 }
 
 func (s *MatchService) GetMatchByID(id string) (*store.Match, error) {
 	if id == "" {
-		return nil, errors.New("match id is required")
+		return nil, domain.ErrInvalidInput
 	}
 	return s.matchRepo.GetByID(id)
 }
@@ -72,22 +78,45 @@ func (s *MatchService) CreateMatch(m *store.Match) error {
 
 // LoadMatchToArena menginisialisasi Orchestrator untuk pertandingan yang akan bertanding di arena
 func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) error {
-	if _, ok := s.activeOrchestrators[matchID]; ok {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 1. Cek apakah match sudah aktif di arena
+	if existing, ok := s.activeOrchestrators[matchID]; ok && existing.IsActive() {
 		return errors.New("match already loaded to arena")
 	}
-	// Buat state machine dan ruleset baru
+
+	// 2. Cek apakah arena sedang digunakan oleh match aktif lain (ARENA_BUSY)
+	for _, orch := range s.activeOrchestrators {
+		if orch.GetArenaID() == arenaID && orch.IsActive() {
+			return domain.ErrArenaBusy
+		}
+	}
+
+	// 3. Buat state machine dan ruleset baru
 	sm := statemachine.New(matchID)
 	r, err := rules.LoadRuleset(rulesetPath)
 	if err != nil {
 		return err
 	}
-	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), s.matchStore, s.eventStore, s.scoreStore)
+
+	var mStore orchestrator.MatchStore
+	if s.matchStore != nil {
+		mStore = s.matchStore
+	} else if s.matchRepo != nil {
+		mStore = s.matchRepo
+	}
+
+	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore)
 	s.activeOrchestrators[matchID] = orch
 	return nil
 }
 
 // GetOrchestrator mengambil Orchestrator berdasarkan matchID
 func (s *MatchService) GetOrchestrator(matchID string) (*orchestrator.Orchestrator, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	o, ok := s.activeOrchestrators[matchID]
 	if !ok {
 		return nil, errors.New("match not loaded to arena")
@@ -100,8 +129,7 @@ func (s *MatchService) StartMatch(matchID string) error {
 	if err != nil {
 		return err
 	}
-	o.Start()
-	return nil
+	return o.Start()
 }
 
 func (s *MatchService) PauseMatch(matchID string) error {
@@ -109,8 +137,7 @@ func (s *MatchService) PauseMatch(matchID string) error {
 	if err != nil {
 		return err
 	}
-	o.Pause()
-	return nil
+	return o.Pause()
 }
 
 func (s *MatchService) ResumeMatch(matchID string) error {
@@ -118,8 +145,7 @@ func (s *MatchService) ResumeMatch(matchID string) error {
 	if err != nil {
 		return err
 	}
-	o.Resume()
-	return nil
+	return o.Resume()
 }
 
 func (s *MatchService) FinishMatch(matchID string) error {
@@ -127,6 +153,63 @@ func (s *MatchService) FinishMatch(matchID string) error {
 	if err != nil {
 		return err
 	}
-	o.Finish()
-	return nil
+	return o.Finish()
+}
+
+func (s *MatchService) CancelMatch(matchID string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	return o.Cancel()
+}
+
+func (s *MatchService) GetMatchScores(matchID string) (*domain.MatchScoreDetail, error) {
+	if matchID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	var scores []domain.MatchScore
+	if s.scoreStore != nil {
+		var err error
+		scores, err = s.scoreStore.GetByMatch(matchID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	totalRed := 0
+	totalBlue := 0
+	for _, sc := range scores {
+		totalRed += sc.AthleteRedScore - sc.RedPenalties
+		totalBlue += sc.AthleteBlueScore - sc.BluePenalties
+	}
+
+	if scores == nil {
+		scores = []domain.MatchScore{}
+	}
+
+	return &domain.MatchScoreDetail{
+		MatchID:   matchID,
+		TotalRed:  totalRed,
+		TotalBlue: totalBlue,
+		Rounds:    scores,
+	}, nil
+}
+
+func (s *MatchService) GetMatchEvents(matchID string) ([]domain.MatchEvent, error) {
+	if matchID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if s.eventStore == nil {
+		return []domain.MatchEvent{}, nil
+	}
+	events, err := s.eventStore.GetByMatch(matchID)
+	if err != nil {
+		return nil, err
+	}
+	if events == nil {
+		events = []domain.MatchEvent{}
+	}
+	return events, nil
 }

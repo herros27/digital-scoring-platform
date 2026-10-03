@@ -12,6 +12,8 @@ const (
 	MsgMatchResult    MessageType = "match_result"
 	MsgPenalty        MessageType = "penalty"
 	MsgError          MessageType = "error"
+	MsgSyncRequest    MessageType = "sync_request"
+	MsgSyncResponse   MessageType = "sync_response"
 )
 
 type Role string

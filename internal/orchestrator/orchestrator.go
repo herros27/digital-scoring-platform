@@ -22,6 +22,16 @@ type RoundScore struct {
 	BluePenalties int
 }
 
+type BracketAdvancer interface {
+	AdvanceWinner(slotID, winnerID string) error
+}
+
+type MatchStore interface {
+	UpdateStatus(id, status string) error
+	SetWinner(matchID, winnerID string) error
+	GetByID(id string) (*store.Match, error)
+}
+
 type Orchestrator struct {
 	mu      sync.Mutex
 	matchID string
@@ -32,9 +42,10 @@ type Orchestrator struct {
 	engine  *consensus.Engine
 	h       *hub.Hub
 
-	matchStore *store.MatchStore
-	eventStore *store.MatchEventStore
-	scoreStore *store.MatchScoreStore
+	matchStore   MatchStore
+	eventStore   *store.MatchEventStore
+	scoreStore   *store.MatchScoreStore
+	bracketStore BracketAdvancer
 
 	// skor per ronde: index = round number (1-based, [0] tidak dipakai)
 	scores [4]RoundScore
@@ -46,20 +57,22 @@ func New(
 	sm *statemachine.StateMachine,
 	ruleset *rules.Ruleset,
 	h *hub.Hub,
-	matchStore *store.MatchStore,
+	matchStore MatchStore,
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
+	bracketStore BracketAdvancer,
 ) *Orchestrator {
 	o := &Orchestrator{
-		matchID:    matchID,
-		arenaID:    arenaID,
-		sm:         sm,
-		ruleset:    ruleset,
-		engine:     consensus.NewEngine(),
-		h:          h,
-		matchStore: matchStore,
-		eventStore: eventStore,
-		scoreStore: scoreStore,
+		matchID:      matchID,
+		arenaID:      arenaID,
+		sm:           sm,
+		ruleset:      ruleset,
+		engine:       consensus.NewEngine(),
+		h:            h,
+		matchStore:   matchStore,
+		eventStore:   eventStore,
+		scoreStore:   scoreStore,
+		bracketStore: bracketStore,
 	}
 	// Pasang callback: setiap message dari hub masuk ke sini
 	h.OnMessage = o.handleMessage
@@ -89,6 +102,8 @@ func (o *Orchestrator) handleMessage(arenaID string, client *hub.Client, msg hub
 		o.handleControl(client, msg)
 	case hub.MsgPenalty:
 		o.handlePenalty(client, msg)
+	case hub.MsgSyncRequest:
+		o.handleSyncRequest(client)
 	default:
 		log.Printf("[orch:%s] unknown message type: %s", o.matchID, msg.Type)
 	}
@@ -114,69 +129,122 @@ func (o *Orchestrator) handleControl(client *hub.Client, msg hub.Message) {
 
 	switch p.Action {
 	case "start":
-		o.doStart()
+		if err := o.doStart(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
 	case "pause":
-		o.doPause()
+		if err := o.doPause(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
 	case "resume":
-		o.doResume()
+		if err := o.doResume(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
 	case "finish":
-		o.doFinish()
+		if err := o.doFinish(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
+	case "cancel":
+		if err := o.doCancel(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
 	default:
 		o.sendError(client, "UNKNOWN_ACTION", p.Action)
 	}
 }
 
-func (o *Orchestrator) doStart() {
+func (o *Orchestrator) doStart() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	// IDLE → READY → ROUND_1 (dua transisi berurutan untuk match baru)
-	// Kalau sudah READY, langsung mulai ronde
 	cur := o.sm.Current()
+	if cur == statemachine.StateFinished || cur == statemachine.StateCancelled {
+		return fmt.Errorf("cannot start match in %s state", cur)
+	}
 	if cur == statemachine.StateIdle {
 		if err := o.sm.Transition(statemachine.EventStart); err != nil {
 			log.Printf("[orch:%s] transition error: %v", o.matchID, err)
-			return
+			return err
 		}
 	}
 	if err := o.sm.Transition(statemachine.EventStart); err != nil {
 		log.Printf("[orch:%s] transition error: %v", o.matchID, err)
-		return
+		return err
 	}
 
 	o.appendEvent("match_started", map[string]any{"round": o.sm.CurrentRoundNumber()}, "")
 	o.startRoundTimer()
 	o.broadcastState()
+	return nil
 }
 
-func (o *Orchestrator) doPause() {
+func (o *Orchestrator) doPause() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
+	if !o.sm.IsInRound() {
+		return fmt.Errorf("cannot pause match in %s state", o.sm.Current())
+	}
 	if o.timer != nil {
 		o.timer.Pause()
 	}
+	var rem int64
+	if o.timer != nil {
+		rem = o.timer.Remaining().Milliseconds()
+	}
 	o.appendEvent("match_paused", map[string]any{
-		"remaining_ms": o.timer.Remaining().Milliseconds(),
+		"remaining_ms": rem,
 	}, "")
 	o.broadcastState()
+	return nil
 }
 
-func (o *Orchestrator) doResume() {
+func (o *Orchestrator) doResume() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
+	if !o.sm.IsInRound() {
+		return fmt.Errorf("cannot resume match in %s state", o.sm.Current())
+	}
 	if o.timer != nil {
 		o.timer.Start()
 	}
 	o.appendEvent("match_resumed", nil, "")
 	o.broadcastState()
+	return nil
 }
 
-func (o *Orchestrator) doFinish() {
+func (o *Orchestrator) doFinish() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+
+	if o.sm.IsFinished() {
+		return fmt.Errorf("match is already finished")
+	}
 	o.finalize()
+	return nil
+}
+
+func (o *Orchestrator) doCancel() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	if o.sm.IsFinished() {
+		return fmt.Errorf("cannot cancel finished match")
+	}
+	if o.timer != nil {
+		o.timer.Stop()
+	}
+	if err := o.sm.Transition(statemachine.EventCancel); err != nil {
+		log.Printf("[orch:%s] cancel transition error: %v", o.matchID, err)
+		return err
+	}
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateCancelled))
+	}
+	o.appendEvent("match_cancelled", nil, "")
+	o.broadcastState()
+	return nil
 }
 
 // payload untuk MsgJudgeInput: {"score_type": "technique", "target": "red", "round": 1}
@@ -343,6 +411,42 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 	o.broadcastScoreUpdate(round)
 }
 
+func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	var remMs int64
+	var timerRunning bool
+	if o.timer != nil {
+		remMs = o.timer.Remaining().Milliseconds()
+		timerRunning = o.timer.IsRunning()
+	}
+
+	var redTotal, blueTotal int
+	for i := 1; i <= 3; i++ {
+		redTotal += o.scores[i].RedTechnical - o.scores[i].RedPenalties
+		blueTotal += o.scores[i].BlueTechnical - o.scores[i].BluePenalties
+	}
+
+	payload := map[string]any{
+		"match_id":           o.matchID,
+		"arena_id":           o.arenaID,
+		"state":              string(o.sm.Current()),
+		"round":              o.sm.CurrentRoundNumber(),
+		"timer_remaining_ms": remMs,
+		"timer_running":      timerRunning,
+		"scores":             o.scores[1:4],
+		"red_total":          redTotal,
+		"blue_total":         blueTotal,
+		"server_time":        time.Now().UTC().Format(time.RFC3339),
+	}
+
+	o.h.SendToClient(client.ID, hub.Message{
+		Type:    hub.MsgSyncResponse,
+		Payload: payload,
+	})
+}
+
 func (o *Orchestrator) startRoundTimer() {
 	duration := time.Duration(o.ruleset.Scoring.RoundDuration) * time.Second
 	o.timer = NewTimer(duration, o.onRoundExpired)
@@ -407,18 +511,46 @@ func (o *Orchestrator) finalize() {
 		o.timer.Stop()
 	}
 
-	winner, resultType := o.determineWinner()
-	o.matchStore.SetWinner(o.matchID, winner)
+	if !o.sm.IsFinished() {
+		_ = o.sm.Transition(statemachine.EventFinish)
+	}
+
+	winnerCorner, resultType := o.determineWinner()
+	winnerID := winnerCorner
+
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateFinished))
+		m, err := o.matchStore.GetByID(o.matchID)
+		if err == nil && m != nil {
+			if winnerCorner == "red" && m.AthleteRedID != "" {
+				winnerID = m.AthleteRedID
+			} else if winnerCorner == "blue" && m.AthleteBlueID != "" {
+				winnerID = m.AthleteBlueID
+			}
+			_ = o.matchStore.SetWinner(o.matchID, winnerID)
+
+			// Otomatisasi Bracket Advancement: majukan pemenang ke slot berikutnya
+			if m.BracketSlotID != "" && o.bracketStore != nil {
+				if err := o.bracketStore.AdvanceWinner(m.BracketSlotID, winnerID); err != nil {
+					log.Printf("[orch:%s] failed to advance bracket winner: %v", o.matchID, err)
+				}
+			}
+		} else {
+			_ = o.matchStore.SetWinner(o.matchID, winnerID)
+		}
+	}
 
 	o.appendEvent("match_finished", map[string]any{
-		"winner":      winner,
+		"winner":      winnerID,
+		"corner":      winnerCorner,
 		"result_type": resultType,
 	}, "")
 
 	o.h.Broadcast(hub.Message{
 		Type: hub.MsgMatchResult,
 		Payload: map[string]any{
-			"winner":      winner,
+			"winner":      winnerID,
+			"corner":      winnerCorner,
 			"result_type": resultType,
 			"scores":      o.scores[1:4],
 		},
@@ -484,6 +616,9 @@ func (o *Orchestrator) sendError(client *hub.Client, code, message string) {
 }
 
 func (o *Orchestrator) appendEvent(eventType string, payload map[string]any, judgeID string) {
+	if o.eventStore == nil {
+		return
+	}
 	raw, _ := json.Marshal(payload)
 	ev := &store.MatchEvent{
 		MatchID:   o.matchID,
@@ -500,18 +635,31 @@ func (o *Orchestrator) GetMatchID() string {
 	return o.matchID
 }
 
-func (o *Orchestrator) Start() {
-	o.doStart()
+func (o *Orchestrator) GetArenaID() string {
+	return o.arenaID
 }
 
-func (o *Orchestrator) Pause() {
-	o.doPause()
+func (o *Orchestrator) IsActive() bool {
+	st := o.sm.Current()
+	return st != statemachine.StateFinished && st != statemachine.StateCancelled
 }
 
-func (o *Orchestrator) Resume() {
-	o.doResume()
+func (o *Orchestrator) Start() error {
+	return o.doStart()
 }
 
-func (o *Orchestrator) Finish() {
-	o.doFinish()
+func (o *Orchestrator) Pause() error {
+	return o.doPause()
 }
+
+func (o *Orchestrator) Resume() error {
+	return o.doResume()
+}
+
+func (o *Orchestrator) Finish() error {
+	return o.doFinish()
+}
+
+func (o *Orchestrator) Cancel() error {
+	return o.doCancel()
+}

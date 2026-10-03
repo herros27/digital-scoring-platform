@@ -98,6 +98,11 @@ func (h *Hub) SendToClient(clientID string, msg Message) {
 	}
 }
 
+// Register adds a client directly to the hub (useful for testing or embedded clients)
+func (h *Hub) Register(client *Client) {
+	h.clients[client] = true
+}
+
 // HandleWS — HTTP handler untuk upgrade ke WebSocket
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request, clientID string, role Role) {
 	conn, err := upgrader.Upgrade(w, r, nil)

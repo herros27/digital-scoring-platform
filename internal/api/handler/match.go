@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/herros27/digital-scoring/internal/auth"
+	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/service"
 	"github.com/herros27/digital-scoring/internal/store"
@@ -95,6 +97,10 @@ func (h *MatchHandler) LoadArena(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Service.LoadMatchToArena(matchID, req.ArenaID, req.RulesetPath); err != nil {
+		if errors.Is(err, domain.ErrArenaBusy) {
+			Fail(w, http.StatusConflict, "ARENA_BUSY", err.Error(), nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
@@ -145,3 +151,35 @@ func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, map[string]string{"status": "finished"})
 }
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/cancel
+func (h *MatchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	if err := h.Service.CancelMatch(matchID); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "cancelled"})
+}
+
+// GET /api/v1/competitions/{comp_id}/matches/{id}/scores
+func (h *MatchHandler) GetScores(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	detail, err := h.Service.GetMatchScores(matchID)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, detail)
+}
+
+// GET /api/v1/competitions/{comp_id}/matches/{id}/events
+func (h *MatchHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	events, err := h.Service.GetMatchEvents(matchID)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, events)
+}

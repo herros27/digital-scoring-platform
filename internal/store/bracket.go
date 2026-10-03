@@ -101,3 +101,24 @@ func (s *BracketStore) GetByID(id string) (*BracketSlot, error) {
 	)
 	return b, err
 }
+
+// AdvanceWinner memajukan pemenang pertandingan ke slot ronde berikutnya
+func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
+	currentSlot, err := s.GetByID(currentSlotID)
+	if err != nil {
+		return err
+	}
+	if currentSlot == nil {
+		return sql.ErrNoRows
+	}
+
+	if err := s.UpdateWinner(currentSlotID, winnerID); err != nil {
+		return err
+	}
+
+	if currentSlot.NextSlotID != nil && *currentSlot.NextSlotID != "" {
+		return s.SetParticipant(*currentSlot.NextSlotID, winnerID)
+	}
+
+	return nil
+}

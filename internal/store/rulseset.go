@@ -3,10 +3,8 @@ package store
 
 import (
 	"database/sql"
-	// "fmt"
-	// "time"
+	"encoding/json"
 )
-
 
 // ---------- Ruleset ----------
 
@@ -15,17 +13,28 @@ type RulesetStore struct {
 }
 
 func (s *RulesetStore) Create(r *Ruleset) error {
+	scoringBytes, err := json.Marshal(r.Scoring)
+	if err != nil {
+		return err
+	}
 	query := `INSERT INTO rulesets (name, version, scoring, status) VALUES ($1, $2, $3, $4) RETURNING id, created_at`
-	return s.DB.QueryRow(query, r.Name, r.Version, r.Scoring, r.Status).Scan(&r.ID, &r.CreatedAt)
+	return s.DB.QueryRow(query, r.Name, r.Version, scoringBytes, r.Status).Scan(&r.ID, &r.CreatedAt)
 }
 
 func (s *RulesetStore) GetByID(id string) (*Ruleset, error) {
 	r := &Ruleset{}
+	var rawScoring []byte
 	err := s.DB.QueryRow(`SELECT id, name, version, scoring, status, created_at FROM rulesets WHERE id = $1`, id).Scan(
-		&r.ID, &r.Name, &r.Version, &r.Scoring, &r.Status, &r.CreatedAt,
+		&r.ID, &r.Name, &r.Version, &rawScoring, &r.Status, &r.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var scoringObj any
+	if err := json.Unmarshal(rawScoring, &scoringObj); err == nil {
+		r.Scoring = scoringObj
+	} else {
+		r.Scoring = string(rawScoring)
 	}
 	return r, nil
 }
@@ -39,7 +48,16 @@ func (s *RulesetStore) List() ([]Ruleset, error) {
 	var list []Ruleset
 	for rows.Next() {
 		var r Ruleset
-		rows.Scan(&r.ID, &r.Name, &r.Version, &r.Scoring, &r.Status, &r.CreatedAt)
+		var rawScoring []byte
+		if err := rows.Scan(&r.ID, &r.Name, &r.Version, &rawScoring, &r.Status, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		var scoringObj any
+		if err := json.Unmarshal(rawScoring, &scoringObj); err == nil {
+			r.Scoring = scoringObj
+		} else {
+			r.Scoring = string(rawScoring)
+		}
 		list = append(list, r)
 	}
 	return list, rows.Err()
@@ -47,11 +65,18 @@ func (s *RulesetStore) List() ([]Ruleset, error) {
 
 func (s *RulesetStore) GetActive() (*Ruleset, error) {
 	r := &Ruleset{}
+	var rawScoring []byte
 	err := s.DB.QueryRow(`SELECT id, name, version, scoring, status, created_at FROM rulesets WHERE status = 'active' ORDER BY created_at DESC LIMIT 1`).Scan(
-		&r.ID, &r.Name, &r.Version, &r.Scoring, &r.Status, &r.CreatedAt,
+		&r.ID, &r.Name, &r.Version, &rawScoring, &r.Status, &r.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var scoringObj any
+	if err := json.Unmarshal(rawScoring, &scoringObj); err == nil {
+		r.Scoring = scoringObj
+	} else {
+		r.Scoring = string(rawScoring)
 	}
 	return r, nil
 }

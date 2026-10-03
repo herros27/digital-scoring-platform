@@ -58,8 +58,10 @@ func (t *Timer) Pause() {
 	}
 	t.running = false
 	t.ticker.Stop()
-	t.mu.Unlock() 
-	t.stop <- struct{}{}
+	select {
+	case t.stop <- struct{}{}:
+	default:
+	}
 }
 
 func (t *Timer) Stop() {

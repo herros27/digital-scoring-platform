@@ -11,6 +11,7 @@ type Participant = domain.Participant
 type Match = domain.Match
 type MatchEvent = domain.MatchEvent
 type MatchScore = domain.MatchScore
+type MatchScoreDetail = domain.MatchScoreDetail
 type BracketSlot = domain.BracketSlot
 type JudgePin = domain.JudgePin
 type Athlete = domain.Athlete

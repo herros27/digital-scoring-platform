@@ -4,7 +4,7 @@ info:
   description: |
     API Backend untuk Digital Scoring Pencak Silat (Kategori Tanding).
     Mendukung Real-Time WebSocket Scoring, Konsensus Juri, Manajemen Gelanggang (Arena),
-    Bagan Turnamen (Single Elimination), dan Event Sourcing Audit Trail.
+    Bagan Turnamen (Single Elimination), Kontrak Protokol WebSocket, dan Event Sourcing Audit Trail.
   version: 1.0.0
 
 servers:
@@ -68,12 +68,18 @@ paths:
                         format: uuid
         '401':
           description: PIN salah atau kadaluarsa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/auth/create-pin:
     post:
-      summary: Generate PIN Baru untuk Petugas Pertandingan
+      summary: Generate PIN Baru untuk Petugas Pertandingan (Admin / Dewan)
       tags:
         - Authentication
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -90,7 +96,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [judge_1, judge_2, judge_3, judge_4, judge_5, referee]
+                  enum: [judge_1, judge_2, judge_3, judge_4, judge_5, referee, admin, dewan]
                   example: "judge_1"
                 pin:
                   type: string
@@ -102,6 +108,12 @@ paths:
       responses:
         '200':
           description: PIN berhasil dibuat
+        '403':
+          description: Forbidden (Hanya admin/dewan yang diizinkan)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # -------------------------------------------------------
   # COMPETITIONS
@@ -111,13 +123,17 @@ paths:
       summary: Daftar Seluruh Kejuaraan
       tags:
         - Competition
+      security:
+        - BearerAuth: []
       responses:
         '200':
           description: List kompetisi berhasil diambil
     post:
-      summary: Buat Kejuaraan Baru
+      summary: Buat Kejuaraan Baru (Admin / Dewan)
       tags:
         - Competition
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -152,6 +168,8 @@ paths:
       summary: Detail Kejuaraan
       tags:
         - Competition
+      security:
+        - BearerAuth: []
       parameters:
         - name: id
           in: path
@@ -165,9 +183,11 @@ paths:
 
   /api/v1/competitions/{id}/activate:
     put:
-      summary: Aktifkan Status Kejuaraan
+      summary: Aktifkan Status Kejuaraan (Admin / Dewan)
       tags:
         - Competition
+      security:
+        - BearerAuth: []
       parameters:
         - name: id
           in: path
@@ -180,6 +200,205 @@ paths:
           description: Status diubah menjadi active
 
   # -------------------------------------------------------
+  # CATEGORIES
+  # -------------------------------------------------------
+  /api/v1/competitions/{comp_id}/categories:
+    get:
+      summary: Daftar Kategori Pertandingan pada Kompetisi
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List kategori tanding
+    post:
+      summary: Tambah Kategori Pertandingan Baru (Admin / Dewan)
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, gender, weight_class]
+              properties:
+                name:
+                  type: string
+                  example: "Tanding Putra Kelas A"
+                gender:
+                  type: string
+                  enum: [male, female]
+                  example: "male"
+                weight_class:
+                  type: string
+                  example: "A"
+                ruleset_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Kategori tanding berhasil dibuat
+
+  /api/v1/competitions/{comp_id}/categories/{id}:
+    get:
+      summary: Detail Kategori Pertandingan
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail kategori pertandingan
+
+  # -------------------------------------------------------
+  # ATHLETES & PARTICIPANTS
+  # -------------------------------------------------------
+  /api/v1/athletes:
+    get:
+      summary: Daftar Master Seluruh Atlet
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List seluruh atlet
+    post:
+      summary: Tambah Master Atlet Baru (Admin / Dewan)
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, gender, team]
+              properties:
+                name:
+                  type: string
+                  example: "Budi Santoso"
+                gender:
+                  type: string
+                  enum: [male, female]
+                  example: "male"
+                team:
+                  type: string
+                  example: "Jawa Barat"
+      responses:
+        '201':
+          description: Atlet berhasil ditambahkan
+
+  /api/v1/athletes/{id}:
+    get:
+      summary: Detail Data Atlet
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail data atlet
+
+  /api/v1/competitions/{comp_id}/athletes:
+    get:
+      summary: Daftar Peserta / Atlet yang Terdaftar pada Kompetisi
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List peserta kompetisi
+    post:
+      summary: Daftarkan Atlet ke Kompetisi & Kelas Berat (Admin / Dewan)
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                athlete_id:
+                  type: string
+                  format: uuid
+                  description: Kosongkan jika membuat atlet baru sekaligus
+                name:
+                  type: string
+                  example: "Budi Santoso"
+                gender:
+                  type: string
+                  enum: [male, female]
+                  example: "male"
+                team:
+                  type: string
+                  example: "Jawa Barat"
+                weight_class:
+                  type: string
+                  example: "A"
+      responses:
+        '201':
+          description: Atlet berhasil didaftarkan ke kompetisi
+
+  # -------------------------------------------------------
   # ARENAS
   # -------------------------------------------------------
   /api/v1/competitions/{comp_id}/arenas:
@@ -187,6 +406,8 @@ paths:
       summary: Daftar Gelanggang / Arena pada Kompetisi
       tags:
         - Arena
+      security:
+        - BearerAuth: []
       parameters:
         - name: comp_id
           in: path
@@ -198,9 +419,11 @@ paths:
         '200':
           description: List gelanggang
     post:
-      summary: Tambah Gelanggang Baru
+      summary: Tambah Gelanggang Baru (Admin / Dewan)
       tags:
         - Arena
+      security:
+        - BearerAuth: []
       parameters:
         - name: comp_id
           in: path
@@ -224,13 +447,31 @@ paths:
           description: Gelanggang berhasil ditambahkan
 
   # -------------------------------------------------------
-  # MATCHES
+  # MATCHES & LIFECYCLE
   # -------------------------------------------------------
   /api/v1/competitions/{comp_id}/matches:
-    post:
-      summary: Buat Partai Pertandingan Baru
+    get:
+      summary: Daftar Pertandingan pada Kompetisi
       tags:
         - Match
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List pertandingan
+    post:
+      summary: Buat Partai Pertandingan Baru (Admin / Dewan)
+      tags:
+        - Match
+      security:
+        - BearerAuth: []
       parameters:
         - name: comp_id
           in: path
@@ -262,12 +503,40 @@ paths:
         '201':
           description: Match dibuat
 
-  /api/v1/competitions/{comp_id}/matches/{id}/load-arena:
-    post:
-      summary: Muat dan Aktifkan Match ke Arena Tertentu
-      description: Menginisialisasi Match Orchestrator, Rules Engine, Timer, dan mengubah status match menjadi READY.
+  /api/v1/competitions/{comp_id}/matches/{id}:
+    get:
+      summary: Detail Pertandingan
       tags:
         - Match
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail match
+
+  /api/v1/competitions/{comp_id}/matches/{id}/load-arena:
+    post:
+      summary: Muat dan Aktifkan Match ke Arena Tertentu (Admin / Dewan / Wasit)
+      description: |
+        Menginisialisasi Match Orchestrator, Rules Engine, Timer, dan mengubah status match menjadi READY.
+        Jika arena sedang aktif menjalankan pertandingan lain, akan mengembalikan error 409 ARENA_BUSY.
+      tags:
+        - Match
+      security:
+        - BearerAuth: []
       parameters:
         - name: comp_id
           in: path
@@ -294,20 +563,218 @@ paths:
                   format: uuid
                 ruleset_path:
                   type: string
-                  default: "ipsi_2024"
-                  example: "ipsi_2024"
+                  default: "ipsi"
+                  example: "ipsi"
       responses:
         '200':
           description: Match siap di arena
+        '409':
+          description: Arena sedang dipakai oleh pertandingan lain yang aktif (ARENA_BUSY)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/competitions/{comp_id}/matches/{id}/start:
+    post:
+      summary: Mulai Pertandingan / Ronde (Admin / Dewan / Wasit)
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pertandingan dimulai (status running)
+
+  /api/v1/competitions/{comp_id}/matches/{id}/pause:
+    post:
+      summary: Jeda Timer Pertandingan (Admin / Dewan / Wasit)
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Timer pertandingan dijeda (status paused)
+
+  /api/v1/competitions/{comp_id}/matches/{id}/resume:
+    post:
+      summary: Lanjutkan Timer Pertandingan (Admin / Dewan / Wasit)
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pertandingan dilanjutkan (status running)
+
+  /api/v1/competitions/{comp_id}/matches/{id}/finish:
+    post:
+      summary: Selesaikan Pertandingan & Hitung Pemenang (Admin / Dewan / Wasit)
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pertandingan selesai dan pemenang ditentukan (status finished)
+
+  /api/v1/competitions/{comp_id}/matches/{id}/cancel:
+    post:
+      summary: Batalkan Pertandingan (Admin / Dewan / Wasit)
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pertandingan dibatalkan (status cancelled)
+
+  /api/v1/competitions/{comp_id}/matches/{id}/scores:
+    get:
+      summary: Detail Breakdown Skor Ronde & Konsensus Pertandingan
+      tags:
+        - Match
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail skor pertandingan per ronde dan total
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/MatchScoreDetail'
+
+  /api/v1/competitions/{comp_id}/matches/{id}/events:
+    get:
+      summary: Riwayat Peristiwa Pertandingan (Audit Trail / Dewan Review)
+      tags:
+        - Match
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Daftar event audit trail pertandingan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MatchEvent'
 
   # -------------------------------------------------------
   # BRACKETS / TOURNAMENT DRAW
   # -------------------------------------------------------
   /api/v1/competitions/{comp_id}/brackets/generate:
     post:
-      summary: Generate Bagan Pertandingan (Single Elimination)
+      summary: Generate Bagan Pertandingan Single Elimination (Admin / Dewan)
       tags:
         - Bracket
+      security:
+        - BearerAuth: []
       parameters:
         - name: comp_id
           in: path
@@ -344,6 +811,8 @@ paths:
       summary: Ambil Struktur Pohon Bagan Pertandingan
       tags:
         - Bracket
+      security:
+        - BearerAuth: []
       parameters:
         - name: comp_id
           in: path
@@ -368,6 +837,60 @@ paths:
           description: Pohon bagan pertandingan
 
   # -------------------------------------------------------
+  # RULESETS
+  # -------------------------------------------------------
+  /api/v1/rulesets:
+    get:
+      summary: Daftar Ruleset Pertandingan (IPSI 2024, PERSILAT, dll)
+      tags:
+        - Ruleset
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Daftar ruleset yang tersedia di sistem
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ruleset'
+
+  /api/v1/rulesets/{id}:
+    get:
+      summary: Detail Ruleset Pertandingan
+      tags:
+        - Ruleset
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "ipsi-2024"
+      responses:
+        '200':
+          description: Detail konfigurasi ruleset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Ruleset'
+
+  # -------------------------------------------------------
   # LIVE SCOREBOARD (PUBLIC)
   # -------------------------------------------------------
   /api/v1/live/scoreboard/{arena_id}:
@@ -387,14 +910,145 @@ paths:
           description: Status live scoring gelanggang saat ini
 
   # -------------------------------------------------------
-  # WEBSOCKET
+  # WEBSOCKET REAL-TIME CHANNEL & PROTOCOL
   # -------------------------------------------------------
   /ws/arena/{arena_id}:
     get:
       summary: Real-Time WebSocket Channel Arena
       description: |
         Endpoint WebSocket dua arah untuk sinkronisasi live match, scoring konsensus juri, kontrol wasit, dan timer.
+        
         **Autentikasi**: Menggunakan Query Param `?token=<JWT_TOKEN>`.
+        
+        ---
+        ### 📡 Kontrak Pesan WebSocket (Protocol Contract):
+        
+        #### 1. Client ➔ Server
+        * **Input Penilaian Juri (`score_event`)**:
+          ```json
+          {
+            "type": "score_event",
+            "payload": {
+              "score_type": "technique",
+              "target": "red",
+              "round": 1
+            }
+          }
+          ```
+          * `score_type`: `technique` (+1), `knockdown` (+2), `fall` (+2/3)
+          * `target`: `red` atau `blue`
+        
+        * **Perintah Wasit / Kontrol Laga (`referee_command`)**:
+          ```json
+          {
+            "type": "referee_command",
+            "payload": {
+              "action": "start"
+            }
+          }
+          ```
+          * `action`: `start`, `pause`, `resume`, `finish`, `cancel`
+          
+        * **Pemberian Peringatan / Hukuman (`penalty_event`)**:
+          ```json
+          {
+            "type": "penalty_event",
+            "payload": {
+              "target": "blue",
+              "penalty_type": "warning",
+              "round": 1
+            }
+          }
+          ```
+
+        * **Sinkronisasi Reconnect (`sync_request`)**:
+          ```json
+          {
+            "type": "sync_request"
+          }
+          ```
+
+        #### 2. Server ➔ Client (Broadcast)
+        * **Balasan Sinkronisasi Status Pertandingan (`sync_response`)**:
+          ```json
+          {
+            "type": "sync_response",
+            "payload": {
+              "match_id": "uuid",
+              "arena_id": "uuid",
+              "state": "round_2",
+              "round": 2,
+              "timer_remaining_ms": 75000,
+              "timer_running": true,
+              "scores": [
+                {"RedTechnical": 3, "BlueTechnical": 2, "RedPenalties": 0, "BluePenalties": 0},
+                {"RedTechnical": 1, "BlueTechnical": 4, "RedPenalties": 0, "BluePenalties": 1}
+              ],
+              "red_total": 4,
+              "blue_total": 5,
+              "server_time": "2026-10-04T06:30:00Z"
+            }
+          }
+          ```
+        * **Status & Timer Pertandingan (`state_change`)**:
+          ```json
+          {
+            "type": "state_change",
+            "payload": {
+              "match_id": "uuid",
+              "status": "round_1",
+              "round": 1,
+              "remaining_ms": 118000
+            }
+          }
+          ```
+        * **Update Skor Resmi (`score_update`)**:
+          ```json
+          {
+            "type": "score_update",
+            "payload": {
+              "round": 1,
+              "red_technical": 3,
+              "blue_technical": 1,
+              "red_penalties": 0,
+              "blue_penalties": 1
+            }
+          }
+          ```
+        * **Notifikasi Poin Sah Masuk (`score_confirmed`)**:
+          ```json
+          {
+            "type": "score_confirmed",
+            "payload": {
+              "score_type": "technique",
+              "target": "red",
+              "points": 1,
+              "count": 2,
+              "round": 1
+            }
+          }
+          ```
+        * **Hasil Akhir Pertandingan (`match_result`)**:
+          ```json
+          {
+            "type": "match_result",
+            "payload": {
+              "winner": "red",
+              "result_type": "point_win",
+              "scores": [...]
+            }
+          }
+          ```
+        * **Pesan Error Server (`error`)**:
+          ```json
+          {
+            "type": "error",
+            "payload": {
+              "code": "INVALID_STATE_TRANSITION",
+              "message": "cannot pause match in ready state"
+            }
+          }
+          ```
       tags:
         - WebSocket Real-Time
       parameters:
@@ -413,3 +1067,115 @@ paths:
       responses:
         '101':
           description: Switching Protocols to WebSocket
+
+# -------------------------------------------------------
+# COMPONENTS & SCHEMAS
+# -------------------------------------------------------
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT yang dihasilkan dari login PIN atau admin auth
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: "ARENA_BUSY"
+            message:
+              type: string
+              example: "arena is currently assigned to another active match"
+            details:
+              nullable: true
+
+    MatchScoreDetail:
+      type: object
+      properties:
+        match_id:
+          type: string
+          format: uuid
+        total_red:
+          type: integer
+          example: 12
+        total_blue:
+          type: integer
+          example: 9
+        rounds:
+          type: array
+          items:
+            type: object
+            properties:
+              round:
+                type: integer
+                example: 1
+              athlete_red_score:
+                type: integer
+                example: 4
+              athlete_blue_score:
+                type: integer
+                example: 3
+              red_penalties:
+                type: integer
+                example: 0
+              blue_penalties:
+                type: integer
+                example: 0
+              updated_at:
+                type: string
+                format: date-time
+
+    MatchEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        match_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          example: "match_started"
+        payload:
+          type: string
+          example: "{\"round\":1}"
+        judge_id:
+          type: string
+          example: "judge-1"
+        created_at:
+          type: string
+          format: date-time
+
+    Ruleset:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "ipsi-2024"
+        name:
+          type: string
+          example: "IPSI 2024"
+        version:
+          type: string
+          example: "2024.1"
+        scoring:
+          type: object
+          description: Konfigurasi poin teknik, bantingan, durasi ronde, dan batas penalti
+        status:
+          type: string
+          example: "active"
+        created_at:
+          type: string
+          format: date-time

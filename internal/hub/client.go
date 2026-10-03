@@ -16,6 +16,17 @@ type Client struct {
 	hub     *Hub
 }
 
+// NewClient creates a client instance (useful for testing and programmatic clients)
+func NewClient(id string, role Role, arenaID string) (*Client, <-chan Message) {
+	ch := make(chan Message, 256)
+	return &Client{
+		ID:      id,
+		Role:    role,
+		ArenaID: arenaID,
+		send:    ch,
+	}, ch
+}
+
 func (c *Client) writePump() {
 	defer func() {
 		c.conn.Close()

@@ -21,14 +21,16 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	bracketRepo := &store.BracketStore{DB: db}
 	categoryRepo := &store.CategoryStore{DB: db}
 	athleteRepo := &store.AthleteStore{DB: db}
+	rulesetRepo := &store.RulesetStore{DB: db}
 
 	// services
 	compService := service.NewCompetitionService(compRepo)
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
-	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo)
+	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
 	bracketService := service.NewBracketService(bracketRepo)
 	categoryService := service.NewCategoryService(categoryRepo)
 	athleteService := service.NewAthleteService(athleteRepo)
+	rulesetService := service.NewRulesetService(rulesetRepo)
 
 	// handlers
 	authH := &handler.AuthHandler{Pins: pinRepo}
@@ -39,6 +41,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	bracketH := &handler.BracketHandler{Service: bracketService}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
 	athleteH := &handler.AthleteHandler{Service: athleteService}
+	rulesetH := &handler.RulesetHandler{Service: rulesetService}
 
 	mux := http.NewServeMux()
 
@@ -87,6 +90,17 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches", adminOrDewan(http.HandlerFunc(matchH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}", matchH.Get)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/load-arena", matchOperators(http.HandlerFunc(matchH.LoadArena)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/start", matchOperators(http.HandlerFunc(matchH.Start)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/pause", matchOperators(http.HandlerFunc(matchH.Pause)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/resume", matchOperators(http.HandlerFunc(matchH.Resume)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/finish", matchOperators(http.HandlerFunc(matchH.Finish)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/cancel", matchOperators(http.HandlerFunc(matchH.Cancel)))
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.GetScores)
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/events", matchH.GetEvents)
+
+	// Rulesets
+	protected.HandleFunc("GET /api/v1/rulesets", rulesetH.List)
+	protected.HandleFunc("GET /api/v1/rulesets/{id}", rulesetH.Get)
 
 	// Brackets
 	protected.Handle("POST /api/v1/competitions/{comp_id}/brackets/generate", adminOrDewan(http.HandlerFunc(bracketH.Generate)))
