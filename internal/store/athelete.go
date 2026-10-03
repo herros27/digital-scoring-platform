@@ -26,12 +26,8 @@ func (s *AthleteStore) GetByID(id string) (*Athlete, error) {
 	return a, nil
 }
 
-func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error) {
-	rows, err := s.DB.Query(`
-		SELECT a.id, a.name, a.gender, a.team, a.created_at
-		FROM athletes a
-		JOIN participants p ON p.athlete_id = a.id
-		WHERE p.competition_id = $1`, competitionID)
+func (s *AthleteStore) List() ([]Athlete, error) {
+	rows, err := s.DB.Query(`SELECT id, name, gender, team, created_at FROM athletes ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -45,4 +41,27 @@ func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error
 	return list, rows.Err()
 }
 
+func (s *AthleteStore) RegisterToCompetition(competitionID, athleteID, weightClass, gender string) error {
+	query := `INSERT INTO participants (competition_id, athlete_id, weight_class, gender) VALUES ($1, $2, $3, $4)`
+	_, err := s.DB.Exec(query, competitionID, athleteID, weightClass, gender)
+	return err
+}
 
+func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error) {
+	rows, err := s.DB.Query(`
+		SELECT a.id, a.name, a.gender, a.team, a.created_at
+		FROM athletes a
+		JOIN participants p ON p.athlete_id = a.id
+		WHERE p.competition_id = $1 ORDER BY a.name`, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []Athlete
+	for rows.Next() {
+		var a Athlete
+		rows.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.CreatedAt)
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}

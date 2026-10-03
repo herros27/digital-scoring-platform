@@ -15,6 +15,13 @@ var jwtSecret = []byte(func() string {
     return "dev-secret-change-in-prod" // ponytail: ganti via env di production
 }())
 
+// SetJWTSecret allows configuring the secret from centralized configuration.
+func SetJWTSecret(secret string) {
+    if secret != "" {
+        jwtSecret = []byte(secret)
+    }
+}
+
 type Claims struct {
     jwt.RegisteredClaims
     JudgePinID    string `json:"pin_id"`
