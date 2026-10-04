@@ -1,0 +1,2051 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { AppButton, AppBadge } from '@/components/ui'
+import { useAuthStore } from '@/stores/auth'
+import { api } from '@/lib/api'
+import DevicePinManager from '@/views/admin/DevicePinManager.vue'
+
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+const initialNav = route.path.includes('/admin') ? 'pin' : ((route.query.tab as any) || 'bagan')
+const activeNav = ref<'kompetisi' | 'gelanggang' | 'kategori' | 'atlet' | 'verifikasi' | 'jadwal' | 'bagan' | 'pin' | 'laporan'>(
+  initialNav
+)
+const selectedArena = ref('GELANGGANG A (UTAMA)')
+const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
+const selectedPool = ref('Pool A & B (Bagan Lengkap 16)')
+
+// Admin Login Modal State
+const showAdminLoginModal = ref(false)
+const adminEmail = ref('admin@silat.id')
+const adminPassword = ref('')
+const adminLoginError = ref('')
+const adminLoginLoading = ref(false)
+
+async function handleAdminLogin() {
+  adminLoginLoading.value = true
+  adminLoginError.value = ''
+  try {
+    const res = await api.post<{ token: string; user: any }>('/api/v1/auth/login', {
+      email: adminEmail.value,
+      password: adminPassword.value,
+    })
+    authStore.setSession({
+      token: res.token,
+      role: res.user?.role || 'admin',
+      name: res.user?.name || 'Ketua Pertandingan',
+    })
+    showToast('Login Admin Berhasil', `Selamat datang, ${res.user?.name || 'Admin'}`, 'success')
+    showAdminLoginModal.value = false
+  } catch (err: any) {
+    adminLoginError.value = err.message || 'Email atau kata sandi tidak valid'
+  } finally {
+    adminLoginLoading.value = false
+  }
+}
+
+// Draw & Locking State
+const isLocked = ref(true)
+const drawHash = ref('#IPSI-2025-CL-A-9941')
+const telemetryMs = ref(12)
+
+// Notification / Toast
+const toast = ref<{ show: boolean; title: string; message: string; type: 'success' | 'info' | 'warning' } | null>(null)
+
+function showToast(title: string, message: string, type: 'success' | 'info' | 'warning' = 'info') {
+  toast.value = { show: true, title, message, type }
+  setTimeout(() => {
+    if (toast.value?.title === title) toast.value = null
+  }, 4000)
+}
+
+// Modal State
+const modal = ref<{
+  show: boolean
+  title: string
+  message: string
+  confirmText: string
+  confirmVariant?: 'primary' | 'danger' | 'emerald'
+  action: () => void
+} | null>(null)
+
+// Bracket Tree Data Types
+interface AthleteEntry {
+  name: string
+  contingent: string
+  score?: number | string
+  isWinner?: boolean
+}
+
+interface MatchCard {
+  id: string
+  partaiNumber: number
+  arenaLabel: string
+  status: 'selesai' | 'live' | 'ready' | 'waiting'
+  statusBadge: string
+  statusVariant: 'neutral' | 'emerald' | 'amber' | 'blue' | 'red'
+  red: AthleteEntry
+  blue: AthleteEntry
+  metaLeft?: string
+  metaRight?: string
+  isLive?: boolean
+  canLoad?: boolean
+}
+
+// Penyisihan 16 Besar (8 Partai)
+const round16: MatchCard[] = [
+  {
+    id: 'm-01',
+    partaiNumber: 1,
+    arenaLabel: 'GELANGGANG 1',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Ahmad Fauzi', contingent: 'JATENG', score: 24, isWinner: true },
+    blue: { name: 'Rafi Pratama', contingent: 'BANTEN', score: 11, isWinner: false },
+  },
+  {
+    id: 'm-02',
+    partaiNumber: 2,
+    arenaLabel: 'GELANGGANG 1',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Ilham Saputra', contingent: 'SUMSEL', score: 9, isWinner: false },
+    blue: { name: 'Bayu Pratama', contingent: 'JATIM', score: 31, isWinner: true },
+  },
+  {
+    id: 'm-03',
+    partaiNumber: 3,
+    arenaLabel: 'GELANGGANG 2',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Hendra Wijaya', contingent: 'JABAR', score: 19, isWinner: true },
+    blue: { name: 'Syahrul Nizam', contingent: 'RIAU', score: 12, isWinner: false },
+  },
+  {
+    id: 'm-04',
+    partaiNumber: 4,
+    arenaLabel: 'GELANGGANG 2',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Dimas Ariyanto', contingent: 'DIY', score: 15, isWinner: false },
+    blue: { name: 'I Made Putra', contingent: 'BALI', score: 22, isWinner: true },
+  },
+  {
+    id: 'm-05',
+    partaiNumber: 5,
+    arenaLabel: 'GELANGGANG 3',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Rizky Maulana', contingent: 'DKI', score: 35, isWinner: true },
+    blue: { name: 'Zulfikar Alamsyah', contingent: 'ACEH', score: 14, isWinner: false },
+  },
+  {
+    id: 'm-06',
+    partaiNumber: 6,
+    arenaLabel: 'GELANGGANG 3',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Farhan Danu', contingent: 'KALSEL', score: 18, isWinner: false },
+    blue: { name: 'Dian Saputra', contingent: 'SUMBAR', score: 26, isWinner: true },
+  },
+  {
+    id: 'm-07',
+    partaiNumber: 7,
+    arenaLabel: 'GELANGGANG 4',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Teguh Prakoso', contingent: 'SULSEL', score: 28, isWinner: true },
+    blue: { name: 'Galang Setia', contingent: 'LAMPUNG', score: 8, isWinner: false },
+  },
+  {
+    id: 'm-08',
+    partaiNumber: 8,
+    arenaLabel: 'GELANGGANG 4',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Bagus Santoso', contingent: 'KALTIM', score: 17, isWinner: false },
+    blue: { name: 'Eko Kurniawan', contingent: 'NTB', score: 29, isWinner: true },
+  },
+]
+
+// Perempat Final (4 Partai)
+const roundQF: MatchCard[] = [
+  {
+    id: 'm-09',
+    partaiNumber: 9,
+    arenaLabel: 'PEREMPAT FINAL 1',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Ahmad Fauzi', contingent: 'JATENG', score: 27, isWinner: true },
+    blue: { name: 'Bayu Pratama', contingent: 'JATIM', score: 21, isWinner: false },
+  },
+  {
+    id: 'm-10',
+    partaiNumber: 10,
+    arenaLabel: 'PEREMPAT FINAL 2',
+    status: 'selesai',
+    statusBadge: 'SELESAI',
+    statusVariant: 'neutral',
+    red: { name: 'Hendra Wijaya', contingent: 'JABAR', score: 32, isWinner: true },
+    blue: { name: 'I Made Putra', contingent: 'BALI', score: 25, isWinner: false },
+  },
+  {
+    id: 'm-11',
+    partaiNumber: 11,
+    arenaLabel: 'MAT 1',
+    status: 'live',
+    statusBadge: 'LIVE 01:14 (B2)',
+    statusVariant: 'emerald',
+    isLive: true,
+    red: { name: 'Rizky Maulana', contingent: 'DKI', score: 16 },
+    blue: { name: 'Dian Saputra', contingent: 'SUMBAR', score: 14 },
+    metaLeft: 'KONTROL: JURI 1-5 AKTIF',
+    metaRight: '5-0 CONSENSUS',
+  },
+  {
+    id: 'm-12',
+    partaiNumber: 12,
+    arenaLabel: 'PEREMPAT FINAL 4',
+    status: 'waiting',
+    statusBadge: 'ANTRIAN MAT 2',
+    statusVariant: 'neutral',
+    red: { name: 'Teguh Prakoso', contingent: 'SULSEL', score: 'VS' },
+    blue: { name: 'Eko Kurniawan', contingent: 'NTB', score: '-' },
+  },
+]
+
+// Semifinal (2 Partai)
+const roundSF: MatchCard[] = [
+  {
+    id: 'm-13',
+    partaiNumber: 13,
+    arenaLabel: 'SEMIFINAL 1',
+    status: 'ready',
+    statusBadge: 'SIAP BERTANDING',
+    statusVariant: 'emerald',
+    canLoad: true,
+    red: { name: 'Ahmad Fauzi', contingent: 'KONTINGEN JAWA TENGAH' },
+    blue: { name: 'Hendra Wijaya', contingent: 'KONTINGEN JAWA BARAT' },
+    metaLeft: 'Jadwal: 14:45 WIB',
+  },
+  {
+    id: 'm-14',
+    partaiNumber: 14,
+    arenaLabel: 'SEMIFINAL 2',
+    status: 'waiting',
+    statusBadge: 'MENUNGGU HASIL QF',
+    statusVariant: 'neutral',
+    red: { name: 'Pemenang Partai 11', contingent: 'Sedang Tanding (DKI vs SUMBAR)', score: '---' },
+    blue: { name: 'Pemenang Partai 12', contingent: 'SULSEL vs NTB', score: '---' },
+    metaLeft: 'Estimasi: 15:15 WIB',
+    metaRight: 'GELANGGANG 2',
+  },
+]
+
+// Operations Actions
+function handleGenerateDraw() {
+  if (isLocked.value) {
+    showToast('Bagan Terkunci', 'Buka kunci bagan terlebih dahulu sebelum me-reacak slot pertandingan.', 'warning')
+    return
+  }
+  modal.value = {
+    show: true,
+    title: 'Acak Ulang Bagan Pertandingan?',
+    message: 'Tindakan ini akan mengacak ulang slot 16 atlet dan mereset partai yang belum bertanding.',
+    confirmText: 'Ya, Generate Acak',
+    confirmVariant: 'emerald',
+    action: async () => {
+      const compId = authStore.competitionId || 'comp-default'
+      try {
+        await api.post(`/api/v1/competitions/${compId}/brackets/generate`, {
+          weight_class: 'A',
+          gender: 'male',
+          participant_ids: [],
+        })
+      } catch {
+        // standalone / demo fallback
+      }
+      drawHash.value = `#IPSI-2025-CL-A-${Math.floor(1000 + Math.random() * 9000)}`
+      showToast('Bagan Berhasil Diacak', `Hash Legalisasi baru: ${drawHash.value}`, 'success')
+      modal.value = null
+    },
+  }
+}
+
+function toggleLock() {
+  if (isLocked.value) {
+    modal.value = {
+      show: true,
+      title: 'Buka Kunci Legalitas Draw?',
+      message: 'Membuka kunci memungkinkan perubahan susunan atlet oleh Delegasi Teknik.',
+      confirmText: 'Buka Kunci',
+      confirmVariant: 'danger',
+      action: () => {
+        isLocked.value = false
+        showToast('Kunci Dibuka', 'Bagan kini dapat disunting atau diacak ulang.', 'info')
+        modal.value = null
+      },
+    }
+  } else {
+    isLocked.value = true
+    showToast('Bagan Dikunci', 'Susunan bagan resmi terkunci dan tersertifikasi.', 'success')
+  }
+}
+
+function handlePrintPDF() {
+  window.print()
+}
+
+function handlePanggilAtlet() {
+  showToast('Panggilan Diumumkan', 'Pengeras suara: Memanggil sudut Merah (Ahmad Fauzi) dan sudut Biru (Hendra Wijaya) menuju Gelanggang 1.', 'info')
+}
+
+function handleLoadToMat1() {
+  modal.value = {
+    show: true,
+    title: 'Muat Partai 13 ke Gelanggang 1?',
+    message: 'Data atlet Ahmad Fauzi (Jateng) vs Hendra Wijaya (Jabar) akan dikirim ke Konsol Wasit & Scoreboard Gelanggang 1.',
+    confirmText: 'Muat & Buka Konsol Wasit',
+    confirmVariant: 'emerald',
+    action: async () => {
+      const compId = authStore.competitionId || 'comp-default'
+      try {
+        await api.post(`/api/v1/competitions/${compId}/matches/m-13/load-arena`, {
+          arena_id: 'gelanggang-1',
+        })
+      } catch {
+        // standalone / demo fallback
+      }
+      showToast('Partai Dimuat', 'Partai 13 berhasil di-load ke Gelanggang 1 (Utama).', 'success')
+      modal.value = null
+      // Redirect to referee console after short delay
+      setTimeout(() => {
+        router.push('/referee?arena_id=gelanggang-1&match_id=m-13')
+      }, 700)
+    },
+  }
+}
+</script>
+
+<template>
+  <div class="ops-layout">
+    <!-- LEFT SIDEBAR -->
+    <aside class="ops-sidebar">
+      <div class="ops-sidebar__header">
+        <div class="ops-brand">
+          <div class="ops-brand__logo font-mono">PS</div>
+          <div>
+            <div class="ops-brand__title font-mono">SILAT CORE</div>
+            <div class="ops-brand__sub font-mono">TOURNAMENT OPS V2.4</div>
+          </div>
+        </div>
+
+        <div class="ops-telemetry font-mono">
+          <span class="telemetry-dot" />
+          <span class="telemetry-text">TELEMETRY LIVE</span>
+          <span class="telemetry-ping">{{ telemetryMs }}ms</span>
+        </div>
+      </div>
+
+      <nav class="ops-nav font-mono">
+        <!-- Section: Operasional Turnamen -->
+        <div class="ops-nav__section-title">OPERASIONAL TURNAMEN</div>
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'kompetisi' }"
+          @click="activeNav = 'kompetisi'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+          </svg>
+          <span>Kompetisi</span>
+        </button>
+
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'gelanggang' }"
+          @click="activeNav = 'gelanggang'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <circle cx="12" cy="12" r="4" />
+          </svg>
+          <span>Gelanggang</span>
+        </button>
+
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'kategori' }"
+          @click="activeNav = 'kategori'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          <span>Kategori Tanding</span>
+        </button>
+
+        <!-- Section: Kontingen & Peserta -->
+        <div class="ops-nav__section-title">KONTINGEN & PESERTA</div>
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'atlet' }"
+          @click="activeNav = 'atlet'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>Data Atlet</span>
+        </button>
+
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'verifikasi' }"
+          @click="activeNav = 'verifikasi'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <polyline points="16 11 18 13 22 9" />
+          </svg>
+          <span>Verifikasi Peserta</span>
+        </button>
+
+        <!-- Section: Manajemen Laga -->
+        <div class="ops-nav__section-title">MANAJEMEN LAGA</div>
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'jadwal' }"
+          @click="activeNav = 'jadwal'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="18" height="18" x="3" y="4" rx="2" />
+            <line x1="16" x2="16" y1="2" y2="6" />
+            <line x1="8" x2="8" y1="2" y2="6" />
+            <line x1="3" x2="21" y1="10" y2="10" />
+          </svg>
+          <span>Jadwal Pertandingan</span>
+        </button>
+
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'bagan' }"
+          @click="activeNav = 'bagan'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="6" x2="6" y1="3" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+          </svg>
+          <span>Bagan Pertandingan</span>
+        </button>
+
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'pin' }"
+          @click="activeNav = 'pin'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span>Perangkat & PIN</span>
+        </button>
+
+        <button
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
+          @click="activeNav = 'laporan'"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" x2="8" y1="13" y2="13" />
+            <line x1="16" x2="8" y1="17" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+          <span>Laporan & Ekspor</span>
+        </button>
+      </nav>
+
+      <!-- User Info Footer -->
+      <div class="ops-sidebar__footer">
+        <div class="ops-user">
+          <div class="ops-user__avatar font-mono">KP</div>
+          <div class="ops-user__meta">
+            <div class="ops-user__name">Ketua Pertandingan</div>
+            <div class="ops-user__role font-mono">ADMIN ARENA</div>
+          </div>
+        </div>
+        <button class="ops-logout-btn" title="Kembali ke Beranda" @click="router.push('/')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" x2="9" y1="12" y2="12" />
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN OPERATIONS CONTENT -->
+    <main class="ops-main">
+      <!-- TOP STATUS BAR -->
+      <header class="ops-topbar">
+        <div class="ops-topbar__titles">
+          <div class="ops-topbar__sub font-mono">KEJUARAAN NASIONAL PENCAK SILAT 2025</div>
+          <h1 class="ops-topbar__heading">KOMANDO OPERASI & BAGAN</h1>
+        </div>
+
+        <div class="ops-topbar__arena-select font-mono">
+          <span class="arena-label">GELANGGANG AKTIF:</span>
+          <select v-model="selectedArena" class="arena-dropdown font-mono">
+            <option value="GELANGGANG A (UTAMA)">GELANGGANG A (UTAMA)</option>
+            <option value="GELANGGANG B">GELANGGANG B</option>
+            <option value="GELANGGANG C">GELANGGANG C</option>
+            <option value="GELANGGANG D">GELANGGANG D</option>
+          </select>
+        </div>
+
+        <div class="ops-topbar__system-pills font-mono">
+          <div class="system-pill">
+            <span class="system-pill__dot emerald" />
+            <span>SERVER SYNC: 100%</span>
+          </div>
+          <div class="system-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
+              <path d="M4 11a9 9 0 0 1 9 9" />
+              <path d="M4 4a16 16 0 0 1 16 16" />
+              <circle cx="5" cy="19" r="1" />
+            </svg>
+            <span>5 JURY CONNECTED</span>
+          </div>
+          <div class="ops-profile-badge" title="Login Admin / Ketua Pertandingan" @click="showAdminLoginModal = true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+        </div>
+      </header>
+
+      <!-- SCROLLABLE OPS VIEW -->
+      <div class="ops-content-scroll" :class="{ 'ops-content-scroll--pin': activeNav === 'pin' }">
+        <!-- TAB PERANGKAT & PIN JURI -->
+        <DevicePinManager v-if="activeNav === 'pin'" />
+
+        <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
+        <template v-else>
+        <!-- HEADER BANNER & ACTION BUTTONS -->
+        <section class="ops-banner-row">
+          <div class="ops-banner-title-group">
+            <div class="ops-banner-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+                <line x1="6" x2="6" y1="3" y2="15" />
+                <circle cx="18" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <path d="M18 9a9 9 0 0 1-9 9" />
+              </svg>
+            </div>
+            <div>
+              <div class="ops-banner-sub font-mono">
+                <span>SISTEM ELIMINASI TUNGGAL (IPSI RULES 2023)</span>
+                <span class="ops-bullet">•</span>
+                <span class="rev-tag">REV: 04.2-FINAL</span>
+              </div>
+              <h2 class="ops-banner-main-title">BAGAN PERTANDINGAN TURNAMEN</h2>
+            </div>
+          </div>
+
+          <div class="ops-banner-actions font-mono">
+            <AppButton variant="emerald" size="sm" @click="handleGenerateDraw">
+              <template #icon>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m16 2-4 4-4-4" />
+                  <path d="M12 6v12" />
+                  <path d="m8 18 4 4 4-4" />
+                </svg>
+              </template>
+              Generate Bagan Acak
+            </AppButton>
+
+            <button class="ops-action-btn-dark font-mono" @click="toggleLock">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>{{ isLocked ? 'Kunci Draw (Locked)' : 'Buka Kunci' }}</span>
+            </button>
+
+            <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect width="12" height="8" x="6" y="14" />
+              </svg>
+              <span>Cetak PDF</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- FILTERS & QUALIFICATION ROW -->
+        <section class="ops-filter-grid">
+          <!-- Filter 1: Kategori & Kelas -->
+          <div class="filter-card">
+            <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
+            <div class="filter-select-wrapper">
+              <select v-model="selectedCategory" class="filter-select font-mono">
+                <option value="Tanding Dewasa Putra - Kelas A (45 - 50 Kg)">Tanding Dewasa Putra - Kelas A (45 - 50 Kg)</option>
+                <option value="Tanding Dewasa Putra - Kelas B (50 - 55 Kg)">Tanding Dewasa Putra - Kelas B (50 - 55 Kg)</option>
+                <option value="Tanding Dewasa Putri - Kelas A (45 - 50 Kg)">Tanding Dewasa Putri - Kelas A (45 - 50 Kg)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Filter 2: Pembagian Pool -->
+          <div class="filter-card">
+            <label class="filter-label font-mono">PEMBAGIAN POOL</label>
+            <div class="filter-select-wrapper">
+              <select v-model="selectedPool" class="filter-select font-mono">
+                <option value="Pool A & B (Bagan Lengkap 16)">Pool A & B (Bagan Lengkap 16)</option>
+                <option value="Pool A (8 Atlet Atas)">Pool A (8 Atlet Atas)</option>
+                <option value="Pool B (8 Atlet Bawah)">Pool B (8 Atlet Bawah)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Card 3: Kualifikasi Timbang Badan -->
+          <div class="filter-card">
+            <label class="filter-label font-mono">KUALIFIKASI TIMBANG BADAN</label>
+            <div class="weigh-in-row font-mono">
+              <div class="weigh-in-status">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <span>Timbang Sah</span>
+              </div>
+              <AppBadge variant="emerald">16/16 ATLET OK</AppBadge>
+            </div>
+          </div>
+
+          <!-- Card 4: Integrasi Gelanggang -->
+          <div class="filter-card">
+            <label class="filter-label font-mono">INTEGRASI GELANGGANG</label>
+            <div class="arena-integration-row font-mono">
+              <div class="arena-ready">
+                <span class="arena-ready__dot" />
+                <span>MAT 1, 2, 3, 4 READY</span>
+              </div>
+              <span class="arena-lat">LAT: 8ms</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- SUMMARY METRICS BAR -->
+        <section class="ops-metrics-bar font-mono">
+          <div class="metric-block">
+            <div class="metric-label">TOTAL PESERTA</div>
+            <div class="metric-val">16 <span class="metric-unit">Atlet</span></div>
+          </div>
+          <div class="metric-block">
+            <div class="metric-label">PARTAI SELESAI</div>
+            <div class="metric-val">10 <span class="metric-unit">/ 15 Laga</span></div>
+          </div>
+          <div class="metric-block">
+            <div class="metric-label">SEDANG TANDING</div>
+            <div class="metric-val text-emerald-400">1 <span class="metric-unit">LIVE (Mat A)</span></div>
+          </div>
+          <div class="metric-block">
+            <div class="metric-label">MENUNGGU ANTRIAN</div>
+            <div class="metric-val">4 <span class="metric-unit">Partai</span></div>
+          </div>
+          <div class="metric-block metric-block--progress">
+            <div class="metric-label">PROGRES BAGAN</div>
+            <div class="bracket-progress-wrapper">
+              <div class="bracket-progress-bar">
+                <div class="bracket-progress-fill" style="width: 67%;" />
+              </div>
+              <span class="progress-num">67%</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- TOURNAMENT BRACKET TREE COLUMNS -->
+        <section class="bracket-tree-container">
+          <!-- COLUMN 1: PENYISIHAN 16 BESAR -->
+          <div class="bracket-column">
+            <div class="bracket-column__header font-mono">
+              <div class="col-title">
+                <span class="col-dot neutral" />
+                <span>PENYISIHAN 16 BESAR</span>
+              </div>
+              <AppBadge variant="neutral" size="sm">8 PARTAI</AppBadge>
+            </div>
+
+            <div class="bracket-matches-list">
+              <div
+                v-for="m in round16"
+                :key="m.id"
+                class="bracket-match-card"
+              >
+                <div class="match-card__header font-mono">
+                  <span class="match-partai">PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}</span>
+                  <span class="match-status-badge neutral">{{ m.statusBadge }}</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--red" :class="{ 'athlete--winner': m.red.isWinner }">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot red" />
+                    <span class="athlete-name">{{ m.red.name }}</span>
+                    <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
+                  </div>
+                  <span class="athlete-score font-mono">{{ m.red.score }}</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--blue" :class="{ 'athlete--winner': m.blue.isWinner }">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot blue" />
+                    <span class="athlete-name">{{ m.blue.name }}</span>
+                    <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
+                  </div>
+                  <span class="athlete-score font-mono">{{ m.blue.score }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN 2: PEREMPAT FINAL -->
+          <div class="bracket-column">
+            <div class="bracket-column__header font-mono">
+              <div class="col-title">
+                <span class="col-dot blue" />
+                <span>PEREMPAT FINAL</span>
+              </div>
+              <AppBadge variant="neutral" size="sm">4 PARTAI</AppBadge>
+            </div>
+
+            <div class="bracket-matches-list bracket-matches-list--qf">
+              <div
+                v-for="m in roundQF"
+                :key="m.id"
+                class="bracket-match-card"
+                :class="{ 'bracket-match-card--live': m.isLive }"
+              >
+                <div class="match-card__header font-mono">
+                  <span class="match-partai">
+                    <span v-if="m.isLive" class="live-dot-pulse" />
+                    PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}
+                  </span>
+                  <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">{{ m.statusBadge }}</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--red" :class="{ 'athlete--winner': m.red.isWinner }">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot red" />
+                    <span class="athlete-name">{{ m.red.name }}</span>
+                    <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
+                  </div>
+                  <span class="athlete-score font-mono">{{ m.red.score }}</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--blue" :class="{ 'athlete--winner': m.blue.isWinner }">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot blue" />
+                    <span class="athlete-name">{{ m.blue.name }}</span>
+                    <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
+                  </div>
+                  <span class="athlete-score font-mono">{{ m.blue.score }}</span>
+                </div>
+
+                <div v-if="m.metaLeft || m.metaRight" class="match-card__meta font-mono">
+                  <span v-if="m.metaLeft">{{ m.metaLeft }}</span>
+                  <span v-if="m.metaRight" class="text-emerald-400 font-bold">{{ m.metaRight }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN 3: SEMIFINAL -->
+          <div class="bracket-column">
+            <div class="bracket-column__header font-mono">
+              <div class="col-title">
+                <span class="col-dot red" />
+                <span>SEMIFINAL</span>
+              </div>
+              <AppBadge variant="neutral" size="sm">2 PARTAI</AppBadge>
+            </div>
+
+            <div class="bracket-matches-list bracket-matches-list--sf">
+              <!-- Semifinal 1 (Ready) -->
+              <div class="bracket-match-card bracket-match-card--highlighted">
+                <div class="match-card__header font-mono">
+                  <span class="match-partai">PARTAI 13 • SEMIFINAL 1</span>
+                  <span class="match-status-badge emerald">SIAP BERTANDING</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--red match-card__athlete--detailed">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot red" />
+                    <div>
+                      <div class="athlete-name font-bold">{{ roundSF[0].red.name }}</div>
+                      <div class="athlete-contingent font-mono text-xs">{{ roundSF[0].red.contingent }}</div>
+                    </div>
+                  </div>
+                  <span class="corner-tag font-mono red">RED</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--blue match-card__athlete--detailed">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot blue" />
+                    <div>
+                      <div class="athlete-name font-bold">{{ roundSF[0].blue.name }}</div>
+                      <div class="athlete-contingent font-mono text-xs">{{ roundSF[0].blue.contingent }}</div>
+                    </div>
+                  </div>
+                  <span class="corner-tag font-mono blue">BLUE</span>
+                </div>
+
+                <div class="match-card__footer font-mono">
+                  <span class="match-time-hint">{{ roundSF[0].metaLeft }}</span>
+                  <button class="load-arena-btn font-mono" @click="handleLoadToMat1">
+                    MUAT KE MAT 1
+                  </button>
+                </div>
+              </div>
+
+              <!-- Semifinal 2 (Waiting) -->
+              <div class="bracket-match-card">
+                <div class="match-card__header font-mono">
+                  <span class="match-partai">PARTAI 14 • SEMIFINAL 2</span>
+                  <span class="match-status-badge neutral">MENUNGGU HASIL QF</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--red match-card__athlete--detailed">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot red" />
+                    <div>
+                      <div class="athlete-name">{{ roundSF[1].red.name }}</div>
+                      <div class="athlete-contingent font-mono text-xs text-slate-400">{{ roundSF[1].red.contingent }}</div>
+                    </div>
+                  </div>
+                  <span class="athlete-score font-mono text-slate-500">---</span>
+                </div>
+
+                <div class="match-card__athlete match-card__athlete--blue match-card__athlete--detailed">
+                  <div class="athlete-name-group">
+                    <span class="corner-dot blue" />
+                    <div>
+                      <div class="athlete-name">{{ roundSF[1].blue.name }}</div>
+                      <div class="athlete-contingent font-mono text-xs text-slate-400">{{ roundSF[1].blue.contingent }}</div>
+                    </div>
+                  </div>
+                  <span class="athlete-score font-mono text-slate-500">---</span>
+                </div>
+
+                <div class="match-card__meta font-mono">
+                  <span>{{ roundSF[1].metaLeft }}</span>
+                  <span>{{ roundSF[1].metaRight }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        </template>
+      </div>
+
+      <!-- BOTTOM STICKY QUICK-ACTION / COMMAND DOCK -->
+      <footer v-if="activeNav === 'bagan'" class="ops-dock">
+        <div class="ops-dock__match-info">
+          <div class="ops-dock__athlete-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.2">
+              <circle cx="12" cy="5" r="3" />
+              <path d="M6.5 9 12 14l5.5-5" />
+              <path d="M12 14v8" />
+              <path d="M9 22h6" />
+            </svg>
+          </div>
+          <div>
+            <div class="ops-dock__sub font-mono">
+              <span>PARTAI ANTRIAN BERIKUTNYA</span>
+              <span class="ops-bullet">•</span>
+              <span>TANDING DEWASA KELAS A</span>
+            </div>
+            <div class="ops-dock__match-title">
+              PARTAI 13: Ahmad Fauzi (JATENG) vs Hendra Wijaya (JABAR)
+            </div>
+          </div>
+        </div>
+
+        <div class="ops-dock__actions font-mono">
+          <button class="ops-dock-btn-dark font-mono" @click="handlePanggilAtlet">
+            Panggil Atlet
+          </button>
+          <AppButton variant="emerald" size="md" @click="handleLoadToMat1">
+            <template #icon>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            </template>
+            Kirim ke Gelanggang 1
+          </AppButton>
+        </div>
+
+        <div class="ops-dock__legal font-mono">
+          <div class="ops-legal-texts">
+            <div class="legal-label">LEGALITAS BAGAN PERTANDINGAN</div>
+            <div class="legal-officials">DELEGET TEKNIK & KETUA PERTANDINGAN</div>
+            <div class="legal-hash">HASH-DRAW: {{ drawHash }}</div>
+          </div>
+          <div class="legal-shield">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <polyline points="9 12 11 14 15 10" />
+            </svg>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <!-- INTERACTIVE TOAST NOTIFICATION -->
+    <Transition name="fade">
+      <div v-if="toast" class="ops-toast font-mono" :class="`ops-toast--${toast.type}`">
+        <div class="toast-title font-bold">{{ toast.title }}</div>
+        <div class="toast-msg">{{ toast.message }}</div>
+      </div>
+    </Transition>
+
+    <!-- MODAL CONFIRMATION DIALOG -->
+    <Transition name="modal-fade">
+      <div v-if="modal?.show" class="ops-modal-backdrop" @click.self="modal = null">
+        <div class="ops-modal">
+          <h3 class="modal-title font-mono">{{ modal.title }}</h3>
+          <p class="modal-msg">{{ modal.message }}</p>
+          <div class="modal-actions font-mono">
+            <AppButton variant="outlined" size="sm" @click="modal = null">
+              Batal
+            </AppButton>
+            <AppButton
+              :variant="modal.confirmVariant || 'primary'"
+              size="sm"
+              @click="modal.action"
+            >
+              {{ modal.confirmText }}
+            </AppButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- MODAL ADMIN / OPERATOR LOGIN -->
+    <Transition name="modal-fade">
+      <div v-if="showAdminLoginModal" class="ops-modal-backdrop" @click.self="showAdminLoginModal = false">
+        <div class="ops-modal">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div style="width: 38px; height: 38px; border-radius: 8px; background-color: rgba(220, 38, 38, 0.2); border: 1px solid rgba(220, 38, 38, 0.4); display: flex; align-items: center; justify-content: center; color: #EF4444; font-weight: 800;" class="font-mono">
+              KP
+            </div>
+            <div>
+              <h3 class="modal-title font-mono" style="margin: 0; font-size: 1rem;">LOGIN KETUA PERTANDINGAN</h3>
+              <p style="font-size: 0.6875rem; color: #94A3B8; margin: 2px 0 0 0;">Akses otorisasi meja komando & manajemen PIN arena</p>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+            <label class="font-mono" style="font-size: 0.6875rem; color: #64748B;">EMAIL OPERATOR / ADMIN</label>
+            <input
+              v-model="adminEmail"
+              type="email"
+              placeholder="admin@silat.id"
+              style="background-color: #080D1A; border: 1px solid rgba(255, 255, 255, 0.12); color: #FFFFFF; padding: 8px 12px; border-radius: 6px; font-size: 0.8125rem; outline: none;"
+              class="font-mono"
+            >
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+            <label class="font-mono" style="font-size: 0.6875rem; color: #64748B;">KATA SANDI</label>
+            <input
+              v-model="adminPassword"
+              type="password"
+              placeholder="••••••••"
+              style="background-color: #080D1A; border: 1px solid rgba(255, 255, 255, 0.12); color: #FFFFFF; padding: 8px 12px; border-radius: 6px; font-size: 0.8125rem; outline: none;"
+              class="font-mono"
+              @keydown.enter="handleAdminLogin"
+            >
+          </div>
+
+          <div v-if="adminLoginError" class="font-mono" style="font-size: 0.75rem; color: #EF4444; margin-bottom: 14px;">
+            {{ adminLoginError }}
+          </div>
+
+          <div class="modal-actions font-mono">
+            <AppButton variant="outlined" size="sm" @click="showAdminLoginModal = false">
+              Tutup
+            </AppButton>
+            <AppButton
+              variant="emerald"
+              size="sm"
+              :loading="adminLoginLoading"
+              @click="handleAdminLogin"
+            >
+              Masuk Komando
+            </AppButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<style scoped>
+/* Main Container Layout */
+.ops-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  background-color: #080D1A;
+  color: #E2E8F0;
+  overflow: hidden;
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+}
+
+/* ==========================================================================
+   LEFT SIDEBAR
+   ========================================================================== */
+.ops-sidebar {
+  width: 250px;
+  background-color: #0B1120;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.ops-sidebar__header {
+  padding: 20px 18px 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ops-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ops-brand__logo {
+  width: 36px;
+  height: 36px;
+  background-color: #DC2626;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4);
+}
+
+.ops-brand__title {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.ops-brand__sub {
+  font-size: 0.6875rem;
+  color: #64748B;
+  letter-spacing: 0.06em;
+}
+
+.ops-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+}
+
+.telemetry-dot {
+  width: 7px;
+  height: 7px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10B981;
+}
+
+.telemetry-text {
+  color: #94A3B8;
+  letter-spacing: 0.06em;
+}
+
+.telemetry-ping {
+  margin-left: auto;
+  color: #10B981;
+  font-weight: 700;
+}
+
+/* Sidebar Nav */
+.ops-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ops-nav__section-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.08em;
+  padding: 12px 10px 4px 10px;
+}
+
+.ops-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #94A3B8;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ops-nav__item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #F8FAFC;
+}
+
+.ops-nav__item--active {
+  background-color: #1E293B;
+  color: #38BDF8;
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 #38BDF8;
+}
+
+.ops-sidebar__footer {
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #0A0F1D;
+}
+
+.ops-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ops-user__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #1E293B;
+  color: #38BDF8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.ops-user__name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #F1F5F9;
+  line-height: 1.2;
+}
+
+.ops-user__role {
+  font-size: 0.625rem;
+  color: #64748B;
+  letter-spacing: 0.06em;
+}
+
+.ops-logout-btn {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.ops-logout-btn:hover {
+  color: #DC2626;
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+/* ==========================================================================
+   MAIN OPS VIEW & TOPBAR
+   ========================================================================== */
+.ops-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Top Status Bar */
+.ops-topbar {
+  height: 60px;
+  background-color: #0B1120;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.ops-topbar__sub {
+  font-size: 0.6875rem;
+  color: #64748B;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+.ops-topbar__heading {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.ops-topbar__arena-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #0F172A;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.arena-label {
+  font-size: 0.6875rem;
+  color: #64748B;
+  letter-spacing: 0.06em;
+}
+
+.arena-dropdown {
+  background: transparent;
+  border: none;
+  color: #38BDF8;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+}
+
+.arena-dropdown option {
+  background-color: #0F172A;
+  color: #E2E8F0;
+}
+
+.ops-topbar__system-pills {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.system-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  color: #94A3B8;
+  letter-spacing: 0.04em;
+}
+
+.system-pill__dot.emerald {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10B981;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.ops-profile-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   SCROLLABLE CONTENT AREA
+   ========================================================================== */
+.ops-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 24px 28px 120px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ops-content-scroll--pin {
+  padding-bottom: 40px;
+}
+
+/* Banner Row */
+.ops-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background-color: #0E1626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 18px 24px;
+  border-radius: 10px;
+}
+
+.ops-banner-title-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ops-banner-icon-box {
+  width: 44px;
+  height: 44px;
+  background-color: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ops-banner-sub {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ops-bullet {
+  color: #475569;
+}
+
+.rev-tag {
+  color: #10B981;
+}
+
+.ops-banner-main-title {
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #FFFFFF;
+}
+
+.ops-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ops-action-btn-dark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #162032;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #E2E8F0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ops-action-btn-dark:hover {
+  background-color: #1E293B;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Filters Row */
+.ops-filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.2fr 1.2fr;
+  gap: 16px;
+}
+
+.filter-card {
+  background-color: #0E1626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 0.6875rem;
+  color: #64748B;
+  letter-spacing: 0.06em;
+}
+
+.filter-select {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #F8FAFC;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-select option {
+  background-color: #0F172A;
+  color: #F8FAFC;
+}
+
+.weigh-in-row,
+.arena-integration-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.weigh-in-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #F1F5F9;
+}
+
+.arena-ready {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.arena-ready__dot {
+  width: 7px;
+  height: 7px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.arena-lat {
+  font-size: 0.6875rem;
+  color: #64748B;
+}
+
+/* Metrics Bar */
+.ops-metrics-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) 1.5fr;
+  gap: 16px;
+  background-color: #0E1626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 14px 20px;
+}
+
+.metric-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-label {
+  font-size: 0.6875rem;
+  color: #64748B;
+  letter-spacing: 0.06em;
+}
+
+.metric-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.metric-unit {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #94A3B8;
+}
+
+.bracket-progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.bracket-progress-bar {
+  flex: 1;
+  height: 8px;
+  background-color: #1E293B;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bracket-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10B981, #34D399);
+  border-radius: 4px;
+}
+
+.progress-num {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #10B981;
+}
+
+/* ==========================================================================
+   BRACKET TREE COLUMNS
+   ========================================================================== */
+.bracket-tree-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 24px;
+  min-width: 980px;
+}
+
+.bracket-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bracket-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.col-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #CBD5E1;
+}
+
+.col-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.col-dot.neutral { background-color: #64748B; }
+.col-dot.blue { background-color: #38BDF8; box-shadow: 0 0 6px #38BDF8; }
+.col-dot.red { background-color: #EF4444; box-shadow: 0 0 6px #EF4444; }
+
+.bracket-matches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bracket-matches-list--qf {
+  gap: 32px;
+  justify-content: space-around;
+  padding-top: 10px;
+}
+
+.bracket-matches-list--sf {
+  gap: 60px;
+  justify-content: space-around;
+  padding-top: 30px;
+}
+
+/* Match Card */
+.bracket-match-card {
+  background-color: #0E1626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.bracket-match-card--live {
+  border-color: rgba(16, 185, 129, 0.6);
+  background-color: #0B1924;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+.bracket-match-card--highlighted {
+  border-color: rgba(56, 189, 248, 0.4);
+  background-color: #0D192E;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.12);
+  padding: 14px 16px;
+}
+
+.match-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: #94A3B8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding-bottom: 6px;
+}
+
+.match-partai {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.live-dot-pulse {
+  width: 7px;
+  height: 7px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10B981;
+  animation: pulse-ring 1.5s infinite;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.match-status-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.match-status-badge.neutral {
+  background-color: rgba(100, 116, 139, 0.2);
+  color: #94A3B8;
+}
+
+.match-status-badge.emerald {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Athlete Row */
+.match-card__athlete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.match-card__athlete--red {
+  background-color: rgba(220, 38, 38, 0.06);
+}
+
+.match-card__athlete--blue {
+  background-color: rgba(37, 99, 235, 0.06);
+}
+
+.match-card__athlete--detailed {
+  padding: 8px 10px;
+}
+
+.athlete-name-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.corner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.corner-dot.red { background-color: #DC2626; box-shadow: 0 0 6px rgba(220, 38, 38, 0.5); }
+.corner-dot.blue { background-color: #2563EB; box-shadow: 0 0 6px rgba(37, 99, 235, 0.5); }
+
+.athlete-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.athlete-contingent {
+  font-size: 0.6875rem;
+  color: #64748B;
+}
+
+.athlete-score {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #CBD5E1;
+}
+
+.athlete--winner .athlete-name {
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.athlete--winner .athlete-score {
+  color: #10B981;
+  font-weight: 800;
+}
+
+.corner-tag {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.corner-tag.red {
+  background-color: rgba(220, 38, 38, 0.2);
+  color: #EF4444;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.corner-tag.blue {
+  background-color: rgba(37, 99, 235, 0.2);
+  color: #38BDF8;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+.match-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: #64748B;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding-top: 6px;
+}
+
+.match-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.match-time-hint {
+  font-size: 0.75rem;
+  color: #94A3B8;
+}
+
+.load-arena-btn {
+  background-color: #10B981;
+  color: #064E3B;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s ease;
+}
+
+.load-arena-btn:hover {
+  background-color: #34D399;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   BOTTOM STICKY DOCK / COMMAND BAR
+   ========================================================================== */
+.ops-dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background-color: #090F1C;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+.ops-dock__match-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ops-dock__athlete-icon {
+  width: 44px;
+  height: 44px;
+  background-color: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ops-dock__sub {
+  font-size: 0.6875rem;
+  color: #94A3B8;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ops-dock__match-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.ops-dock__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ops-dock-btn-dark {
+  background-color: #162032;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #E2E8F0;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ops-dock-btn-dark:hover {
+  background-color: #1E293B;
+}
+
+.ops-dock__legal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: right;
+}
+
+.legal-label {
+  font-size: 0.625rem;
+  color: #64748B;
+  letter-spacing: 0.08em;
+}
+
+.legal-officials {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #CBD5E1;
+}
+
+.legal-hash {
+  font-size: 0.6875rem;
+  color: #10B981;
+  letter-spacing: 0.06em;
+}
+
+.legal-shield {
+  width: 36px;
+  height: 36px;
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   TOAST & MODAL
+   ========================================================================== */
+.ops-toast {
+  position: fixed;
+  top: 76px;
+  right: 28px;
+  background-color: #0F172A;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 12px 18px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.ops-toast--success { border-color: #10B981; }
+.ops-toast--warning { border-color: #F59E0B; }
+.ops-toast--info { border-color: #38BDF8; }
+
+.toast-title {
+  font-size: 0.8125rem;
+  color: #FFFFFF;
+  margin-bottom: 2px;
+}
+
+.toast-msg {
+  font-size: 0.75rem;
+  color: #94A3B8;
+}
+
+.ops-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+}
+
+.ops-modal {
+  background-color: #0F172A;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+.modal-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 10px;
+}
+
+.modal-msg {
+  font-size: 0.875rem;
+  color: #94A3B8;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Animations */
+.fade-enter-active,
+.fade-leave-active,
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+/* Print Styles */
+@media print {
+  .ops-sidebar,
+  .ops-topbar,
+  .ops-dock,
+  .ops-banner-actions {
+    display: none !important;
+  }
+  .ops-layout {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .ops-main {
+    overflow: visible !important;
+  }
+  .ops-content-scroll {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .bracket-match-card {
+    background: #FFFFFF !important;
+    border: 1px solid #000000 !important;
+    color: #000000 !important;
+  }
+}
+</style>

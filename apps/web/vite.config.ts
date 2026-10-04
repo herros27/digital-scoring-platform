@@ -10,6 +10,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
+    port: 5173,
     proxy: {
       // ponytail: proxy API calls to Go backend during dev
       '/api': {
