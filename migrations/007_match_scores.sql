@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE match_scores (
+CREATE TABLE IF NOT EXISTS match_scores (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
     round INT NOT NULL,

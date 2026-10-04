@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE bracket_slots (
+CREATE TABLE IF NOT EXISTS bracket_slots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
     weight_class VARCHAR(50) NOT NULL,

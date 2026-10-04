@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE athletes (
+CREATE TABLE IF NOT EXISTS athletes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     gender VARCHAR(20) NOT NULL,

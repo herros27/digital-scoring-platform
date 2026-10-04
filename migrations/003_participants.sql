@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE participants (
+CREATE TABLE IF NOT EXISTS participants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
