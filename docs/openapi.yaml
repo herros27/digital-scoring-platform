@@ -86,7 +86,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [competition_id, arena_id, role, pin]
+              required: [competition_id, arena_id, role]
               properties:
                 competition_id:
                   type: string
@@ -100,14 +100,44 @@ paths:
                   example: "judge_1"
                 pin:
                   type: string
-                  example: "123456"
+                  description: Optional. Jika tidak diisi, server akan men-generate PIN 6 angka acak.
+                  example: "839201"
                 ttl_hours:
                   type: integer
                   default: 12
                   example: 12
       responses:
         '200':
-          description: PIN berhasil dibuat
+          description: PIN berhasil dibuat (mengembalikan plaintext PIN yang di-generate server dan masa berlaku)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      competition_id:
+                        type: string
+                        format: uuid
+                      arena_id:
+                        type: string
+                        format: uuid
+                      role:
+                        type: string
+                        example: "judge_1"
+                      pin:
+                        type: string
+                        example: "839201"
+                      expires_at:
+                        type: string
+                        format: date-time
         '403':
           description: Forbidden (Hanya admin/dewan yang diizinkan)
           content:
@@ -120,14 +150,66 @@ paths:
   # -------------------------------------------------------
   /api/v1/competitions:
     get:
-      summary: Daftar Seluruh Kejuaraan
+      summary: Daftar Seluruh Kejuaraan (Mendukung Pagination & Filter Status)
       tags:
         - Competition
       security:
         - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Nomor halaman (dimulai dari 1)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Jumlah data per halaman (maksimal 100)
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [upcoming, ongoing, completed]
+          description: Filter berdasarkan status kompetisi
       responses:
         '200':
-          description: List kompetisi berhasil diambil
+          description: List kompetisi berhasil diambil beserta metadata pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: "Kejuaraan Nasional Silat 2026"
+                        location:
+                          type: string
+                          example: "Jakarta"
+                        status:
+                          type: string
+                          example: "ongoing"
+                        ruleset_name:
+                          type: string
+                          example: "IPSI 2024"
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
     post:
       summary: Buat Kejuaraan Baru (Admin / Dewan)
       tags:
@@ -286,14 +368,63 @@ paths:
   # -------------------------------------------------------
   /api/v1/athletes:
     get:
-      summary: Daftar Master Seluruh Atlet
+      summary: Daftar Master Seluruh Atlet (Mendukung Pagination & Filter Gender)
       tags:
         - Athlete
       security:
         - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Nomor halaman (dimulai dari 1)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Jumlah data per halaman (maksimal 100)
+        - name: gender
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [male, female]
+          description: Filter berdasarkan gender atlet
       responses:
         '200':
-          description: List seluruh atlet
+          description: List seluruh atlet berhasil diambil beserta metadata pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: "Budi Santoso"
+                        gender:
+                          type: string
+                          example: "male"
+                        team:
+                          type: string
+                          example: "Jawa Barat"
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
     post:
       summary: Tambah Master Atlet Baru (Admin / Dewan)
       tags:
@@ -451,7 +582,7 @@ paths:
   # -------------------------------------------------------
   /api/v1/competitions/{comp_id}/matches:
     get:
-      summary: Daftar Pertandingan pada Kompetisi
+      summary: Daftar Pertandingan pada Kompetisi (Mendukung Pagination & Filter Status)
       tags:
         - Match
       security:
@@ -463,9 +594,60 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Nomor halaman (dimulai dari 1)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Jumlah data per halaman (maksimal 100)
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [scheduled, ready, running, paused, finished, cancelled]
+          description: Filter berdasarkan status pertandingan
       responses:
         '200':
-          description: List pertandingan
+          description: List pertandingan berhasil diambil beserta metadata pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        competition_id:
+                          type: string
+                          format: uuid
+                        arena_id:
+                          type: string
+                          format: uuid
+                        status:
+                          type: string
+                          example: "running"
+                        round:
+                          type: integer
+                          example: 1
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
     post:
       summary: Buat Partai Pertandingan Baru (Admin / Dewan)
       tags:
@@ -728,6 +910,98 @@ paths:
                     example: true
                   data:
                     $ref: '#/components/schemas/MatchScoreDetail'
+    post:
+      summary: Kirim Input Nilai / Poin Juri (Dukungan Idempotency Key)
+      description: |
+        Mengirimkan skor/poin dari juri melalui HTTP REST API (sebagai alternatif/fallback dari WebSocket).
+        Mendukung header `Idempotency-Key` atau properti `event_id` / `idempotency_key` pada payload
+        untuk mencegah duplikasi skor (accidental double tap / retry akibat network latency).
+        Jika key sudah pernah diproses, server mengembalikan status 200 dengan `duplicate: true` tanpa menggandakan poin.
+      tags:
+        - Match
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: UUID unik request penilaian untuk mencegah duplikasi poin (anti double-tap)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [judge_id, corner, action]
+              properties:
+                judge_id:
+                  type: string
+                  example: "judge_1"
+                corner:
+                  type: string
+                  enum: [red, blue]
+                  example: "red"
+                action:
+                  type: string
+                  enum: [punch, kick, drop, foul, warning, reprimand]
+                  example: "punch"
+                round:
+                  type: integer
+                  example: 1
+                event_id:
+                  type: string
+                  description: ID unik event skor (alternatif Idempotency-Key)
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                idempotency_key:
+                  type: string
+                  description: Idempotency key pada request body
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Input poin diproses atau duplikasi diabaikan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "processed"
+                      duplicate:
+                        type: boolean
+                        example: false
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Match tidak ditemukan atau belum aktif di arena
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/competitions/{comp_id}/matches/{id}/events:
     get:
@@ -1179,3 +1453,16 @@ components:
         created_at:
           type: string
           format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 45

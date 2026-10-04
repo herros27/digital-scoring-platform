@@ -48,8 +48,9 @@ type Orchestrator struct {
 	bracketStore BracketAdvancer
 
 	// skor per ronde: index = round number (1-based, [0] tidak dipakai)
-	scores [4]RoundScore
-	timer  *Timer
+	scores     [4]RoundScore
+	timer      *Timer
+	seenEvents map[string]time.Time
 }
 
 func New(
@@ -73,6 +74,7 @@ func New(
 		eventStore:   eventStore,
 		scoreStore:   scoreStore,
 		bracketStore: bracketStore,
+		seenEvents:   make(map[string]time.Time),
 	}
 	// Pasang callback: setiap message dari hub masuk ke sini
 	h.OnMessage = o.handleMessage
@@ -247,11 +249,13 @@ func (o *Orchestrator) doCancel() error {
 	return nil
 }
 
-// payload untuk MsgJudgeInput: {"score_type": "technique", "target": "red", "round": 1}
+// payload untuk MsgJudgeInput: {"event_id": "...", "score_type": "technique", "target": "red", "round": 1}
 type judgeInputPayload struct {
-	ScoreType string `json:"score_type"`
-	Target    string `json:"target"`
-	Round     int    `json:"round"`
+	EventID        string `json:"event_id,omitempty"`
+	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	ScoreType      string `json:"score_type"`
+	Target         string `json:"target"`
+	Round          int    `json:"round"`
 }
 
 func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
@@ -276,6 +280,29 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	if err := decodePayload(msg.Payload, &p); err != nil {
 		o.sendError(client, "BAD_PAYLOAD", err.Error())
 		return
+	}
+
+	key := p.EventID
+	if key == "" {
+		key = p.IdempotencyKey
+	}
+	if key != "" {
+		o.mu.Lock()
+		if _, exists := o.seenEvents[key]; exists {
+			o.mu.Unlock()
+			log.Printf("[orch:%s] duplicate score event ignored by idempotency key: %s", o.matchID, key)
+			return
+		}
+		o.seenEvents[key] = time.Now()
+		if len(o.seenEvents) > 500 {
+			cutoff := time.Now().Add(-5 * time.Minute)
+			for k, t := range o.seenEvents {
+				if t.Before(cutoff) {
+					delete(o.seenEvents, k)
+				}
+			}
+		}
+		o.mu.Unlock()
 	}
 
 	input := consensus.JudgeInput{
@@ -306,6 +333,41 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	o.applyScore(result)
 }
 
+// SubmitJudgeInput memungkinkan pengiriman scoring event via REST dengan idempotency key check
+func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyKey string) (*consensus.ConsensusResult, bool, error) {
+	if !o.sm.IsInRound() {
+		return nil, false, fmt.Errorf("scoring not allowed in state %s", o.sm.Current())
+	}
+
+	if idempotencyKey != "" {
+		o.mu.Lock()
+		if _, exists := o.seenEvents[idempotencyKey]; exists {
+			o.mu.Unlock()
+			return nil, true, nil
+		}
+		o.seenEvents[idempotencyKey] = time.Now()
+		o.mu.Unlock()
+	}
+
+	input.MatchID = o.matchID
+	input.Round = o.sm.CurrentRoundNumber()
+	input.Timestamp = time.Now()
+
+	o.appendEvent("judge_input", map[string]any{
+		"judge_id":   input.JudgeID,
+		"score_type": input.ScoreType,
+		"target":     input.Target,
+		"round":      input.Round,
+	}, input.JudgeID)
+
+	result := o.engine.Submit(input)
+	if result != nil && result.Accepted {
+		o.applyScore(result)
+	}
+
+	return result, false, nil
+}
+
 func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -328,8 +390,10 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 		RedPenalties:     o.scores[round].RedPenalties,
 		BluePenalties:    o.scores[round].BluePenalties,
 	}
-	if err := o.scoreStore.Upsert(sc); err != nil {
-		log.Printf("[orch:%s] score upsert error: %v", o.matchID, err)
+	if o.scoreStore != nil {
+		if err := o.scoreStore.Upsert(sc); err != nil {
+			log.Printf("[orch:%s] score upsert error: %v", o.matchID, err)
+		}
 	}
 
 	o.appendEvent("score_confirmed", map[string]any{
@@ -399,7 +463,9 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 		RedPenalties:     o.scores[round].RedPenalties,
 		BluePenalties:    o.scores[round].BluePenalties,
 	}
-	o.scoreStore.Upsert(sc)
+	if o.scoreStore != nil {
+		_ = o.scoreStore.Upsert(sc)
+	}
 
 	o.appendEvent("penalty_applied", map[string]any{
 		"target": p.Target,

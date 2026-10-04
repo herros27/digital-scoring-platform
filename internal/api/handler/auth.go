@@ -43,7 +43,7 @@ func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/auth/create-pin  (admin only — untuk assign PIN ke juri)
-// Body: { "competition_id", "arena_id", "role", "pin", "ttl_hours" }
+// Body: { "competition_id", "arena_id", "role", "pin" (opsional), "ttl_hours" (opsional) }
 func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
     var req struct {
         CompetitionID string `json:"competition_id"`
@@ -56,15 +56,39 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
         Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
         return
     }
-    if req.TTLHours == 0 {
+    if req.CompetitionID == "" || req.ArenaID == "" || req.Role == "" {
+        Fail(w, http.StatusBadRequest, "BAD_REQUEST", "competition_id, arena_id, and role are required", nil)
+        return
+    }
+
+    pin := req.PIN
+    if pin == "" {
+        var err error
+        pin, err = auth.GenerateRandomPIN()
+        if err != nil {
+            Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to generate pin", nil)
+            return
+        }
+    }
+
+    if req.TTLHours <= 0 {
         req.TTLHours = 12 // default 12 jam
     }
 
     ttl := time.Duration(req.TTLHours) * time.Hour
-    record, err := h.Pins.CreatePIN(req.CompetitionID, req.ArenaID, req.Role, req.PIN, ttl)
+    record, err := h.Pins.CreatePIN(req.CompetitionID, req.ArenaID, req.Role, pin, ttl)
     if err != nil {
         Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
         return
     }
-    Ok(w, record)
+
+    // Kembalikan plain PIN dan expires_at agar admin/operator dapat membagikannya kepada juri
+    Ok(w, map[string]any{
+        "id":             record.ID,
+        "competition_id": record.CompetitionID,
+        "arena_id":       record.ArenaID,
+        "role":           record.Role,
+        "pin":            pin,
+        "expires_at":     record.ExpiresAt,
+    })
 }

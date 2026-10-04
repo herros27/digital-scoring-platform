@@ -41,6 +41,39 @@ func (s *AthleteStore) List() ([]Athlete, error) {
 	return list, rows.Err()
 }
 
+func (s *AthleteStore) ListPaged(gender string, limit, offset int) ([]Athlete, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM athletes WHERE ($1 = '' OR gender = $1)`
+	if err := s.DB.QueryRow(countQuery, gender).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := `
+		SELECT id, name, gender, team, created_at 
+		FROM athletes 
+		WHERE ($1 = '' OR gender = $1) 
+		ORDER BY name ASC 
+		LIMIT $2 OFFSET $3`
+	rows, err := s.DB.Query(query, gender, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var list []Athlete
+	for rows.Next() {
+		var a Athlete
+		if err := rows.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		list = append(list, a)
+	}
+	if list == nil {
+		list = []Athlete{}
+	}
+	return list, total, rows.Err()
+}
+
 func (s *AthleteStore) RegisterToCompetition(competitionID, athleteID, weightClass, gender string) error {
 	query := `INSERT INTO participants (competition_id, athlete_id, weight_class, gender) VALUES ($1, $2, $3, $4)`
 	_, err := s.DB.Exec(query, competitionID, athleteID, weightClass, gender)

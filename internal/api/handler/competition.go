@@ -12,14 +12,17 @@ type CompetitionHandler struct {
 	Service *service.CompetitionService
 }
 
-// GET /api/v1/competitions
+// GET /api/v1/competitions?page=1&limit=20&status=active
 func (h *CompetitionHandler) List(w http.ResponseWriter, r *http.Request) {
-	list, err := h.Service.GetAllCompetitions()
+	page, limit, _ := ParsePagination(r)
+	status := r.URL.Query().Get("status")
+
+	list, total, err := h.Service.GetCompetitionsPaged(status, page, limit)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
-	Ok(w, list)
+	OkPaged(w, list, page, limit, total)
 }
 
 // GET /api/v1/competitions/{id}

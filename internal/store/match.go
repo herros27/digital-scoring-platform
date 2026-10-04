@@ -78,3 +78,50 @@ func (s *MatchStore) SetWinner(matchID, winnerID string) error {
 	_, err := s.DB.Exec(`UPDATE matches SET winner_id = $1, status = 'finished', finished_at = NOW() WHERE id = $2`, winnerID, matchID)
 	return err
 }
+
+func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]Match, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND ($2 = '' OR status = $2)`
+	if err := s.DB.QueryRow(countQuery, competitionID, status).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := `
+		SELECT id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at 
+		FROM matches 
+		WHERE competition_id = $1 AND ($2 = '' OR status = $2)
+		ORDER BY created_at DESC 
+		LIMIT $3 OFFSET $4`
+	rows, err := s.DB.Query(query, competitionID, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var list []Match
+	for rows.Next() {
+		var m Match
+		var arenaID, bracketSlotID, winnerID sql.NullString
+		if err := rows.Scan(
+			&m.ID, &m.CompetitionID, &arenaID, &bracketSlotID,
+			&m.AthleteRedID, &m.AthleteBlueID, &m.CurrentRound,
+			&m.Status, &winnerID, &m.CreatedAt, &m.StartedAt, &m.FinishedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		if arenaID.Valid {
+			m.ArenaID = arenaID.String
+		}
+		if bracketSlotID.Valid {
+			m.BracketSlotID = bracketSlotID.String
+		}
+		if winnerID.Valid {
+			m.WinnerID = winnerID.String
+		}
+		list = append(list, m)
+	}
+	if list == nil {
+		list = []Match{}
+	}
+	return list, total, rows.Err()
+}

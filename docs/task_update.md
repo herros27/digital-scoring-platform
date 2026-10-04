@@ -54,9 +54,35 @@
     - Added message types `sync_request` and `sync_response` in `internal/hub/message.go`.
     - Handled `sync_request` in `Orchestrator.handleSyncRequest()`, delivering immediate snapshot state of round, timer, and scores to reconnected tablets/screens.
     - Documented protocol contract in `docs/openapi.yaml` and added automated unit test in `tests/p1_features_test.go`.
+17. **Server-Side Random PIN Generation (P2)** –
+    - Added cryptographic numeric PIN generator `auth.GenerateRandomPIN()` in [`internal/auth/pin.go`](file:///d:/Freelance/DigitalScoring/internal/auth/pin.go) using `crypto/rand`.
+    - Updated `AuthHandler.CreatePIN` in [`internal/api/handler/auth.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/auth.go) to auto-generate a 6-digit PIN if empty and return expiration details (`expires_at`).
+    - Documented request and response schema in [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml).
+    - Added unit test in [`tests/p2_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/p2_features_test.go).
+18. **Pagination & Filtering (P2)** –
+    - Added `Pagination` struct, `ParsePagination()`, and `OkPaged()` in [`internal/api/handler/respond.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/respond.go).
+    - Added `ListPaged` methods in `CompetitionStore`, `MatchStore`, and `AthleteStore` with SQL pagination and row counting.
+    - Updated `GET /competitions` (status filter), `GET .../matches` (status filter), and `GET /athletes` (gender filter) with `?page=1&limit=20`.
+    - Documented query parameters and `Pagination` schema in [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml).
+    - Added unit test in [`tests/p2_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/p2_features_test.go).
+19. **Idempotency Key pada Scoring Event (P2)** –
+    - Added `seenEvents` registry with TTL and mutex protection in `Orchestrator` ([`internal/orchestrator/orchestrator.go`](file:///d:/Freelance/DigitalScoring/internal/orchestrator/orchestrator.go)).
+    - Supported `event_id` and `idempotency_key` deduplication on WebSocket judge scoring inputs.
+    - Added `POST /api/v1/competitions/{comp_id}/matches/{id}/scores` with `Idempotency-Key` header and payload fallback to prevent accidental double-tap scoring.
+    - Documented endpoint and schema in [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml).
+20. **Comprehensive Unit Test Suite & QA (Ops)** –
+    - Created isolated unit test suites in [`tests/`](file:///d:/Freelance/DigitalScoring/tests):
+      - [`tests/match_service_test.go`](file:///d:/Freelance/DigitalScoring/tests/match_service_test.go): Full lifecycle flow and concurrency (`ARENA_BUSY`).
+      - [`tests/consensus_engine_test.go`](file:///d:/Freelance/DigitalScoring/tests/consensus_engine_test.go): Majority voting (2/3), sliding window (3s), duplicate suppression, mismatch filters, and concurrency.
+      - [`tests/bracket_generator_test.go`](file:///d:/Freelance/DigitalScoring/tests/bracket_generator_test.go): Single-elimination tree generation, BYE handling, auto-advancing BYE opponents, and next slot linking.
+      - [`tests/statemachine_and_rules_test.go`](file:///d:/Freelance/DigitalScoring/tests/statemachine_and_rules_test.go): Normal round flow, invalid transitions, early finish, cancel, and ruleset loader (IPSI 2024 / PERSILAT).
+      - [`tests/auth_jwt_test.go`](file:///d:/Freelance/DigitalScoring/tests/auth_jwt_test.go): JWT token issuance/verification, expiration, signature validation, and bcrypt PIN hashing/verification.
+      - [`tests/category_service_test.go`](file:///d:/Freelance/DigitalScoring/tests/category_service_test.go): Input validation, category creation, retrieval, and listing.
+      - [`tests/p1_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/p1_features_test.go): Bracket advancement, rulesets, match events, and WebSocket sync.
+      - [`tests/p2_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/p2_features_test.go): Server PIN generator, pagination & filtering, and scoring idempotency.
+    - Verified all 26 test cases passing (`go test -count=1 ./...` exits 0, `go vet ./...` clean).
 
 ## Pending
-- Write unit tests for consensus engine edge cases.
 - Verify status codes and payloads for all REST endpoints against `docs/openapi.yaml`.
 - Ensure `FailMsg()` helper is consistently used where appropriate.
 - Deploy changes to staging and run integration tests.

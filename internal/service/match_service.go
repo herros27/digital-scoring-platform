@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/herros27/digital-scoring/internal/consensus"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/orchestrator"
@@ -59,6 +60,32 @@ func (s *MatchService) GetMatchByID(id string) (*store.Match, error) {
 		return nil, domain.ErrInvalidInput
 	}
 	return s.matchRepo.GetByID(id)
+}
+
+type MatchPagedRepository interface {
+	ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]store.Match, int, error)
+}
+
+func (s *MatchService) GetMatchesByCompetitionPaged(competitionID, status string, page, limit int) ([]store.Match, int, error) {
+	if competitionID == "" {
+		return nil, 0, domain.ErrInvalidInput
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	if pagedRepo, ok := s.matchRepo.(MatchPagedRepository); ok {
+		return pagedRepo.ListByCompetitionPaged(competitionID, status, limit, offset)
+	}
+	if s.matchStore != nil {
+		return s.matchStore.ListByCompetitionPaged(competitionID, status, limit, offset)
+	}
+
+	return []store.Match{}, 0, nil
 }
 
 func (s *MatchService) CreateMatch(m *store.Match) error {
@@ -212,4 +239,12 @@ func (s *MatchService) GetMatchEvents(matchID string) ([]domain.MatchEvent, erro
 		events = []domain.MatchEvent{}
 	}
 	return events, nil
+}
+
+func (s *MatchService) SubmitScoreInput(matchID string, input consensus.JudgeInput, idempotencyKey string) (*consensus.ConsensusResult, bool, error) {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return nil, false, err
+	}
+	return o.SubmitJudgeInput(input, idempotencyKey)
 }

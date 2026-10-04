@@ -23,8 +23,47 @@ func NewCompetitionService(repo CompetitionRepository) *CompetitionService {
 	return &CompetitionService{repo: repo}
 }
 
+type CompetitionPagedRepository interface {
+	ListPaged(status string, limit, offset int) ([]domain.Competition, int, error)
+}
+
 func (s *CompetitionService) GetAllCompetitions() ([]domain.Competition, error) {
 	return s.repo.List()
+}
+
+func (s *CompetitionService) GetCompetitionsPaged(status string, page, limit int) ([]domain.Competition, int, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	if pagedRepo, ok := s.repo.(CompetitionPagedRepository); ok {
+		return pagedRepo.ListPaged(status, limit, offset)
+	}
+
+	all, err := s.repo.List()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var filtered []domain.Competition
+	for _, c := range all {
+		if status == "" || c.Status == status {
+			filtered = append(filtered, c)
+		}
+	}
+	total := len(filtered)
+	if offset >= total {
+		return []domain.Competition{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return filtered[offset:end], total, nil
 }
 
 func (s *CompetitionService) GetCompetitionByID(id string) (*domain.Competition, error) {

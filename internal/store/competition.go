@@ -40,6 +40,39 @@ func (s *CompetitionStore) List() ([]Competition, error) {
 	return list, rows.Err()
 }
 
+func (s *CompetitionStore) ListPaged(status string, limit, offset int) ([]Competition, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM competitions WHERE ($1 = '' OR status = $1)`
+	if err := s.DB.QueryRow(countQuery, status).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := `
+		SELECT id, name, location, start_date, end_date, ruleset_name, status, created_at 
+		FROM competitions 
+		WHERE ($1 = '' OR status = $1) 
+		ORDER BY created_at DESC 
+		LIMIT $2 OFFSET $3`
+	rows, err := s.DB.Query(query, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var list []Competition
+	for rows.Next() {
+		var c Competition
+		if err := rows.Scan(&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &c.Status, &c.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		list = append(list, c)
+	}
+	if list == nil {
+		list = []Competition{}
+	}
+	return list, total, rows.Err()
+}
+
 func (s *CompetitionStore) UpdateStatus(id, status string) error {
 	_, err := s.DB.Exec(`UPDATE competitions SET status = $1 WHERE id = $2`, status, id)
 	return err

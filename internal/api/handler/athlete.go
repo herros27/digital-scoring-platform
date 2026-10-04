@@ -28,13 +28,17 @@ func (h *AthleteHandler) Create(w http.ResponseWriter, r *http.Request) {
 	Ok(w, a)
 }
 
+// GET /api/v1/athletes?page=1&limit=20&gender=male
 func (h *AthleteHandler) List(w http.ResponseWriter, r *http.Request) {
-	list, err := h.Service.ListAthletes()
+	page, limit, _ := ParsePagination(r)
+	gender := r.URL.Query().Get("gender")
+
+	list, total, err := h.Service.GetAthletesPaged(gender, page, limit)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
-	Ok(w, list)
+	OkPaged(w, list, page, limit, total)
 }
 
 func (h *AthleteHandler) Get(w http.ResponseWriter, r *http.Request) {

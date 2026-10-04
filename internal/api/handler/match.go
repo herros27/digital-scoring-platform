@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/herros27/digital-scoring/internal/auth"
+	"github.com/herros27/digital-scoring/internal/consensus"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/service"
@@ -16,11 +17,18 @@ type MatchHandler struct {
     HubManager *hub.Manager
 }
 
-// GET /api/v1/competitions/{comp_id}/matches
+// GET /api/v1/competitions/{comp_id}/matches?page=1&limit=20&status=running
 func (h *MatchHandler) List(w http.ResponseWriter, r *http.Request) {
-    // ponytail: list by competition belum ada di store, pakai match_events nanti
-    // untuk sekarang return empty
-    Ok(w, []any{})
+    compID := r.PathValue("comp_id")
+    page, limit, _ := ParsePagination(r)
+    status := r.URL.Query().Get("status")
+
+    matches, total, err := h.Service.GetMatchesByCompetitionPaged(compID, status, page, limit)
+    if err != nil {
+        Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+        return
+    }
+    OkPaged(w, matches, page, limit, total)
 }
 
 // GET /api/v1/competitions/{comp_id}/matches/{id}
@@ -182,4 +190,54 @@ func (h *MatchHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Ok(w, events)
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/scores
+func (h *MatchHandler) SubmitScore(w http.ResponseWriter, r *http.Request) {
+	matchID := r.PathValue("id")
+	idempotencyKey := r.Header.Get("Idempotency-Key")
+
+	var req struct {
+		EventID        string `json:"event_id"`
+		IdempotencyKey string `json:"idempotency_key"`
+		JudgeID        string `json:"judge_id"`
+		ScoreType      string `json:"score_type"`
+		Target         string `json:"target"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+
+	if idempotencyKey == "" {
+		idempotencyKey = req.IdempotencyKey
+	}
+	if idempotencyKey == "" {
+		idempotencyKey = req.EventID
+	}
+
+	input := consensus.JudgeInput{
+		JudgeID:   req.JudgeID,
+		ScoreType: consensus.ScoreType(req.ScoreType),
+		Target:    consensus.Target(req.Target),
+	}
+
+	res, isDuplicate, err := h.Service.SubmitScoreInput(matchID, input, idempotencyKey)
+	if err != nil {
+		Fail(w, http.StatusBadRequest, "SCORING_ERROR", err.Error(), nil)
+		return
+	}
+
+	if isDuplicate {
+		Ok(w, map[string]any{
+			"status":    "duplicate_ignored",
+			"duplicate": true,
+		})
+		return
+	}
+
+	Ok(w, map[string]any{
+		"status": "accepted",
+		"result": res,
+	})
 }

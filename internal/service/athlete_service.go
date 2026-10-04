@@ -48,8 +48,47 @@ func (s *AthleteService) GetAthleteByID(id string) (*domain.Athlete, error) {
 	return athlete, nil
 }
 
+type AthletePagedRepository interface {
+	ListPaged(gender string, limit, offset int) ([]domain.Athlete, int, error)
+}
+
 func (s *AthleteService) ListAthletes() ([]domain.Athlete, error) {
 	return s.repo.List()
+}
+
+func (s *AthleteService) GetAthletesPaged(gender string, page, limit int) ([]domain.Athlete, int, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	if pagedRepo, ok := s.repo.(AthletePagedRepository); ok {
+		return pagedRepo.ListPaged(gender, limit, offset)
+	}
+
+	all, err := s.repo.List()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var filtered []domain.Athlete
+	for _, a := range all {
+		if gender == "" || a.Gender == gender {
+			filtered = append(filtered, a)
+		}
+	}
+	total := len(filtered)
+	if offset >= total {
+		return []domain.Athlete{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return filtered[offset:end], total, nil
 }
 
 func (s *AthleteService) RegisterAthleteToCompetition(competitionID, athleteID, weightClass, gender string) error {
