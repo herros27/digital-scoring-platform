@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { AppButton, AppBadge, AppCard } from '@/components/ui'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+
+async function handleLogout() {
+  await authStore.logout()
+}
 </script>
 
 <template>
@@ -14,9 +21,29 @@ import { AppButton, AppBadge, AppCard } from '@/components/ui'
         Arsitektur Frontend Real-Time terintegrasi penuh dengan Go Backend WebSocket & Konsensus Juri.
       </p>
 
-      <div class="home-actions">
-        <AppButton variant="primary" size="lg" @click="$router.push('/design-system')">
-          🎨 Buka Design System Showcase
+      <div v-if="authStore.isAuthenticated" class="home-user-session font-mono">
+        <div class="user-pill">
+          <span class="user-dot" />
+          <span>Sesi Aktif: <strong>{{ authStore.name }}</strong> ({{ (authStore.role || 'user').toUpperCase() }})</span>
+        </div>
+        <div class="session-btns">
+          <AppButton variant="emerald" size="lg" @click="$router.push(authStore.role === 'admin' || authStore.role === 'dewan' ? '/ops?tab=kompetisi' : authStore.role === 'contingent' ? '/ops?tab=atlet' : '/ops')">
+            Buka Panel Operasi →
+          </AppButton>
+          <button class="home-logout-btn font-mono" @click="handleLogout">
+            Keluar (Logout)
+          </button>
+        </div>
+      </div>
+      <div v-else class="home-actions">
+        <AppButton variant="primary" size="lg" @click="$router.push('/login')">
+          🔐 Masuk ke Akun
+        </AppButton>
+        <AppButton variant="secondary" size="lg" @click="$router.push('/register')">
+          📝 Daftar Kontingen
+        </AppButton>
+        <AppButton variant="emerald" size="lg" @click="$router.push('/judge/login')">
+          📱 Tablet Juri PIN
         </AppButton>
       </div>
     </div>
@@ -100,7 +127,7 @@ import { AppButton, AppBadge, AppCard } from '@/components/ui'
             Dashboard admin komando operasi, pohon bagan single-elimination, integrasi timbang badan sah, dan tombol load arena (Kirim ke Gelanggang).
           </p>
           <template #footer>
-            <AppButton variant="outlined" size="sm" @click="$router.push('/bracket')">
+            <AppButton variant="outlined" size="sm" @click="$router.push('/ops')">
               Buka Bagan Turnamen →
             </AppButton>
           </template>
@@ -118,6 +145,22 @@ import { AppButton, AppBadge, AppCard } from '@/components/ui'
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/admin')">
               Buka Manajemen PIN →
+            </AppButton>
+          </template>
+        </AppCard>
+
+        <!-- 6. Akun & Autentikasi -->
+        <AppCard variant="emerald" glow>
+          <template #header>
+            <span class="font-bold font-mono text-emerald-400">06. AKUN & AUTENTIKASI</span>
+            <AppBadge variant="emerald" dot>RESMI PERSILAT</AppBadge>
+          </template>
+          <p class="card-desc">
+            Halaman login terpadu (Admin, Operator, Dewan Hakim, dan Official Kontingen), pendaftaran kontingen baru, serta login tablet juri via PIN gelanggang.
+          </p>
+          <template #footer>
+            <AppButton variant="outlined" size="sm" @click="$router.push('/login')">
+              Buka Halaman Login →
             </AppButton>
           </template>
         </AppCard>
@@ -192,5 +235,62 @@ import { AppButton, AppBadge, AppCard } from '@/components/ui'
   font-size: 0.875rem;
   color: var(--color-neutral-300);
   line-height: 1.5;
+}
+
+/* Home User Session */
+.home-user-session {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 20px 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #E2E8F0;
+}
+
+.user-pill strong {
+  color: #34D399;
+}
+
+.user-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10B981;
+  box-shadow: 0 0 8px #10B981;
+}
+
+.session-btns {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-logout-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #F87171;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.home-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #EF4444;
 }
 </style>

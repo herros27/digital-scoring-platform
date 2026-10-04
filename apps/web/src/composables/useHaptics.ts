@@ -14,6 +14,26 @@ export function useHaptics() {
     }
   }
 
+  function light() {
+    trigger(25)
+  }
+
+  function medium() {
+    trigger(50)
+  }
+
+  function heavy() {
+    trigger(80)
+  }
+
+  function success() {
+    trigger([30, 50, 30])
+  }
+
+  function error() {
+    trigger([60, 80, 60, 80])
+  }
+
   function toggle() {
     isEnabled.value = !isEnabled.value
     if (isEnabled.value) {
@@ -24,6 +44,11 @@ export function useHaptics() {
   return {
     isEnabled,
     trigger,
+    light,
+    medium,
+    heavy,
+    success,
+    error,
     toggle,
   }
 }

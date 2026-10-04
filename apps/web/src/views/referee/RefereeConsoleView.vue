@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
 import { useHaptics } from '@/composables/useHaptics'
 
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/lib/api'
+import { matchService } from '@/features/matches/api/matchService'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const arenaId = computed(() => (route.params.arena_id as string) || (route.query.arena_id as string) || authStore.arenaId || 'gelanggang-1')
 const compId = computed(() => (route.query.comp_id as string) || authStore.competitionId || '')
 const matchId = computed(() => (route.query.match_id as string) || '')
+
 
 // --- Active Tab / Navigation ---
 const activeTab = ref('kontrol-tanding')
@@ -96,6 +98,18 @@ const isVarActive = ref(false)
 // Confirmation Modal for Disqualification or Finish
 const confirmModal = ref<{ show: boolean; title: string; message: string; action: () => void } | null>(null)
 
+function triggerRefereeLogout() {
+  confirmModal.value = {
+    show: true,
+    title: 'Keluar dari Konsol Wasit?',
+    message: 'Apakah Anda yakin ingin mengakhiri sesi meja pengawas wasit dan keluar?',
+    action: async () => {
+      await authStore.logout()
+      router.push('/login')
+    },
+  }
+}
+
 // --- Timer & Haptics ---
 const timer = useTimer()
 const haptics = useHaptics()
@@ -111,7 +125,7 @@ function triggerStart() {
   timer.sync(timer.remainingMs.value || 98000, true)
   sendMessage('state_change', { action: 'start' })
   if (compId.value && matchId.value) {
-    api.post(`/api/v1/competitions/${compId.value}/matches/${matchId.value}/start`).catch(() => {})
+    matchService.startMatch(compId.value, matchId.value).catch(() => {})
   }
   addLog(timer.formattedTime.value, 'Ronde Dimulai / Lanjut', 'Wasit mengaktifkan timer', 'control')
 }
@@ -122,7 +136,7 @@ function triggerPause() {
   timer.pause()
   sendMessage('state_change', { action: 'pause' })
   if (compId.value && matchId.value) {
-    api.post(`/api/v1/competitions/${compId.value}/matches/${matchId.value}/pause`).catch(() => {})
+    matchService.pauseMatch(compId.value, matchId.value).catch(() => {})
   }
   addLog(timer.formattedTime.value, 'Pertandingan Dijeda (PAUSE)', 'Wasit menghentikan waktu', 'control')
 }
@@ -133,7 +147,7 @@ function triggerResume() {
   timer.sync(timer.remainingMs.value, true)
   sendMessage('state_change', { action: 'resume' })
   if (compId.value && matchId.value) {
-    api.post(`/api/v1/competitions/${compId.value}/matches/${matchId.value}/resume`).catch(() => {})
+    matchService.resumeMatch(compId.value, matchId.value).catch(() => {})
   }
   addLog(timer.formattedTime.value, 'Pertandingan Dilanjutkan', 'Wasit melanjutkan waktu', 'control')
 }
@@ -149,7 +163,7 @@ function triggerFinish() {
       timer.pause()
       sendMessage('state_change', { action: 'finish' })
       if (compId.value && matchId.value) {
-        api.post(`/api/v1/competitions/${compId.value}/matches/${matchId.value}/finish`).catch(() => {})
+        matchService.finishMatch(compId.value, matchId.value).catch(() => {})
       }
       addLog(timer.formattedTime.value, 'Pertandingan Selesai', 'Wasit menutup laga resmi', 'control')
       confirmModal.value = null
@@ -204,7 +218,7 @@ function applyPenalty(target: 'red' | 'blue', type: 'teguran1' | 'teguran2' | 'p
       action: () => {
         sendMessage('state_change', { action: 'cancel' })
         if (compId.value && matchId.value) {
-          api.post(`/api/v1/competitions/${compId.value}/matches/${matchId.value}/cancel`).catch(() => {})
+          matchService.cancelMatch(compId.value, matchId.value).catch(() => {})
         }
         addLog(timer.formattedTime.value, `DISKUALIFIKASI ${targetLabel.toUpperCase()}`, `Pesilat ${athlete.name} didiskualifikasi`, 'penalty')
         confirmModal.value = null
@@ -261,8 +275,61 @@ onMounted(() => {
   // Set default initial timer to 01:38 (98000ms) matching Figma 03_referee_console.png
   timer.sync(98000, true)
 
+  // Request state sync from backend orchestrator
+  sendMessage('sync_request', {})
+
+  onMessage('sync_response', (payload) => {
+    if (payload.round) currentRound.value = payload.round
+    if (payload.state) {
+      if (payload.state.includes('round')) roundStatus.value = 'running'
+      else if (payload.state.includes('break')) roundStatus.value = 'break'
+      else if (payload.state === 'paused') roundStatus.value = 'paused'
+      else if (payload.state === 'finished') roundStatus.value = 'finished'
+    }
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(payload.timer_remaining_ms, payload.timer_running)
+    }
+    if (payload.red_total !== undefined) redAthlete.value.score = payload.red_total
+    if (payload.blue_total !== undefined) blueAthlete.value.score = payload.blue_total
+  })
+
+  onMessage('state_change', (payload) => {
+    if (payload.round) currentRound.value = payload.round
+    if (payload.state) {
+      if (payload.state.includes('round')) roundStatus.value = 'running'
+      else if (payload.state.includes('break')) roundStatus.value = 'break'
+      else if (payload.state === 'paused') roundStatus.value = 'paused'
+      else if (payload.state === 'finished') roundStatus.value = 'finished'
+    }
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(payload.timer_remaining_ms, roundStatus.value === 'running')
+    }
+  })
+
+  onMessage('timer_sync', (payload) => {
+    if (payload.remaining_ms !== undefined) {
+      timer.sync(payload.remaining_ms, payload.running)
+    }
+  })
+
   onMessage('score_confirmed', (payload) => {
     addLog(timer.formattedTime.value, `Konsensus Poin: +${payload.points} ${payload.score_type.toUpperCase()}`, `Sudut ${payload.target.toUpperCase()}`, 'score')
+  })
+
+  onMessage('score_update', (payload) => {
+    if (payload.red_technical !== undefined) {
+      redAthlete.value.score = payload.red_technical - (payload.red_penalties || 0)
+    }
+    if (payload.blue_technical !== undefined) {
+      blueAthlete.value.score = payload.blue_technical - (payload.blue_penalties || 0)
+    }
+  })
+
+  onMessage('match_result', (payload) => {
+    roundStatus.value = 'finished'
+    timer.pause()
+    const winnerCorner = payload.corner === 'red' ? 'SUDUT MERAH' : 'SUDUT BIRU'
+    addLog(timer.formattedTime.value, `Pertandingan Berakhir: ${winnerCorner} MENANG`, payload.result_type || 'Keputusan Poin', 'control')
   })
 })
 
@@ -404,7 +471,7 @@ onUnmounted(() => {
           <span class="ref-lan-chip">
             <span class="ref-pulse-dot" /> LAN JURI OK
           </span>
-          <div class="ref-avatar">
+          <div class="ref-avatar" title="Keluar dari Konsol Wasit (Logout)" style="cursor: pointer;" @click="triggerRefereeLogout">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />

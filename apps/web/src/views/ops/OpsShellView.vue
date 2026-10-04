@@ -1,22 +1,65 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AppButton, AppBadge } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/lib/api'
+import { authApi } from '@/lib/authApi'
 import DevicePinManager from '@/views/admin/DevicePinManager.vue'
+import CompetitionsView from '@/views/admin/CompetitionsView.vue'
+import ArenaOpsView from '@/features/arena/views/ArenaOpsView.vue'
+import CategoryOpsView from '@/features/categories/views/CategoryOpsView.vue'
+import AthletesOpsView from '@/features/athletes/views/AthletesOpsView.vue'
+import ParticipantVerificationView from '@/features/athletes/views/ParticipantVerificationView.vue'
+import ScheduleOpsView from '@/features/matches/views/ScheduleOpsView.vue'
+import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
+import { matchService } from '@/features/matches/api/matchService'
+import { bracketService } from '@/features/tournament/api/bracketService'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-const initialNav = route.path.includes('/admin') ? 'pin' : ((route.query.tab as any) || 'bagan')
+// ponytail: default to 'jadwal' for ops overview, or contingent default to 'atlet'
+const resolveDefaultNav = () => {
+  if (route.query.tab) return route.query.tab as any
+  if (route.path.includes('/admin')) return 'pin'
+  if (authStore.role === 'contingent') return 'atlet'
+  return 'jadwal'
+}
+
 const activeNav = ref<'kompetisi' | 'gelanggang' | 'kategori' | 'atlet' | 'verifikasi' | 'jadwal' | 'bagan' | 'pin' | 'laporan'>(
-  initialNav
+  resolveDefaultNav()
 )
+
+function setNav(tab: typeof activeNav.value) {
+  activeNav.value = tab
+  router.replace({ query: { ...route.query, tab } })
+}
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && newTab !== activeNav.value) {
+      activeNav.value = newTab as any
+    }
+  }
+)
+
 const selectedArena = ref('GELANGGANG A (UTAMA)')
 const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
 const selectedPool = ref('Pool A & B (Bagan Lengkap 16)')
+
+function handleArenaSelect(arena: { name: string }) {
+  selectedArena.value = arena.name
+  setNav('bagan')
+  showToast('Gelanggang Dipilih', `Menampilkan bagan untuk ${arena.name}`, 'info')
+}
+
+function handleCategorySelect(cat: { name: string; weight_class: string }) {
+  selectedCategory.value = cat.name
+  setNav('bagan')
+  showToast('Kategori Dipilih', `Menampilkan bagan untuk ${cat.name}`, 'info')
+}
 
 // Admin Login Modal State
 const showAdminLoginModal = ref(false)
@@ -29,7 +72,7 @@ async function handleAdminLogin() {
   adminLoginLoading.value = true
   adminLoginError.value = ''
   try {
-    const res = await api.post<{ token: string; user: any }>('/api/v1/auth/login', {
+    const res = await authApi.login({
       email: adminEmail.value,
       password: adminPassword.value,
     })
@@ -44,6 +87,40 @@ async function handleAdminLogin() {
     adminLoginError.value = err.message || 'Email atau kata sandi tidak valid'
   } finally {
     adminLoginLoading.value = false
+  }
+}
+
+// User Profile & Logout Handling
+const userInitials = computed(() => {
+  const n = authStore.name || 'Ketua Pertandingan'
+  const parts = n.trim().split(/\s+/)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return n.slice(0, 2).toUpperCase()
+})
+
+function triggerLogoutPrompt() {
+  modal.value = {
+    show: true,
+    title: 'Konfirmasi Keluar',
+    message: 'Apakah Anda yakin ingin mengakhiri sesi dan keluar dari sistem operasional turnamen?',
+    confirmText: 'Keluar Sekarang',
+    confirmVariant: 'danger',
+    action: async () => {
+      await authStore.logout()
+      modal.value = null
+      showToast('Berhasil Keluar', 'Sesi operasional turnamen telah diakhiri dengan aman.', 'info')
+      router.push('/login')
+    },
+  }
+}
+
+function handleProfileClick() {
+  if (authStore.isAuthenticated) {
+    triggerLogoutPrompt()
+  } else {
+    showAdminLoginModal.value = true
   }
 }
 
@@ -269,7 +346,7 @@ function handleGenerateDraw() {
     action: async () => {
       const compId = authStore.competitionId || 'comp-default'
       try {
-        await api.post(`/api/v1/competitions/${compId}/brackets/generate`, {
+        await bracketService.generateBracket(compId, {
           weight_class: 'A',
           gender: 'male',
           participant_ids: [],
@@ -322,9 +399,7 @@ function handleLoadToMat1() {
     action: async () => {
       const compId = authStore.competitionId || 'comp-default'
       try {
-        await api.post(`/api/v1/competitions/${compId}/matches/m-13/load-arena`, {
-          arena_id: 'gelanggang-1',
-        })
+        await matchService.loadArena(compId, 'm-13', 'gelanggang-1')
       } catch {
         // standalone / demo fallback
       }
@@ -365,7 +440,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'kompetisi' }"
-          @click="activeNav = 'kompetisi'"
+          @click="setNav('kompetisi')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
@@ -381,7 +456,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'gelanggang' }"
-          @click="activeNav = 'gelanggang'"
+          @click="setNav('gelanggang')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -393,11 +468,12 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'kategori' }"
-          @click="activeNav = 'kategori'"
+          @click="setNav('kategori')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
+            <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+            <path d="M11 3 8 9l4 12 4-12-3-6" />
+            <path d="M2 9h20" />
           </svg>
           <span>Kategori Tanding</span>
         </button>
@@ -407,7 +483,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'atlet' }"
-          @click="activeNav = 'atlet'"
+          @click="setNav('atlet')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -421,7 +497,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'verifikasi' }"
-          @click="activeNav = 'verifikasi'"
+          @click="setNav('verifikasi')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -436,7 +512,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'jadwal' }"
-          @click="activeNav = 'jadwal'"
+          @click="setNav('jadwal')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect width="18" height="18" x="3" y="4" rx="2" />
@@ -450,7 +526,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'bagan' }"
-          @click="activeNav = 'bagan'"
+          @click="setNav('bagan')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="6" x2="6" y1="3" y2="15" />
@@ -464,7 +540,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'pin' }"
-          @click="activeNav = 'pin'"
+          @click="setNav('pin')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
@@ -476,7 +552,7 @@ function handleLoadToMat1() {
         <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
-          @click="activeNav = 'laporan'"
+          @click="setNav('laporan')"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -492,13 +568,13 @@ function handleLoadToMat1() {
       <!-- User Info Footer -->
       <div class="ops-sidebar__footer">
         <div class="ops-user">
-          <div class="ops-user__avatar font-mono">KP</div>
+          <div class="ops-user__avatar font-mono">{{ userInitials }}</div>
           <div class="ops-user__meta">
-            <div class="ops-user__name">Ketua Pertandingan</div>
-            <div class="ops-user__role font-mono">ADMIN ARENA</div>
+            <div class="ops-user__name truncate">{{ authStore.name || 'Ketua Pertandingan' }}</div>
+            <div class="ops-user__role font-mono">{{ (authStore.role || 'Admin Arena').toUpperCase() }}</div>
           </div>
         </div>
-        <button class="ops-logout-btn" title="Kembali ke Beranda" @click="router.push('/')">
+        <button class="ops-logout-btn" title="Keluar dari Sesi (Logout)" @click="triggerLogoutPrompt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" />
@@ -540,7 +616,12 @@ function handleLoadToMat1() {
             </svg>
             <span>5 JURY CONNECTED</span>
           </div>
-          <div class="ops-profile-badge" title="Login Admin / Ketua Pertandingan" @click="showAdminLoginModal = true">
+          <div
+            class="ops-profile-badge"
+            :class="{ 'ops-profile-badge--active': authStore.isAuthenticated }"
+            :title="authStore.isAuthenticated ? `Sesi aktif: ${authStore.name || 'Admin'} (Klik untuk Keluar)` : 'Login Admin / Ketua Pertandingan'"
+            @click="handleProfileClick"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
@@ -550,9 +631,54 @@ function handleLoadToMat1() {
       </header>
 
       <!-- SCROLLABLE OPS VIEW -->
-      <div class="ops-content-scroll" :class="{ 'ops-content-scroll--pin': activeNav === 'pin' }">
+      <div class="ops-content-scroll" :class="{ 'ops-content-scroll--pin': activeNav === 'pin' || activeNav === 'laporan' || activeNav === 'kompetisi' || activeNav === 'gelanggang' || activeNav === 'kategori' || activeNav === 'atlet' || activeNav === 'verifikasi' || activeNav === 'jadwal' }">
+        <!-- TAB KOMPETISI -->
+        <CompetitionsView v-if="activeNav === 'kompetisi'" />
+
+        <!-- TAB GELANGGANG -->
+        <ArenaOpsView
+          v-else-if="activeNav === 'gelanggang'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          @select-arena="handleArenaSelect"
+        />
+
+        <!-- TAB KATEGORI TANDING -->
+        <CategoryOpsView
+          v-else-if="activeNav === 'kategori'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          @select-category="handleCategorySelect"
+        />
+
+        <!-- TAB DATA ATLET & KONTINGEN -->
+        <AthletesOpsView
+          v-else-if="activeNav === 'atlet'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          @navigate-verification="activeNav = 'verifikasi'"
+        />
+
+        <!-- TAB VERIFIKASI PESERTA -->
+        <ParticipantVerificationView
+          v-else-if="activeNav === 'verifikasi'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+        />
+
+        <!-- TAB JADWAL TANDING -->
+        <ScheduleOpsView
+          v-else-if="activeNav === 'jadwal'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+        />
+
         <!-- TAB PERANGKAT & PIN JURI -->
-        <DevicePinManager v-if="activeNav === 'pin'" />
+        <DevicePinManager
+          v-else-if="activeNav === 'pin'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+        />
+
+        <!-- TAB LAPORAN & EKSPOR -->
+        <ReportsOpsView
+          v-else-if="activeNav === 'laporan'"
+          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+        />
 
         <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
         <template v-else>
@@ -1320,6 +1446,13 @@ function handleLoadToMat1() {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ops-profile-badge--active {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
 /* ==========================================================================

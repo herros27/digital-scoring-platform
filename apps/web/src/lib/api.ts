@@ -9,7 +9,17 @@ export interface ApiResponse<T = unknown> {
   }
 }
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export interface PagedResponse<T = unknown> {
+  success: boolean
+  data: T[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+  }
+}
+
+export async function requestRaw<T = any>(path: string, init?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('ds_token')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -34,6 +44,12 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(errorMsg)
   }
 
+  return body as T
+}
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const body = await requestRaw<any>(path, init)
+
   // If response follows standard { success: true, data: ... }
   if (body && typeof body === 'object' && 'data' in body && 'success' in body) {
     return body.data as T
@@ -44,6 +60,8 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string, init?: RequestInit) => request<T>(path, { ...init, method: 'GET' }),
+  getPaged: <T>(path: string, init?: RequestInit) =>
+    requestRaw<PagedResponse<T>>(path, { ...init, method: 'GET' }),
   post: <T>(path: string, body?: unknown, init?: RequestInit) =>
     request<T>(path, {
       ...init,

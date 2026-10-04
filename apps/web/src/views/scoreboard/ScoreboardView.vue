@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
-import { api } from '@/lib/api'
+import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
 const arenaId = computed(() => (route.params.arena_id as string) || 'gelanggang-1')
@@ -97,14 +97,14 @@ function toggleFullscreen() {
 }
 
 // --- Real-Time WebSocket Connection ---
-const { isConnected, onMessage } = useWebSocket(arenaId.value)
+const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value)
 
 onMounted(async () => {
   // Initialize timer to 01:41 (101 seconds) as depicted in Figma 01_arena_scoreboard.png
   timer.sync(101000, true)
 
   try {
-    const snapshot = await api.get<any>(`/api/v1/live/scoreboard/${arenaId.value}`)
+    const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
     if (snapshot && typeof snapshot === 'object' && snapshot.status !== 'no active match') {
       if (snapshot.round) currentRound.value = snapshot.round
       if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete
@@ -113,6 +113,9 @@ onMounted(async () => {
   } catch {
     // Keep local baseline state
   }
+
+  // Request sync from backend WebSocket hub
+  sendMessage('sync_request', {})
 
   // Listen to WebSocket broadcasts
   onMessage('sync_response', (payload) => {

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
 import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/lib/api'
+import { authApi } from '@/lib/authApi'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 // Query or session params
@@ -102,13 +103,7 @@ async function handlePinSubmit() {
   pinLoading.value = true
   pinError.value = ''
   try {
-    const res = await api.post<{
-      token: string
-      role: 'judge'
-      seat_number: number
-      arena_id: string
-      competition_id: string
-    }>('/api/v1/auth/judge-login', {
+    const res = await authApi.judgeLogin({
       competition_id: compId.value,
       arena_id: arenaId.value,
       pin: pinInput.value,
@@ -138,6 +133,12 @@ function handleEnterDemo() {
     competitionId: compId.value,
   })
   showPinModal.value = false
+}
+
+async function handleJudgeLogout() {
+  await authStore.logout()
+  showPinModal.value = false
+  router.push('/judge/login')
 }
 
 function handleScoreTap(target: 'red' | 'blue', technique: 'technique' | 'knockdown' | 'fall', points: number, label: string) {
@@ -206,6 +207,9 @@ function handleCancelLast() {
 onMounted(() => {
   // Sync initial timer to 01:28 (88000ms) as shown in Figma 02_judge_tablet_pwa.png
   timer.sync(88000, true)
+
+  // Request state sync from backend hub
+  sendMessage('sync_request', {})
 
   onMessage('sync_response', (payload) => {
     if (payload.round) currentRound.value = payload.round
@@ -651,6 +655,9 @@ onMounted(() => {
         <div class="judge-pin-footer font-mono">
           <button class="demo-link-btn" @click="handleEnterDemo">
             Mode Uji Coba Offline (Demo) →
+          </button>
+          <button v-if="authStore.isAuthenticated" class="demo-link-btn text-rose-400" @click="handleJudgeLogout">
+            Keluar dari Tablet Juri (Logout)
           </button>
         </div>
       </div>

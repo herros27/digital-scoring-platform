@@ -1,18 +1,59 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/lib/api'
+import { authApi } from '@/lib/authApi'
+import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+
+interface Props {
+  competitionId?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
+})
 
 const authStore = useAuthStore()
+const compIdRef = computed(() => props.competitionId || authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
 
-// Props & State
-const selectedArena = ref<'gelanggang-1' | 'gelanggang-2' | 'gelanggang-3' | 'gelanggang-4'>('gelanggang-1')
+// Fetch real arenas
+const { data: remoteArenas } = useArenasQuery(compIdRef)
 
-interface DeviceSeat {
+interface ArenaItem {
+  id: string
+  name: string
+}
+
+const displayArenas = computed<ArenaItem[]>(() => {
+  if (remoteArenas.value && remoteArenas.value.length > 0) {
+    return remoteArenas.value.map(a => ({ id: a.id, name: a.name }))
+  }
+  return [
+    { id: 'c7397556-eb39-406f-aa89-6b3053a2fd08', name: 'Gelanggang A (Utama)' },
+    { id: '32d25db4-5636-46ad-bb2c-a43d052a405a', name: 'Gelanggang B' },
+  ]
+})
+
+const selectedArena = ref<string>('')
+
+watch(
+  displayArenas,
+  (arenas) => {
+    if (arenas.length > 0 && (!selectedArena.value || !arenas.some(a => a.id === selectedArena.value))) {
+      selectedArena.value = arenas[0].id
+    }
+  },
+  { immediate: true }
+)
+
+const activeArenaObj = computed(() => {
+  return displayArenas.value.find(a => a.id === selectedArena.value) || displayArenas.value[0] || { id: '', name: 'Gelanggang' }
+})
+
+export interface DeviceSeat {
   id: string
   seatNumber: number
-  role: 'judge' | 'wasit' | 'scoreboard'
+  role: 'judge' | 'wasit' | 'scoreboard' | 'dewan'
   label: string
   deviceModel: string
   pin: string
@@ -22,59 +63,95 @@ interface DeviceSeat {
   expiresAt: string
 }
 
-// Mock & Initial Data per Arena
-const arenaData = ref<Record<string, DeviceSeat[]>>({
-  'gelanggang-1': [
+// Reactive store of seats per arena ID
+const arenaData = ref<Record<string, DeviceSeat[]>>({})
+
+function getInitialSeatsForArena(arenaId: string): DeviceSeat[] {
+  // Check localStorage for saved PINs
+  const storageKey = `device_pins_${arenaId}`
+  let saved: Record<string, string> = {}
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (raw) saved = JSON.parse(raw)
+  } catch {
+    // ignore
+  }
+
+  return [
     {
-      id: 'g1-j1',
+      id: `${arenaId}-j1`,
       seatNumber: 1,
       role: 'judge',
       label: 'KURSI JURI 1',
       deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: '839 102',
+      pin: saved['1'] || '839 102',
       status: 'online',
       latencyMs: 14,
       batteryPct: 94,
       expiresAt: '22:00 WIB (10 Jam Tersisa)',
     },
     {
-      id: 'g1-j2',
+      id: `${arenaId}-j2`,
       seatNumber: 2,
       role: 'judge',
       label: 'KURSI JURI 2',
       deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: '491 205',
+      pin: saved['2'] || '491 205',
       status: 'online',
       latencyMs: 18,
       batteryPct: 88,
       expiresAt: '22:00 WIB (10 Jam Tersisa)',
     },
     {
-      id: 'g1-j3',
+      id: `${arenaId}-j3`,
       seatNumber: 3,
       role: 'judge',
       label: 'KURSI JURI 3',
       deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: '720 184',
+      pin: saved['3'] || '720 184',
       status: 'online',
       latencyMs: 12,
       batteryPct: 91,
       expiresAt: '22:00 WIB (10 Jam Tersisa)',
     },
     {
-      id: 'g1-wasit',
+      id: `${arenaId}-j4`,
+      seatNumber: 4,
+      role: 'judge',
+      label: 'KURSI JURI 4',
+      deviceModel: 'LENOVO TAB M10 • ANDROID PWA',
+      pin: saved['4'] || '339 014',
+      status: 'idle',
+      latencyMs: 22,
+      batteryPct: 79,
+      expiresAt: '22:00 WIB (10 Jam Tersisa)',
+    },
+    {
+      id: `${arenaId}-j5`,
+      seatNumber: 5,
+      role: 'judge',
+      label: 'KURSI JURI 5',
+      deviceModel: 'LENOVO TAB M10 • ANDROID PWA',
+      pin: saved['5'] || '612 883',
+      status: 'idle',
+      latencyMs: 25,
+      batteryPct: 83,
+      expiresAt: '22:00 WIB (10 Jam Tersisa)',
+    },
+    {
+      id: `${arenaId}-wasit`,
       seatNumber: 0,
       role: 'wasit',
       label: 'MEJA PENGAWAS & WASIT',
       deviceModel: 'LAPTOP WASIT PERSILAT • WEBSOCKET OPERATOR',
-      pin: '662 901',
+      pin: saved['wasit'] || '662 901',
       status: 'online',
       latencyMs: 8,
       batteryPct: 100,
       expiresAt: '22:00 WIB (10 Jam Tersisa)',
     },
     {
-      id: 'g1-sb',
+      id: `${arenaId}-sb`,
       seatNumber: 0,
       role: 'scoreboard',
       label: 'SCOREBOARD TV DISPLAY',
@@ -85,99 +162,38 @@ const arenaData = ref<Record<string, DeviceSeat[]>>({
       batteryPct: 100,
       expiresAt: 'NON-EXPIRING (PUBLIC)',
     },
-  ],
-  'gelanggang-2': [
-    {
-      id: 'g2-j1',
-      seatNumber: 1,
-      role: 'judge',
-      label: 'KURSI JURI 1',
-      deviceModel: 'XIAOMI PAD 6 • CHROME PWA',
-      pin: '118 439',
-      status: 'online',
-      latencyMs: 16,
-      batteryPct: 82,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g2-j2',
-      seatNumber: 2,
-      role: 'judge',
-      label: 'KURSI JURI 2',
-      deviceModel: 'XIAOMI PAD 6 • CHROME PWA',
-      pin: '502 911',
-      status: 'online',
-      latencyMs: 15,
-      batteryPct: 79,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g2-j3',
-      seatNumber: 3,
-      role: 'judge',
-      label: 'KURSI JURI 3',
-      deviceModel: 'XIAOMI PAD 6 • CHROME PWA',
-      pin: '874 320',
-      status: 'online',
-      latencyMs: 19,
-      batteryPct: 85,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g2-wasit',
-      seatNumber: 0,
-      role: 'wasit',
-      label: 'MEJA PENGAWAS & WASIT',
-      deviceModel: 'WORKSTATION MAT 2 • DUAL SCREEN',
-      pin: '904 112',
-      status: 'online',
-      latencyMs: 9,
-      batteryPct: 100,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-  ],
-  'gelanggang-3': [
-    {
-      id: 'g3-j1',
-      seatNumber: 1,
-      role: 'judge',
-      label: 'KURSI JURI 1',
-      deviceModel: 'LENOVO TAB M10 • PWA CLIENT',
-      pin: '339 014',
-      status: 'idle',
-      latencyMs: 24,
-      batteryPct: 75,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g3-j2',
-      seatNumber: 2,
-      role: 'judge',
-      label: 'KURSI JURI 2',
-      deviceModel: 'LENOVO TAB M10 • PWA CLIENT',
-      pin: '612 883',
-      status: 'idle',
-      latencyMs: 22,
-      batteryPct: 70,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g3-j3',
-      seatNumber: 3,
-      role: 'judge',
-      label: 'KURSI JURI 3',
-      deviceModel: 'LENOVO TAB M10 • PWA CLIENT',
-      pin: '445 901',
-      status: 'idle',
-      latencyMs: 26,
-      batteryPct: 73,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-  ],
-  'gelanggang-4': [],
+  ]
+}
+
+function persistArenaPins(arenaId: string) {
+  const seats = arenaData.value[arenaId]
+  if (!seats) return
+  const toSave: Record<string, string> = {}
+  seats.forEach(s => {
+    if (s.role === 'judge') toSave[String(s.seatNumber)] = s.pin
+    if (s.role === 'wasit') toSave['wasit'] = s.pin
+  })
+  try {
+    localStorage.setItem(`device_pins_${arenaId}`, JSON.stringify(toSave))
+  } catch {
+    // ignore
+  }
+}
+
+// Ensure seats exist for selected arena
+const currentSeats = computed(() => {
+  const aid = selectedArena.value
+  if (!aid) return []
+  if (!arenaData.value[aid]) {
+    arenaData.value[aid] = getInitialSeatsForArena(aid)
+  }
+  return arenaData.value[aid]
 })
 
-const currentSeats = computed(() => arenaData.value[selectedArena.value] || [])
+function getSeatCount(arenaId: string): number {
+  const seats = arenaData.value[arenaId] || getInitialSeatsForArena(arenaId)
+  return seats.length
+}
 
 // Toast Notification
 const toast = ref<{ show: boolean; title: string; message: string; type: 'success' | 'info' | 'warning' } | null>(null)
@@ -200,25 +216,29 @@ function copyPin(pin: string, label: string) {
 
 // Reset / Generate Single PIN
 async function generatePinForSeat(seat: DeviceSeat) {
-  const randomPin = String(Math.floor(100000 + Math.random() * 900000))
-  const formattedPin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
+  let randomPin = String(Math.floor(100000 + Math.random() * 900000))
 
-  // Call Go backend if API available
   try {
-    const compId = authStore.competitionId || 'comp-default'
-    await api.post('/api/v1/auth/create-pin', {
+    const compId = compIdRef.value
+    const roleForBackend = seat.role === 'wasit' ? 'wasit' : 'juri'
+    const res = await authApi.createPin({
       competition_id: compId,
       arena_id: selectedArena.value,
-      role: seat.role === 'wasit' ? 'wasit' : 'juri',
+      role: roleForBackend,
       seat_number: seat.seatNumber,
       pin: randomPin,
       ttl_hours: 12,
     })
-  } catch {
-    // Graceful fallback to local reactive state
+    if (res?.pin) {
+      randomPin = res.pin
+    }
+  } catch (err: any) {
+    // Fallback locally
   }
 
+  const formattedPin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
   seat.pin = formattedPin
+  persistArenaPins(selectedArena.value)
   showToast('PIN Diperbarui', `PIN baru untuk ${seat.label}: ${formattedPin}`, 'success')
 }
 
@@ -226,12 +246,11 @@ async function generatePinForSeat(seat: DeviceSeat) {
 async function handleBatchGenerate() {
   const judges = currentSeats.value.filter(s => s.role === 'judge')
   for (const j of judges) {
-    const randomPin = String(Math.floor(100000 + Math.random() * 900000))
-    j.pin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
+    let randomPin = String(Math.floor(100000 + Math.random() * 900000))
 
     try {
-      const compId = authStore.competitionId || 'comp-default'
-      await api.post('/api/v1/auth/create-pin', {
+      const compId = compIdRef.value
+      const res = await authApi.createPin({
         competition_id: compId,
         arena_id: selectedArena.value,
         role: 'juri',
@@ -239,11 +258,17 @@ async function handleBatchGenerate() {
         pin: randomPin,
         ttl_hours: 12,
       })
+      if (res?.pin) {
+        randomPin = res.pin
+      }
     } catch {
       // offline fallback
     }
+
+    j.pin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
   }
-  showToast('Batch Generate Selesai', `Seluruh PIN Juri di ${selectedArena.value.toUpperCase()} berhasil diacak ulang.`, 'success')
+  persistArenaPins(selectedArena.value)
+  showToast('Batch Generate Selesai', `Seluruh PIN Juri di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang.`, 'success')
 }
 
 // Ping / Test Device Vibrations
@@ -265,12 +290,11 @@ const customPinInput = ref('')
 const customTtl = ref(12)
 
 async function handleSaveCustomPin() {
-  const pinValue = customPinInput.value || String(Math.floor(100000 + Math.random() * 900000))
-  const formatted = `${pinValue.slice(0, 3)} ${pinValue.slice(3)}`
+  let pinValue = customPinInput.value || String(Math.floor(100000 + Math.random() * 900000))
 
   try {
-    const compId = authStore.competitionId || 'comp-default'
-    await api.post('/api/v1/auth/create-pin', {
+    const compId = compIdRef.value
+    const res = await authApi.createPin({
       competition_id: compId,
       arena_id: selectedArena.value,
       role: customRole.value,
@@ -278,16 +302,25 @@ async function handleSaveCustomPin() {
       pin: pinValue,
       ttl_hours: customTtl.value,
     })
+    if (res?.pin) {
+      pinValue = res.pin
+    }
   } catch {
     // Fallback
   }
 
+  const formatted = `${pinValue.slice(0, 3)} ${pinValue.slice(3)}`
   // Update in array if exists
-  const existing = currentSeats.value.find(s => s.role === customRole.value && s.seatNumber === customSeat.value)
+  const existing = currentSeats.value.find(s => {
+    if (customRole.value === 'juri') return s.role === 'judge' && s.seatNumber === customSeat.value
+    if (customRole.value === 'wasit') return s.role === 'wasit'
+    return false
+  })
   if (existing) {
     existing.pin = formatted
   }
 
+  persistArenaPins(selectedArena.value)
   showToast('PIN Berhasil Dibuat', `PIN ${customRole.value.toUpperCase()} (${formatted}) berhasil disimpan.`, 'success')
   showCustomPinModal.value = false
   customPinInput.value = ''
@@ -346,43 +379,15 @@ async function handleSaveCustomPin() {
     <!-- ARENA SELECTOR TABS -->
     <div class="arena-tabs-row font-mono">
       <button
+        v-for="arena in displayArenas"
+        :key="arena.id"
         class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-1' }"
-        @click="selectedArena = 'gelanggang-1'"
+        :class="{ 'arena-tab-btn--active': selectedArena === arena.id }"
+        @click="selectedArena = arena.id"
       >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-1' }" />
-        GELANGGANG 1 (UTAMA)
-        <span class="arena-count-badge">5 ALAT</span>
-      </button>
-
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-2' }"
-        @click="selectedArena = 'gelanggang-2'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-2' }" />
-        GELANGGANG 2
-        <span class="arena-count-badge">4 ALAT</span>
-      </button>
-
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-3' }"
-        @click="selectedArena = 'gelanggang-3'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-3' }" />
-        GELANGGANG 3
-        <span class="arena-count-badge">3 ALAT</span>
-      </button>
-
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-4' }"
-        @click="selectedArena = 'gelanggang-4'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-4' }" />
-        GELANGGANG 4
-        <span class="arena-count-badge">0 ALAT</span>
+        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === arena.id }" />
+        {{ arena.name.toUpperCase() }}
+        <span class="arena-count-badge">{{ getSeatCount(arena.id) }} ALAT</span>
       </button>
     </div>
 
@@ -482,7 +487,7 @@ async function handleSaveCustomPin() {
 
           <router-link
             v-if="seat.role === 'judge'"
-            :to="`/judge?arena_id=${selectedArena}&seat=${seat.seatNumber}`"
+            :to="`/judge?arena_id=${selectedArena}&seat=${seat.seatNumber}&comp_id=${compIdRef}`"
             target="_blank"
             class="card-action-link"
           >
@@ -491,7 +496,7 @@ async function handleSaveCustomPin() {
 
           <router-link
             v-if="seat.role === 'wasit'"
-            :to="`/referee?arena_id=${selectedArena}`"
+            :to="`/referee?arena_id=${selectedArena}&comp_id=${compIdRef}`"
             target="_blank"
             class="card-action-link"
           >
@@ -519,10 +524,9 @@ async function handleSaveCustomPin() {
         <div class="pin-form-group">
           <label class="font-mono">PILIH GELANGGANG</label>
           <select v-model="selectedArena" class="pin-form-select font-mono">
-            <option value="gelanggang-1">GELANGGANG 1 (UTAMA)</option>
-            <option value="gelanggang-2">GELANGGANG 2</option>
-            <option value="gelanggang-3">GELANGGANG 3</option>
-            <option value="gelanggang-4">GELANGGANG 4</option>
+            <option v-for="arena in displayArenas" :key="arena.id" :value="arena.id">
+              {{ arena.name.toUpperCase() }}
+            </option>
           </select>
         </div>
 
@@ -603,7 +607,7 @@ async function handleSaveCustomPin() {
               <span class="slip-logo">PS</span>
               <div>
                 <div class="slip-title">PENCAK SILAT DIGITAL SCORING</div>
-                <div class="slip-sub">{{ selectedArena.toUpperCase() }}</div>
+                <div class="slip-sub">{{ activeArenaObj.name.toUpperCase() }}</div>
               </div>
             </div>
             <div class="slip-seat">{{ seat.label }}</div>
@@ -1036,6 +1040,13 @@ async function handleSaveCustomPin() {
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
+}
+
+.print-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
 .printable-slips-container {
