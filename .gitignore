@@ -12,3 +12,4 @@ bin
 # Frontend
 node_modules
 apps/web/dist
+apps/web/design

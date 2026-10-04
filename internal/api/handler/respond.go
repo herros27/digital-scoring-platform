@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/herros27/digital-scoring/internal/logger"
 )
 
 var validate *validator.Validate
@@ -133,6 +134,9 @@ func Ok(w http.ResponseWriter, data any) {
 }
 
 func Fail(w http.ResponseWriter, status int, code, message string, details any) {
+	if logger.Log != nil {
+		logger.Log.Warn("API Error", "status", status, "code", code, "message", message)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]any{

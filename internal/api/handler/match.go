@@ -69,7 +69,8 @@ func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 	tokenStr := r.URL.Query().Get("token")
 	if tokenStr == "" {
-		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing token", nil)
+		// Scoreboard display publik / penonton tidak memerlukan autentikasi
+		h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, "public-scoreboard", hub.RoleScoreboard, 0)
 		return
 	}
 	claims, err := auth.ParseToken(tokenStr)
@@ -77,13 +78,26 @@ func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 		return
 	}
-	// pastikan token scoped ke arena yang benar
-	if claims.ArenaID != arenaID {
-		Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch", nil)
-		return
+
+	role := hub.Role(claims.Role)
+	if claims.Role == "juri" || claims.Role == "judge" {
+		role = hub.RoleJudge
+		if claims.ArenaID != "" && claims.ArenaID != arenaID {
+			Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch", nil)
+			return
+		}
+	} else if claims.Role == "wasit" || claims.Role == "referee" {
+		role = hub.RoleReferee
+	} else if claims.Role == "admin" || claims.Role == "dewan" {
+		role = hub.RoleAdmin
 	}
 
-	h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, claims.JudgePinID, hub.Role(claims.Role), claims.SeatNumber)
+	clientID := claims.JudgePinID
+	if clientID == "" {
+		clientID = "client-" + string(role)
+	}
+
+	h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, clientID, role, claims.SeatNumber)
 }
 
 // POST /api/v1/competitions/{comp_id}/matches/{id}/load-arena

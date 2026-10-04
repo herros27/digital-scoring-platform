@@ -407,6 +407,17 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 		"round":      round,
 	}, "")
 
+	o.h.Broadcast(hub.Message{
+		Type: "score_confirmed",
+		Payload: map[string]any{
+			"score_type": string(result.ScoreType),
+			"target":     string(result.Target),
+			"points":     pts,
+			"count":      result.Count,
+			"round":      round,
+		},
+	})
+
 	o.broadcastScoreUpdate(round)
 
 	// cek win condition (KO, point difference)
