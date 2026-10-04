@@ -188,6 +188,30 @@ paths:
         '401':
           description: Email atau password salah
 
+  /api/v1/auth/logout:
+    post:
+      summary: Logout Sesi Pengguna
+      description: Konfirmasi logout dari server. Pada arsitektur Stateless JWT, klien wajib menghapus token dari storage lokal.
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Berhasil logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "OK"
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "successfully logged out"
+
   /api/v1/auth/create-pin:
     post:
       summary: Generate PIN Baru untuk Petugas Pertandingan (Admin / Dewan)

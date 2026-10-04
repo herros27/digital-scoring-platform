@@ -93,3 +93,12 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, res)
 }
+
+// POST /api/v1/auth/logout
+// ponytail: stateless JWT logout. Token destruction is client-side (clearing localStorage/Pinia).
+// Upgrade path: Redis/in-memory token blacklist (JTI revocation) if immediate invalidation is required.
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	Ok(w, map[string]string{
+		"message": "successfully logged out",
+	})
+}

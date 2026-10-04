@@ -138,7 +138,33 @@ curl -X POST http://localhost:8080/api/v1/auth/judge-login \
 
 ---
 
-## 4. Endpoint Publik & Display Scoreboard (Tanpa Autentikasi)
+## 4. Logout Sesi (`POST /api/v1/auth/logout`)
+
+Digunakan untuk konfirmasi logout dari aplikasi.
+
+> **Mekanisme Stateless JWT:**  
+> Pada sistem berbasis token JWT murni, penghancuran sesi utama dilakukan di sisi **Frontend / Client** dengan menghapus token dari `localStorage` atau Pinia store (`authStore.logout()`).  
+> Endpoint ini disediakan agar klien dapat melakukan *handshake* logout formal ke server.
+
+### Contoh Request Logout:
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/logout \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+### Format Response:
+```json
+{
+  "code": "OK",
+  "data": {
+    "message": "successfully logged out"
+  }
+}
+```
+
+---
+
+## 5. Endpoint Publik & Display Scoreboard (Tanpa Autentikasi)
 
 Endpoint berikut dapat dibuka langsung di browser atau perangkat scoreboard penonton tanpa header Authorization:
 
@@ -157,7 +183,7 @@ Endpoint berikut dapat dibuka langsung di browser atau perangkat scoreboard peno
 
 ---
 
-## 5. Koneksi Real-Time WebSocket
+## 6. Koneksi Real-Time WebSocket
 
 Untuk menghubungkan klien tablet juri, wasit, atau scoreboard ke real-time engine:
 

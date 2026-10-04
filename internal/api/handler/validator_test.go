@@ -135,3 +135,28 @@ func TestValidator_NonStructSafeBypass(t *testing.T) {
 		t.Fatalf("unexpected map value: %v", m)
 	}
 }
+
+func TestAuthHandler_Logout(t *testing.T) {
+	h := &AuthHandler{}
+	req := httptest.NewRequest("POST", "/api/v1/auth/logout", nil)
+	rec := httptest.NewRecorder()
+
+	h.Logout(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got: %d", rec.Code)
+	}
+
+	var res struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Message string `json:"message"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !res.Success || res.Data.Message != "successfully logged out" {
+		t.Fatalf("unexpected logout response: %+v", res)
+	}
+}
