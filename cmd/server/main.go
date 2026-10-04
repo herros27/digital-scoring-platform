@@ -36,6 +36,21 @@ func main() {
 		}
 	}
 
+	if cfg.SeedData {
+		if summary, err := store.SeedData(db); err != nil {
+			logger.Log.Error("database seed failed", "error", err)
+		} else {
+			logger.Log.Info("🌱 database seed applied successfully",
+				"officials", summary.Officials,
+				"contingents", summary.Contingents,
+				"athletes", summary.Athletes,
+				"participants", summary.Participants,
+				"matches", summary.Matches,
+				"judge_pins", summary.JudgePins,
+			)
+		}
+	}
+
 	// 4. Hub Manager & Router
 	hubManager := hub.NewManager()
 	router := api.NewRouter(db, hubManager)

@@ -13,6 +13,7 @@ type Config struct {
 	DBURL       string `env:"DB_URL" envDefault:"postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"`
 	JWTSecret   string `env:"JWT_SECRET" envDefault:"dev-secret-change-in-prod"`
 	AutoMigrate bool   `env:"AUTO_MIGRATE" envDefault:"true"`
+	SeedData    bool   `env:"SEED_DATA" envDefault:"false"`
 }
 
 // Load loads configuration from optional .env files and environment variables into Config.
