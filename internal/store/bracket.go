@@ -121,4 +121,4 @@ func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
 	}
 
 	return nil
-}
+}

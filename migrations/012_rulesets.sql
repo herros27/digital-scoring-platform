@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE rulesets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
@@ -6,5 +7,8 @@ CREATE TABLE rulesets (
     status VARCHAR(50) DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
--- unique constraint on name+version
 CREATE UNIQUE INDEX idx_rulesets_name_version ON rulesets(name, version);
+
+-- +goose Down
+DROP INDEX IF EXISTS idx_rulesets_name_version;
+DROP TABLE IF EXISTS rulesets;

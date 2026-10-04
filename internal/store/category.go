@@ -2,7 +2,6 @@ package store
 
 import "database/sql"
 
-
 type CategoryStore struct {
 	DB *sql.DB
 }
@@ -37,4 +36,3 @@ func (s *CategoryStore) ListByCompetition(competitionID string) ([]Category, err
 	}
 	return list, rows.Err()
 }
-

@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE judge_pins (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
@@ -7,3 +8,6 @@ CREATE TABLE judge_pins (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS judge_pins;

@@ -13,8 +13,8 @@ type OfficialHandler struct {
 // POST /api/v1/auth/login
 func (h *OfficialHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=1"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -46,10 +46,10 @@ func (h *OfficialHandler) List(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/officials
 func (h *OfficialHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
+		Name     string `json:"name" validate:"required,min=2,max=100"`
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=6"`
+		Role     string `json:"role" validate:"required,oneof=admin dewan wasit juri operator"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -80,8 +80,8 @@ func (h *OfficialHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *OfficialHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req struct {
-		Name string `json:"name"`
-		Role string `json:"role"`
+		Name string `json:"name" validate:"required,min=2,max=100"`
+		Role string `json:"role" validate:"required,oneof=admin dewan wasit juri operator"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)

@@ -4,7 +4,7 @@ import "time"
 
 type Competition struct {
 	ID          string    `json:"id"`
-	Name        string    `json:"name"`
+	Name        string    `json:"name" validate:"required,min=2,max=100"`
 	Location    string    `json:"location"`
 	StartDate   string    `json:"start_date"`
 	EndDate     string    `json:"end_date"`
@@ -39,8 +39,8 @@ type Match struct {
 	CompetitionID string     `json:"competition_id"`
 	ArenaID       string     `json:"arena_id"`
 	BracketSlotID string     `json:"bracket_slot_id"`
-	AthleteRedID  string     `json:"athlete_red_id"`
-	AthleteBlueID string     `json:"athlete_blue_id"`
+	AthleteRedID  string     `json:"athlete_red_id" validate:"required"`
+	AthleteBlueID string     `json:"athlete_blue_id" validate:"required"`
 	CurrentRound  int        `json:"current_round"`
 	Status        string     `json:"status"`
 	WinnerID      string     `json:"winner_id"`
@@ -119,9 +119,9 @@ type JudgePin struct {
 type Athlete struct {
 	ID           string    `json:"id"`
 	ContingentID string    `json:"contingent_id,omitempty"`
-	Name         string    `json:"name"`
-	Gender       string    `json:"gender"`
-	Team         string    `json:"team"`
+	Name         string    `json:"name" validate:"required,min=2,max=100"`
+	Gender       string    `json:"gender" validate:"required,oneof=male female putra putri"`
+	Team         string    `json:"team" validate:"required,min=1,max=100"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 

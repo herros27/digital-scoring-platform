@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/herros27/digital-scoring/internal/metrics"
 )
 
 var upgrader = websocket.Upgrader{
@@ -42,12 +43,14 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.clients[client] = true
 			log.Printf("[hub:%s] client connected: %s (%s)", h.ArenaID, client.ID, client.Role)
+			metrics.IncWSConnections(h.ArenaID, string(client.Role))
 
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
 				log.Printf("[hub:%s] client disconnected: %s", h.ArenaID, client.ID)
+				metrics.DecWSConnections(h.ArenaID, string(client.Role))
 			}
 
 		case inbound := <-h.inbound:
@@ -67,6 +70,7 @@ func (h *Hub) Broadcast(msg Message) {
 		default:
 			close(client.send)
 			delete(h.clients, client)
+			metrics.DecWSConnections(h.ArenaID, string(client.Role))
 		}
 	}
 }

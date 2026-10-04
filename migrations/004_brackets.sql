@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE bracket_slots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
@@ -10,3 +11,6 @@ CREATE TABLE bracket_slots (
     winner_id UUID REFERENCES participants(id),
     next_slot_id UUID REFERENCES bracket_slots(id)
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS bracket_slots;

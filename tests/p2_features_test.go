@@ -40,11 +40,11 @@ type mockPagedCompRepo struct {
 	comps []domain.Competition
 }
 
-func (m *mockPagedCompRepo) Create(c *domain.Competition) error          { return nil }
+func (m *mockPagedCompRepo) Create(c *domain.Competition) error             { return nil }
 func (m *mockPagedCompRepo) GetByID(id string) (*domain.Competition, error) { return nil, nil }
 func (m *mockPagedCompRepo) List() ([]domain.Competition, error)            { return m.comps, nil }
 func (m *mockPagedCompRepo) UpdateStatus(id, status string) error           { return nil }
-func (m *mockPagedCompRepo) Update(c *domain.Competition) error                 { return nil }
+func (m *mockPagedCompRepo) Update(c *domain.Competition) error             { return nil }
 
 type mockPagedMatchRepo struct {
 	*mockMatchRepo
@@ -72,11 +72,15 @@ type mockPagedAthleteRepo struct {
 	athletes []domain.Athlete
 }
 
-func (m *mockPagedAthleteRepo) Create(a *domain.Athlete) error { return nil }
+func (m *mockPagedAthleteRepo) Create(a *domain.Athlete) error             { return nil }
 func (m *mockPagedAthleteRepo) GetByID(id string) (*domain.Athlete, error) { return nil, nil }
-func (m *mockPagedAthleteRepo) List() ([]domain.Athlete, error) { return m.athletes, nil }
-func (m *mockPagedAthleteRepo) RegisterToCompetition(competitionID, athleteID, weightClass, gender string) error { return nil }
-func (m *mockPagedAthleteRepo) ListByCompetition(competitionID string) ([]domain.Athlete, error) { return nil, nil }
+func (m *mockPagedAthleteRepo) List() ([]domain.Athlete, error)            { return m.athletes, nil }
+func (m *mockPagedAthleteRepo) RegisterToCompetition(competitionID, athleteID, weightClass, gender string) error {
+	return nil
+}
+func (m *mockPagedAthleteRepo) ListByCompetition(competitionID string) ([]domain.Athlete, error) {
+	return nil, nil
+}
 
 func TestPaginationAndFiltering(t *testing.T) {
 	// 1. Competitions Pagination & Status Filter

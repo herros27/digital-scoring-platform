@@ -5,12 +5,14 @@ import (
 	"net/http"
 
 	"github.com/herros27/digital-scoring/internal/auth"
+	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type AthleteHandler struct {
 	Service *service.AthleteService
+	Cache   *cache.Cache
 }
 
 func (h *AthleteHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +71,7 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		Name        string `json:"name"`
 		Gender      string `json:"gender"`
 		Team        string `json:"team"`
-		WeightClass string `json:"weight_class"`
+		WeightClass string `json:"weight_class" validate:"required"`
 	}
 
 	var req RegisterRequest
@@ -112,6 +114,10 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	Ok(w, map[string]string{
 		"competition_id": compID,
@@ -124,6 +130,7 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 
 // PUT /api/v1/competitions/{comp_id}/participants/{id}/verify
 func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
 	participantID := r.PathValue("id")
 	if participantID == "" {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "participant id is required", nil)
@@ -131,21 +138,20 @@ func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Status string `json:"status"` // "verified" or "rejected"
+		Status string `json:"status" validate:"required,oneof=verified rejected"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
-	if req.Status != "verified" && req.Status != "rejected" {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "status must be 'verified' or 'rejected'", nil)
-		return
-	}
-
 	if err := h.Service.VerifyParticipant(participantID, req.Status); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
+	}
+
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
 	}
 
 	Ok(w, map[string]string{

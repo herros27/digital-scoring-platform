@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE match_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -9,3 +10,8 @@ CREATE TABLE match_events (
 
 CREATE INDEX idx_match_events_match_id ON match_events(match_id);
 CREATE INDEX idx_match_events_created_at ON match_events(created_at);
+
+-- +goose Down
+DROP INDEX IF EXISTS idx_match_events_created_at;
+DROP INDEX IF EXISTS idx_match_events_match_id;
+DROP TABLE IF EXISTS match_events;

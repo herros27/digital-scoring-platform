@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // NewDB initializes the PostgreSQL connection pool.
@@ -24,7 +24,7 @@ func NewDB(dsnOverride ...string) *sql.DB {
 		dsn = "postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"
 	}
 
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatalf("failed to open db: %v", err)
 	}

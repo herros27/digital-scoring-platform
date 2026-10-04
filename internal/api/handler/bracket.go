@@ -3,12 +3,14 @@ package handler
 import (
 	"net/http"
 
+	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type BracketHandler struct {
 	Service        *service.BracketService
 	AthleteService *service.AthleteService
+	Cache          *cache.Cache
 }
 
 // POST /api/v1/competitions/{comp_id}/brackets/generate
@@ -17,8 +19,8 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 
 	var req struct {
-		WeightClass    string   `json:"weight_class"`
-		Gender         string   `json:"gender"`
+		WeightClass    string   `json:"weight_class" validate:"required"`
+		Gender         string   `json:"gender" validate:"required,oneof=male female putra putri"`
 		ParticipantIDs []string `json:"participant_ids"`
 	}
 
@@ -65,6 +67,10 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
+	}
+
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
 	}
 
 	w.WriteHeader(http.StatusCreated)

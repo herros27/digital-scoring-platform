@@ -269,7 +269,7 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 		o.sendError(client, "FORBIDDEN", "only judges can submit scores")
 		return
 	}
-	
+
 	// scoring hanya boleh di state ROUND
 	if !o.sm.IsInRound() {
 		o.sendError(client, "SCORING_NOT_ALLOWED", fmt.Sprintf("state is %s", o.sm.Current()))
@@ -665,11 +665,11 @@ func (o *Orchestrator) broadcastScoreUpdate(round int) {
 	o.h.Broadcast(hub.Message{
 		Type: hub.MsgScoreUpdate,
 		Payload: map[string]any{
-			"round":              round,
-			"red_technical":      o.scores[round].RedTechnical,
-			"blue_technical":     o.scores[round].BlueTechnical,
-			"red_penalties":      o.scores[round].RedPenalties,
-			"blue_penalties":     o.scores[round].BluePenalties,
+			"round":          round,
+			"red_technical":  o.scores[round].RedTechnical,
+			"blue_technical": o.scores[round].BlueTechnical,
+			"red_penalties":  o.scores[round].RedPenalties,
+			"blue_penalties": o.scores[round].BluePenalties,
 		},
 	})
 }
@@ -731,4 +731,4 @@ func (o *Orchestrator) Finish() error {
 
 func (o *Orchestrator) Cancel() error {
 	return o.doCancel()
-}
+}

@@ -1,10 +1,9 @@
-package tests
+package service
 
 import (
 	"testing"
 
 	"github.com/herros27/digital-scoring/internal/domain"
-	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type mockCategoryRepo struct {
@@ -35,7 +34,7 @@ func (m *mockCategoryRepo) ListByCompetition(compID string) ([]domain.Category, 
 
 func TestCategoryService_ValidationAndCRUD(t *testing.T) {
 	repo := &mockCategoryRepo{categories: make(map[string]*domain.Category)}
-	svc := service.NewCategoryService(repo)
+	svc := NewCategoryService(repo)
 
 	// 1. Validation errors
 	if err := svc.CreateCategory(&domain.Category{}); err == nil {

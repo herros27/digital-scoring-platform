@@ -9,9 +9,11 @@ Backend system untuk **Pencak Silat Kategori Tanding** dengan real-time scoring,
 | Layer | Technology |
 |-------|------------|
 | Backend API + WS | Go 1.27 (stdlib `net/http` + `gorilla/websocket`) |
-| Rules Engine | Go struct-based, rule set dari JSON/DB |
-| Database | PostgreSQL 16 (`pgx`/`lib/pq` driver) |
-| Auth | PIN (bcrypt) + JWT (HS256) |
+| Rules Engine | Go struct-based, dynamic rule set dari JSON/DB |
+| Database | PostgreSQL 16 (`jackc/pgx/v5` driver via stdlib) |
+| Auth & Security | PIN (bcrypt) + JWT (HS256) + Token Bucket Rate Limiting (`golang.org/x/time/rate`) |
+| Validation | `go-playground/validator/v10` |
+| Caching & Metrics | In-Memory TTL Cache (`internal/cache`) + Prometheus (`internal/metrics`) |
 | Deployment | Single binary + systemd + Caddy reverse proxy |
 
 ---
@@ -21,24 +23,28 @@ Backend system untuk **Pencak Silat Kategori Tanding** dengan real-time scoring,
 ```
 cmd/server/main.go           # Entry point & graceful shutdown
 internal/
-  api/                       # HTTP handlers, router, middleware (JWT, RBAC, CORS)
+  api/                       # HTTP handlers, router, middleware (JWT, RBAC, CORS, RateLimit)
     handler/                 # REST handlers (auth, competition, match, arena, bracket, official, contingent, report, live)
     swagger.go               # Swagger UI + OpenAPI spec
   auth/                      # Random PIN generation (crypto/rand), bcrypt, JWT claims (role & seat)
   bracket/                   # Single-elimination bracket generator & tree traversal
+  cache/                     # In-memory TTL report cache with concurrent invalidation
+  config/                    # Centralized environment & app settings (godotenv + env/v11)
   consensus/                 # Dynamic judge consensus engine (sliding window voting)
+  domain/                    # Core domain models & sentinel errors (zero dependency)
   hub/                       # WebSocket hub per arena (role-based broadcast & reconnect sync)
   logger/                    # Structured logging (slog)
+  metrics/                   # Prometheus observability (/metrics)
   orchestrator/              # Match orchestrator, server-side timer, event deduplication
-  rules/                     # Rules engine (data-driven dari JSON)
+  rules/                     # Rules engine (data-driven dari JSON & dynamic DB resolver)
   service/                   # Business logic layer (match, comp, arena, bracket, official, contingent, report)
   statemachine/              # Match state machine (idle → ready → rounds → finished → cancelled)
-  store/                     # Repository layer (PostgreSQL connection pool & queries)
+  store/                     # Repository layer (PostgreSQL connection pool & pgx/v5 queries)
 rulesets/
   ipsi_2024.json             # IPSI 2024 ruleset
   persilat_v7.json           # PERSILAT ruleset
-migrations/                  # SQL migrations (001 s/d 016)
-tests/                       # 37 automated unit & QA test suite (100% PASS)
+migrations/                  # SQL migrations (001 s/d 016) + Auto-migration engine
+tests/                       # End-to-end integration test scenarios (tournament lifecycle & workflows)
 docker-compose.yml           # Local PostgreSQL
 docs/openapi.yaml            # OpenAPI 3.0 spec & WebSocket protocol contracts
 ```
@@ -162,11 +168,12 @@ export JWT_SECRET="your-production-secret-here"
 export ENV="development"  # atau "production"
 ```
 
-### 3. Run Migrations
+### 3. Run Migrations (Otomatis)
+Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 016) akan otomatis diterapkan:
 ```bash
-# Using golang-migrate
-migrate -path migrations -database "$DB_URL" up
+go run ./cmd/server
 ```
+*(Opsional: set env `AUTO_MIGRATE=false` jika ingin menonaktifkan auto-migrasi).*
 
 ### 4. Build & Run
 ```bash
@@ -414,16 +421,25 @@ Returns: DB status, active arenas, active matches, WS connections.
 ```bash
 go test -v -count=1 ./...
 ```
-Menjalankan seluruh **40 automated unit & regression tests** (100% PASS) di folder `tests/` yang mencakup:
-- Match State Machine & Server-side Timer
-- Match Orchestrator & Crash Recovery
-- Consensus Engine (Majority, Deduplication, Disqualification)
-- Single Elimination Bracket Generator & Tree Progression
-- 3 Auth Flows (Officials bcrypt, Judge PIN/Seat, Contingent Portal)
-- Participant Verification Workflow & Bracket Safeguard
-- Dynamic Rulesets CRUD & Database-driven Engine Binding
-- Idempotent Score Submission (`Idempotency-Key`)
-- Admin Reports (Summary, Medals, Full JSON Export)
+Menjalankan seluruh **automated unit tests** (co-located di `internal/`) dan **integration test scenarios** (di `tests/`) dengan hasil 100% PASS:
+- **Unit Tests (`internal/`)**:
+  - `internal/auth`: Token issuance, verification, expiration, seat number, bcrypt PIN
+  - `internal/bracket`: Single elimination tree generator, BYE handling, auto-advance
+  - `internal/consensus`: Majority voting (2/3), sliding window (3s), duplicate suppression
+  - `internal/statemachine`: Round lifecycle flow, invalid transitions, early finish
+  - `internal/rules`: Dynamic loader & default ruleset configuration (IPSI / PERSILAT)
+  - `internal/service`: Category & validation logic
+  - `internal/cache`: TTL cache hit/miss, concurrent invalidation
+  - `internal/metrics`: Prometheus metric vectors & latency histogram
+  - `internal/config`: Environment parser & defaults
+  - `internal/api`: Token bucket rate limiting middleware & struct validator
+- **Integration Tests (`tests/`)**:
+  - `tests/contingent_test.go`: End-to-end contingent portal, athlete registration & verification
+  - `tests/match_service_test.go`: Full match lifecycle, timer, WebSocket broadcast & scoring
+  - `tests/official_and_report_test.go`: Tournament report aggregation, medals table, export
+  - `tests/ruleset_crud_test.go`: Dynamic database ruleset CRUD integration
+  - `tests/admin_features_test.go`: Arena CRUD & Competition administrative operations
+  - `tests/p1_features_test.go` & `tests/p2_features_test.go`: Phase 1 & 2 feature regression tests
 
 ### Generate Migration
 ```bash

@@ -29,10 +29,10 @@ func NewRulesetService(repo RulesetRepository) *RulesetService {
 }
 
 type CreateRulesetInput struct {
-	Name    string             `json:"name"`
-	Version string             `json:"version"`
-	Scoring rules.ScoringRule  `json:"scoring"`
-	Status  string             `json:"status"`
+	Name    string            `json:"name" validate:"required,min=2,max=100"`
+	Version string            `json:"version" validate:"required"`
+	Scoring rules.ScoringRule `json:"scoring"`
+	Status  string            `json:"status" validate:"omitempty,oneof=draft active archived"`
 }
 
 // CreateRuleset membuat ruleset baru secara dinamis

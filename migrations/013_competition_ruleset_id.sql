@@ -1,2 +1,5 @@
+-- +goose Up
 ALTER TABLE competitions ADD COLUMN IF NOT EXISTS ruleset_id UUID REFERENCES rulesets(id);
--- optionally keep ruleset_name for backward compat during migration
+
+-- +goose Down
+ALTER TABLE competitions DROP COLUMN IF EXISTS ruleset_id;

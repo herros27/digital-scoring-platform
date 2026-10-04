@@ -1,7 +1,25 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scoring-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENV=production
+      - DB_URL=postgres://scoring_user@postgres:5432/digital_scoring?sslmode=disable
+      - JWT_SECRET=change-this-in-production-secret-key-123
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     container_name: scoring-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: digital_scoring
       POSTGRES_USER: scoring_user
@@ -11,6 +29,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scoring_user -d digital_scoring"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

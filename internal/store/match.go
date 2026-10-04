@@ -22,12 +22,12 @@ func (s *MatchStore) Create(m *Match) error {
 		arenaID = nil
 	}
 	return s.DB.QueryRow(query,
-		m.CompetitionID, 
-		arenaID, 
+		m.CompetitionID,
+		arenaID,
 		bracketSlotID,
-		m.AthleteRedID, 
-		m.AthleteBlueID, 
-		m.CurrentRound, 
+		m.AthleteRedID,
+		m.AthleteBlueID,
+		m.CurrentRound,
 		m.Status,
 	).Scan(&m.ID, &m.CreatedAt)
 }
@@ -39,17 +39,17 @@ func (s *MatchStore) GetByID(id string) (*Match, error) {
 	var arenaID, bracketSlotID, winnerID sql.NullString
 
 	err := s.DB.QueryRow(query, id).Scan(
-		&m.ID, 
-		&m.CompetitionID, 
-		&arenaID, 
+		&m.ID,
+		&m.CompetitionID,
+		&arenaID,
 		&bracketSlotID,
-		&m.AthleteRedID, 
-		&m.AthleteBlueID, 
-		&m.CurrentRound, 
+		&m.AthleteRedID,
+		&m.AthleteBlueID,
+		&m.CurrentRound,
 		&m.Status,
-		&winnerID, 
-		&m.CreatedAt, 
-		&m.StartedAt, 
+		&winnerID,
+		&m.CreatedAt,
+		&m.StartedAt,
 		&m.FinishedAt,
 	)
 	if err != nil {

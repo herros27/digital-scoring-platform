@@ -104,5 +104,5 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 }
 
 func slotKey(round, index int) string {
-	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(string(rune(round*1000 + index)))).String()
+	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(string(rune(round*1000+index)))).String()
 }

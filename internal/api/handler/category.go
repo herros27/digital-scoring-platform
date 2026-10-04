@@ -19,13 +19,24 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var c domain.Category
-	if err := Decode(r, &c); err != nil {
+	var req struct {
+		Name        string  `json:"name" validate:"required,min=2,max=100"`
+		Gender      string  `json:"gender" validate:"required,oneof=male female putra putri"`
+		WeightClass string  `json:"weight_class" validate:"required"`
+		RulesetID   *string `json:"ruleset_id,omitempty"`
+	}
+	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
-	c.CompetitionID = compID
+	c := domain.Category{
+		CompetitionID: compID,
+		Name:          req.Name,
+		Gender:        req.Gender,
+		WeightClass:   req.WeightClass,
+		RulesetID:     req.RulesetID,
+	}
 	if err := h.Service.CreateCategory(&c); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return

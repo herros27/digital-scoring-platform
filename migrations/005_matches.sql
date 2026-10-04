@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE matches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
@@ -12,3 +13,6 @@ CREATE TABLE matches (
     started_at TIMESTAMPTZ,
     finished_at TIMESTAMPTZ
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS matches;

@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS contingents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -10,3 +11,8 @@ CREATE TABLE IF NOT EXISTS contingents (
 
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS contingent_id UUID REFERENCES contingents(id);
 ALTER TABLE participants ADD COLUMN IF NOT EXISTS contingent_id UUID REFERENCES contingents(id);
+
+-- +goose Down
+ALTER TABLE participants DROP COLUMN IF EXISTS contingent_id;
+ALTER TABLE athletes DROP COLUMN IF EXISTS contingent_id;
+DROP TABLE IF EXISTS contingents;

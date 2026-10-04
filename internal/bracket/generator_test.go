@@ -1,22 +1,21 @@
-package tests
+package bracket
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/herros27/digital-scoring/internal/bracket"
 	"github.com/herros27/digital-scoring/internal/store"
 )
 
 func TestBracketGenerator_FewerThanTwoParticipants(t *testing.T) {
 	// 0 participants
-	slots0 := bracket.GenerateSlots("comp-1", "A", "male", []string{})
+	slots0 := GenerateSlots("comp-1", "A", "male", []string{})
 	if slots0 != nil {
 		t.Fatalf("expected nil for 0 participants, got %d slots", len(slots0))
 	}
 
 	// 1 participant
-	slots1 := bracket.GenerateSlots("comp-1", "A", "male", []string{"p1"})
+	slots1 := GenerateSlots("comp-1", "A", "male", []string{"p1"})
 	if slots1 != nil {
 		t.Fatalf("expected nil for 1 participant, got %d slots", len(slots1))
 	}
@@ -24,7 +23,7 @@ func TestBracketGenerator_FewerThanTwoParticipants(t *testing.T) {
 
 func TestBracketGenerator_TwoParticipants(t *testing.T) {
 	participants := []string{"p1", "p2"}
-	slots := bracket.GenerateSlots("comp-1", "A", "male", participants)
+	slots := GenerateSlots("comp-1", "A", "male", participants)
 
 	// 2 participants = 1 round (Final) with 2 slots
 	if len(slots) != 2 {
@@ -49,7 +48,7 @@ func TestBracketGenerator_TwoParticipants(t *testing.T) {
 
 func TestBracketGenerator_FourParticipants(t *testing.T) {
 	participants := []string{"p1", "p2", "p3", "p4"}
-	slots := bracket.GenerateSlots("comp-1", "B", "female", participants)
+	slots := GenerateSlots("comp-1", "B", "female", participants)
 
 	// 4 participants = 4 slots (round 1) + 2 slots (round 2/final) = 6 slots
 	if len(slots) != 6 {
@@ -86,7 +85,7 @@ func TestBracketGenerator_FourParticipants(t *testing.T) {
 
 func TestBracketGenerator_WithByes_ThreeParticipants(t *testing.T) {
 	participants := []string{"p1", "p2", "p3"}
-	slots := bracket.GenerateSlots("comp-1", "C", "male", participants)
+	slots := GenerateSlots("comp-1", "C", "male", participants)
 
 	// bracketSize is nextPowerOfTwo(3) = 4 -> 4 slots in R1, 2 slots in R2 = 6 total slots
 	if len(slots) != 6 {
@@ -105,7 +104,6 @@ func TestBracketGenerator_WithByes_ThreeParticipants(t *testing.T) {
 	}
 
 	// The participant paired with the BYE slot (index 2 paired with index 3) must be auto-advanced
-	// SlotIndex 2 has opponent 3. Since 3 is BYE, slot 2 should have WinnerID set to its ParticipantID
 	var autoAdvancedSlotFound bool
 	for _, s := range r1Slots {
 		if s.ParticipantID != nil && s.WinnerID != nil && *s.WinnerID == *s.ParticipantID {
@@ -127,7 +125,7 @@ func TestBracketGenerator_EightParticipants(t *testing.T) {
 		participants = append(participants, fmt.Sprintf("p%d", i))
 	}
 
-	slots := bracket.GenerateSlots("comp-1", "D", "male", participants)
+	slots := GenerateSlots("comp-1", "D", "male", participants)
 	// 8 R1 + 4 R2 + 2 R3 = 14 slots
 	if len(slots) != 14 {
 		t.Fatalf("expected 14 slots for 8 participants, got %d", len(slots))

@@ -199,6 +199,32 @@ func (m *mockAthleteRepo) ListByCompetition(competitionID string) ([]domain.Athl
 	return list, nil
 }
 
+type mockCategoryRepo struct {
+	categories map[string]*domain.Category
+}
+
+func (m *mockCategoryRepo) Create(c *domain.Category) error {
+	m.categories[c.ID] = c
+	return nil
+}
+
+func (m *mockCategoryRepo) GetByID(id string) (*domain.Category, error) {
+	if cat, ok := m.categories[id]; ok {
+		return cat, nil
+	}
+	return nil, nil
+}
+
+func (m *mockCategoryRepo) ListByCompetition(compID string) ([]domain.Category, error) {
+	var list []domain.Category
+	for _, c := range m.categories {
+		if c.CompetitionID == compID {
+			list = append(list, *c)
+		}
+	}
+	return list, nil
+}
+
 func TestReportService_SummaryAndMedalsAndExport(t *testing.T) {
 	compMap := make(map[string]*domain.Competition)
 	compRepo := &mockLifecycleCompRepo{comps: compMap}
@@ -402,4 +428,3 @@ func TestReportHandler_HTTP(t *testing.T) {
 		t.Errorf("expected 200 OK for export, got %d: %s", wExport.Code, wExport.Body.String())
 	}
 }
-

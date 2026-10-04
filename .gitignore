@@ -8,3 +8,7 @@ internal/docs
 .env
 .env.example
 bin
+
+# Frontend
+node_modules
+apps/web/dist

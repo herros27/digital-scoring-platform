@@ -13,11 +13,11 @@ type ContingentHandler struct {
 // POST /api/v1/auth/contingent/register
 func (h *ContingentHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name     string `json:"name"`
-		PicName  string `json:"pic_name"`
-		Email    string `json:"email"`
-		Phone    string `json:"phone"`
-		Password string `json:"password"`
+		Name     string `json:"name" validate:"required,min=2,max=100"`
+		PicName  string `json:"pic_name" validate:"required,min=2,max=100"`
+		Email    string `json:"email" validate:"required,email"`
+		Phone    string `json:"phone" validate:"required,min=6,max=20"`
+		Password string `json:"password" validate:"required,min=6"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -37,8 +37,8 @@ func (h *ContingentHandler) Register(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/auth/contingent/login
 func (h *ContingentHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=1"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)

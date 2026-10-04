@@ -3,15 +3,23 @@ package api
 import (
 	"database/sql"
 	"net/http"
+	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/herros27/digital-scoring/internal/api/handler"
 	"github.com/herros27/digital-scoring/internal/auth"
+	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/service"
 	"github.com/herros27/digital-scoring/internal/store"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
+	// in-memory cache (Otter S3-FIFO)
+	appCache := cache.MustNew(10_000)
+
 	// stores
 	compRepo := &store.CompetitionStore{DB: db}
 	arenaRepo := &store.ArenaStore{DB: db}
@@ -42,11 +50,11 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	authH := &handler.AuthHandler{Pins: pinRepo}
 	compH := &handler.CompetitionHandler{Service: compService}
 	arenaH := &handler.ArenaHandler{Service: arenaService}
-	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager}
+	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
 	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo}
-	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService}
+	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
-	athleteH := &handler.AthleteHandler{Service: athleteService}
+	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache}
 	rulesetH := &handler.RulesetHandler{Service: rulesetService}
 	officialH := &handler.OfficialHandler{Service: officialService}
 	contingentH := &handler.ContingentHandler{Service: contingentService}
@@ -58,12 +66,45 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	mux.HandleFunc("GET /docs", SwaggerHandler())
 	mux.HandleFunc("GET /docs/openapi.yaml", OpenAPISpecHandler("docs/openapi.yaml"))
 
+	// === Prometheus Metrics (Public) ===
+	mux.Handle("GET /metrics", promhttp.Handler())
+
+	// === Health Check (Public) ===
+	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		dbStatus := "connected"
+		if err := db.Ping(); err != nil {
+			dbStatus = "error: " + err.Error()
+		}
+		handler.Ok(w, map[string]any{
+			"status":   "ok",
+			"database": dbStatus,
+			"version":  "1.0.0",
+		})
+	})
+
+	// Rate limiters:
+	// Auth endpoints: 10 req/min, burst 10 per IP (brute force mitigation for PIN & password)
+	authLimiter := RateLimit(rate.Every(6*time.Second), 10)
+	// Global: 60 req/sec, burst 100 per IP (DoS/flood protection)
+	globalLimiter := RateLimit(rate.Limit(60), 100)
+
 	// === Public endpoints (no auth) ===
-	mux.HandleFunc("POST /api/v1/auth/judge-login", authH.JudgeLogin)
-	mux.HandleFunc("POST /api/v1/auth/login", officialH.Login)
-	mux.HandleFunc("POST /api/v1/auth/contingent/register", contingentH.Register)
-	mux.HandleFunc("POST /api/v1/auth/contingent/login", contingentH.Login)
+	mux.Handle("POST /api/v1/auth/judge-login", authLimiter(http.HandlerFunc(authH.JudgeLogin)))
+	mux.Handle("POST /api/v1/auth/pin", authLimiter(http.HandlerFunc(authH.JudgeLogin)))
+	mux.Handle("POST /api/v1/auth/login", authLimiter(http.HandlerFunc(officialH.Login)))
+	mux.Handle("POST /api/v1/auth/contingent/register", authLimiter(http.HandlerFunc(contingentH.Register)))
+	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
+
+	// === Public cached tournament views (Otter in-memory cache) ===
+	// ponytail: 10s TTL absorbs high-concurrency bursts from spectators & contingents during tournaments.
+	// Auto-invalidated on match finish & bracket generate, fallback to 10s TTL.
+	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/summary", appCache.Handler(10*time.Second, reportH.Summary))
+	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/medals", appCache.Handler(10*time.Second, reportH.Medals))
+	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/export", appCache.Handler(10*time.Second, reportH.Export))
+	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/brackets", appCache.Handler(10*time.Second, bracketH.GetTree))
+	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/athletes", appCache.Handler(15*time.Second, athleteH.ListByCompetition))
+	mux.HandleFunc("GET /api/v1/athletes", appCache.Handler(15*time.Second, athleteH.List))
 
 	// === Protected endpoints (JWT required) ===
 	protected := http.NewServeMux()
@@ -93,10 +134,8 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories/{id}", categoryH.Get)
 
 	// Athletes & Participants
-	protected.HandleFunc("GET /api/v1/athletes", athleteH.List)
 	protected.Handle("POST /api/v1/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.Create)))
 	protected.HandleFunc("GET /api/v1/athletes/{id}", athleteH.Get)
-	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/athletes", athleteH.ListByCompetition)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.RegisterToCompetition)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/participants", athleteH.ListParticipants)
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/verify", adminOrDewan(http.HandlerFunc(athleteH.VerifyParticipant)))
@@ -131,7 +170,6 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 
 	// Brackets
 	protected.Handle("POST /api/v1/competitions/{comp_id}/brackets/generate", adminOrDewan(http.HandlerFunc(bracketH.Generate)))
-	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/brackets", bracketH.GetTree)
 
 	// Officials / Operator Management (Admin & Dewan)
 	protected.Handle("GET /api/v1/officials", adminOrDewan(http.HandlerFunc(officialH.List)))
@@ -144,17 +182,12 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	protected.Handle("GET /api/v1/contingents", adminOrDewan(http.HandlerFunc(contingentH.List)))
 	protected.HandleFunc("GET /api/v1/contingents/{id}", contingentH.Get)
 
-	// Reporting & Statistics & Export
-	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/report/summary", reportH.Summary)
-	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/report/medals", reportH.Medals)
-	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/report/export", reportH.Export)
-
 	// Mount protected routes under AuthMiddleware
 	mux.Handle("/api/v1/", Chain(protected, AuthMiddleware))
 
 	// === WebSocket (auth via query param) ===
 	mux.HandleFunc("GET /ws/arena/{arena_id}", matchH.HandleWS)
 
-	// Apply CORS ke semua
-	return Chain(mux, CORSMiddleware)
+	// Apply CORS, Metrics & Global Rate Limiting ke semua
+	return Chain(mux, CORSMiddleware, MetricsMiddleware, globalLimiter)
 }

@@ -217,16 +217,16 @@ type mockCompRepoWithRuleset struct {
 	comps map[string]*domain.Competition
 }
 
-func (c *mockCompRepoWithRuleset) Create(comp *domain.Competition) error          { return nil }
+func (c *mockCompRepoWithRuleset) Create(comp *domain.Competition) error { return nil }
 func (c *mockCompRepoWithRuleset) GetByID(id string) (*domain.Competition, error) {
 	if comp, ok := c.comps[id]; ok {
 		return comp, nil
 	}
 	return nil, domain.ErrNotFound
 }
-func (c *mockCompRepoWithRuleset) List() ([]domain.Competition, error)            { return nil, nil }
-func (c *mockCompRepoWithRuleset) UpdateStatus(id, status string) error           { return nil }
-func (c *mockCompRepoWithRuleset) Update(comp *domain.Competition) error           { return nil }
+func (c *mockCompRepoWithRuleset) List() ([]domain.Competition, error)   { return nil, nil }
+func (c *mockCompRepoWithRuleset) UpdateStatus(id, status string) error  { return nil }
+func (c *mockCompRepoWithRuleset) Update(comp *domain.Competition) error { return nil }
 
 func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 	repo := newMemoryRulesetRepo()
@@ -282,4 +282,3 @@ func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 		t.Fatalf("orchestrator is nil")
 	}
 }
-

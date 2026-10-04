@@ -35,7 +35,7 @@ func (h *ArenaHandler) Get(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/competitions/{comp_id}/arenas
 func (h *ArenaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name string `json:"name"`
+		Name string `json:"name" validate:"required,min=1,max=100"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -55,7 +55,7 @@ func (h *ArenaHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ArenaHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req struct {
-		Name string `json:"name"`
+		Name string `json:"name" validate:"required,min=1,max=100"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)

@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE participants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
@@ -7,3 +8,6 @@ CREATE TABLE participants (
     gender VARCHAR(20),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS participants;

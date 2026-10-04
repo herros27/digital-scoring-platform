@@ -17,10 +17,10 @@ const (
 type ScoreType string
 
 const (
-	ScoreTechnique  ScoreType = "technique"
-	ScoreKnockdown  ScoreType = "knockdown"
-	ScoreFall       ScoreType = "fall"
-	ScorePenalty    ScoreType = "penalty"
+	ScoreTechnique ScoreType = "technique"
+	ScoreKnockdown ScoreType = "knockdown"
+	ScoreFall      ScoreType = "fall"
+	ScorePenalty   ScoreType = "penalty"
 )
 
 type Target string

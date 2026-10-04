@@ -25,9 +25,16 @@ func main() {
 	logger.Init(cfg.IsProduction())
 	auth.SetJWTSecret(cfg.JWTSecret)
 
-	// 3. Hubungkan Database
+	// 3. Hubungkan Database & Jalankan Migrasi Otomatis
 	db := store.NewDB(cfg.DBURL)
 	defer db.Close()
+
+	if cfg.AutoMigrate {
+		if err := store.RunMigrations(db); err != nil {
+			logger.Log.Error("database migration failed", "error", err)
+			os.Exit(1)
+		}
+	}
 
 	// 4. Hub Manager & Router
 	hubManager := hub.NewManager()

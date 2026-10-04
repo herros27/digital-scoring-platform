@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE match_scores (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -9,3 +10,6 @@ CREATE TABLE match_scores (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(match_id, round)
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS match_scores;

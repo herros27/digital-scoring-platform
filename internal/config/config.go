@@ -1,43 +1,36 @@
 package config
 
 import (
-	"os"
+	"log"
+
+	"github.com/caarlos0/env/v11"
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Port      string
-	Env       string
-	DBURL     string
-	JWTSecret string
+	Port        string `env:"PORT" envDefault:"8080"`
+	Env         string `env:"ENV" envDefault:"development"`
+	DBURL       string `env:"DB_URL" envDefault:"postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"`
+	JWTSecret   string `env:"JWT_SECRET" envDefault:"dev-secret-change-in-prod"`
+	AutoMigrate bool   `env:"AUTO_MIGRATE" envDefault:"true"`
 }
 
-func Load() *Config {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+// Load loads configuration from optional .env files and environment variables into Config.
+// ponytail: godotenv loads .env file if present, env.Parse unmarshals with defaults and type coercion.
+func Load(filenames ...string) *Config {
+	if len(filenames) > 0 {
+		_ = godotenv.Load(filenames...)
+	} else {
+		// Ignore error if .env doesn't exist (e.g. in docker/production where env is injected)
+		_ = godotenv.Load()
 	}
 
-	env := os.Getenv("ENV")
-	if env == "" {
-		env = "development"
+	cfg := &Config{}
+	if err := env.Parse(cfg); err != nil {
+		log.Fatalf("failed to parse environment configuration: %v", err)
 	}
 
-	dbURL := os.Getenv("DB_URL")
-	if dbURL == "" {
-		dbURL = "postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"
-	}
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "dev-secret-change-in-prod" // ponytail: override via env in production
-	}
-
-	return &Config{
-		Port:      port,
-		Env:       env,
-		DBURL:     dbURL,
-		JWTSecret: jwtSecret,
-	}
+	return cfg
 }
 
 func (c *Config) IsProduction() bool {

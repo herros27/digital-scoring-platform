@@ -3,6 +3,8 @@ package consensus
 import (
 	"sync"
 	"time"
+
+	"github.com/herros27/digital-scoring/internal/metrics"
 )
 
 const (
@@ -30,6 +32,7 @@ func NewEngine() *Engine {
 }
 
 func (e *Engine) Submit(input JudgeInput) *ConsensusResult {
+	start := time.Now()
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -39,6 +42,7 @@ func (e *Engine) Submit(input JudgeInput) *ConsensusResult {
 			existing.ScoreType == input.ScoreType &&
 			existing.Target == input.Target &&
 			time.Since(existing.Timestamp) < windowDuration {
+			metrics.RecordConsensusDuration("duplicate", time.Since(start))
 			return nil // ignore duplikat
 		}
 	}
@@ -50,7 +54,13 @@ func (e *Engine) Submit(input JudgeInput) *ConsensusResult {
 	e.cleanup()
 
 	// cek majority dalam window
-	return e.evaluate(input)
+	res := e.evaluate(input)
+	status := "pending"
+	if res != nil && res.Accepted {
+		status = "accepted"
+	}
+	metrics.RecordConsensusDuration(status, time.Since(start))
+	return res
 }
 
 func (e *Engine) evaluate(latest JudgeInput) *ConsensusResult {
