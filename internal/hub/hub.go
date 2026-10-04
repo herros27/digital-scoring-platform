@@ -3,6 +3,7 @@ package hub
 import (
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/herros27/digital-scoring/internal/metrics"
@@ -18,6 +19,7 @@ type inboundMessage struct {
 }
 
 type Hub struct {
+	mu         sync.RWMutex
 	ArenaID    string
 	clients    map[*Client]bool
 	inbound    chan inboundMessage
@@ -41,17 +43,21 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
+			h.mu.Lock()
 			h.clients[client] = true
+			h.mu.Unlock()
 			log.Printf("[hub:%s] client connected: %s (%s)", h.ArenaID, client.ID, client.Role)
 			metrics.IncWSConnections(h.ArenaID, string(client.Role))
 
 		case client := <-h.unregister:
+			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
 				log.Printf("[hub:%s] client disconnected: %s", h.ArenaID, client.ID)
 				metrics.DecWSConnections(h.ArenaID, string(client.Role))
 			}
+			h.mu.Unlock()
 
 		case inbound := <-h.inbound:
 			// judge tidak bisa lihat input judge lain
@@ -64,6 +70,8 @@ func (h *Hub) Run() {
 
 // Broadcast ke semua client di arena
 func (h *Hub) Broadcast(msg Message) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	for client := range h.clients {
 		select {
 		case client.send <- msg:
@@ -77,6 +85,8 @@ func (h *Hub) Broadcast(msg Message) {
 
 // Send ke role tertentu saja
 func (h *Hub) SendToRole(role Role, msg Message) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	for client := range h.clients {
 		if client.Role == role {
 			select {
@@ -84,6 +94,7 @@ func (h *Hub) SendToRole(role Role, msg Message) {
 			default:
 				close(client.send)
 				delete(h.clients, client)
+				metrics.DecWSConnections(h.ArenaID, string(client.Role))
 			}
 		}
 	}
@@ -91,6 +102,8 @@ func (h *Hub) SendToRole(role Role, msg Message) {
 
 // Send ke client tertentu
 func (h *Hub) SendToClient(clientID string, msg Message) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	for client := range h.clients {
 		if client.ID == clientID {
 			select {
@@ -104,6 +117,8 @@ func (h *Hub) SendToClient(clientID string, msg Message) {
 
 // Register adds a client directly to the hub (useful for testing or embedded clients)
 func (h *Hub) Register(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.clients[client] = true
 }
 

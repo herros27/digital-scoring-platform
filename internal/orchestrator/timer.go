@@ -9,7 +9,7 @@ type Timer struct {
 	mu        sync.Mutex
 	remaining time.Duration
 	ticker    *time.Ticker
-	stop      chan struct{}
+	stopCh    chan struct{}
 	onExpired func()
 	running   bool
 }
@@ -18,7 +18,6 @@ func NewTimer(duration time.Duration, onExpired func()) *Timer {
 	return &Timer{
 		remaining: duration,
 		onExpired: onExpired,
-		stop:      make(chan struct{}),
 	}
 }
 
@@ -30,20 +29,29 @@ func (t *Timer) Start() {
 	}
 	t.running = true
 	t.ticker = time.NewTicker(time.Second)
+	t.stopCh = make(chan struct{})
+
+	ticker := t.ticker
+	stopCh := t.stopCh
+
 	go func() {
+		defer ticker.Stop()
 		for {
 			select {
-			case <-t.ticker.C:
+			case <-ticker.C:
 				t.mu.Lock()
 				t.remaining -= time.Second
 				expired := t.remaining <= 0
 				t.mu.Unlock()
+
 				if expired {
 					t.Stop()
-					t.onExpired()
+					if t.onExpired != nil {
+						t.onExpired()
+					}
 					return
 				}
-			case <-t.stop:
+			case <-stopCh:
 				return
 			}
 		}
@@ -51,31 +59,26 @@ func (t *Timer) Start() {
 }
 
 func (t *Timer) Pause() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if !t.running {
-		return
-	}
-	t.running = false
-	t.ticker.Stop()
-	select {
-	case t.stop <- struct{}{}:
-	default:
-	}
+	t.stopInternal()
 }
 
 func (t *Timer) Stop() {
+	t.stopInternal()
+}
+
+func (t *Timer) stopInternal() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !t.running {
 		return
 	}
 	t.running = false
-	t.ticker.Stop()
-	// drain stop channel non-blocking
-	select {
-	case t.stop <- struct{}{}:
-	default:
+	if t.ticker != nil {
+		t.ticker.Stop()
+	}
+	if t.stopCh != nil {
+		close(t.stopCh)
+		t.stopCh = nil
 	}
 }
 

@@ -2,6 +2,7 @@ package tests
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -11,6 +12,7 @@ import (
 )
 
 type mockMatchRepo struct {
+	mu      sync.RWMutex
 	matches map[string]*store.Match
 }
 
@@ -19,11 +21,15 @@ func newMockMatchRepo() *mockMatchRepo {
 }
 
 func (m *mockMatchRepo) Create(match *store.Match) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.matches[match.ID] = match
 	return nil
 }
 
 func (m *mockMatchRepo) GetByID(id string) (*store.Match, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if match, ok := m.matches[id]; ok {
 		return match, nil
 	}
@@ -31,6 +37,8 @@ func (m *mockMatchRepo) GetByID(id string) (*store.Match, error) {
 }
 
 func (m *mockMatchRepo) UpdateStatus(id, status string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if match, ok := m.matches[id]; ok {
 		match.Status = status
 		return nil
@@ -39,6 +47,8 @@ func (m *mockMatchRepo) UpdateStatus(id, status string) error {
 }
 
 func (m *mockMatchRepo) SetWinner(matchID, winnerID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if match, ok := m.matches[matchID]; ok {
 		match.WinnerID = winnerID
 		return nil

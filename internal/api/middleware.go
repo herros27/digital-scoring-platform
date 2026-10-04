@@ -109,11 +109,12 @@ type clientLimiter struct {
 // ponytail: in-memory map per instance. Ceiling: single-node memory / no sync across horizontal replicas.
 // Upgrade path: Redis-backed token bucket / sliding window when running multiple replicas behind a load balancer.
 type IPRateLimiter struct {
-	mu      sync.Mutex
-	clients map[string]*clientLimiter
-	rate    rate.Limit
-	burst   int
-	stopCh  chan struct{}
+	mu        sync.Mutex
+	clients   map[string]*clientLimiter
+	rate      rate.Limit
+	burst     int
+	stopCh    chan struct{}
+	closeOnce sync.Once
 }
 
 // NewIPRateLimiter creates an in-memory token bucket rate limiter per client IP.
@@ -151,11 +152,9 @@ func NewIPRateLimiter(r rate.Limit, burst int) *IPRateLimiter {
 
 // Close stops the cleanup goroutine.
 func (l *IPRateLimiter) Close() {
-	select {
-	case <-l.stopCh:
-	default:
+	l.closeOnce.Do(func() {
 		close(l.stopCh)
-	}
+	})
 }
 
 // Get retrieves or creates a rate.Limiter for the given IP.

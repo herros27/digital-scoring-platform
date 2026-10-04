@@ -709,6 +709,8 @@ func (o *Orchestrator) GetArenaID() string {
 }
 
 func (o *Orchestrator) IsActive() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	st := o.sm.Current()
 	return st != statemachine.StateFinished && st != statemachine.StateCancelled
 }

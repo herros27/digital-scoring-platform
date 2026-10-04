@@ -51,6 +51,8 @@ type mockPagedMatchRepo struct {
 }
 
 func (m *mockPagedMatchRepo) ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]store.Match, int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	var filtered []store.Match
 	for _, match := range m.matches {
 		if match.CompetitionID == competitionID && (status == "" || match.Status == status) {
