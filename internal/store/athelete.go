@@ -11,6 +11,10 @@ type AthleteStore struct {
 }
 
 func (s *AthleteStore) Create(a *Athlete) error {
+	if a.ContingentID != "" {
+		query := `INSERT INTO athletes (name, gender, team, contingent_id) VALUES ($1, $2, $3, $4) RETURNING id, created_at`
+		return s.DB.QueryRow(query, a.Name, a.Gender, a.Team, a.ContingentID).Scan(&a.ID, &a.CreatedAt)
+	}
 	query := `INSERT INTO athletes (name, gender, team) VALUES ($1, $2, $3) RETURNING id, created_at`
 	return s.DB.QueryRow(query, a.Name, a.Gender, a.Team).Scan(&a.ID, &a.CreatedAt)
 }
@@ -75,9 +79,72 @@ func (s *AthleteStore) ListPaged(gender string, limit, offset int) ([]Athlete, i
 }
 
 func (s *AthleteStore) RegisterToCompetition(competitionID, athleteID, weightClass, gender string) error {
-	query := `INSERT INTO participants (competition_id, athlete_id, weight_class, gender) VALUES ($1, $2, $3, $4)`
-	_, err := s.DB.Exec(query, competitionID, athleteID, weightClass, gender)
+	return s.RegisterParticipant(competitionID, athleteID, "", weightClass, gender, "registered")
+}
+
+func (s *AthleteStore) RegisterParticipant(competitionID, athleteID, contingentID, weightClass, gender, status string) error {
+	if status == "" {
+		status = "pending"
+	}
+	if contingentID != "" {
+		query := `INSERT INTO participants (competition_id, athlete_id, contingent_id, weight_class, gender, registration_status) VALUES ($1, $2, $3, $4, $5, $6)`
+		_, err := s.DB.Exec(query, competitionID, athleteID, contingentID, weightClass, gender, status)
+		return err
+	}
+	query := `INSERT INTO participants (competition_id, athlete_id, weight_class, gender, registration_status) VALUES ($1, $2, $3, $4, $5)`
+	_, err := s.DB.Exec(query, competitionID, athleteID, weightClass, gender, status)
 	return err
+}
+
+func (s *AthleteStore) UpdateParticipantStatus(participantID, status string) error {
+	query := `UPDATE participants SET registration_status = $1 WHERE id = $2`
+	res, err := s.DB.Exec(query, status, participantID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Participant, error) {
+	baseQuery := `
+		SELECT p.id, p.competition_id, COALESCE(p.athlete_id::text, ''), COALESCE(p.contingent_id::text, ''), 
+		       COALESCE(a.name, p.name, ''), COALESCE(a.team, p.club, ''), p.weight_class, p.gender, 
+		       COALESCE(p.registration_status, 'registered'), p.created_at
+		FROM participants p
+		LEFT JOIN athletes a ON p.athlete_id = a.id
+		WHERE p.competition_id = $1`
+	var rows *sql.Rows
+	var err error
+	if status != "" {
+		rows, err = s.DB.Query(baseQuery+` AND p.registration_status = $2 ORDER BY p.created_at DESC`, competitionID, status)
+	} else {
+		rows, err = s.DB.Query(baseQuery+` ORDER BY p.created_at DESC`, competitionID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Participant
+	for rows.Next() {
+		var part Participant
+		if err := rows.Scan(&part.ID, &part.CompetitionID, &part.AthleteID, &part.ContingentID,
+			&part.Name, &part.Club, &part.WeightClass, &part.Gender, &part.RegistrationStatus, &part.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, part)
+	}
+	if list == nil {
+		list = []Participant{}
+	}
+	return list, rows.Err()
 }
 
 func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error) {

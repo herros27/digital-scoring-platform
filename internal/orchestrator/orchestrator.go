@@ -306,21 +306,24 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	}
 
 	input := consensus.JudgeInput{
-		JudgeID:   client.ID,
-		Role:      consensus.JudgeRole(client.Role),
-		MatchID:   o.matchID,
-		Round:     o.sm.CurrentRoundNumber(),
-		ScoreType: consensus.ScoreType(p.ScoreType),
-		Target:    consensus.Target(p.Target),
-		Timestamp: time.Now(),
+		JudgeID:    client.ID,
+		Role:       consensus.JudgeRole(client.Role),
+		SeatNumber: client.SeatNumber,
+		MatchID:    o.matchID,
+		Round:      o.sm.CurrentRoundNumber(),
+		ScoreType:  consensus.ScoreType(p.ScoreType),
+		Target:     consensus.Target(p.Target),
+		Timestamp:  time.Now(),
 	}
 
 	// log raw judge input ke DB (audit trail)
 	o.appendEvent("judge_input", map[string]any{
-		"judge_id":   input.JudgeID,
-		"score_type": input.ScoreType,
-		"target":     input.Target,
-		"round":      input.Round,
+		"judge_id":    input.JudgeID,
+		"seat_number": client.SeatNumber,
+		"role":        client.Role,
+		"score_type":  input.ScoreType,
+		"target":      input.Target,
+		"round":       input.Round,
 	}, client.ID)
 
 	result := o.engine.Submit(input)

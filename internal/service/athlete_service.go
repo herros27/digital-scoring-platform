@@ -98,6 +98,42 @@ func (s *AthleteService) RegisterAthleteToCompetition(competitionID, athleteID, 
 	return s.repo.RegisterToCompetition(competitionID, athleteID, weightClass, gender)
 }
 
+type ParticipantManager interface {
+	RegisterParticipant(competitionID, athleteID, contingentID, weightClass, gender, status string) error
+	UpdateParticipantStatus(participantID, status string) error
+	ListParticipants(competitionID, status string) ([]domain.Participant, error)
+}
+
+func (s *AthleteService) RegisterParticipant(competitionID, athleteID, contingentID, weightClass, gender, status string) error {
+	if competitionID == "" || athleteID == "" {
+		return domain.ErrInvalidInput
+	}
+	if pm, ok := s.repo.(ParticipantManager); ok {
+		return pm.RegisterParticipant(competitionID, athleteID, contingentID, weightClass, gender, status)
+	}
+	return s.repo.RegisterToCompetition(competitionID, athleteID, weightClass, gender)
+}
+
+func (s *AthleteService) VerifyParticipant(participantID, status string) error {
+	if participantID == "" || (status != "verified" && status != "rejected") {
+		return domain.ErrInvalidInput
+	}
+	if pm, ok := s.repo.(ParticipantManager); ok {
+		return pm.UpdateParticipantStatus(participantID, status)
+	}
+	return nil
+}
+
+func (s *AthleteService) ListParticipants(competitionID, status string) ([]domain.Participant, error) {
+	if competitionID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if pm, ok := s.repo.(ParticipantManager); ok {
+		return pm.ListParticipants(competitionID, status)
+	}
+	return []domain.Participant{}, nil
+}
+
 func (s *AthleteService) ListAthletesByCompetition(competitionID string) ([]domain.Athlete, error) {
 	if competitionID == "" {
 		return nil, domain.ErrInvalidInput

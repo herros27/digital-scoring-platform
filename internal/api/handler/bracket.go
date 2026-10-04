@@ -7,7 +7,8 @@ import (
 )
 
 type BracketHandler struct {
-	Service *service.BracketService
+	Service        *service.BracketService
+	AthleteService *service.AthleteService
 }
 
 // POST /api/v1/competitions/{comp_id}/brackets/generate
@@ -26,8 +27,37 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-populate from verified participants if participant_ids omitted
+	if len(req.ParticipantIDs) == 0 && h.AthleteService != nil {
+		parts, err := h.AthleteService.ListParticipants(compID, "verified")
+		if err == nil {
+			for _, p := range parts {
+				if p.WeightClass == req.WeightClass && p.Gender == req.Gender {
+					req.ParticipantIDs = append(req.ParticipantIDs, p.ID)
+				}
+			}
+		}
+	} else if len(req.ParticipantIDs) > 0 && h.AthleteService != nil {
+		// Filter out pending or rejected participants
+		parts, err := h.AthleteService.ListParticipants(compID, "")
+		if err == nil && len(parts) > 0 {
+			statusMap := make(map[string]string)
+			for _, p := range parts {
+				statusMap[p.ID] = p.RegistrationStatus
+			}
+			var verifiedIDs []string
+			for _, pid := range req.ParticipantIDs {
+				st := statusMap[pid]
+				if st != "pending" && st != "rejected" {
+					verifiedIDs = append(verifiedIDs, pid)
+				}
+			}
+			req.ParticipantIDs = verifiedIDs
+		}
+	}
+
 	if req.WeightClass == "" || req.Gender == "" || len(req.ParticipantIDs) < 2 {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class, gender, and at least 2 participants required", nil)
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class, gender, and at least 2 verified participants required", nil)
 		return
 	}
 

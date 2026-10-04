@@ -13,6 +13,7 @@ type CompetitionRepository interface {
 	GetByID(id string) (*domain.Competition, error)
 	List() ([]domain.Competition, error)
 	UpdateStatus(id, status string) error
+	Update(c *domain.Competition) error
 }
 
 type CompetitionService struct {
@@ -104,4 +105,71 @@ func (s *CompetitionService) ActivateCompetition(id string) error {
 		return domain.ErrAlreadyActive
 	}
 	return s.repo.UpdateStatus(id, "active")
+}
+
+func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competition) (*domain.Competition, error) {
+	if id == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	comp, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if comp == nil {
+		return nil, domain.ErrCompetitionNotFound
+	}
+
+	if update.Name != "" {
+		comp.Name = update.Name
+	}
+	if update.Location != "" {
+		comp.Location = update.Location
+	}
+	if update.StartDate != "" {
+		comp.StartDate = update.StartDate
+	}
+	if update.EndDate != "" {
+		comp.EndDate = update.EndDate
+	}
+	if update.RulesetName != "" {
+		comp.RulesetName = update.RulesetName
+	}
+
+	if err := s.repo.Update(comp); err != nil {
+		return nil, err
+	}
+	return comp, nil
+}
+
+func (s *CompetitionService) PauseCompetition(id string) error {
+	comp, err := s.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if comp == nil {
+		return domain.ErrCompetitionNotFound
+	}
+	return s.repo.UpdateStatus(id, "paused")
+}
+
+func (s *CompetitionService) FinishCompetition(id string) error {
+	comp, err := s.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if comp == nil {
+		return domain.ErrCompetitionNotFound
+	}
+	return s.repo.UpdateStatus(id, "completed")
+}
+
+func (s *CompetitionService) CancelCompetition(id string) error {
+	comp, err := s.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if comp == nil {
+		return domain.ErrCompetitionNotFound
+	}
+	return s.repo.UpdateStatus(id, "cancelled")
 }

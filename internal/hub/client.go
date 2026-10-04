@@ -8,12 +8,13 @@ import (
 )
 
 type Client struct {
-	ID      string
-	Role    Role
-	ArenaID string
-	conn    *websocket.Conn
-	send    chan Message
-	hub     *Hub
+	ID         string
+	Role       Role
+	SeatNumber int
+	ArenaID    string
+	conn       *websocket.Conn
+	send       chan Message
+	hub        *Hub
 }
 
 // NewClient creates a client instance (useful for testing and programmatic clients)

@@ -20,18 +20,27 @@ type MatchRepository interface {
 	SetWinner(matchID, winnerID string) error
 }
 
+type RulesetResolver interface {
+	ResolveRuleset(identifier string) (*rules.Ruleset, error)
+}
+
 type MatchService struct {
-	mu         sync.RWMutex
-	matchRepo  MatchRepository
-	compRepo   CompetitionRepository
-	hubManager *hub.Manager
-	eventStore *store.MatchEventStore
-	scoreStore *store.MatchScoreStore
-	matchStore *store.MatchStore
-	bracketStore orchestrator.BracketAdvancer
+	mu              sync.RWMutex
+	matchRepo       MatchRepository
+	compRepo        CompetitionRepository
+	hubManager      *hub.Manager
+	eventStore      *store.MatchEventStore
+	scoreStore      *store.MatchScoreStore
+	matchStore      *store.MatchStore
+	bracketStore    orchestrator.BracketAdvancer
+	rulesetResolver RulesetResolver
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
+}
+
+func (s *MatchService) SetRulesetResolver(resolver RulesetResolver) {
+	s.rulesetResolver = resolver
 }
 
 func NewMatchService(
@@ -122,7 +131,27 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 
 	// 3. Buat state machine dan ruleset baru
 	sm := statemachine.New(matchID)
-	r, err := rules.LoadRuleset(rulesetPath)
+
+	// Jika rulesetPath kosong, coba ambil ruleset_id dari competition
+	if rulesetPath == "" && s.matchRepo != nil && s.compRepo != nil {
+		if m, errMatch := s.matchRepo.GetByID(matchID); errMatch == nil && m != nil {
+			if comp, errComp := s.compRepo.GetByID(m.CompetitionID); errComp == nil && comp != nil {
+				if comp.RulesetID != nil && *comp.RulesetID != "" {
+					rulesetPath = *comp.RulesetID
+				} else if comp.RulesetName != "" {
+					rulesetPath = comp.RulesetName
+				}
+			}
+		}
+	}
+
+	var r *rules.Ruleset
+	var err error
+	if s.rulesetResolver != nil {
+		r, err = s.rulesetResolver.ResolveRuleset(rulesetPath)
+	} else {
+		r, err = rules.LoadRuleset(rulesetPath)
+	}
 	if err != nil {
 		return err
 	}
@@ -221,6 +250,11 @@ func (s *MatchService) GetMatchScores(matchID string) (*domain.MatchScoreDetail,
 		TotalRed:  totalRed,
 		TotalBlue: totalBlue,
 		Rounds:    scores,
+		Consensus: &domain.ConsensusSummary{
+			RedScore:  totalRed,
+			BlueScore: totalBlue,
+		},
+		Judges: []domain.JudgeScoreSummary{},
 	}, nil
 }
 

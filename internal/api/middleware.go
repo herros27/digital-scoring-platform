@@ -1,17 +1,12 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
 	"github.com/herros27/digital-scoring/internal/api/handler"
 	"github.com/herros27/digital-scoring/internal/auth"
 )
-
-type contextKey string
-
-const claimsKey contextKey = "claims"
 
 // AuthMiddleware — validasi JWT, inject claims ke context
 func AuthMiddleware(next http.Handler) http.Handler {
@@ -26,7 +21,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 			return
 		}
-		ctx := context.WithValue(r.Context(), claimsKey, claims)
+		ctx := auth.ContextWithClaims(r.Context(), claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -50,8 +45,7 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 }
 
 func ClaimsFrom(r *http.Request) *auth.Claims {
-	c, _ := r.Context().Value(claimsKey).(*auth.Claims)
-	return c
+	return auth.ClaimsFromContext(r.Context())
 }
 
 // CORS — izinkan semua origin (untuk PWA dari domain sama / dev)

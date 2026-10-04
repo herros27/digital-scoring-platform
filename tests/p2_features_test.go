@@ -44,6 +44,7 @@ func (m *mockPagedCompRepo) Create(c *domain.Competition) error          { retur
 func (m *mockPagedCompRepo) GetByID(id string) (*domain.Competition, error) { return nil, nil }
 func (m *mockPagedCompRepo) List() ([]domain.Competition, error)            { return m.comps, nil }
 func (m *mockPagedCompRepo) UpdateStatus(id, status string) error           { return nil }
+func (m *mockPagedCompRepo) Update(c *domain.Competition) error                 { return nil }
 
 type mockPagedMatchRepo struct {
 	*mockMatchRepo

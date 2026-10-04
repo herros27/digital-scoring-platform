@@ -125,3 +125,8 @@ func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit,
 	}
 	return list, total, rows.Err()
 }
+
+func (s *MatchStore) ListByCompetition(competitionID string) ([]Match, error) {
+	list, _, err := s.ListByCompetitionPaged(competitionID, "", 10000, 0)
+	return list, err
+}

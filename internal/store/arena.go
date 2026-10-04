@@ -26,3 +26,25 @@ func (s *ArenaStore) ListByCompetition(competitionID string) ([]Arena, error) {
 	}
 	return list, rows.Err()
 }
+
+func (s *ArenaStore) GetByID(id string) (*Arena, error) {
+	a := &Arena{}
+	query := `SELECT id, competition_id, name, created_at FROM arenas WHERE id = $1`
+	err := s.DB.QueryRow(query, id).Scan(&a.ID, &a.CompetitionID, &a.Name, &a.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *ArenaStore) Update(a *Arena) error {
+	query := `UPDATE arenas SET name = $1 WHERE id = $2`
+	_, err := s.DB.Exec(query, a.Name, a.ID)
+	return err
+}
+
+func (s *ArenaStore) Delete(id string) error {
+	query := `DELETE FROM arenas WHERE id = $1`
+	_, err := s.DB.Exec(query, id)
+	return err
+}

@@ -44,6 +44,31 @@ func (r *mockRulesetRepo) GetByID(id string) (*store.Ruleset, error) {
 	return nil, domain.ErrNotFound
 }
 
+func (r *mockRulesetRepo) Create(rs *store.Ruleset) error {
+	r.rulesets = append(r.rulesets, *rs)
+	return nil
+}
+
+func (r *mockRulesetRepo) Update(rs *store.Ruleset) error {
+	for i, existing := range r.rulesets {
+		if existing.ID == rs.ID {
+			r.rulesets[i] = *rs
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (r *mockRulesetRepo) Delete(id string) error {
+	for i, existing := range r.rulesets {
+		if existing.ID == id {
+			r.rulesets = append(r.rulesets[:i], r.rulesets[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
 func (r *mockRulesetRepo) GetActive() (*store.Ruleset, error) {
 	if len(r.rulesets) > 0 {
 		return &r.rulesets[0], nil

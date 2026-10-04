@@ -81,7 +81,7 @@ func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    h.HubManager.GetOrCreate(arenaID).HandleWS(w, r, claims.JudgePinID, hub.Role(claims.Role))
+    h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, claims.JudgePinID, hub.Role(claims.Role), claims.SeatNumber)
 }
 
 // POST /api/v1/competitions/{comp_id}/matches/{id}/load-arena

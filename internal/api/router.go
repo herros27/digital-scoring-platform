@@ -22,6 +22,8 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	categoryRepo := &store.CategoryStore{DB: db}
 	athleteRepo := &store.AthleteStore{DB: db}
 	rulesetRepo := &store.RulesetStore{DB: db}
+	officialRepo := &store.OfficialStore{DB: db}
+	contingentRepo := &store.ContingentStore{DB: db}
 
 	// services
 	compService := service.NewCompetitionService(compRepo)
@@ -31,6 +33,10 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	categoryService := service.NewCategoryService(categoryRepo)
 	athleteService := service.NewAthleteService(athleteRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
+	matchService.SetRulesetResolver(rulesetService)
+	officialService := service.NewOfficialService(officialRepo)
+	contingentService := service.NewContingentService(contingentRepo)
+	reportService := service.NewReportService(compRepo, arenaRepo, categoryRepo, athleteRepo, matchRepo)
 
 	// handlers
 	authH := &handler.AuthHandler{Pins: pinRepo}
@@ -38,10 +44,13 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	arenaH := &handler.ArenaHandler{Service: arenaService}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager}
 	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo}
-	bracketH := &handler.BracketHandler{Service: bracketService}
+	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
 	athleteH := &handler.AthleteHandler{Service: athleteService}
 	rulesetH := &handler.RulesetHandler{Service: rulesetService}
+	officialH := &handler.OfficialHandler{Service: officialService}
+	contingentH := &handler.ContingentHandler{Service: contingentService}
+	reportH := &handler.ReportHandler{Service: reportService}
 
 	mux := http.NewServeMux()
 
@@ -51,6 +60,9 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 
 	// === Public endpoints (no auth) ===
 	mux.HandleFunc("POST /api/v1/auth/judge-login", authH.JudgeLogin)
+	mux.HandleFunc("POST /api/v1/auth/login", officialH.Login)
+	mux.HandleFunc("POST /api/v1/auth/contingent/register", contingentH.Register)
+	mux.HandleFunc("POST /api/v1/auth/contingent/login", contingentH.Login)
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
 
 	// === Protected endpoints (JWT required) ===
@@ -59,6 +71,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	// RBAC roles
 	adminOrDewan := RequireRole("admin", "dewan")
 	matchOperators := RequireRole("admin", "dewan", "wasit")
+	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
 
 	// Auth & PIN (Admin only)
 	protected.Handle("POST /api/v1/auth/create-pin", adminOrDewan(http.HandlerFunc(authH.CreatePIN)))
@@ -67,7 +80,12 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	protected.HandleFunc("GET /api/v1/competitions", compH.List)
 	protected.Handle("POST /api/v1/competitions", adminOrDewan(http.HandlerFunc(compH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{id}", compH.Get)
+	protected.Handle("PUT /api/v1/competitions/{id}", adminOrDewan(http.HandlerFunc(compH.Update)))
 	protected.Handle("PUT /api/v1/competitions/{id}/activate", adminOrDewan(http.HandlerFunc(compH.Activate)))
+	protected.Handle("POST /api/v1/competitions/{id}/activate", adminOrDewan(http.HandlerFunc(compH.Activate)))
+	protected.Handle("POST /api/v1/competitions/{id}/pause", adminOrDewan(http.HandlerFunc(compH.Pause)))
+	protected.Handle("POST /api/v1/competitions/{id}/finish", adminOrDewan(http.HandlerFunc(compH.Finish)))
+	protected.Handle("POST /api/v1/competitions/{id}/cancel", adminOrDewan(http.HandlerFunc(compH.Cancel)))
 
 	// Categories
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories", categoryH.List)
@@ -76,14 +94,19 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 
 	// Athletes & Participants
 	protected.HandleFunc("GET /api/v1/athletes", athleteH.List)
-	protected.Handle("POST /api/v1/athletes", adminOrDewan(http.HandlerFunc(athleteH.Create)))
+	protected.Handle("POST /api/v1/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.Create)))
 	protected.HandleFunc("GET /api/v1/athletes/{id}", athleteH.Get)
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/athletes", athleteH.ListByCompetition)
-	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", adminOrDewan(http.HandlerFunc(athleteH.RegisterToCompetition)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.RegisterToCompetition)))
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/participants", athleteH.ListParticipants)
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/verify", adminOrDewan(http.HandlerFunc(athleteH.VerifyParticipant)))
 
 	// Arenas
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas", arenaH.List)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/arenas", adminOrDewan(http.HandlerFunc(arenaH.Create)))
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas/{id}", arenaH.Get)
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Update)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Delete)))
 
 	// Matches
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches", matchH.List)
@@ -101,11 +124,30 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 
 	// Rulesets
 	protected.HandleFunc("GET /api/v1/rulesets", rulesetH.List)
+	protected.Handle("POST /api/v1/rulesets", adminOrDewan(http.HandlerFunc(rulesetH.Create)))
 	protected.HandleFunc("GET /api/v1/rulesets/{id}", rulesetH.Get)
+	protected.Handle("PUT /api/v1/rulesets/{id}", adminOrDewan(http.HandlerFunc(rulesetH.Update)))
+	protected.Handle("DELETE /api/v1/rulesets/{id}", adminOrDewan(http.HandlerFunc(rulesetH.Delete)))
 
 	// Brackets
 	protected.Handle("POST /api/v1/competitions/{comp_id}/brackets/generate", adminOrDewan(http.HandlerFunc(bracketH.Generate)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/brackets", bracketH.GetTree)
+
+	// Officials / Operator Management (Admin & Dewan)
+	protected.Handle("GET /api/v1/officials", adminOrDewan(http.HandlerFunc(officialH.List)))
+	protected.Handle("POST /api/v1/officials", adminOrDewan(http.HandlerFunc(officialH.Create)))
+	protected.Handle("GET /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Get)))
+	protected.Handle("PUT /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Update)))
+	protected.Handle("DELETE /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Delete)))
+
+	// Contingents Management
+	protected.Handle("GET /api/v1/contingents", adminOrDewan(http.HandlerFunc(contingentH.List)))
+	protected.HandleFunc("GET /api/v1/contingents/{id}", contingentH.Get)
+
+	// Reporting & Statistics & Export
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/report/summary", reportH.Summary)
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/report/medals", reportH.Medals)
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/report/export", reportH.Export)
 
 	// Mount protected routes under AuthMiddleware
 	mux.Handle("/api/v1/", Chain(protected, AuthMiddleware))

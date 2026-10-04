@@ -105,6 +105,11 @@ func (h *Hub) Register(client *Client) {
 
 // HandleWS — HTTP handler untuk upgrade ke WebSocket
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request, clientID string, role Role) {
+	h.HandleWSWithSeat(w, r, clientID, role, 0)
+}
+
+// HandleWSWithSeat — HTTP handler untuk upgrade ke WebSocket dengan nomor kursi
+func (h *Hub) HandleWSWithSeat(w http.ResponseWriter, r *http.Request, clientID string, role Role, seatNumber int) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("ws upgrade error: %v", err)
@@ -112,12 +117,13 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request, clientID string, 
 	}
 
 	client := &Client{
-		ID:      clientID,
-		Role:    role,
-		ArenaID: h.ArenaID,
-		conn:    conn,
-		send:    make(chan Message, 256),
-		hub:     h,
+		ID:         clientID,
+		Role:       role,
+		SeatNumber: seatNumber,
+		ArenaID:    h.ArenaID,
+		conn:       conn,
+		send:       make(chan Message, 256),
+		hub:        h,
 	}
 
 	h.register <- client

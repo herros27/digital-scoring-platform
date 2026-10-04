@@ -7,3 +7,4 @@ internal/docs
 # Environment
 .env
 .env.example
+bin

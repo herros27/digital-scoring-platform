@@ -77,3 +77,12 @@ func (s *CompetitionStore) UpdateStatus(id, status string) error {
 	_, err := s.DB.Exec(`UPDATE competitions SET status = $1 WHERE id = $2`, status, id)
 	return err
 }
+
+func (s *CompetitionStore) Update(c *Competition) error {
+	query := `
+		UPDATE competitions 
+		SET name = $1, location = $2, start_date = $3, end_date = $4, ruleset_name = $5 
+		WHERE id = $6`
+	_, err := s.DB.Exec(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, c.ID)
+	return err
+}

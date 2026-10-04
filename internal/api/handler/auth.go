@@ -34,21 +34,26 @@ func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    Ok(w, map[string]any{
+    res := map[string]any{
         "token":          token,
         "role":           record.Role,
         "arena_id":       record.ArenaID,
         "competition_id": record.CompetitionID,
-    })
+    }
+    if record.SeatNumber > 0 {
+        res["seat_number"] = record.SeatNumber
+    }
+    Ok(w, res)
 }
 
 // POST /api/v1/auth/create-pin  (admin only — untuk assign PIN ke juri)
-// Body: { "competition_id", "arena_id", "role", "pin" (opsional), "ttl_hours" (opsional) }
+// Body: { "competition_id", "arena_id", "role", "seat_number" (opsional), "pin" (opsional), "ttl_hours" (opsional) }
 func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
     var req struct {
         CompetitionID string `json:"competition_id"`
         ArenaID       string `json:"arena_id"`
         Role          string `json:"role"`
+        SeatNumber    int    `json:"seat_number"`
         PIN           string `json:"pin"`
         TTLHours      int    `json:"ttl_hours"`
     }
@@ -76,19 +81,23 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
     }
 
     ttl := time.Duration(req.TTLHours) * time.Hour
-    record, err := h.Pins.CreatePIN(req.CompetitionID, req.ArenaID, req.Role, pin, ttl)
+    record, err := h.Pins.CreatePINWithSeat(req.CompetitionID, req.ArenaID, req.Role, req.SeatNumber, pin, ttl)
     if err != nil {
         Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
         return
     }
 
     // Kembalikan plain PIN dan expires_at agar admin/operator dapat membagikannya kepada juri
-    Ok(w, map[string]any{
+    res := map[string]any{
         "id":             record.ID,
         "competition_id": record.CompetitionID,
         "arena_id":       record.ArenaID,
         "role":           record.Role,
         "pin":            pin,
         "expires_at":     record.ExpiresAt,
-    })
+    }
+    if record.SeatNumber > 0 {
+        res["seat_number"] = record.SeatNumber
+    }
+    Ok(w, res)
 }

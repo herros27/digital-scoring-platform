@@ -39,6 +39,41 @@ func (s *RulesetStore) GetByID(id string) (*Ruleset, error) {
 	return r, nil
 }
 
+func (s *RulesetStore) Update(r *Ruleset) error {
+	scoringBytes, err := json.Marshal(r.Scoring)
+	if err != nil {
+		return err
+	}
+	query := `UPDATE rulesets SET name = $1, version = $2, scoring = $3, status = $4 WHERE id = $5`
+	res, err := s.DB.Exec(query, r.Name, r.Version, scoringBytes, r.Status, r.ID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (s *RulesetStore) Delete(id string) error {
+	res, err := s.DB.Exec(`DELETE FROM rulesets WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *RulesetStore) List() ([]Ruleset, error) {
 	rows, err := s.DB.Query(`SELECT id, name, version, scoring, status, created_at FROM rulesets ORDER BY created_at DESC`)
 	if err != nil {

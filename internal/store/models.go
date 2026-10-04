@@ -17,3 +17,5 @@ type JudgePin = domain.JudgePin
 type Athlete = domain.Athlete
 type Category = domain.Category
 type Ruleset = domain.Ruleset
+type Official = domain.Official
+type Contingent = domain.Contingent

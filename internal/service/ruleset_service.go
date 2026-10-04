@@ -1,6 +1,9 @@
 package service
 
 import (
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -9,6 +12,9 @@ import (
 )
 
 type RulesetRepository interface {
+	Create(r *store.Ruleset) error
+	Update(r *store.Ruleset) error
+	Delete(id string) error
 	List() ([]store.Ruleset, error)
 	GetByID(id string) (*store.Ruleset, error)
 	GetActive() (*store.Ruleset, error)
@@ -20,6 +26,95 @@ type RulesetService struct {
 
 func NewRulesetService(repo RulesetRepository) *RulesetService {
 	return &RulesetService{repo: repo}
+}
+
+type CreateRulesetInput struct {
+	Name    string             `json:"name"`
+	Version string             `json:"version"`
+	Scoring rules.ScoringRule  `json:"scoring"`
+	Status  string             `json:"status"`
+}
+
+// CreateRuleset membuat ruleset baru secara dinamis
+func (s *RulesetService) CreateRuleset(input CreateRulesetInput) (*domain.Ruleset, error) {
+	if input.Name == "" || input.Version == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if input.Scoring.RoundDuration <= 0 || input.Scoring.TotalRounds <= 0 {
+		return nil, errors.New("round_duration and total_rounds must be greater than 0")
+	}
+	status := input.Status
+	if status == "" {
+		status = "active"
+	}
+
+	rs := &domain.Ruleset{
+		Name:    input.Name,
+		Version: input.Version,
+		Scoring: input.Scoring,
+		Status:  status,
+	}
+
+	if s.repo != nil {
+		if err := s.repo.Create(rs); err != nil {
+			return nil, err
+		}
+		return rs, nil
+	}
+
+	rs.ID = "ruleset-" + input.Name
+	rs.CreatedAt = time.Now()
+	return rs, nil
+}
+
+// UpdateRuleset memperbarui ruleset dinamis
+func (s *RulesetService) UpdateRuleset(id string, input CreateRulesetInput) (*domain.Ruleset, error) {
+	if id == "" || input.Name == "" || input.Version == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if input.Scoring.RoundDuration <= 0 || input.Scoring.TotalRounds <= 0 {
+		return nil, errors.New("round_duration and total_rounds must be greater than 0")
+	}
+	status := input.Status
+	if status == "" {
+		status = "active"
+	}
+
+	rs := &domain.Ruleset{
+		ID:      id,
+		Name:    input.Name,
+		Version: input.Version,
+		Scoring: input.Scoring,
+		Status:  status,
+	}
+
+	if s.repo != nil {
+		if err := s.repo.Update(rs); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, domain.ErrNotFound
+			}
+			return nil, err
+		}
+		return rs, nil
+	}
+
+	return rs, nil
+}
+
+// DeleteRuleset menghapus ruleset
+func (s *RulesetService) DeleteRuleset(id string) error {
+	if id == "" {
+		return domain.ErrInvalidInput
+	}
+	if s.repo != nil {
+		if err := s.repo.Delete(id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return domain.ErrNotFound
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // ListRulesets mengambil daftar ruleset dari DB atau fallback ke built-in rulesets
@@ -53,6 +148,40 @@ func (s *RulesetService) GetRulesetByID(id string) (*domain.Ruleset, error) {
 	}
 
 	return nil, domain.ErrNotFound
+}
+
+// ResolveRuleset memuat engine Ruleset dari DB (ID/Nama) atau fallback ke file JSON/hardcoded
+func (s *RulesetService) ResolveRuleset(identifier string) (*rules.Ruleset, error) {
+	if identifier != "" && s.repo != nil {
+		if r, err := s.repo.GetByID(identifier); err == nil && r != nil {
+			return toRulesStruct(r)
+		}
+		if list, err := s.repo.List(); err == nil {
+			for _, item := range list {
+				if item.Name == identifier || item.ID == identifier {
+					return toRulesStruct(&item)
+				}
+			}
+		}
+	}
+
+	return rules.LoadRuleset(identifier)
+}
+
+func toRulesStruct(r *domain.Ruleset) (*rules.Ruleset, error) {
+	bytes, err := json.Marshal(r.Scoring)
+	if err != nil {
+		return nil, err
+	}
+	var sc rules.ScoringRule
+	if err := json.Unmarshal(bytes, &sc); err != nil {
+		return nil, err
+	}
+	return &rules.Ruleset{
+		Name:    r.Name,
+		Version: r.Version,
+		Scoring: sc,
+	}, nil
 }
 
 func getBuiltinRulesets() []domain.Ruleset {

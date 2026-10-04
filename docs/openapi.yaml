@@ -59,7 +59,10 @@ paths:
                         example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                       role:
                         type: string
-                        example: "judge_1"
+                        example: "judge"
+                      seat_number:
+                        type: integer
+                        example: 1
                       arena_id:
                         type: string
                         format: uuid
@@ -72,6 +75,118 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/login:
+    post:
+      summary: Login Admin / Operator / Dewan menggunakan Email & Password
+      description: Mengautentikasi akun admin/operator dan mengembalikan token JWT untuk akses API administratif.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "admin@silat.id"
+                password:
+                  type: string
+                  format: password
+                  example: "AdminSecret123!"
+      responses:
+        '200':
+          description: Login berhasil, token JWT diberikan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        $ref: '#/components/schemas/Official'
+        '401':
+          description: Email atau password salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/contingent/register:
+    post:
+      summary: Registrasi Akun Manajer Kontingen / Official Tim
+      description: Memungkinkan perwakilan kontingen/perguruan mendaftar secara mandiri untuk mengelola pendaftaran atlet mereka.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, pic_name, email, phone, password]
+              properties:
+                name:
+                  type: string
+                  example: "Tapak Suci Sleman"
+                pic_name:
+                  type: string
+                  example: "Budi Santoso"
+                email:
+                  type: string
+                  format: email
+                  example: "tapaksuci@example.com"
+                phone:
+                  type: string
+                  example: "081234567890"
+                password:
+                  type: string
+                  format: password
+                  example: "Secret123!"
+      responses:
+        '201':
+          description: Kontingen berhasil terdaftar
+        '400':
+          description: Validasi gagal atau email sudah terdaftar
+
+  /api/v1/auth/contingent/login:
+    post:
+      summary: Login Manajer Kontingen
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "tapaksuci@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "Secret123!"
+      responses:
+        '200':
+          description: Login berhasil, token JWT role 'contingent' dikembalikan
+        '401':
+          description: Email atau password salah
 
   /api/v1/auth/create-pin:
     post:
@@ -96,8 +211,12 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [judge_1, judge_2, judge_3, judge_4, judge_5, referee, admin, dewan]
-                  example: "judge_1"
+                  enum: [judge, referee, admin, dewan, operator, judge_1, judge_2, judge_3]
+                  example: "judge"
+                seat_number:
+                  type: integer
+                  description: Optional. Nomor kursi juri di gelanggang (1, 2, 3, dst).
+                  example: 1
                 pin:
                   type: string
                   description: Optional. Jika tidak diisi, server akan men-generate PIN 6 angka acak.
@@ -131,7 +250,10 @@ paths:
                         format: uuid
                       role:
                         type: string
-                        example: "judge_1"
+                        example: "judge"
+                      seat_number:
+                        type: integer
+                        example: 1
                       pin:
                         type: string
                         example: "839201"
@@ -262,6 +384,43 @@ paths:
       responses:
         '200':
           description: Detail kompetisi
+    put:
+      summary: Perbarui Data Kejuaraan (Admin / Dewan)
+      tags:
+        - Competition
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Kejuaraan Nasional Silat Edisi Khusus 2026"
+                location:
+                  type: string
+                  example: "Bandung"
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                ruleset_name:
+                  type: string
+      responses:
+        '200':
+          description: Data kompetisi berhasil diperbarui
 
   /api/v1/competitions/{id}/activate:
     put:
@@ -280,6 +439,60 @@ paths:
       responses:
         '200':
           description: Status diubah menjadi active
+
+  /api/v1/competitions/{id}/pause:
+    post:
+      summary: Jeda Status Kejuaraan (Admin / Dewan)
+      tags:
+        - Competition
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status diubah menjadi paused
+
+  /api/v1/competitions/{id}/finish:
+    post:
+      summary: Selesaikan Kejuaraan (Admin / Dewan)
+      tags:
+        - Competition
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status diubah menjadi completed
+
+  /api/v1/competitions/{id}/cancel:
+    post:
+      summary: Batalkan Kejuaraan (Admin / Dewan)
+      tags:
+        - Competition
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status diubah menjadi cancelled
 
   # -------------------------------------------------------
   # CATEGORIES
@@ -529,6 +742,96 @@ paths:
         '201':
           description: Atlet berhasil didaftarkan ke kompetisi
 
+  /api/v1/competitions/{comp_id}/participants:
+    get:
+      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected)
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          description: Filter status ('pending', 'verified', 'rejected')
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daftar peserta kompetisi
+
+  /api/v1/competitions/{comp_id}/participants/{id}/verify:
+    put:
+      summary: Verifikasi Pendaftaran Atlet oleh Admin / Dewan (Timbang Badan & Berkas)
+      description: Mengubah status pendaftaran peserta menjadi 'verified' atau 'rejected'.
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [verified, rejected]
+                  example: "verified"
+      responses:
+        '200':
+          description: Status verifikasi berhasil diperbarui
+
+  /api/v1/contingents:
+    get:
+      summary: Daftar Kontingen Terdaftar (Admin / Dewan)
+      tags:
+        - Contingent
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List seluruh kontingen
+
+  /api/v1/contingents/{id}:
+    get:
+      summary: Detail Data Kontingen
+      tags:
+        - Contingent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail data kontingen
+
   # -------------------------------------------------------
   # ARENAS
   # -------------------------------------------------------
@@ -576,6 +879,108 @@ paths:
       responses:
         '201':
           description: Gelanggang berhasil ditambahkan
+
+  /api/v1/competitions/{comp_id}/arenas/{id}:
+    get:
+      summary: Detail Gelanggang / Arena
+      tags:
+        - Arena
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Data gelanggang berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      competition_id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        example: "Gelanggang A"
+                      created_at:
+                        type: string
+                        format: date-time
+    put:
+      summary: Perbarui Data Gelanggang (Admin / Dewan)
+      tags:
+        - Arena
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Gelanggang Utama"
+      responses:
+        '200':
+          description: Gelanggang berhasil diperbarui
+    delete:
+      summary: Hapus Gelanggang (Admin / Dewan)
+      tags:
+        - Arena
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Gelanggang berhasil dihapus
 
   # -------------------------------------------------------
   # MATCHES & LIFECYCLE
@@ -1135,6 +1540,81 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Ruleset'
+    post:
+      summary: Buat Ruleset Pertandingan Baru (Admin / Dewan)
+      description: Membuat aturan scoring kustom secara dinamis tanpa mengubah kode sumber atau me-restart server.
+      tags:
+        - Ruleset
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - version
+                - scoring
+              properties:
+                name:
+                  type: string
+                  example: "Kejurda Remaja 2026"
+                version:
+                  type: string
+                  example: "1.0"
+                scoring:
+                  type: object
+                  properties:
+                    technique_points:
+                      type: integer
+                      example: 1
+                    knockdown_points:
+                      type: integer
+                      example: 2
+                    fall_points:
+                      type: integer
+                      example: 3
+                    max_penalties:
+                      type: integer
+                      example: 3
+                    penalty_threshold:
+                      type: integer
+                      example: 1
+                    round_duration:
+                      type: integer
+                      description: Durasi ronde dalam detik
+                      example: 90
+                    break_duration:
+                      type: integer
+                      description: Durasi istirahat dalam detik
+                      example: 45
+                    total_rounds:
+                      type: integer
+                      example: 3
+                status:
+                  type: string
+                  example: "active"
+      responses:
+        '201':
+          description: Ruleset berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Ruleset'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
 
   /api/v1/rulesets/{id}:
     get:
@@ -1163,6 +1643,318 @@ paths:
                     example: true
                   data:
                     $ref: '#/components/schemas/Ruleset'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      summary: Perbarui Ruleset Pertandingan (Admin / Dewan)
+      tags:
+        - Ruleset
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                version:
+                  type: string
+                scoring:
+                  type: object
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Ruleset berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Ruleset'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      summary: Hapus Ruleset Pertandingan (Admin / Dewan)
+      tags:
+        - Ruleset
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ruleset berhasil dihapus
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # -------------------------------------------------------
+  # OFFICIALS & OPERATOR MANAGEMENT
+  # -------------------------------------------------------
+  /api/v1/officials:
+    get:
+      summary: Daftar Petugas / Operator Sistem (Admin / Dewan)
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Daftar official
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Official'
+    post:
+      summary: Buat Akun Petugas / Operator Baru (Admin / Dewan)
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                  example: "Operator Lapangan 1"
+                email:
+                  type: string
+                  format: email
+                  example: "operator1@silat.id"
+                password:
+                  type: string
+                  example: "mock_secret_1"
+                role:
+                  type: string
+                  enum: [admin, dewan, operator, wasit]
+                  default: operator
+                  example: "operator"
+      responses:
+        '201':
+          description: Akun petugas berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Official'
+
+  /api/v1/officials/{id}:
+    get:
+      summary: Detail Data Petugas / Operator (Admin / Dewan)
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail data official
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Official'
+    put:
+      summary: Perbarui Data Petugas / Operator (Admin / Dewan)
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Dewan Utama"
+                role:
+                  type: string
+                  enum: [admin, dewan, operator, wasit]
+                  example: "dewan"
+      responses:
+        '200':
+          description: Data official berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Official'
+    delete:
+      summary: Hapus Akun Petugas / Operator (Admin / Dewan)
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Official berhasil dihapus
+
+  # -------------------------------------------------------
+  # REPORTING, STATISTICS & EXPORT
+  # -------------------------------------------------------
+  /api/v1/competitions/{comp_id}/report/summary:
+    get:
+      summary: Ringkasan Metrik & Statistik Kompetisi
+      tags:
+        - Reporting & Export
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ringkasan metrik kompetisi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CompetitionSummary'
+
+  /api/v1/competitions/{comp_id}/report/medals:
+    get:
+      summary: Klasemen Perolehan Medali Kontingen / Tim
+      tags:
+        - Reporting & Export
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Daftar klasemen medali
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MedalStanding'
+
+  /api/v1/competitions/{comp_id}/report/export:
+    get:
+      summary: Ekspor Seluruh Data Turnamen / Kompetisi (JSON Export)
+      tags:
+        - Reporting & Export
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Full tournament data export
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CompetitionExport'
 
   # -------------------------------------------------------
   # LIVE SCOREBOARD (PUBLIC)
@@ -1386,6 +2178,38 @@ components:
         total_blue:
           type: integer
           example: 9
+        consensus:
+          type: object
+          properties:
+            red_score:
+              type: integer
+              example: 12
+            blue_score:
+              type: integer
+              example: 9
+        judges:
+          type: array
+          items:
+            type: object
+            properties:
+              judge_id:
+                type: string
+                format: uuid
+              role:
+                type: string
+                example: "judge"
+              seat_number:
+                type: integer
+                example: 1
+              connected:
+                type: boolean
+                example: true
+              red_score:
+                type: integer
+                example: 12
+              blue_score:
+                type: integer
+                example: 9
         rounds:
           type: array
           items:
@@ -1466,3 +2290,93 @@ components:
         total:
           type: integer
           example: 45
+
+    Official:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Admin Silat"
+        email:
+          type: string
+          format: email
+          example: "admin@silat.id"
+        role:
+          type: string
+          enum: [admin, dewan, operator, wasit]
+          example: "admin"
+        created_at:
+          type: string
+          format: date-time
+
+    CompetitionSummary:
+      type: object
+      properties:
+        competition_id:
+          type: string
+          format: uuid
+        competition_name:
+          type: string
+          example: "Kejurnas Pencak Silat 2026"
+        total_arenas:
+          type: integer
+          example: 3
+        total_categories:
+          type: integer
+          example: 8
+        total_athletes:
+          type: integer
+          example: 64
+        total_matches:
+          type: integer
+          example: 32
+        matches_by_status:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            completed: 20
+            running: 2
+            idle: 10
+
+    MedalStanding:
+      type: object
+      properties:
+        team:
+          type: string
+          example: "Kontingen Jatim"
+        gold:
+          type: integer
+          example: 5
+        silver:
+          type: integer
+          example: 3
+        bronze:
+          type: integer
+          example: 2
+        total:
+          type: integer
+          example: 10
+
+    CompetitionExport:
+      type: object
+      properties:
+        competition:
+          $ref: '#/components/schemas/Competition'
+        summary:
+          $ref: '#/components/schemas/CompetitionSummary'
+        medals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MedalStanding'
+        categories:
+          type: array
+          items:
+            type: object
+        matches:
+          type: array
+          items:
+            type: object

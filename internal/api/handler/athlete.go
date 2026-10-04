@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/herros27/digital-scoring/internal/auth"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
 )
@@ -80,12 +81,23 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 	athleteID := req.AthleteID
 	gender := req.Gender
 
+	// Determine status and contingent_id based on caller claims
+	status := "registered"
+	contingentID := ""
+	if claims := auth.ClaimsFromContext(r.Context()); claims != nil {
+		if claims.Role == "contingent" {
+			contingentID = claims.JudgePinID
+			status = "pending"
+		}
+	}
+
 	// If no athlete_id provided, create new athlete record first
 	if athleteID == "" {
 		newAthlete := domain.Athlete{
-			Name:   req.Name,
-			Gender: req.Gender,
-			Team:   req.Team,
+			ContingentID: contingentID,
+			Name:         req.Name,
+			Gender:       req.Gender,
+			Team:         req.Team,
 		}
 		if err := h.Service.CreateAthlete(&newAthlete); err != nil {
 			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -95,7 +107,7 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		gender = newAthlete.Gender
 	}
 
-	if err := h.Service.RegisterAthleteToCompetition(compID, athleteID, req.WeightClass, gender); err != nil {
+	if err := h.Service.RegisterParticipant(compID, athleteID, contingentID, req.WeightClass, gender, status); err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
@@ -104,9 +116,58 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 	Ok(w, map[string]string{
 		"competition_id": compID,
 		"athlete_id":     athleteID,
+		"contingent_id":  contingentID,
 		"weight_class":   req.WeightClass,
-		"status":         "registered",
+		"status":         status,
 	})
+}
+
+// PUT /api/v1/competitions/{comp_id}/participants/{id}/verify
+func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Request) {
+	participantID := r.PathValue("id")
+	if participantID == "" {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "participant id is required", nil)
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"` // "verified" or "rejected"
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+
+	if req.Status != "verified" && req.Status != "rejected" {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "status must be 'verified' or 'rejected'", nil)
+		return
+	}
+
+	if err := h.Service.VerifyParticipant(participantID, req.Status); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+
+	Ok(w, map[string]string{
+		"participant_id": participantID,
+		"status":         req.Status,
+	})
+}
+
+// GET /api/v1/competitions/{comp_id}/participants?status=pending
+func (h *AthleteHandler) ListParticipants(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	if compID == "" {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "competition id is required", nil)
+		return
+	}
+	status := r.URL.Query().Get("status")
+	list, err := h.Service.ListParticipants(compID, status)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, list)
 }
 
 func (h *AthleteHandler) ListByCompetition(w http.ResponseWriter, r *http.Request) {

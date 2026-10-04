@@ -75,3 +75,65 @@ func (h *CompetitionHandler) Activate(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, map[string]string{"status": "active"})
 }
+
+// PUT /api/v1/competitions/{id}
+func (h *CompetitionHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req domain.Competition
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	updated, err := h.Service.UpdateCompetition(id, &req)
+	if err != nil {
+		if errors.Is(err, domain.ErrCompetitionNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	Ok(w, updated)
+}
+
+// POST /api/v1/competitions/{id}/pause
+func (h *CompetitionHandler) Pause(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := h.Service.PauseCompetition(id); err != nil {
+		if errors.Is(err, domain.ErrCompetitionNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "paused"})
+}
+
+// POST /api/v1/competitions/{id}/finish
+func (h *CompetitionHandler) Finish(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := h.Service.FinishCompetition(id); err != nil {
+		if errors.Is(err, domain.ErrCompetitionNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "completed"})
+}
+
+// POST /api/v1/competitions/{id}/cancel
+func (h *CompetitionHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := h.Service.CancelCompetition(id); err != nil {
+		if errors.Is(err, domain.ErrCompetitionNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]string{"status": "cancelled"})
+}

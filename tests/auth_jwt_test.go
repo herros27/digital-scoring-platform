@@ -85,3 +85,45 @@ func TestAuth_HashAndVerifyPIN(t *testing.T) {
 		t.Errorf("VerifyPIN should return false for incorrect PIN")
 	}
 }
+
+func TestAuth_JWTGenerationWithSeat(t *testing.T) {
+	auth.SetJWTSecret("test-secret-key-12345")
+
+	pinID := "pin-uuid-judge-seat"
+	compID := "comp-uuid-1"
+	arenaID := "arena-uuid-1"
+	role := "judge"
+	seat := 3
+	ttl := 2 * time.Hour
+
+	tokenStr, err := auth.GenerateTokenWithSeat(pinID, compID, arenaID, role, seat, ttl)
+	if err != nil {
+		t.Fatalf("GenerateTokenWithSeat failed: %v", err)
+	}
+
+	claims, err := auth.ParseToken(tokenStr)
+	if err != nil {
+		t.Fatalf("ParseToken failed: %v", err)
+	}
+
+	if claims.Role != "judge" || claims.SeatNumber != 3 {
+		t.Errorf("expected role judge and seat 3, got role=%s seat=%d", claims.Role, claims.SeatNumber)
+	}
+}
+
+func TestAuth_NormalizeRoleAndSeat(t *testing.T) {
+	r1, s1 := auth.NormalizeRoleAndSeat("judge_2", 0)
+	if r1 != "judge" || s1 != 2 {
+		t.Errorf("expected judge and 2, got %s and %d", r1, s1)
+	}
+
+	r2, s2 := auth.NormalizeRoleAndSeat("judge", 5)
+	if r2 != "judge" || s2 != 5 {
+		t.Errorf("expected judge and 5, got %s and %d", r2, s2)
+	}
+
+	r3, s3 := auth.NormalizeRoleAndSeat("referee", 0)
+	if r3 != "referee" || s3 != 0 {
+		t.Errorf("expected referee and 0, got %s and %d", r3, s3)
+	}
+}

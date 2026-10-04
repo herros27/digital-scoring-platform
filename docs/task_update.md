@@ -80,9 +80,42 @@
       - [`tests/category_service_test.go`](file:///d:/Freelance/DigitalScoring/tests/category_service_test.go): Input validation, category creation, retrieval, and listing.
       - [`tests/p1_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/p1_features_test.go): Bracket advancement, rulesets, match events, and WebSocket sync.
       - [`tests/p2_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/p2_features_test.go): Server PIN generator, pagination & filtering, and scoring idempotency.
-    - Verified all 26 test cases passing (`go test -count=1 ./...` exits 0, `go vet ./...` clean).
+      - [`tests/admin_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/admin_features_test.go): Arena CRUD and Competition lifecycle.
+    - Verified all 32 test cases passing (`go test -count=1 ./...` exits 0, `go vet ./...` clean).
+21. **Arena CRUD Lanjutan & Competition Lifecycle (P2)** –
+    - Implemented `GetArenaByID`, `UpdateArena`, and `DeleteArena` in [`ArenaStore`](file:///d:/Freelance/DigitalScoring/internal/store/arena.go), [`ArenaService`](file:///d:/Freelance/DigitalScoring/internal/service/arena_service.go), and [`ArenaHandler`](file:///d:/Freelance/DigitalScoring/internal/api/handler/arena.go).
+    - Implemented `UpdateCompetition`, `PauseCompetition`, `FinishCompetition`, and `CancelCompetition` in [`CompetitionStore`](file:///d:/Freelance/DigitalScoring/internal/store/competition.go), [`CompetitionService`](file:///d:/Freelance/DigitalScoring/internal/service/competition_service.go), and [`CompetitionHandler`](file:///d:/Freelance/DigitalScoring/internal/api/handler/competition.go).
+    - Mounted new endpoints in [`internal/api/router.go`](file:///d:/Freelance/DigitalScoring/internal/api/router.go) protected with RBAC (`admin`, `dewan`).
+    - Documented all endpoints in [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml) and verified via automated test in [`tests/admin_features_test.go`](file:///d:/Freelance/DigitalScoring/tests/admin_features_test.go).
+22. **Admin/Operator Management & Reporting, Statistics, Export (P2)** –
+    - Implemented `OfficialStore` ([`internal/store/official.go`](file:///d:/Freelance/DigitalScoring/internal/store/official.go)), `OfficialService` ([`internal/service/official_service.go`](file:///d:/Freelance/DigitalScoring/internal/service/official_service.go)), and `OfficialHandler` ([`internal/api/handler/official.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/official.go)) with password hashing via bcrypt, 24h JWT issuance, duplicate email checks, and full CRUD (`GET`, `POST`, `PUT`, `DELETE /api/v1/officials`).
+    - Implemented `ReportService` ([`internal/service/report_service.go`](file:///d:/Freelance/DigitalScoring/internal/service/report_service.go)) and `ReportHandler` ([`internal/api/handler/report.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/report.go)) with `GET .../report/summary`, `GET .../report/medals`, and `GET .../report/export`.
+    - Mounted public login endpoint `POST /api/v1/auth/login` and protected routes in [`internal/api/router.go`](file:///d:/Freelance/DigitalScoring/internal/api/router.go).
+    - Documented paths and schemas (`Official`, `CompetitionSummary`, `MedalStanding`, `CompetitionExport`) in [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml).
+    - Added automated unit & HTTP integration tests in [`tests/official_and_report_test.go`](file:///d:/Freelance/DigitalScoring/tests/official_and_report_test.go).
+23. **Option A: Clean Architecture — Pemisahan Role & Seat Juri** –
+    - Decoupled judge position from authorization role: `role: "judge"` (RBAC) dan `seat_number: 1, 2, ...` (penempatan gelanggang).
+    - Added database migration `014_judge_pins_seat_number.sql` (`ALTER TABLE judge_pins ADD COLUMN seat_number INT DEFAULT 0`).
+    - Added backward-compatible auto-normalization in `internal/auth/pin.go` (`NormalizeRoleAndSeat`), mapping legacy `"judge_1"` into `("judge", 1)`.
+    - Updated `MatchScoreDetail` response with `consensus` and `judges` breakdown per seat.
+    - Added unit test coverage in `tests/auth_jwt_test.go`.
+24. **Database Reset & Migrasi Penuh (001 - 016)** –
+    - Added `015_officials.sql` for management & official accounts.
+    - Refactored `011_participants.sql` to be safe & idempotent.
+    - Executed clean schema reset and sequential execution of all 16 migration files against local PostgreSQL container.
+25. **Option 2: Manajemen Kontingen & Alur Verifikasi Pendaftaran Atlet (Weigh-in / Document Approval)** –
+    - Created dedicated table `contingents` (`migrations/016_contingents.sql`) linked to `athletes` and `participants`.
+    - Implemented `ContingentStore`, `ContingentService`, and `ContingentHandler` with self-registration (`POST /api/v1/auth/contingent/register`), login (`POST /api/v1/auth/contingent/login`), and listing (`GET /api/v1/contingents`).
+    - Supported athlete registration by contingent with automatic `pending` status (`POST /api/v1/competitions/{comp_id}/athletes`).
+    - Added verification endpoints for Admin & Dewan (`PUT /api/v1/competitions/{comp_id}/participants/{id}/verify` and `GET .../participants?status=`).
+    - Enforced bracket generation safeguard in `BracketHandler`: only `verified` participants enter tournament brackets.
+26. **Dynamic Rulesets API & Database-driven Engine Integration** –
+    - Implemented `POST /api/v1/rulesets`, `PUT /api/v1/rulesets/{id}`, and `DELETE /api/v1/rulesets/{id}` in [`RulesetHandler`](file:///d:/Freelance/DigitalScoring/internal/api/handler/ruleset.go), protected with RBAC (`admin`, `dewan`).
+    - Added `CreateRuleset`, `UpdateRuleset`, `DeleteRuleset`, and `ResolveRuleset` in [`RulesetService`](file:///d:/Freelance/DigitalScoring/internal/service/ruleset_service.go).
+    - Added `Update` and `Delete` methods in [`RulesetStore`](file:///d:/Freelance/DigitalScoring/internal/store/rulseset.go).
+    - Integrated dynamic ruleset resolution into `MatchService.LoadMatchToArena`: matches automatically load their ruleset directly from the PostgreSQL database (via competition `ruleset_id` or explicit ruleset identifier) without requiring manual JSON file creation or project rebuilds.
+    - Added comprehensive unit and HTTP integration tests in [`tests/ruleset_crud_test.go`](file:///d:/Freelance/DigitalScoring/tests/ruleset_crud_test.go), bringing total test suite to **40 automated unit tests (100% PASS)**.
+    - Updated documentation in [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml) and [`README.md`](file:///d:/Freelance/DigitalScoring/README.md).
 
 ## Pending
-- Verify status codes and payloads for all REST endpoints against `docs/openapi.yaml`.
-- Ensure `FailMsg()` helper is consistently used where appropriate.
 - Deploy changes to staging and run integration tests.

@@ -52,6 +52,7 @@ func (c *mockCompRepo) Create(comp *domain.Competition) error            { retur
 func (c *mockCompRepo) GetByID(id string) (*domain.Competition, error)   { return &domain.Competition{ID: id}, nil }
 func (c *mockCompRepo) List() ([]domain.Competition, error)              { return nil, nil }
 func (c *mockCompRepo) UpdateStatus(id, status string) error             { return nil }
+func (c *mockCompRepo) Update(comp *domain.Competition) error             { return nil }
 
 func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 	matchRepo := newMockMatchRepo()
