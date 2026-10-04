@@ -417,6 +417,14 @@ Returns: DB status, active arenas, active matches, WS connections.
 
 ## Development
 
+### Database Seeding & Default Credentials
+Untuk mengisi database kosong dengan data turnamen realistis (kompetisi, 2 gelanggang, kategori tanding, 4 kontingen, 8 atlet, bagan turnamen, match aktif, serta PIN wasit & juri):
+```bash
+go run ./cmd/seed/main.go
+```
+Daftar lengkap akun login official, kontingen, dan PIN wasit/juri didokumentasikan di:  
+👉 **[docs/CREDENTIALS.md](docs/CREDENTIALS.md)**
+
 ### Run Tests
 ```bash
 go test -v -count=1 ./...
