@@ -71,6 +71,15 @@ export const authService = {
   },
 
   /**
+   * List Active Device PINs for an Arena (Admin only)
+   */
+  async listPins(competitionId: string, arenaId: string): Promise<any[]> {
+    const url = `${ENDPOINTS.AUTH.PINS}?competition_id=${competitionId}&arena_id=${arenaId}`
+    const res = await apiClient.get<any, { success: boolean; data: any[] }>(url)
+    return res.data || []
+  },
+
+  /**
    * Logout user / device session
    */
   async logout(): Promise<void> {

@@ -354,38 +354,54 @@ function openBracketOps(c: Competition) {
       </div>
     </Transition>
 
-    <!-- Header Section -->
+    <!-- Header Section (Standardized Ops Banner) -->
     <header class="comp-header">
-      <div class="comp-header__info">
-        <div class="comp-header__tag">
-          <AppBadge variant="primary" size="sm">DIREKTORAT PERTANDINGAN</AppBadge>
-          <span class="comp-header__live-indicator">
-            <span class="comp-header__pulse-dot" />
-            TanStack Server Cache Terhubung
-          </span>
+      <div class="comp-header__left">
+        <div class="comp-header__icon-box">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+          </svg>
         </div>
-        <h1 class="comp-header__title text-balance">Manajemen Kejuaraan Silat</h1>
-        <p class="comp-header__desc text-pretty">
-          Kelola siklus hidup turnamen, regulasi scoring resmi IPSI/PERSILAT, penjadwalan arena, dan bagan tanding.
-        </p>
+        <div>
+          <div class="comp-header__sub font-mono">
+            <span>DIREKTORAT PERTANDINGAN</span>
+            <span class="comp-bullet">•</span>
+            <span class="comp-tag">REGULASI PERSILAT 2024</span>
+            <span class="comp-bullet">•</span>
+            <span class="comp-pulse-wrapper">
+              <span class="comp-pulse-dot" />
+              <span>SERVER CACHE SYNC</span>
+            </span>
+          </div>
+          <h2 class="comp-header__title">MANAJEMEN KEJUARAAN</h2>
+        </div>
       </div>
 
-      <div class="comp-header__actions">
-        <AppButton variant="secondary" size="md" :loading="loading" @click="() => refetch()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-            <path d="M21 2v6h-6" />
-            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-            <path d="M3 22v-6h6" />
-            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-          </svg>
-          Segarkan Data
+      <div class="comp-header__actions font-mono">
+        <AppButton variant="secondary" size="sm" :loading="loading" @click="() => refetch()">
+          <template #icon>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2v6h-6" />
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+              <path d="M3 22v-6h6" />
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+            </svg>
+          </template>
+          Segarkan
         </AppButton>
-        <AppButton variant="primary" size="md" @click="openCreateModal">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Tambah Kejuaraan Baru
+        <AppButton variant="emerald" size="sm" @click="openCreateModal">
+          <template #icon>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </template>
+          Tambah Kejuaraan
         </AppButton>
       </div>
     </header>
@@ -915,58 +931,69 @@ function openBracketOps(c: Competition) {
 .comp-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-card);
+  gap: 16px;
+  padding: 18px 24px;
+  background: var(--bg-card, #131d33);
+  border: 1px solid var(--border-card, #1e293b);
+  border-radius: var(--radius-lg, 12px);
 }
-.comp-header__info {
-  max-width: 720px;
-}
-.comp-header__tag {
+.comp-header__left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 16px;
 }
-.comp-header__live-indicator {
+.comp-header__icon-box {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-emerald-400, #34d399);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.comp-header__sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 0.6875rem;
-  color: var(--color-emerald-400);
+  font-weight: 600;
+  color: var(--color-neutral-400, #94a3b8);
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
 }
-.comp-header__pulse-dot {
+.comp-bullet { color: var(--color-neutral-600, #475569); }
+.comp-tag { color: var(--color-primary-400, #f87171); }
+.comp-pulse-wrapper { display: inline-flex; align-items: center; gap: 5px; color: var(--color-emerald-400, #34d399); }
+.comp-pulse-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: var(--color-emerald-400);
-  box-shadow: 0 0 8px var(--color-emerald-400);
-  animation: pulse-dot 2s infinite;
+  background: var(--color-emerald-400, #34d399);
+  box-shadow: 0 0 8px var(--color-emerald-400, #34d399);
+  animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 .comp-header__title {
-  font-family: var(--font-heading);
-  font-size: 1.875rem;
+  font-family: var(--font-sans, 'Space Grotesk', sans-serif);
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin: 0 0 6px 0;
-}
-.comp-header__desc {
-  font-size: 0.9375rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin: 0;
+  color: #ffffff;
+  line-height: 1.2;
 }
 .comp-header__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .btn-icon {
   margin-right: 6px;

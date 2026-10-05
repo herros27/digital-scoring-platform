@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/store"
@@ -52,7 +53,8 @@ func (s *ArenaService) CreateArena(competitionID string, name string) (*store.Ar
 	if competitionID == "" {
 		return nil, errors.New("competition id is required")
 	}
-	if name == "" {
+	cleanName := strings.TrimSpace(name)
+	if cleanName == "" {
 		return nil, errors.New("arena name cannot be empty")
 	}
 
@@ -62,9 +64,19 @@ func (s *ArenaService) CreateArena(competitionID string, name string) (*store.Ar
 		return nil, errors.New("competition not found")
 	}
 
+	// Validasi duplikasi nama gelanggang dalam kompetisi yang sama
+	existing, err := s.arenaRepo.ListByCompetition(competitionID)
+	if err == nil {
+		for _, a := range existing {
+			if strings.EqualFold(strings.TrimSpace(a.Name), cleanName) {
+				return nil, errors.New("nama gelanggang sudah terdaftar pada kompetisi ini")
+			}
+		}
+	}
+
 	arena := &store.Arena{
 		CompetitionID: competitionID,
-		Name:          name,
+		Name:          cleanName,
 	}
 
 	if err := s.arenaRepo.Create(arena); err != nil {
@@ -77,7 +89,8 @@ func (s *ArenaService) UpdateArena(id string, name string) (*store.Arena, error)
 	if id == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	if name == "" {
+	cleanName := strings.TrimSpace(name)
+	if cleanName == "" {
 		return nil, errors.New("arena name cannot be empty")
 	}
 	arena, err := s.arenaRepo.GetByID(id)
@@ -87,7 +100,18 @@ func (s *ArenaService) UpdateArena(id string, name string) (*store.Arena, error)
 	if arena == nil {
 		return nil, domain.ErrNotFound
 	}
-	arena.Name = name
+
+	// Validasi duplikasi nama saat update jika nama diubah
+	existing, err := s.arenaRepo.ListByCompetition(arena.CompetitionID)
+	if err == nil {
+		for _, a := range existing {
+			if a.ID != id && strings.EqualFold(strings.TrimSpace(a.Name), cleanName) {
+				return nil, errors.New("nama gelanggang sudah terdaftar pada kompetisi ini")
+			}
+		}
+	}
+
+	arena.Name = cleanName
 	if err := s.arenaRepo.Update(arena); err != nil {
 		return nil, err
 	}

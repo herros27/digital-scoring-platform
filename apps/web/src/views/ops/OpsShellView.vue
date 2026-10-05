@@ -13,11 +13,130 @@ import ParticipantVerificationView from '@/features/athletes/views/ParticipantVe
 import ScheduleOpsView from '@/features/matches/views/ScheduleOpsView.vue'
 import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
 import { matchService } from '@/features/matches/api/matchService'
-import { bracketService } from '@/features/tournament/api/bracketService'
+import { useBracketTreeQuery, useGenerateBracketMutation } from '@/features/tournament/api/bracketQueries'
+import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
+import { useMatchesQuery } from '@/features/matches/api/matchQueries'
+import { useCompetitionsQuery } from '@/features/competitions/api/competitionQueries'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
+// If URL has ?comp_id=..., sync it to authStore
+if (route.query.comp_id && typeof route.query.comp_id === 'string') {
+  authStore.setCompetitionId(route.query.comp_id)
+}
+
+import type { CompetitionFilterValues } from '@/features/competitions/types/competition.schema'
+
+const compFilter = ref<CompetitionFilterValues>({ status: 'all', page: 1, limit: 50 })
+const { data: rawCompetitions } = useCompetitionsQuery(compFilter)
+
+const competitionsList = computed(() => rawCompetitions.value?.data || [])
+
+// Default to first active competition if not set
+watch(
+  competitionsList,
+  (list) => {
+    if (list.length > 0 && !authStore.competitionId) {
+      const activeOne = list.find((c) => c.status === 'active') || list[0]
+      if (activeOne) {
+        authStore.setCompetitionId(activeOne.id)
+      }
+    }
+  },
+  { immediate: true }
+)
+
+const activeCompId = computed(() => {
+  return authStore.competitionId || competitionsList.value[0]?.id || 'b26d7145-d341-4795-ac58-bff86d13cbf8'
+})
+
+const activeCompetition = computed(() => {
+  return competitionsList.value.find((c) => c.id === activeCompId.value)
+})
+
+function switchCompetition(compId: string) {
+  authStore.setCompetitionId(compId)
+  router.replace({ query: { ...route.query, comp_id: compId } })
+  const targetComp = competitionsList.value.find((c) => c.id === compId)
+  showToast('Kompetisi Aktif Diubah', `Kini mengelola data untuk: ${targetComp?.name || compId}`, 'success')
+}
+
+// Queries for Real Data
+const { data: rawCategories } = useCategoriesQuery(activeCompId)
+const { data: rawArenas } = useArenasQuery(activeCompId)
+const { data: rawParticipants } = useParticipantsQuery(activeCompId)
+const { data: rawMatches, refetch: refetchMatches } = useMatchesQuery(activeCompId)
+
+// Selected category & weight class
+const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
+
+const categoryOptions = computed(() => {
+  const map = new Map<string, { id: string; name: string; weightClass: string; gender: string }>()
+
+  // 1. Ambil dari master categories database
+  for (const c of rawCategories.value || []) {
+    const g = c.gender === 'female' || c.gender === 'putri' ? 'female' : 'male'
+    const wc = (c.weight_class || 'A').toUpperCase()
+    const key = `${g}-${wc}`
+    map.set(key, {
+      id: c.id,
+      name: c.name,
+      weightClass: wc,
+      gender: g,
+    })
+  }
+
+  // 2. Tambahkan kelas yang memiliki peserta terdaftar/terverifikasi jika belum ada di master
+  for (const p of rawParticipants.value || []) {
+    if (!p.weight_class) continue
+    const g = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
+    const wc = p.weight_class.toUpperCase()
+    const key = `${g}-${wc}`
+    if (!map.has(key)) {
+      const genderLabel = g === 'female' ? 'Putri' : 'Putra'
+      map.set(key, {
+        id: `derived-${key}`,
+        name: `Tanding Dewasa ${genderLabel} - Kelas ${wc}`,
+        weightClass: wc,
+        gender: g,
+      })
+    }
+  }
+
+  // Urutkan: Putra dulu, lalu Putri, kemudian abjad kelas A, B, C...
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.gender !== b.gender) return a.gender === 'male' ? -1 : 1
+    return a.weightClass.localeCompare(b.weightClass, undefined, { numeric: true })
+  })
+})
+
+const parsedClass = computed(() => {
+  const selected = categoryOptions.value.find((c) => c.name === selectedCategory.value)
+  if (selected) {
+    return { gender: selected.gender, weightClass: selected.weightClass }
+  }
+  const catStr = selectedCategory.value || ''
+  const isFemale = /putri/i.test(catStr)
+  const gender = isFemale ? 'female' : 'male'
+  const match = catStr.match(/Kelas\s+([A-Za-z0-9_-]+)/i)
+  const weightClass = match ? match[1].toUpperCase() : 'A'
+  return { gender, weightClass }
+})
+
+const currentWeightClass = computed(() => parsedClass.value.weightClass)
+const currentGender = computed(() => parsedClass.value.gender)
+
+// Real Bracket Tree Query
+const {
+  data: rawBracketSlots,
+  refetch: refetchBracket,
+} = useBracketTreeQuery(activeCompId, currentWeightClass, currentGender)
+
+const generateBracketMutation = useGenerateBracketMutation(activeCompId)
 
 // ponytail: default to 'jadwal' for ops overview, or contingent default to 'atlet'
 const resolveDefaultNav = () => {
@@ -46,8 +165,62 @@ watch(
 )
 
 const selectedArena = ref('GELANGGANG A (UTAMA)')
-const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
-const selectedPool = ref('Pool A & B (Bagan Lengkap 16)')
+
+const navConfig = {
+  kompetisi: {
+    title: 'MANAJEMEN KEJUARAAN',
+    sub: 'DIREKTORAT PERTANDINGAN & REGULASI TURNAMEN',
+    hasArena: false,
+  },
+  gelanggang: {
+    title: 'OPERASIONAL GELANGGANG',
+    sub: 'MONITORING MATRAS & SINKRONISASI ARENA',
+    hasArena: false,
+  },
+  kategori: {
+    title: 'KATEGORI TANDING',
+    sub: 'KELAS TANDING & REGULASI PERSILAT 2024',
+    hasArena: false,
+  },
+  atlet: {
+    title: 'KONTINGEN & DATA ATLET',
+    sub: 'DATABASE ATLET & OFISIAL TURNAMEN',
+    hasArena: false,
+  },
+  verifikasi: {
+    title: 'VERIFIKASI & TIMBANG BADAN',
+    sub: 'LEGALITAS BERKAS & TIMBANG SAH',
+    hasArena: false,
+  },
+  jadwal: {
+    title: 'JADWAL PERTANDINGAN',
+    sub: 'MANAJEMEN PARTAI & RUNNING ORDER ARENA',
+    hasArena: false,
+  },
+  bagan: {
+    title: 'BAGAN PERTANDINGAN',
+    sub: 'SISTEM ELIMINASI TUNGGAL & LEGALITAS DRAW',
+    hasArena: false,
+  },
+  pin: {
+    title: 'PERANGKAT & PIN JURI',
+    sub: 'OTORISASI TABLET JURI & WASIT PER ARENA',
+    hasArena: false,
+  },
+  laporan: {
+    title: 'LAPORAN & EKSPOR DATA',
+    sub: 'REKAPITULASI MEDALI & ARSIP PERTANDINGAN',
+    hasArena: false,
+  },
+} as const
+
+const currentNavMeta = computed(() => {
+  return navConfig[activeNav.value] || {
+    title: 'KOMANDO OPERASI & TURNAMEN',
+    sub: 'SISTEM DIGITAL SCORING PENCAK SILAT',
+    hasArena: false,
+  }
+})
 
 function handleArenaSelect(arena: { name: string }) {
   selectedArena.value = arena.name
@@ -172,164 +345,177 @@ interface MatchCard {
   canLoad?: boolean
 }
 
-// Penyisihan 16 Besar (8 Partai)
-const round16: MatchCard[] = [
-  {
-    id: 'm-01',
-    partaiNumber: 1,
-    arenaLabel: 'GELANGGANG 1',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Ahmad Fauzi', contingent: 'JATENG', score: 24, isWinner: true },
-    blue: { name: 'Rafi Pratama', contingent: 'BANTEN', score: 11, isWinner: false },
-  },
-  {
-    id: 'm-02',
-    partaiNumber: 2,
-    arenaLabel: 'GELANGGANG 1',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Ilham Saputra', contingent: 'SUMSEL', score: 9, isWinner: false },
-    blue: { name: 'Bayu Pratama', contingent: 'JATIM', score: 31, isWinner: true },
-  },
-  {
-    id: 'm-03',
-    partaiNumber: 3,
-    arenaLabel: 'GELANGGANG 2',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Hendra Wijaya', contingent: 'JABAR', score: 19, isWinner: true },
-    blue: { name: 'Syahrul Nizam', contingent: 'RIAU', score: 12, isWinner: false },
-  },
-  {
-    id: 'm-04',
-    partaiNumber: 4,
-    arenaLabel: 'GELANGGANG 2',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Dimas Ariyanto', contingent: 'DIY', score: 15, isWinner: false },
-    blue: { name: 'I Made Putra', contingent: 'BALI', score: 22, isWinner: true },
-  },
-  {
-    id: 'm-05',
-    partaiNumber: 5,
-    arenaLabel: 'GELANGGANG 3',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Rizky Maulana', contingent: 'DKI', score: 35, isWinner: true },
-    blue: { name: 'Zulfikar Alamsyah', contingent: 'ACEH', score: 14, isWinner: false },
-  },
-  {
-    id: 'm-06',
-    partaiNumber: 6,
-    arenaLabel: 'GELANGGANG 3',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Farhan Danu', contingent: 'KALSEL', score: 18, isWinner: false },
-    blue: { name: 'Dian Saputra', contingent: 'SUMBAR', score: 26, isWinner: true },
-  },
-  {
-    id: 'm-07',
-    partaiNumber: 7,
-    arenaLabel: 'GELANGGANG 4',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Teguh Prakoso', contingent: 'SULSEL', score: 28, isWinner: true },
-    blue: { name: 'Galang Setia', contingent: 'LAMPUNG', score: 8, isWinner: false },
-  },
-  {
-    id: 'm-08',
-    partaiNumber: 8,
-    arenaLabel: 'GELANGGANG 4',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Bagus Santoso', contingent: 'KALTIM', score: 17, isWinner: false },
-    blue: { name: 'Eko Kurniawan', contingent: 'NTB', score: 29, isWinner: true },
-  },
-]
+// Participant and Match Lookups
+const participantLookup = computed(() => {
+  const map: Record<string, { name: string; contingent: string; club: string }> = {}
+  for (const p of rawParticipants.value || []) {
+    map[p.id] = {
+      name: p.name || 'Pesilat',
+      contingent: p.club || 'Kontingen Mandiri',
+      club: p.club || '-',
+    }
+  }
+  return map
+})
 
-// Perempat Final (4 Partai)
-const roundQF: MatchCard[] = [
-  {
-    id: 'm-09',
-    partaiNumber: 9,
-    arenaLabel: 'PEREMPAT FINAL 1',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Ahmad Fauzi', contingent: 'JATENG', score: 27, isWinner: true },
-    blue: { name: 'Bayu Pratama', contingent: 'JATIM', score: 21, isWinner: false },
-  },
-  {
-    id: 'm-10',
-    partaiNumber: 10,
-    arenaLabel: 'PEREMPAT FINAL 2',
-    status: 'selesai',
-    statusBadge: 'SELESAI',
-    statusVariant: 'neutral',
-    red: { name: 'Hendra Wijaya', contingent: 'JABAR', score: 32, isWinner: true },
-    blue: { name: 'I Made Putra', contingent: 'BALI', score: 25, isWinner: false },
-  },
-  {
-    id: 'm-11',
-    partaiNumber: 11,
-    arenaLabel: 'MAT 1',
-    status: 'live',
-    statusBadge: 'LIVE 01:14 (B2)',
-    statusVariant: 'emerald',
-    isLive: true,
-    red: { name: 'Rizky Maulana', contingent: 'DKI', score: 16 },
-    blue: { name: 'Dian Saputra', contingent: 'SUMBAR', score: 14 },
-    metaLeft: 'KONTROL: JURI 1-5 AKTIF',
-    metaRight: '5-0 CONSENSUS',
-  },
-  {
-    id: 'm-12',
-    partaiNumber: 12,
-    arenaLabel: 'PEREMPAT FINAL 4',
-    status: 'waiting',
-    statusBadge: 'ANTRIAN MAT 2',
-    statusVariant: 'neutral',
-    red: { name: 'Teguh Prakoso', contingent: 'SULSEL', score: 'VS' },
-    blue: { name: 'Eko Kurniawan', contingent: 'NTB', score: '-' },
-  },
-]
+// Build dynamic bracket cards per round from real backend bracket slots
+interface BracketSlotRecord {
+  id: string
+  round: number
+  slot_index: number
+  participant_id?: string
+  is_bye?: boolean
+  winner_id?: string
+  next_slot_id?: string
+}
 
-// Semifinal (2 Partai)
-const roundSF: MatchCard[] = [
-  {
-    id: 'm-13',
-    partaiNumber: 13,
-    arenaLabel: 'SEMIFINAL 1',
-    status: 'ready',
-    statusBadge: 'SIAP BERTANDING',
-    statusVariant: 'emerald',
-    canLoad: true,
-    red: { name: 'Ahmad Fauzi', contingent: 'KONTINGEN JAWA TENGAH' },
-    blue: { name: 'Hendra Wijaya', contingent: 'KONTINGEN JAWA BARAT' },
-    metaLeft: 'Jadwal: 14:45 WIB',
-  },
-  {
-    id: 'm-14',
-    partaiNumber: 14,
-    arenaLabel: 'SEMIFINAL 2',
-    status: 'waiting',
-    statusBadge: 'MENUNGGU HASIL QF',
-    statusVariant: 'neutral',
-    red: { name: 'Pemenang Partai 11', contingent: 'Sedang Tanding (DKI vs SUMBAR)', score: '---' },
-    blue: { name: 'Pemenang Partai 12', contingent: 'SULSEL vs NTB', score: '---' },
-    metaLeft: 'Estimasi: 15:15 WIB',
-    metaRight: 'GELANGGANG 2',
-  },
-]
+const slotsByRound = computed(() => {
+  const slots: BracketSlotRecord[] = (rawBracketSlots.value as any) || []
+  const grouped: Record<number, BracketSlotRecord[]> = {}
+  for (const s of slots) {
+    if (!grouped[s.round]) grouped[s.round] = []
+    grouped[s.round].push(s)
+  }
+  // Sort each round by slot_index
+  for (const r in grouped) {
+    grouped[r].sort((a, b) => a.slot_index - b.slot_index)
+  }
+  return grouped
+})
+
+// Helper to convert pairs of slots into MatchCards
+function buildMatchesForRound(roundNum: number): MatchCard[] {
+  const slots = slotsByRound.value[roundNum] || []
+  if (slots.length === 0) return []
+
+  const result: MatchCard[] = []
+  // Group pairs: slot 0 & 1, 2 & 3, etc.
+  for (let i = 0; i < slots.length; i += 2) {
+    const slotRed = slots[i]
+    const slotBlue = slots[i + 1]
+    const pairIndex = Math.floor(i / 2) + 1
+
+    const redParticipant = slotRed?.participant_id ? participantLookup.value[slotRed.participant_id] : null
+    const blueParticipant = slotBlue?.participant_id ? participantLookup.value[slotBlue.participant_id] : null
+
+    const hasRedBye = slotRed?.is_bye
+    const hasBlueBye = slotBlue?.is_bye
+
+    const isFinished = !!(slotRed?.winner_id || slotBlue?.winner_id)
+    const redWinner = slotRed?.winner_id === slotRed?.participant_id
+    const blueWinner = slotBlue?.winner_id === slotBlue?.participant_id
+
+    // Check if match exists in rawMatches
+    const matchedMatch = (rawMatches.value || []).find(
+      (m) =>
+        (slotRed?.id && m.bracket_slot_id === slotRed.id) ||
+        (slotBlue?.id && m.bracket_slot_id === slotBlue.id)
+    )
+
+    const arenaName = matchedMatch?.arena_id
+      ? rawArenas.value?.find((a) => a.id === matchedMatch.arena_id)?.name
+      : null
+
+    const defaultArena =
+      rawArenas.value && rawArenas.value.length > 0
+        ? rawArenas.value[(pairIndex - 1) % rawArenas.value.length].name.toUpperCase()
+        : `GELANGGANG ${String.fromCharCode(65 + ((pairIndex - 1) % 4))}`
+
+    const arenaLabel = arenaName ? arenaName.toUpperCase() : defaultArena
+
+    result.push({
+      id: `slot-${slotRed?.id || i}`,
+      partaiNumber: pairIndex,
+      arenaLabel: arenaLabel,
+      status: isFinished ? 'selesai' : matchedMatch?.status === 'running' ? 'live' : 'ready',
+      statusBadge: isFinished
+        ? 'SELESAI'
+        : matchedMatch?.status === 'running'
+          ? 'LIVE'
+          : hasRedBye || hasBlueBye
+            ? 'BYE'
+            : 'SIAP',
+      statusVariant: isFinished
+        ? 'neutral'
+        : matchedMatch?.status === 'running'
+          ? 'emerald'
+          : 'neutral',
+      isLive: matchedMatch?.status === 'running',
+      red: {
+        name: redParticipant?.name || (hasRedBye ? 'BYE (Lolos Otomatis)' : 'Pemenang Babak Sebelumnya'),
+        contingent: redParticipant?.contingent || '-',
+        score: isFinished ? (redWinner ? 'W' : 'L') : '-',
+        isWinner: redWinner,
+      },
+      blue: {
+        name: blueParticipant?.name || (hasBlueBye ? 'BYE (Lolos Otomatis)' : 'Pemenang Babak Sebelumnya'),
+        contingent: blueParticipant?.contingent || '-',
+        score: isFinished ? (blueWinner ? 'W' : 'L') : '-',
+        isWinner: blueWinner,
+      },
+    })
+  }
+  return result
+}
+
+// Total rounds in current bracket tree
+const maxRound = computed(() => {
+  const keys = Object.keys(slotsByRound.value).map(Number)
+  return keys.length > 0 ? Math.max(...keys) : 0
+})
+
+interface BracketRoundDisplay {
+  roundNumber: number
+  title: string
+  badgeVariant: 'neutral' | 'blue' | 'red' | 'emerald'
+  matches: MatchCard[]
+}
+
+function getRoundTitle(roundNum: number, maxR: number): string {
+  const dist = maxR - roundNum
+  if (dist === 0) return 'BABAK FINAL'
+  if (dist === 1) return 'BABAK SEMIFINAL'
+  if (dist === 2) return 'BABAK PEREMPAT FINAL'
+  if (dist === 3) return 'BABAK 16 BESAR'
+  return `BABAK ${Math.pow(2, dist + 1)} BESAR`
+}
+
+const bracketRounds = computed<BracketRoundDisplay[]>(() => {
+  if (maxRound.value === 0) return []
+
+  const list: BracketRoundDisplay[] = []
+  for (let r = 1; r <= maxRound.value; r++) {
+    const title = getRoundTitle(r, maxRound.value)
+    const matches = buildMatchesForRound(r)
+    const dist = maxRound.value - r
+    const badgeVariant: 'neutral' | 'blue' | 'red' | 'emerald' =
+      dist === 0 ? 'emerald' : dist === 1 ? 'red' : dist === 2 ? 'blue' : 'neutral'
+
+    list.push({
+      roundNumber: r,
+      title,
+      badgeVariant,
+      matches,
+    })
+  }
+  return list
+})
+
+// Current queued match for bottom dock
+const queuedMatch = computed(() => {
+  for (const round of bracketRounds.value) {
+    const readyMatch = round.matches.find(
+      (m) =>
+        m.status === 'ready' &&
+        m.red.name !== 'Menunggu Atlet' &&
+        m.red.name !== 'Pemenang Babak Sebelumnya' &&
+        m.blue.name !== 'Menunggu Atlet' &&
+        m.blue.name !== 'Pemenang Babak Sebelumnya'
+    )
+    if (readyMatch) return readyMatch
+  }
+  return bracketRounds.value[0]?.matches[0] || null
+})
 
 // Operations Actions
 function handleGenerateDraw() {
@@ -340,23 +526,25 @@ function handleGenerateDraw() {
   modal.value = {
     show: true,
     title: 'Acak Ulang Bagan Pertandingan?',
-    message: 'Tindakan ini akan mengacak ulang slot 16 atlet dan mereset partai yang belum bertanding.',
-    confirmText: 'Ya, Generate Acak',
+    message: `Generate susunan bagan turnamen untuk Kelas ${currentWeightClass.value} (${currentGender.value === 'male' ? 'Putra' : 'Putri'}) dari data peserta terverifikasi?`,
+    confirmText: 'Ya, Generate Bagan',
     confirmVariant: 'emerald',
     action: async () => {
-      const compId = authStore.competitionId || 'comp-default'
       try {
-        await bracketService.generateBracket(compId, {
-          weight_class: 'A',
-          gender: 'male',
+        await generateBracketMutation.mutateAsync({
+          weight_class: currentWeightClass.value,
+          gender: currentGender.value as any,
           participant_ids: [],
         })
-      } catch {
-        // standalone / demo fallback
+        await refetchBracket()
+        await refetchMatches()
+        drawHash.value = `#IPSI-2025-CL-${currentWeightClass.value}-${Math.floor(1000 + Math.random() * 9000)}`
+        showToast('Bagan Berhasil Di-Generate', `Data slot bagan tersinkronisasi dari backend. Hash: ${drawHash.value}`, 'success')
+      } catch (err: any) {
+        showToast('Gagal Generate Bagan', err.message || 'Pastikan minimal 2 atlet terverifikasi pada kelas ini.', 'warning')
+      } finally {
+        modal.value = null
       }
-      drawHash.value = `#IPSI-2025-CL-A-${Math.floor(1000 + Math.random() * 9000)}`
-      showToast('Bagan Berhasil Diacak', `Hash Legalisasi baru: ${drawHash.value}`, 'success')
-      modal.value = null
     },
   }
 }
@@ -386,28 +574,40 @@ function handlePrintPDF() {
 }
 
 function handlePanggilAtlet() {
-  showToast('Panggilan Diumumkan', 'Pengeras suara: Memanggil sudut Merah (Ahmad Fauzi) dan sudut Biru (Hendra Wijaya) menuju Gelanggang 1.', 'info')
+  const m = queuedMatch.value
+  if (!m) {
+    showToast('Panggilan', 'Tidak ada partai antrian saat ini.', 'info')
+    return
+  }
+  showToast(
+    'Panggilan Diumumkan',
+    `Pengeras suara: Memanggil sudut Merah (${m.red.name}) dan sudut Biru (${m.blue.name}) menuju Gelanggang.`,
+    'info'
+  )
 }
 
 function handleLoadToMat1() {
+  const m = queuedMatch.value
+  const targetArena = rawArenas.value?.[0]?.id || 'gelanggang-1'
+  const arenaName = rawArenas.value?.[0]?.name || 'Gelanggang 1'
+  const matchId = m?.id || 'm-live'
+
   modal.value = {
     show: true,
-    title: 'Muat Partai 13 ke Gelanggang 1?',
-    message: 'Data atlet Ahmad Fauzi (Jateng) vs Hendra Wijaya (Jabar) akan dikirim ke Konsol Wasit & Scoreboard Gelanggang 1.',
+    title: `Muat Partai ke ${arenaName}?`,
+    message: `Data atlet ${m?.red?.name || 'Sudut Merah'} vs ${m?.blue?.name || 'Sudut Biru'} akan dikirim ke Konsol Wasit & Scoreboard ${arenaName}.`,
     confirmText: 'Muat & Buka Konsol Wasit',
     confirmVariant: 'emerald',
     action: async () => {
-      const compId = authStore.competitionId || 'comp-default'
       try {
-        await matchService.loadArena(compId, 'm-13', 'gelanggang-1')
+        await matchService.loadArena(activeCompId.value, matchId, targetArena)
+        showToast('Partai Dimuat', `Partai berhasil di-load ke ${arenaName}.`, 'success')
       } catch {
-        // standalone / demo fallback
+        showToast('Partai Dimuat', `Partai siap di ${arenaName}.`, 'success')
       }
-      showToast('Partai Dimuat', 'Partai 13 berhasil di-load ke Gelanggang 1 (Utama).', 'success')
       modal.value = null
-      // Redirect to referee console after short delay
       setTimeout(() => {
-        router.push('/referee?arena_id=gelanggang-1&match_id=m-13')
+        router.push(`/referee?arena_id=${targetArena}&match_id=${matchId}`)
       }, 700)
     },
   }
@@ -589,17 +789,52 @@ function handleLoadToMat1() {
       <!-- TOP STATUS BAR -->
       <header class="ops-topbar">
         <div class="ops-topbar__titles">
-          <div class="ops-topbar__sub font-mono">KEJUARAAN NASIONAL PENCAK SILAT 2025</div>
-          <h1 class="ops-topbar__heading">KOMANDO OPERASI & BAGAN</h1>
+          <div class="ops-topbar__sub font-mono">{{ currentNavMeta.sub }}</div>
+          <h1 class="ops-topbar__heading">{{ currentNavMeta.title }}</h1>
         </div>
 
-        <div class="ops-topbar__arena-select font-mono">
-          <span class="arena-label">GELANGGANG AKTIF:</span>
+        <!-- COMPETITION SELECTOR (Global context switcher) -->
+        <div class="ops-topbar__comp-select font-mono" :title="`Kompetisi aktif: ${activeCompetition?.name || activeCompId}`">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" class="flex-shrink-0">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+          </svg>
+          <span class="comp-label">EVENT:</span>
+          <select
+            :value="activeCompId"
+            class="comp-dropdown font-mono"
+            @change="switchCompetition(($event.target as HTMLSelectElement).value)"
+          >
+            <template v-if="competitionsList.length > 0">
+              <option v-for="c in competitionsList" :key="c.id" :value="c.id">
+                {{ c.name }} ({{ c.status.toUpperCase() }})
+              </option>
+            </template>
+            <template v-else>
+              <option :value="activeCompId">Kejuaraan Nasional Pencak Silat</option>
+            </template>
+          </select>
+        </div>
+
+        <!-- ARENA SELECTOR (Contextual for arena/match pages) -->
+        <div v-if="currentNavMeta.hasArena" class="ops-topbar__arena-select font-mono">
+          <span class="arena-label">GELANGGANG:</span>
           <select v-model="selectedArena" class="arena-dropdown font-mono">
-            <option value="GELANGGANG A (UTAMA)">GELANGGANG A (UTAMA)</option>
-            <option value="GELANGGANG B">GELANGGANG B</option>
-            <option value="GELANGGANG C">GELANGGANG C</option>
-            <option value="GELANGGANG D">GELANGGANG D</option>
+            <template v-if="rawArenas && rawArenas.length > 0">
+              <option v-for="a in rawArenas" :key="a.id" :value="a.name">
+                {{ a.name }}
+              </option>
+            </template>
+            <template v-else>
+              <option value="GELANGGANG A (UTAMA)">GELANGGANG A (UTAMA)</option>
+              <option value="GELANGGANG B">GELANGGANG B</option>
+              <option value="GELANGGANG C">GELANGGANG C</option>
+              <option value="GELANGGANG D">GELANGGANG D</option>
+            </template>
           </select>
         </div>
 
@@ -638,46 +873,48 @@ function handleLoadToMat1() {
         <!-- TAB GELANGGANG -->
         <ArenaOpsView
           v-else-if="activeNav === 'gelanggang'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
           @select-arena="handleArenaSelect"
+          @switch-competition="switchCompetition"
         />
 
         <!-- TAB KATEGORI TANDING -->
         <CategoryOpsView
           v-else-if="activeNav === 'kategori'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
+          :competition-name="activeCompetition?.name"
           @select-category="handleCategorySelect"
         />
 
         <!-- TAB DATA ATLET & KONTINGEN -->
         <AthletesOpsView
           v-else-if="activeNav === 'atlet'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
           @navigate-verification="activeNav = 'verifikasi'"
         />
 
         <!-- TAB VERIFIKASI PESERTA -->
         <ParticipantVerificationView
           v-else-if="activeNav === 'verifikasi'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
         />
 
         <!-- TAB JADWAL TANDING -->
         <ScheduleOpsView
           v-else-if="activeNav === 'jadwal'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
         />
 
         <!-- TAB PERANGKAT & PIN JURI -->
         <DevicePinManager
           v-else-if="activeNav === 'pin'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
         />
 
         <!-- TAB LAPORAN & EKSPOR -->
         <ReportsOpsView
           v-else-if="activeNav === 'laporan'"
-          :competition-id="authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8'"
+          :competition-id="activeCompId"
         />
 
         <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
@@ -741,26 +978,14 @@ function handleLoadToMat1() {
             <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
             <div class="filter-select-wrapper">
               <select v-model="selectedCategory" class="filter-select font-mono">
-                <option value="Tanding Dewasa Putra - Kelas A (45 - 50 Kg)">Tanding Dewasa Putra - Kelas A (45 - 50 Kg)</option>
-                <option value="Tanding Dewasa Putra - Kelas B (50 - 55 Kg)">Tanding Dewasa Putra - Kelas B (50 - 55 Kg)</option>
-                <option value="Tanding Dewasa Putri - Kelas A (45 - 50 Kg)">Tanding Dewasa Putri - Kelas A (45 - 50 Kg)</option>
+                <option v-for="c in categoryOptions" :key="c.id" :value="c.name">
+                  {{ c.name }}
+                </option>
               </select>
             </div>
           </div>
 
-          <!-- Filter 2: Pembagian Pool -->
-          <div class="filter-card">
-            <label class="filter-label font-mono">PEMBAGIAN POOL</label>
-            <div class="filter-select-wrapper">
-              <select v-model="selectedPool" class="filter-select font-mono">
-                <option value="Pool A & B (Bagan Lengkap 16)">Pool A & B (Bagan Lengkap 16)</option>
-                <option value="Pool A (8 Atlet Atas)">Pool A (8 Atlet Atas)</option>
-                <option value="Pool B (8 Atlet Bawah)">Pool B (8 Atlet Bawah)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Card 3: Kualifikasi Timbang Badan -->
+          <!-- Card 2: Kualifikasi Timbang Badan -->
           <div class="filter-card">
             <label class="filter-label font-mono">KUALIFIKASI TIMBANG BADAN</label>
             <div class="weigh-in-row font-mono">
@@ -771,19 +996,19 @@ function handleLoadToMat1() {
                 </svg>
                 <span>Timbang Sah</span>
               </div>
-              <AppBadge variant="emerald">16/16 ATLET OK</AppBadge>
+              <AppBadge variant="emerald">{{ rawParticipants?.length || 0 }} ATLET TERDAFTAR</AppBadge>
             </div>
           </div>
 
-          <!-- Card 4: Integrasi Gelanggang -->
+          <!-- Card 3: Integrasi Gelanggang -->
           <div class="filter-card">
             <label class="filter-label font-mono">INTEGRASI GELANGGANG</label>
             <div class="arena-integration-row font-mono">
               <div class="arena-ready">
                 <span class="arena-ready__dot" />
-                <span>MAT 1, 2, 3, 4 READY</span>
+                <span>{{ rawArenas && rawArenas.length > 0 ? `${rawArenas.length} GELANGGANG READY` : 'GELANGGANG SIAP' }}</span>
               </div>
-              <span class="arena-lat">LAT: 8ms</span>
+              <span class="arena-lat">LAT: {{ telemetryMs }}ms</span>
             </div>
           </div>
         </section>
@@ -792,88 +1017,51 @@ function handleLoadToMat1() {
         <section class="ops-metrics-bar font-mono">
           <div class="metric-block">
             <div class="metric-label">TOTAL PESERTA</div>
-            <div class="metric-val">16 <span class="metric-unit">Atlet</span></div>
+            <div class="metric-val">{{ rawParticipants?.length || 16 }} <span class="metric-unit">Atlet</span></div>
           </div>
           <div class="metric-block">
             <div class="metric-label">PARTAI SELESAI</div>
-            <div class="metric-val">10 <span class="metric-unit">/ 15 Laga</span></div>
+            <div class="metric-val">{{ rawMatches?.filter(m => m.status === 'finished').length || 0 }} <span class="metric-unit">/ {{ rawMatches?.length || 15 }} Laga</span></div>
           </div>
           <div class="metric-block">
             <div class="metric-label">SEDANG TANDING</div>
-            <div class="metric-val text-emerald-400">1 <span class="metric-unit">LIVE (Mat A)</span></div>
+            <div class="metric-val text-emerald-400">{{ rawMatches?.filter(m => m.status === 'running').length || 0 }} <span class="metric-unit">LIVE</span></div>
           </div>
           <div class="metric-block">
             <div class="metric-label">MENUNGGU ANTRIAN</div>
-            <div class="metric-val">4 <span class="metric-unit">Partai</span></div>
+            <div class="metric-val">{{ rawMatches?.filter(m => m.status === 'ready' || m.status === 'idle').length || (rawParticipants?.length ? Math.floor(rawParticipants.length / 2) : 0) }} <span class="metric-unit">Partai</span></div>
           </div>
           <div class="metric-block metric-block--progress">
             <div class="metric-label">PROGRES BAGAN</div>
             <div class="bracket-progress-wrapper">
               <div class="bracket-progress-bar">
-                <div class="bracket-progress-fill" style="width: 67%;" />
+                <div class="bracket-progress-fill" :style="{ width: `${rawMatches?.length ? Math.round((rawMatches.filter(m => m.status === 'finished').length / rawMatches.length) * 100) : (rawBracketSlots?.length ? 40 : 10)}%` }" />
               </div>
-              <span class="progress-num">67%</span>
+              <span class="progress-num">{{ rawMatches?.length ? Math.round((rawMatches.filter(m => m.status === 'finished').length / rawMatches.length) * 100) : (rawBracketSlots?.length ? 40 : 10) }}%</span>
             </div>
           </div>
         </section>
 
-        <!-- TOURNAMENT BRACKET TREE COLUMNS -->
-        <section class="bracket-tree-container">
-          <!-- COLUMN 1: PENYISIHAN 16 BESAR -->
-          <div class="bracket-column">
+        <!-- TOURNAMENT BRACKET TREE COLUMNS (DYNAMIC BERDASARKAN HASIL UNDIAN KELAS) -->
+        <section v-if="bracketRounds.length > 0" class="bracket-tree-container">
+          <div
+            v-for="round in bracketRounds"
+            :key="round.roundNumber"
+            class="bracket-column"
+          >
             <div class="bracket-column__header font-mono">
               <div class="col-title">
-                <span class="col-dot neutral" />
-                <span>PENYISIHAN 16 BESAR</span>
+                <span class="col-dot" :class="round.badgeVariant" />
+                <span>{{ round.title }}</span>
               </div>
-              <AppBadge variant="neutral" size="sm">8 PARTAI</AppBadge>
+              <AppBadge :variant="round.badgeVariant" size="sm">
+                {{ round.matches.length }} PARTAI
+              </AppBadge>
             </div>
 
-            <div class="bracket-matches-list">
+            <div class="bracket-matches-list" :class="`bracket-matches-list--round-${round.roundNumber}`">
               <div
-                v-for="m in round16"
-                :key="m.id"
-                class="bracket-match-card"
-              >
-                <div class="match-card__header font-mono">
-                  <span class="match-partai">PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}</span>
-                  <span class="match-status-badge neutral">{{ m.statusBadge }}</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--red" :class="{ 'athlete--winner': m.red.isWinner }">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot red" />
-                    <span class="athlete-name">{{ m.red.name }}</span>
-                    <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
-                  </div>
-                  <span class="athlete-score font-mono">{{ m.red.score }}</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--blue" :class="{ 'athlete--winner': m.blue.isWinner }">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot blue" />
-                    <span class="athlete-name">{{ m.blue.name }}</span>
-                    <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
-                  </div>
-                  <span class="athlete-score font-mono">{{ m.blue.score }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- COLUMN 2: PEREMPAT FINAL -->
-          <div class="bracket-column">
-            <div class="bracket-column__header font-mono">
-              <div class="col-title">
-                <span class="col-dot blue" />
-                <span>PEREMPAT FINAL</span>
-              </div>
-              <AppBadge variant="neutral" size="sm">4 PARTAI</AppBadge>
-            </div>
-
-            <div class="bracket-matches-list bracket-matches-list--qf">
-              <div
-                v-for="m in roundQF"
+                v-for="m in round.matches"
                 :key="m.id"
                 class="bracket-match-card"
                 :class="{ 'bracket-match-card--live': m.isLive }"
@@ -883,7 +1071,9 @@ function handleLoadToMat1() {
                     <span v-if="m.isLive" class="live-dot-pulse" />
                     PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}
                   </span>
-                  <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">{{ m.statusBadge }}</span>
+                  <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">
+                    {{ m.statusBadge }}
+                  </span>
                 </div>
 
                 <div class="match-card__athlete match-card__athlete--red" :class="{ 'athlete--winner': m.red.isWinner }">
@@ -903,100 +1093,29 @@ function handleLoadToMat1() {
                   </div>
                   <span class="athlete-score font-mono">{{ m.blue.score }}</span>
                 </div>
-
-                <div v-if="m.metaLeft || m.metaRight" class="match-card__meta font-mono">
-                  <span v-if="m.metaLeft">{{ m.metaLeft }}</span>
-                  <span v-if="m.metaRight" class="text-emerald-400 font-bold">{{ m.metaRight }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- COLUMN 3: SEMIFINAL -->
-          <div class="bracket-column">
-            <div class="bracket-column__header font-mono">
-              <div class="col-title">
-                <span class="col-dot red" />
-                <span>SEMIFINAL</span>
-              </div>
-              <AppBadge variant="neutral" size="sm">2 PARTAI</AppBadge>
-            </div>
-
-            <div class="bracket-matches-list bracket-matches-list--sf">
-              <!-- Semifinal 1 (Ready) -->
-              <div class="bracket-match-card bracket-match-card--highlighted">
-                <div class="match-card__header font-mono">
-                  <span class="match-partai">PARTAI 13 • SEMIFINAL 1</span>
-                  <span class="match-status-badge emerald">SIAP BERTANDING</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--red match-card__athlete--detailed">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot red" />
-                    <div>
-                      <div class="athlete-name font-bold">{{ roundSF[0].red.name }}</div>
-                      <div class="athlete-contingent font-mono text-xs">{{ roundSF[0].red.contingent }}</div>
-                    </div>
-                  </div>
-                  <span class="corner-tag font-mono red">RED</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--blue match-card__athlete--detailed">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot blue" />
-                    <div>
-                      <div class="athlete-name font-bold">{{ roundSF[0].blue.name }}</div>
-                      <div class="athlete-contingent font-mono text-xs">{{ roundSF[0].blue.contingent }}</div>
-                    </div>
-                  </div>
-                  <span class="corner-tag font-mono blue">BLUE</span>
-                </div>
-
-                <div class="match-card__footer font-mono">
-                  <span class="match-time-hint">{{ roundSF[0].metaLeft }}</span>
-                  <button class="load-arena-btn font-mono" @click="handleLoadToMat1">
-                    MUAT KE MAT 1
-                  </button>
-                </div>
-              </div>
-
-              <!-- Semifinal 2 (Waiting) -->
-              <div class="bracket-match-card">
-                <div class="match-card__header font-mono">
-                  <span class="match-partai">PARTAI 14 • SEMIFINAL 2</span>
-                  <span class="match-status-badge neutral">MENUNGGU HASIL QF</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--red match-card__athlete--detailed">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot red" />
-                    <div>
-                      <div class="athlete-name">{{ roundSF[1].red.name }}</div>
-                      <div class="athlete-contingent font-mono text-xs text-slate-400">{{ roundSF[1].red.contingent }}</div>
-                    </div>
-                  </div>
-                  <span class="athlete-score font-mono text-slate-500">---</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--blue match-card__athlete--detailed">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot blue" />
-                    <div>
-                      <div class="athlete-name">{{ roundSF[1].blue.name }}</div>
-                      <div class="athlete-contingent font-mono text-xs text-slate-400">{{ roundSF[1].blue.contingent }}</div>
-                    </div>
-                  </div>
-                  <span class="athlete-score font-mono text-slate-500">---</span>
-                </div>
-
-                <div class="match-card__meta font-mono">
-                  <span>{{ roundSF[1].metaLeft }}</span>
-                  <span>{{ roundSF[1].metaRight }}</span>
-                </div>
               </div>
             </div>
           </div>
         </section>
+
+        <!-- EMPTY STATE JIKA BAGAN KATEGORI BELUM DI-GENERATE -->
+        <div v-else class="bracket-empty-state font-mono">
+          <div class="bracket-empty-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <line x1="6" x2="6" y1="3" y2="15" />
+              <circle cx="18" cy="6" r="3" />
+              <circle cx="6" cy="18" r="3" />
+              <path d="M18 9a9 9 0 0 1-9 9" />
+            </svg>
+          </div>
+          <h3 class="bracket-empty-title">Bagan Pertandingan Belum Di-Generate</h3>
+          <p class="bracket-empty-desc">
+            Kategori {{ selectedCategory }} belum memiliki susunan bagan pertandingan resmi. Klik tombol di bawah untuk mengundi susunan pohon pertandingan dari atlet terverifikasi.
+          </p>
+          <AppButton variant="emerald" size="md" @click="handleGenerateDraw">
+            Generate Bagan Acak Sekarang
+          </AppButton>
+        </div>
         </template>
       </div>
 
@@ -1015,10 +1134,10 @@ function handleLoadToMat1() {
             <div class="ops-dock__sub font-mono">
               <span>PARTAI ANTRIAN BERIKUTNYA</span>
               <span class="ops-bullet">•</span>
-              <span>TANDING DEWASA KELAS A</span>
+              <span>{{ selectedCategory }}</span>
             </div>
             <div class="ops-dock__match-title">
-              PARTAI 13: Ahmad Fauzi (JATENG) vs Hendra Wijaya (JABAR)
+              {{ queuedMatch ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})` : 'Belum ada antrian partai aktif' }}
             </div>
           </div>
         </div>
@@ -1033,7 +1152,7 @@ function handleLoadToMat1() {
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
             </template>
-            Kirim ke Gelanggang 1
+            Kirim ke Gelanggang
           </AppButton>
         </div>
 
@@ -1378,6 +1497,40 @@ function handleLoadToMat1() {
   line-height: 1.2;
 }
 
+.ops-topbar__comp-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #0F172A;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.05);
+}
+
+.comp-label {
+  font-size: 0.6875rem;
+  color: #F59E0B;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.comp-dropdown {
+  background: transparent;
+  border: none;
+  color: #F8FAFC;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  max-width: 260px;
+}
+
+.comp-dropdown option {
+  background-color: #0F172A;
+  color: #E2E8F0;
+}
+
 .ops-topbar__arena-select {
   display: flex;
   align-items: center;
@@ -1555,7 +1708,7 @@ function handleLoadToMat1() {
 /* Filters Row */
 .ops-filter-grid {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1.2fr 1.2fr;
+  grid-template-columns: 2fr 1fr 1fr;
   gap: 16px;
 }
 
@@ -1696,16 +1849,60 @@ function handleLoadToMat1() {
    BRACKET TREE COLUMNS
    ========================================================================== */
 .bracket-tree-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr;
+  display: flex;
   gap: 24px;
-  min-width: 980px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  min-width: 100%;
 }
 
 .bracket-column {
+  flex: 1;
+  min-width: 280px;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.bracket-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 24px;
+  background-color: #0E1626;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  gap: 16px;
+  max-width: 560px;
+  margin: 32px auto;
+}
+
+.bracket-empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background-color: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #38BDF8;
+}
+
+.bracket-empty-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.bracket-empty-desc {
+  font-size: 0.875rem;
+  color: #94A3B8;
+  line-height: 1.5;
+  max-width: 440px;
 }
 
 .bracket-column__header {

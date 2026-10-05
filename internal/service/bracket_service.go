@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/herros27/digital-scoring/internal/bracket"
 	"github.com/herros27/digital-scoring/internal/store"
@@ -10,17 +11,38 @@ import (
 type BracketRepository interface {
 	CreateBatch(slots []store.BracketSlot) error
 	GetByCompetitionCategory(competitionID, weightClass, gender string) ([]store.BracketSlot, error)
+	DeleteByCompetitionCategory(competitionID, weightClass, gender string) error
 	GetByID(id string) (*store.BracketSlot, error)
 	UpdateWinner(slotID, winnerID string) error
 	SetParticipant(slotID, participantID string) error
 }
 
+type MatchCreatorRepository interface {
+	Create(m *store.Match) error
+}
+
+type ArenaListRepository interface {
+	ListByCompetition(competitionID string) ([]store.Arena, error)
+}
+
 type BracketService struct {
-	repo BracketRepository
+	repo      BracketRepository
+	matchRepo MatchCreatorRepository
+	arenaRepo ArenaListRepository
 }
 
 func NewBracketService(repo BracketRepository) *BracketService {
 	return &BracketService{repo: repo}
+}
+
+func (s *BracketService) WithMatchStore(m MatchCreatorRepository) *BracketService {
+	s.matchRepo = m
+	return s
+}
+
+func (s *BracketService) WithArenaStore(a ArenaListRepository) *BracketService {
+	s.arenaRepo = a
+	return s
 }
 
 // GenerateBracket membuat seluruh slot turnamen untuk kategori tertentu
@@ -29,18 +51,66 @@ func (s *BracketService) GenerateBracket(competitionID, weightClass, gender stri
 		return nil, errors.New("minimum 2 participants required to generate a bracket")
 	}
 
-	// Cek apakah sudah pernah di-generate sebelumnya
+	// Hapus slot bagan sebelumnya jika ada (mendukung regenerasi / acak ulang)
 	existing, err := s.repo.GetByCompetitionCategory(competitionID, weightClass, gender)
 	if err != nil {
 		return nil, err
 	}
 	if len(existing) > 0 {
-		return nil, errors.New("bracket for this category already exists")
+		if err := s.repo.DeleteByCompetitionCategory(competitionID, weightClass, gender); err != nil {
+			return nil, err
+		}
 	}
 
 	slots := bracket.GenerateSlots(competitionID, weightClass, gender, participantIDs)
 	if err := s.repo.CreateBatch(slots); err != nil {
 		return nil, err
+	}
+
+	// Otomatis sinkronisasi partai Babak 1 ke tabel matches (Jadwal Pertandingan)
+	if s.matchRepo != nil {
+		var arenas []store.Arena
+		if s.arenaRepo != nil {
+			arenas, _ = s.arenaRepo.ListByCompetition(competitionID)
+		}
+
+		// Filter dan urutkan slot Ronde 1
+		var round1Slots []store.BracketSlot
+		for _, sl := range slots {
+			if sl.Round == 1 {
+				round1Slots = append(round1Slots, sl)
+			}
+		}
+		sort.Slice(round1Slots, func(i, j int) bool {
+			return round1Slots[i].SlotIndex < round1Slots[j].SlotIndex
+		})
+
+		// Pasangkan slot Ronde 1 (0 & 1, 2 & 3, ...)
+		matchCounter := 0
+		for i := 0; i+1 < len(round1Slots); i += 2 {
+			slotRed := round1Slots[i]
+			slotBlue := round1Slots[i+1]
+
+			// Partai valid jika kedua sudut memiliki peserta sah (bukan double BYE / salah satu BYE)
+			if slotRed.ParticipantID != nil && !slotRed.IsBye && slotBlue.ParticipantID != nil && !slotBlue.IsBye {
+				var arenaID string
+				if len(arenas) > 0 {
+					arenaID = arenas[matchCounter%len(arenas)].ID
+				}
+
+				m := &store.Match{
+					CompetitionID: competitionID,
+					ArenaID:       arenaID,
+					BracketSlotID: slotRed.ID,
+					AthleteRedID:  *slotRed.ParticipantID,
+					AthleteBlueID: *slotBlue.ParticipantID,
+					CurrentRound:  1,
+					Status:        "idle",
+				}
+				_ = s.matchRepo.Create(m)
+				matchCounter++
+			}
+		}
 	}
 
 	return slots, nil

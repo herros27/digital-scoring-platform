@@ -291,6 +291,79 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/auth/pins:
+    get:
+      summary: Mengambil Daftar PIN Aktif per Gelanggang (Admin / Dewan)
+      description: Mengambil seluruh PIN aktif untuk gelanggang tertentu secara sinkron dari database. Jika arena belum memiliki PIN, server akan otomatis men-generate PIN awal untuk 5 Juri dan 1 Wasit.
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: competition_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID kompetisi yang aktif
+        - name: arena_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID gelanggang yang dipilih
+      responses:
+        '200':
+          description: Daftar PIN juri dan wasit aktif berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        competition_id:
+                          type: string
+                          format: uuid
+                        arena_id:
+                          type: string
+                          format: uuid
+                        role:
+                          type: string
+                          example: "judge"
+                        seat_number:
+                          type: integer
+                          example: 1
+                        pin:
+                          type: string
+                          example: "703351"
+                        expires_at:
+                          type: string
+                          format: date-time
+        '400':
+          description: Bad Request (competition_id atau arena_id tidak disertakan)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Hanya admin atau dewan yang berwenang)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # -------------------------------------------------------
   # COMPETITIONS
   # -------------------------------------------------------

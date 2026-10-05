@@ -44,8 +44,8 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 		}
 	}
 
-	// 2. Susun slot dengan relasi next_slot_id
-	for r := 1; r <= totalRounds; r++ {
+	// 2. Susun slot dengan relasi next_slot_id (dari ronde akhir ke ronde 1 agar parent slot ada di DB lebih dulu)
+	for r := totalRounds; r >= 1; r-- {
 		numSlotsInRound := bracketSize / (1 << (r - 1))
 
 		for i := 0; i < numSlotsInRound; i++ {
@@ -94,6 +94,15 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 			for j := 0; j < len(allSlots); j++ {
 				if allSlots[j].Round == 1 && allSlots[j].SlotIndex == opponentIndex && allSlots[j].IsBye {
 					allSlots[i].WinnerID = allSlots[i].ParticipantID
+					if allSlots[i].NextSlotID != nil {
+						nextID := *allSlots[i].NextSlotID
+						for k := 0; k < len(allSlots); k++ {
+							if allSlots[k].ID == nextID {
+								allSlots[k].ParticipantID = allSlots[i].ParticipantID
+								break
+							}
+						}
+					}
 					break
 				}
 			}

@@ -52,6 +52,15 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.removeItem('token')
   }
 
+  function setCompetitionId(compId: string) {
+    if (session.value) {
+      session.value = { ...session.value, competitionId: compId }
+    } else {
+      session.value = { token: '', role: 'public', competitionId: compId }
+    }
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session.value))
+  }
+
   async function logout() {
     try {
       await authService.logout()
@@ -77,6 +86,7 @@ export const useAuthStore = defineStore('auth', () => {
     competitionId,
     setSession,
     clearSession,
+    setCompetitionId,
     logout,
   }
 })

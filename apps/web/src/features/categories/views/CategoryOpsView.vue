@@ -234,7 +234,7 @@ function handleCategoryClick(cat: Category) {
           <div class="cat-header__sub font-mono">
             <span>SISTEM ELIMINASI IPSI RULES 2023</span>
             <span class="cat-bullet">•</span>
-            <span class="cat-tag">DEWASA & REMAJA</span>
+            <span class="cat-comp-badge">EVENT: {{ (competitionName || 'Kejuaraan').toUpperCase() }}</span>
             <span class="cat-bullet">•</span>
             <span class="cat-pulse-wrapper">
               <span class="cat-pulse-dot" />
@@ -578,6 +578,22 @@ function handleCategoryClick(cat: Category) {
         </header>
 
         <form class="cat-modal__body" @submit.prevent="handleSubmitCategory">
+          <!-- Active Competition Target Banner -->
+          <div class="cat-target-comp font-mono">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" class="flex-shrink-0">
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+              <path d="M4 22h16" />
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+            </svg>
+            <div class="target-comp-text">
+              <span class="target-comp-label">KEJUARAAN TUJUAN:</span>
+              <span class="target-comp-name">{{ competitionName || 'Kejuaraan Terpilih' }}</span>
+            </div>
+          </div>
+
           <!-- Preset Selector -->
           <div class="cat-form-group">
             <label for="cat-preset-select" class="cat-form-label font-mono">
@@ -1491,6 +1507,35 @@ function handleCategoryClick(cat: Category) {
   margin-top: 10px;
 }
 
+.cat-comp-badge {
+  color: #F59E0B;
+  font-weight: 700;
+}
+.cat-target-comp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.target-comp-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.target-comp-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #F59E0B;
+  letter-spacing: 0.06em;
+}
+.target-comp-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #F8FAFC;
+}
 .sr-only {
   position: absolute;
   width: 1px;

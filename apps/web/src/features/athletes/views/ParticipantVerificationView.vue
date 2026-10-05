@@ -481,6 +481,7 @@ function formatDate(iso: string): string {
 
         <!-- Card Footer: Verification Actions -->
         <footer class="verif-card__footer font-mono">
+          <!-- State 1: Verified (Lolos) -->
           <template v-if="part.registration_status === 'verified'">
             <div class="verif-verified-label">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -490,14 +491,41 @@ function formatDate(iso: string): string {
             </div>
             <button
               type="button"
-              class="verif-btn-revert"
+              class="verif-btn-reject-action"
               :disabled="processingId === part.id"
               @click="handleSetStatus(part, 'rejected')"
             >
-              Batalkan
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              Tolak Peserta
             </button>
           </template>
 
+          <!-- State 2: Rejected (Ditolak) -->
+          <template v-else-if="part.registration_status === 'rejected'">
+            <div class="verif-rejected-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              <span>Status: Ditolak</span>
+            </div>
+            <button
+              type="button"
+              class="verif-btn-approve-action"
+              :disabled="processingId === part.id"
+              @click="handleSetStatus(part, 'verified')"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Loloskan Peserta
+            </button>
+          </template>
+
+          <!-- State 3: Pending / Registered (Menunggu) -->
           <template v-else>
             <button
               type="button"
@@ -861,15 +889,52 @@ function formatDate(iso: string): string {
   font-weight: 700;
   color: var(--color-emerald-400, #34d399);
 }
-.verif-btn-revert {
-  background: none;
-  border: none;
-  color: var(--color-neutral-400, #94a3b8);
+.verif-rejected-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.6875rem;
-  cursor: pointer;
-  text-decoration: underline;
+  font-weight: 700;
+  color: #f87171;
 }
-.verif-btn-revert:hover { color: #f87171; }
+.verif-btn-reject-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.verif-btn-reject-action:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #ffffff;
+}
+.verif-btn-approve-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.verif-btn-approve-action:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.55);
+  color: #ffffff;
+}
 .verif-action-btn {
   flex: 1;
   display: inline-flex;

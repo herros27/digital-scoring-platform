@@ -43,10 +43,14 @@ internal/
 rulesets/
   ipsi_2024.json             # IPSI 2024 ruleset
   persilat_v7.json           # PERSILAT ruleset
-migrations/                  # SQL migrations (001 s/d 016) + Auto-migration engine
+migrations/                  # SQL migrations (001 s/d 017) + Auto-migration engine
 tests/                       # End-to-end integration test scenarios (tournament lifecycle & workflows)
 docker-compose.yml           # Local PostgreSQL
-docs/openapi.yaml            # OpenAPI 3.0 spec & WebSocket protocol contracts
+docs/
+  openapi.yaml               # OpenAPI 3.0 spec & WebSocket protocol contracts
+  task_update.md             # Log progres & status fitur backend
+  frontend_progress.md       # Log progres, status modul & gap analysis frontend
+  CREDENTIALS.md             # Kredensial akun uji coba & format otorisasi
 ```
 
 ---
@@ -132,7 +136,7 @@ MatchOrchestrator
 | **Kontingen** | Manajer Tim / Pelatih | Email & Password (bcrypt) → JWT | 24 jam (`role: contingent`) |
 
 - **Clean Architecture Juri**: Pemisahan tegas antara otorisasi (`role: "judge"`) dan nomor kursi fisik gelanggang (`seat_number`). Mendukung format juri dinamis (1, 3, 5, dst).
-- **Server-Side PIN**: PIN di-generate otomatis secara kriptografis (`crypto/rand`) dengan expiration time (`expires_at`).
+- **Server-Side PIN & Multi-Device Sync**: PIN di-generate otomatis secara kriptografis (`crypto/rand`) dengan expiration time (`expires_at`), disimpan persisten dalam database (`judge_pins.raw_pin`), dan disinkronisasi ke seluruh perangkat admin/operator via `GET /api/v1/auth/pins`.
 
 ### 8. Pendaftaran Atlet & Verifikasi Panitia (Contingent Workflow)
 - **Portal Kontingen**: Perwakilan kontingen dapat mendaftar mandiri (`/api/v1/auth/contingent/register`) dan mendaftarkan atlet asuhannya.
@@ -140,11 +144,11 @@ MatchOrchestrator
 - **Meja Timbang / Verifikasi**: Panitia (Admin / Dewan) memverifikasi berkas & timbang badan peserta (`PUT .../participants/{id}/verify`) menjadi `verified` atau `rejected`.
 - **Bracket Safeguard**: Hanya atlet berstatus `verified` yang dapat dimasukkan ke dalam bagan pertandingan single-elimination.
 
-### 9. Database (PostgreSQL 16) - 16 Versioned Migrations
+### 9. Database (PostgreSQL 16) - 17 Versioned Migrations
 Tabel database terstruktur & termigrasi lengkap:
 - `competitions`, `arenas`, `categories`, `rulesets`
 - `athletes`, `contingents`, `participants` (dengan `registration_status`), `officials`
-- `judge_pins` (dengan `seat_number INT`), `matches`, `match_scores`, `match_events` (audit trail), `bracket_slots`
+- `judge_pins` (dengan `seat_number INT` dan `raw_pin VARCHAR`), `matches`, `match_scores`, `match_events` (audit trail), `bracket_slots`
 
 ---
 
@@ -169,7 +173,7 @@ export ENV="development"  # atau "production"
 ```
 
 ### 3. Run Migrations (Otomatis)
-Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 016) akan otomatis diterapkan:
+Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 017) akan otomatis diterapkan:
 ```bash
 go run ./cmd/server
 ```

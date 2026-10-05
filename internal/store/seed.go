@@ -194,7 +194,20 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	}{
 		{Name: "Tanding Dewasa Putra - Kelas A (45-50 Kg)", Gender: "male", WeightClass: "A"},
 		{Name: "Tanding Dewasa Putra - Kelas B (50-55 Kg)", Gender: "male", WeightClass: "B"},
+		{Name: "Tanding Dewasa Putra - Kelas C (55-60 Kg)", Gender: "male", WeightClass: "C"},
+		{Name: "Tanding Dewasa Putra - Kelas D (60-65 Kg)", Gender: "male", WeightClass: "D"},
+		{Name: "Tanding Dewasa Putra - Kelas E (65-70 Kg)", Gender: "male", WeightClass: "E"},
+		{Name: "Tanding Dewasa Putra - Kelas F (70-75 Kg)", Gender: "male", WeightClass: "F"},
+		{Name: "Tanding Dewasa Putra - Kelas G (75-80 Kg)", Gender: "male", WeightClass: "G"},
+		{Name: "Tanding Dewasa Putra - Kelas H (80-85 Kg)", Gender: "male", WeightClass: "H"},
+		{Name: "Tanding Dewasa Putra - Kelas I (85-90 Kg)", Gender: "male", WeightClass: "I"},
+		{Name: "Tanding Dewasa Putra - Kelas J (90-95 Kg)", Gender: "male", WeightClass: "J"},
 		{Name: "Tanding Dewasa Putri - Kelas A (45-50 Kg)", Gender: "female", WeightClass: "A"},
+		{Name: "Tanding Dewasa Putri - Kelas B (50-55 Kg)", Gender: "female", WeightClass: "B"},
+		{Name: "Tanding Dewasa Putri - Kelas C (55-60 Kg)", Gender: "female", WeightClass: "C"},
+		{Name: "Tanding Dewasa Putri - Kelas D (60-65 Kg)", Gender: "female", WeightClass: "D"},
+		{Name: "Tanding Dewasa Putri - Kelas E (65-70 Kg)", Gender: "female", WeightClass: "E"},
+		{Name: "Tanding Dewasa Putri - Kelas F (70-75 Kg)", Gender: "female", WeightClass: "F"},
 	}
 	for _, cat := range categories {
 		var catID string
@@ -399,9 +412,9 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 			compID, p.ArenaID, p.Role, p.SeatNumber).Scan(&existingID)
 		if err == sql.ErrNoRows {
 			_, err = tx.ExecContext(ctx, `
-				INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, pin_hash, expires_at)
-				VALUES ($1, $2, $3, $4, $5, $6)`,
-				compID, p.ArenaID, p.Role, p.SeatNumber, hash, expiry)
+				INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, raw_pin, pin_hash, expires_at)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				compID, p.ArenaID, p.Role, p.SeatNumber, p.PIN, hash, expiry)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert judge pin for arena %s %s:%d: %w", p.ArenaID, p.Role, p.SeatNumber, err)
 			}
@@ -409,8 +422,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 			return nil, fmt.Errorf("failed to check existing pin: %w", err)
 		} else {
 			_, _ = tx.ExecContext(ctx, `
-				UPDATE judge_pins SET pin_hash = $1, expires_at = $2 WHERE id = $3`,
-				hash, expiry, existingID)
+				UPDATE judge_pins SET raw_pin = $1, pin_hash = $2, expires_at = $3 WHERE id = $4`,
+				p.PIN, hash, expiry, existingID)
 		}
 		summary.JudgePins++
 	}

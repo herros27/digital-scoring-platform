@@ -17,6 +17,9 @@ const bcryptCost = 12
 
 // NormalizeRoleAndSeat mengekstrak role standar ("judge") dan nomor kursi jika diberikan "judge_1" atau role & seat terpisah
 func NormalizeRoleAndSeat(roleStr string, seat int) (string, int) {
+	if roleStr == "juri" {
+		roleStr = "judge"
+	}
 	if strings.HasPrefix(roleStr, "judge_") {
 		numStr := strings.TrimPrefix(roleStr, "judge_")
 		if n, err := strconv.Atoi(numStr); err == nil && seat == 0 {
@@ -58,6 +61,7 @@ type PinRecord struct {
 	ArenaID       string
 	Role          string
 	SeatNumber    int
+	RawPIN        string
 	PinHash       string
 	ExpiresAt     time.Time
 }
@@ -65,15 +69,17 @@ type PinRecord struct {
 // GetByCompAndArena ambil semua PIN aktif untuk competition + arena tertentu
 func (s *PinStore) GetByCompAndArena(competitionID, arenaID string) ([]PinRecord, error) {
 	queryWithSeat := `
-        SELECT id, competition_id, arena_id, role, COALESCE(seat_number, 0), pin_hash, expires_at
+        SELECT id, competition_id, arena_id, role, COALESCE(seat_number, 0), COALESCE(raw_pin, ''), pin_hash, expires_at
         FROM judge_pins
-        WHERE competition_id = $1 AND arena_id = $2 AND expires_at > NOW()`
+        WHERE competition_id = $1 AND arena_id = $2 AND expires_at > NOW()
+        ORDER BY role, seat_number ASC`
 	rows, err := s.DB.Query(queryWithSeat, competitionID, arenaID)
 	if err != nil {
 		queryFallback := `
-            SELECT id, competition_id, arena_id, role, pin_hash, expires_at
+            SELECT id, competition_id, arena_id, role, COALESCE(seat_number, 0), pin_hash, expires_at
             FROM judge_pins
-            WHERE competition_id = $1 AND arena_id = $2 AND expires_at > NOW()`
+            WHERE competition_id = $1 AND arena_id = $2 AND expires_at > NOW()
+            ORDER BY role, seat_number ASC`
 		rows, err = s.DB.Query(queryFallback, competitionID, arenaID)
 		if err != nil {
 			return nil, err
@@ -83,10 +89,10 @@ func (s *PinStore) GetByCompAndArena(competitionID, arenaID string) ([]PinRecord
 		var list []PinRecord
 		for rows.Next() {
 			var r PinRecord
-			if err := rows.Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.PinHash, &r.ExpiresAt); err != nil {
+			if err := rows.Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.SeatNumber, &r.PinHash, &r.ExpiresAt); err != nil {
 				return nil, err
 			}
-			r.Role, r.SeatNumber = NormalizeRoleAndSeat(r.Role, 0)
+			r.Role, r.SeatNumber = NormalizeRoleAndSeat(r.Role, r.SeatNumber)
 			list = append(list, r)
 		}
 		return list, rows.Err()
@@ -96,7 +102,7 @@ func (s *PinStore) GetByCompAndArena(competitionID, arenaID string) ([]PinRecord
 	var list []PinRecord
 	for rows.Next() {
 		var r PinRecord
-		if err := rows.Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.SeatNumber, &r.PinHash, &r.ExpiresAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.SeatNumber, &r.RawPIN, &r.PinHash, &r.ExpiresAt); err != nil {
 			return nil, err
 		}
 		r.Role, r.SeatNumber = NormalizeRoleAndSeat(r.Role, r.SeatNumber)
@@ -105,38 +111,64 @@ func (s *PinStore) GetByCompAndArena(competitionID, arenaID string) ([]PinRecord
 	return list, rows.Err()
 }
 
+var ErrArenaNotFound = errors.New("gelanggang tidak ditemukan atau tidak terdaftar pada kompetisi ini")
+
 // CreatePIN simpan PIN baru ke DB (backward-compatible)
 func (s *PinStore) CreatePIN(competitionID, arenaID, role, pin string, ttl time.Duration) (*PinRecord, error) {
 	return s.CreatePINWithSeat(competitionID, arenaID, role, 0, pin, ttl)
 }
 
-// CreatePINWithSeat simpan PIN baru ke DB dengan nomor kursi
+// CreatePINWithSeat simpan PIN baru ke DB dengan nomor kursi dan raw_pin
 func (s *PinStore) CreatePINWithSeat(competitionID, arenaID, role string, seatNumber int, pin string, ttl time.Duration) (*PinRecord, error) {
+	if s.DB != nil {
+		var exists bool
+		err := s.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM arenas WHERE id = $1 AND competition_id = $2)`, arenaID, competitionID).Scan(&exists)
+		if err != nil || !exists {
+			return nil, ErrArenaNotFound
+		}
+	}
+
 	role, seatNumber = NormalizeRoleAndSeat(role, seatNumber)
 	hash, err := HashPIN(pin)
 	if err != nil {
 		return nil, err
 	}
 	expiresAt := time.Now().Add(ttl)
-	r := &PinRecord{SeatNumber: seatNumber}
 
-	queryWithSeat := `
-        INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, pin_hash, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, competition_id, arena_id, role, seat_number, pin_hash, expires_at`
-	err = s.DB.QueryRow(queryWithSeat, competitionID, arenaID, role, seatNumber, hash, expiresAt).
-		Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.SeatNumber, &r.PinHash, &r.ExpiresAt)
+	// Hapus PIN lama pada kursi/role ini di arena yang sama agar tidak menumpuk duplikat
+	_, _ = s.DB.Exec(`
+        DELETE FROM judge_pins
+        WHERE competition_id = $1 AND arena_id = $2 AND role = $3 AND COALESCE(seat_number, 0) = $4`,
+		competitionID, arenaID, role, seatNumber)
+
+	r := &PinRecord{
+		CompetitionID: competitionID,
+		ArenaID:       arenaID,
+		Role:          role,
+		SeatNumber:    seatNumber,
+		RawPIN:        pin,
+		PinHash:       hash,
+		ExpiresAt:     expiresAt,
+	}
+
+	queryWithRaw := `
+        INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, raw_pin, pin_hash, expires_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, competition_id, arena_id, role, seat_number, COALESCE(raw_pin, ''), pin_hash, expires_at`
+	err = s.DB.QueryRow(queryWithRaw, competitionID, arenaID, role, seatNumber, pin, hash, expiresAt).
+		Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.SeatNumber, &r.RawPIN, &r.PinHash, &r.ExpiresAt)
 	if err != nil {
+		// Fallback query jika kolom raw_pin belum ada
 		queryFallback := `
-            INSERT INTO judge_pins (competition_id, arena_id, role, pin_hash, expires_at)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, competition_id, arena_id, role, pin_hash, expires_at`
-		err = s.DB.QueryRow(queryFallback, competitionID, arenaID, role, hash, expiresAt).
-			Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.PinHash, &r.ExpiresAt)
+            INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, pin_hash, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, competition_id, arena_id, role, seat_number, pin_hash, expires_at`
+		err = s.DB.QueryRow(queryFallback, competitionID, arenaID, role, seatNumber, hash, expiresAt).
+			Scan(&r.ID, &r.CompetitionID, &r.ArenaID, &r.Role, &r.SeatNumber, &r.PinHash, &r.ExpiresAt)
 		if err != nil {
 			return nil, err
 		}
-		r.SeatNumber = seatNumber
+		r.RawPIN = pin
 	}
 	return r, nil
 }

@@ -9,6 +9,11 @@ import {
   useSeedArenasMutation,
 } from '../api/arenaQueries'
 import {
+  useCompetitionQuery,
+  useCompetitionsQuery,
+} from '@/features/competitions/api/competitionQueries'
+import type { CompetitionFilterValues } from '@/features/competitions/types/competition.schema'
+import {
   createArenaSchema,
   type Arena,
 } from '../types/arena.schema'
@@ -24,9 +29,17 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'selectArena', arena: Arena): void
+  (e: 'switchCompetition', compId: string): void
 }>()
 
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
+const { data: compDetail } = useCompetitionQuery(activeCompId)
+const activeCompetitionName = computed(() => compDetail.value?.name || 'Kejuaraan Terpilih')
+
+// All competitions for target selector
+const compFilter = ref<CompetitionFilterValues>({ page: 1, limit: 50, status: 'all' })
+const { data: competitionsData } = useCompetitionsQuery(compFilter)
+const availableCompetitions = computed(() => competitionsData.value?.data || [])
 
 // Queries & Mutations
 const { data: rawArenas, isLoading, isFetching, error, refetch } = useArenasQuery(activeCompId)
@@ -56,12 +69,14 @@ function showToast(title: string, message: string, type: 'success' | 'danger' | 
 const isModalOpen = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
 const editingArenaId = ref<string | null>(null)
+const selectedTargetCompId = ref(activeCompId.value)
 const arenaName = ref('')
 const formError = ref('')
 
 function openCreateModal() {
   modalMode.value = 'create'
   editingArenaId.value = null
+  selectedTargetCompId.value = activeCompId.value
   arenaName.value = ''
   formError.value = ''
   isModalOpen.value = true
@@ -70,6 +85,7 @@ function openCreateModal() {
 function openEditModal(arena: Arena) {
   modalMode.value = 'edit'
   editingArenaId.value = arena.id
+  selectedTargetCompId.value = activeCompId.value
   arenaName.value = arena.name
   formError.value = ''
   isModalOpen.value = true
@@ -86,8 +102,18 @@ async function handleSubmitArena() {
 
   try {
     if (modalMode.value === 'create') {
-      const created = await createMutation.mutateAsync(arenaName.value.trim())
-      showToast('Gelanggang Dibuat', `${created.name} berhasil ditambahkan ke arena pertandingan.`, 'success')
+      const targetId = selectedTargetCompId.value || activeCompId.value
+      const created = await createMutation.mutateAsync({
+        name: arenaName.value.trim(),
+        compId: targetId,
+      })
+      const targetCompName =
+        availableCompetitions.value.find((c) => c.id === targetId)?.name || activeCompetitionName.value
+      showToast('Gelanggang Dibuat', `${created.name} berhasil ditambahkan ke ${targetCompName}.`, 'success')
+
+      if (targetId !== activeCompId.value) {
+        emit('switchCompetition', targetId)
+      }
     } else if (editingArenaId.value) {
       const updated = await updateMutation.mutateAsync({
         id: editingArenaId.value,
@@ -186,7 +212,7 @@ const filteredArenas = computed(() => {
           <div class="arena-header__sub font-mono">
             <span>OPERASIONAL & MONITORING GELANGGANG</span>
             <span class="arena-bullet">•</span>
-            <span class="arena-tag">IPSI RULES 2023</span>
+            <span class="arena-comp-badge">EVENT: {{ activeCompetitionName.toUpperCase() }}</span>
             <span class="arena-bullet">•</span>
             <span class="arena-pulse-wrapper">
               <span class="arena-pulse-dot" />
@@ -529,8 +555,39 @@ const filteredArenas = computed(() => {
             ✕
           </button>
         </header>
-
+ 
         <form class="arena-modal__body" @submit.prevent="handleSubmitArena">
+          <!-- Interactive Competition Selector in Modal -->
+          <div class="arena-form-group">
+            <label for="arena-comp-select" class="arena-form-label font-mono">
+              TARGET KEJUARAAN / TURNAMEN <span class="arena-req">*</span>
+            </label>
+            <div class="arena-select-wrap">
+              <select
+                id="arena-comp-select"
+                v-model="selectedTargetCompId"
+                class="arena-form-select font-mono"
+                :disabled="modalMode === 'edit'"
+              >
+                <template v-if="availableCompetitions.length > 0">
+                  <option
+                    v-for="c in availableCompetitions"
+                    :key="c.id"
+                    :value="c.id"
+                  >
+                    {{ c.name }} ({{ c.status.toUpperCase() }})
+                  </option>
+                </template>
+                <template v-else>
+                  <option :value="activeCompId">{{ activeCompetitionName }}</option>
+                </template>
+              </select>
+            </div>
+            <span class="arena-form-help font-mono">
+              {{ modalMode === 'create' ? 'Pilih kejuaraan tempat gelanggang ini akan didaftarkan.' : 'Kejuaraan tempat gelanggang ini terdaftar.' }}
+            </span>
+          </div>
+
           <div class="arena-form-group">
             <label for="arena-name-input" class="arena-form-label font-mono">
               NAMA GELANGGANG <span class="arena-req">*</span>
@@ -1044,10 +1101,54 @@ const filteredArenas = computed(() => {
   outline: none;
   box-sizing: border-box;
 }
-.arena-form-input:focus { border-color: var(--color-emerald-400, #34d399); }
-.arena-form-input--error { border-color: var(--color-primary-500, #ef4444) !important; }
-.arena-form-error { font-size: 0.6875rem; color: var(--color-primary-400, #f87171); }
-.arena-form-help { font-size: 0.6875rem; color: var(--color-neutral-500, #64748b); }
-
+.arena-target-comp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.target-comp-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.target-comp-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #F59E0B;
+  letter-spacing: 0.06em;
+}
+.arena-comp-badge {
+  color: #F59E0B;
+  font-weight: 700;
+}
+.arena-form-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid var(--border-card, #334155);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  outline: none;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.arena-form-select:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.arena-form-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(15, 23, 42, 0.5);
+}
+.arena-form-help {
+  font-size: 0.6875rem;
+  color: var(--color-neutral-400, #94a3b8);
+  margin-top: 2px;
+}
 .arena-modal__footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
 </style>

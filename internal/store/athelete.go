@@ -114,11 +114,18 @@ func (s *AthleteStore) UpdateParticipantStatus(participantID, status string) err
 
 func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Participant, error) {
 	baseQuery := `
-		SELECT p.id, p.competition_id, COALESCE(p.athlete_id::text, ''), COALESCE(p.contingent_id::text, ''), 
-		       COALESCE(a.name, p.name, ''), COALESCE(a.team, p.club, ''), p.weight_class, p.gender, 
-		       COALESCE(p.registration_status, 'registered'), p.created_at
+		SELECT p.id, p.competition_id, 
+		       COALESCE(p.athlete_id::text, ''), 
+		       COALESCE(p.contingent_id::text, a.contingent_id::text, ''), 
+		       COALESCE(a.name, p.name, ''), 
+		       COALESCE(NULLIF(a.team, ''), c.name, ''), 
+		       p.weight_class, 
+		       p.gender, 
+		       COALESCE(p.registration_status, 'registered'), 
+		       p.created_at
 		FROM participants p
 		LEFT JOIN athletes a ON p.athlete_id = a.id
+		LEFT JOIN contingents c ON COALESCE(p.contingent_id, a.contingent_id) = c.id
 		WHERE p.competition_id = $1`
 	var rows *sql.Rows
 	var err error

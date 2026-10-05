@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { AppButton } from '@/components/ui'
 import {
   useMatchesQuery,
-  useCreateMatchMutation,
   useLoadArenaMutation,
   useStartMatchMutation,
   usePauseMatchMutation,
@@ -13,6 +13,9 @@ import {
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import type { MatchDTO } from '../api/matchService'
+
+const router = useRouter()
+const route = useRoute()
 
 const props = withDefaults(
   defineProps<{
@@ -32,7 +35,6 @@ const { data: rawArenas } = useArenasQuery(activeCompId)
 const { data: rawParticipants } = useParticipantsQuery(activeCompId)
 
 // Mutations
-const createMatchMutation = useCreateMatchMutation(activeCompId)
 const loadArenaMutation = useLoadArenaMutation(activeCompId)
 const startMatchMutation = useStartMatchMutation(activeCompId)
 const pauseMatchMutation = usePauseMatchMutation(activeCompId)
@@ -79,48 +81,6 @@ function showToast(title: string, message: string, type: 'success' | 'danger' | 
   toastTimer = setTimeout(() => {
     toast.value = null
   }, 4000)
-}
-
-// Modal State (Create Match)
-const isModalOpen = ref(false)
-const formArenaId = ref('')
-const formRedId = ref('')
-const formBlueId = ref('')
-const formRound = ref(1)
-const formError = ref('')
-
-function openCreateModal() {
-  formArenaId.value = arenas.value[0]?.id || ''
-  formRedId.value = participants.value[0]?.id || ''
-  formBlueId.value = participants.value[1]?.id || ''
-  formRound.value = 1
-  formError.value = ''
-  isModalOpen.value = true
-}
-
-async function handleSubmitMatch() {
-  formError.value = ''
-  if (!formRedId.value || !formBlueId.value) {
-    formError.value = 'Pilih kedua atlet untuk sudut merah dan biru'
-    return
-  }
-  if (formRedId.value === formBlueId.value) {
-    formError.value = 'Atlet sudut merah dan sudut biru tidak boleh sama'
-    return
-  }
-
-  try {
-    await createMatchMutation.mutateAsync({
-      arena_id: formArenaId.value || undefined,
-      athlete_red_id: formRedId.value,
-      athlete_blue_id: formBlueId.value,
-      current_round: Number(formRound.value) || 1,
-    })
-    isModalOpen.value = false
-    showToast('Partai Dibuat', 'Partai pertandingan baru berhasil ditambahkan ke jadwal.', 'success')
-  } catch (err: any) {
-    formError.value = err.message || 'Gagal menambahkan partai pertandingan.'
-  }
 }
 
 // Operational Actions
@@ -305,20 +265,6 @@ const filteredMatches = computed(() => {
           </template>
           Segarkan Jadwal
         </AppButton>
-
-        <AppButton
-          variant="emerald"
-          size="sm"
-          @click="openCreateModal"
-        >
-          <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </template>
-          Tambah Partai Baru
-        </AppButton>
       </div>
     </header>
 
@@ -489,7 +435,7 @@ const filteredMatches = computed(() => {
         {{
           searchQuery
             ? `Pencarian "${searchQuery}" tidak menghasilkan jadwal partai manapun.`
-            : 'Belum ada partai pertandingan yang dijadwalkan pada kompetisi ini. Tambahkan partai baru atau gunakan bagan turnamen.'
+            : 'Belum ada partai pertandingan yang dijadwalkan pada kompetisi ini. Silakan undi susunan pohon bagan di menu Bagan Pertandingan.'
         }}
       </p>
 
@@ -506,9 +452,9 @@ const filteredMatches = computed(() => {
           v-else
           variant="emerald"
           size="md"
-          @click="openCreateModal"
+          @click="router.push({ query: { ...route.query, tab: 'bagan' } })"
         >
-          Jadwalkan Partai Pertama
+          Buka Bagan Pertandingan
         </AppButton>
       </div>
     </div>
@@ -691,88 +637,6 @@ const filteredMatches = computed(() => {
           </div>
         </footer>
       </article>
-    </div>
-
-    <!-- Modal Form (Tambah Partai Baru) -->
-    <div
-      v-if="isModalOpen"
-      class="sch-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="sch-modal-title"
-      @click.self="isModalOpen = false"
-    >
-      <div class="sch-modal">
-        <header class="sch-modal__header">
-          <div>
-            <div class="sch-modal__tag font-mono">OPERASIONAL JADWAL</div>
-            <h3 id="sch-modal-title" class="sch-modal__title">Jadwalkan Partai Pertandingan</h3>
-          </div>
-          <button class="sch-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">✕</button>
-        </header>
-
-        <form class="sch-modal__body" @submit.prevent="handleSubmitMatch">
-          <!-- Arena Selection -->
-          <div class="sch-form-group">
-            <label for="sch-arena-select" class="sch-form-label font-mono">
-              PILIH GELANGGANG <span class="sch-req">*</span>
-            </label>
-            <select id="sch-arena-select" v-model="formArenaId" class="sch-form-select font-mono" required>
-              <option v-for="a in arenas" :key="a.id" :value="a.id">
-                {{ a.name }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Red Athlete Selection -->
-          <div class="sch-form-group">
-            <label for="sch-red-select" class="sch-form-label font-mono">
-              PESILAT SUDUT MERAH <span class="sch-req">*</span>
-            </label>
-            <select id="sch-red-select" v-model="formRedId" class="sch-form-select font-mono" required>
-              <option v-for="p in participants" :key="p.id" :value="p.id">
-                {{ p.name }} ({{ p.club }}) - KELAS {{ p.weight_class }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Blue Athlete Selection -->
-          <div class="sch-form-group">
-            <label for="sch-blue-select" class="sch-form-label font-mono">
-              PESILAT SUDUT BIRU <span class="sch-req">*</span>
-            </label>
-            <select id="sch-blue-select" v-model="formBlueId" class="sch-form-select font-mono" required>
-              <option v-for="p in participants" :key="p.id" :value="p.id">
-                {{ p.name }} ({{ p.club }}) - KELAS {{ p.weight_class }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Round Selection -->
-          <div class="sch-form-group">
-            <label for="sch-round-select" class="sch-form-label font-mono">
-              BABAK PERTANDINGAN <span class="sch-req">*</span>
-            </label>
-            <select id="sch-round-select" v-model.number="formRound" class="sch-form-select font-mono">
-              <option :value="1">Babak 1 (Penyisihan / Babak Awal)</option>
-              <option :value="2">Babak 2 (Perempat Final)</option>
-              <option :value="3">Babak 3 (Semi Final)</option>
-              <option :value="4">Babak 4 (Final Perebutan Emas)</option>
-            </select>
-          </div>
-
-          <span v-if="formError" class="sch-form-error font-mono">{{ formError }}</span>
-
-          <footer class="sch-modal__footer font-mono">
-            <AppButton type="button" variant="secondary" size="md" @click="isModalOpen = false">
-              Batal
-            </AppButton>
-            <AppButton type="submit" variant="emerald" size="md" :loading="createMatchMutation.isPending.value">
-              Jadwalkan Partai
-            </AppButton>
-          </footer>
-        </form>
-      </div>
     </div>
   </div>
 </template>

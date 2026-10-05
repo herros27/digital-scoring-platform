@@ -37,7 +37,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	compService := service.NewCompetitionService(compRepo)
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
 	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
-	bracketService := service.NewBracketService(bracketRepo)
+	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo)
 	categoryService := service.NewCategoryService(categoryRepo)
 	athleteService := service.NewAthleteService(athleteRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
@@ -116,6 +116,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
 
 	// Auth & PIN (Admin only)
+	protected.Handle("GET /api/v1/auth/pins", adminOrDewan(http.HandlerFunc(authH.ListPINs)))
 	protected.Handle("POST /api/v1/auth/create-pin", adminOrDewan(http.HandlerFunc(authH.CreatePIN)))
 
 	// Competitions

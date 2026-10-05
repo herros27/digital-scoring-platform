@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/lib/authApi'
@@ -17,7 +17,7 @@ const authStore = useAuthStore()
 const compIdRef = computed(() => props.competitionId || authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
 
 // Fetch real arenas
-const { data: remoteArenas } = useArenasQuery(compIdRef)
+const { data: remoteArenas, refetch: refetchArenas } = useArenasQuery(compIdRef)
 
 interface ArenaItem {
   id: string
@@ -26,25 +26,85 @@ interface ArenaItem {
 
 const displayArenas = computed<ArenaItem[]>(() => {
   if (remoteArenas.value && remoteArenas.value.length > 0) {
-    return remoteArenas.value.map(a => ({ id: a.id, name: a.name }))
+    // Deteksi nama kembar dan berikan indikator pembeda (#1, #2)
+    const nameCounts = new Map<string, number>()
+    for (const a of remoteArenas.value) {
+      const norm = a.name.trim().toLowerCase()
+      nameCounts.set(norm, (nameCounts.get(norm) || 0) + 1)
+    }
+
+    const nameTracker = new Map<string, number>()
+    return remoteArenas.value.map(a => {
+      const norm = a.name.trim().toLowerCase()
+      const total = nameCounts.get(norm) || 0
+      if (total > 1) {
+        const idx = (nameTracker.get(norm) || 0) + 1
+        nameTracker.set(norm, idx)
+        return {
+          id: a.id,
+          name: `${a.name} (#${idx})`,
+        }
+      }
+      return { id: a.id, name: a.name }
+    })
   }
-  return [
-    { id: 'c7397556-eb39-406f-aa89-6b3053a2fd08', name: 'Gelanggang A (Utama)' },
-    { id: '32d25db4-5636-46ad-bb2c-a43d052a405a', name: 'Gelanggang B' },
-  ]
+  return []
 })
 
 const selectedArena = ref<string>('')
+const judgeFormat = ref<'5' | '3'>('5')
+
+// Jumlah perangkat fisik riil tersinkronisasi per gelanggang
+const arenaDeviceCounts = ref<Record<string, number>>({})
+
+async function loadAllArenasDeviceCounts() {
+  const compId = compIdRef.value
+  if (!compId || displayArenas.value.length === 0) return
+  await Promise.allSettled(
+    displayArenas.value.map(async (arena) => {
+      try {
+        const pins = await authApi.listPins(compId, arena.id)
+        const maxJudge = judgeFormat.value === '3' ? 3 : 5
+        const validPins = (pins || []).filter((p: any) => {
+          if (p.role === 'wasit') return true
+          if (p.role === 'judge' || p.role === 'juri') {
+            return Number(p.seat_number) <= maxJudge
+          }
+          return false
+        })
+        arenaDeviceCounts.value[arena.id] = validPins.length
+      } catch {
+        // fallback jika belum ter-fetch
+      }
+    })
+  )
+}
 
 watch(
   displayArenas,
   (arenas) => {
-    if (arenas.length > 0 && (!selectedArena.value || !arenas.some(a => a.id === selectedArena.value))) {
-      selectedArena.value = arenas[0].id
+    if (arenas.length > 0) {
+      if (!selectedArena.value || !arenas.some(a => a.id === selectedArena.value)) {
+        selectedArena.value = arenas[0].id
+      }
+    } else {
+      selectedArena.value = ''
     }
+    loadAllArenasDeviceCounts()
   },
   { immediate: true }
 )
+
+onMounted(async () => {
+  await refetchArenas()
+})
+
+watch(judgeFormat, () => {
+  if (selectedArena.value) {
+    fetchPinsForArena(selectedArena.value)
+  }
+  loadAllArenasDeviceCounts()
+})
 
 const activeArenaObj = computed(() => {
   return displayArenas.value.find(a => a.id === selectedArena.value) || displayArenas.value[0] || { id: '', name: 'Gelanggang' }
@@ -65,134 +125,111 @@ export interface DeviceSeat {
 
 // Reactive store of seats per arena ID
 const arenaData = ref<Record<string, DeviceSeat[]>>({})
+const isLoadingPins = ref(false)
 
-function getInitialSeatsForArena(arenaId: string): DeviceSeat[] {
-  // Check localStorage for saved PINs
-  const storageKey = `device_pins_${arenaId}`
-  let saved: Record<string, string> = {}
-  try {
-    const raw = localStorage.getItem(storageKey)
-    if (raw) saved = JSON.parse(raw)
-  } catch {
-    // ignore
+function formatPin(raw: string): string {
+  const clean = (raw || '').replace(/\s+/g, '')
+  if (clean.length === 6) {
+    return `${clean.slice(0, 3)} ${clean.slice(3)}`
   }
+  return clean || '------'
+}
 
-  return [
-    {
-      id: `${arenaId}-j1`,
-      seatNumber: 1,
-      role: 'judge',
-      label: 'KURSI JURI 1',
-      deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: saved['1'] || '839 102',
-      status: 'online',
-      latencyMs: 14,
-      batteryPct: 94,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: `${arenaId}-j2`,
-      seatNumber: 2,
-      role: 'judge',
-      label: 'KURSI JURI 2',
-      deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: saved['2'] || '491 205',
-      status: 'online',
-      latencyMs: 18,
-      batteryPct: 88,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: `${arenaId}-j3`,
-      seatNumber: 3,
-      role: 'judge',
-      label: 'KURSI JURI 3',
-      deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: saved['3'] || '720 184',
-      status: 'online',
-      latencyMs: 12,
-      batteryPct: 91,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: `${arenaId}-j4`,
-      seatNumber: 4,
-      role: 'judge',
-      label: 'KURSI JURI 4',
-      deviceModel: 'LENOVO TAB M10 • ANDROID PWA',
-      pin: saved['4'] || '339 014',
-      status: 'idle',
-      latencyMs: 22,
-      batteryPct: 79,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: `${arenaId}-j5`,
-      seatNumber: 5,
-      role: 'judge',
-      label: 'KURSI JURI 5',
-      deviceModel: 'LENOVO TAB M10 • ANDROID PWA',
-      pin: saved['5'] || '612 883',
-      status: 'idle',
-      latencyMs: 25,
-      batteryPct: 83,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: `${arenaId}-wasit`,
+function formatExpiry(isoStr?: string): string {
+  if (!isoStr) return '12 Jam Tersisa'
+  try {
+    const d = new Date(isoStr)
+    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    const now = new Date()
+    const diffMs = d.getTime() - now.getTime()
+    if (diffMs <= 0) return `${timeStr} WIB (Kadaluarsa)`
+    const hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60))
+    return `${timeStr} WIB (${hoursLeft} Jam Tersisa)`
+  } catch {
+    return '12 Jam Tersisa'
+  }
+}
+
+async function fetchPinsForArena(arenaId: string) {
+  if (!arenaId) return
+  isLoadingPins.value = true
+  try {
+    const compId = compIdRef.value
+    const pinsFromBackend = await authApi.listPins(compId, arenaId)
+
+    const maxJudge = judgeFormat.value === '3' ? 3 : 5
+    const seats: DeviceSeat[] = []
+
+    // 1. Kursi Juri (1 s/d 3 atau 1 s/d 5)
+    for (let s = 1; s <= maxJudge; s++) {
+      const found = pinsFromBackend.find(
+        (p: any) => (p.role === 'judge' || p.role === 'juri') && Number(p.seat_number) === s
+      )
+      const pinStr = found?.pin ? formatPin(found.pin) : '--- ---'
+      seats.push({
+        id: found?.id || `${arenaId}-j${s}`,
+        seatNumber: s,
+        role: 'judge',
+        label: `KURSI JURI ${s}`,
+        deviceModel: s <= 3 ? 'SAMSUNG GALAXY TAB A9 • ANDROID PWA' : 'LENOVO TAB M10 • ANDROID PWA',
+        pin: pinStr,
+        status: s <= 3 ? 'online' : 'idle',
+        latencyMs: 12 + s * 3,
+        batteryPct: 96 - s * 4,
+        expiresAt: formatExpiry(found?.expires_at),
+      })
+    }
+
+    // 2. Meja Pengawas & Wasit
+    const foundWasit = pinsFromBackend.find((p: any) => p.role === 'wasit')
+    const wasitPinStr = foundWasit?.pin ? formatPin(foundWasit.pin) : '--- ---'
+    seats.push({
+      id: foundWasit?.id || `${arenaId}-wasit`,
       seatNumber: 0,
       role: 'wasit',
       label: 'MEJA PENGAWAS & WASIT',
       deviceModel: 'LAPTOP WASIT PERSILAT • WEBSOCKET OPERATOR',
-      pin: saved['wasit'] || '662 901',
+      pin: wasitPinStr,
       status: 'online',
       latencyMs: 8,
       batteryPct: 100,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: `${arenaId}-sb`,
-      seatNumber: 0,
-      role: 'scoreboard',
-      label: 'SCOREBOARD TV DISPLAY',
-      deviceModel: 'LED ARENA 65" • 4K ULTRA HD BROADCAST',
-      pin: 'AKSES PUBLIK',
-      status: 'online',
-      latencyMs: 4,
-      batteryPct: 100,
-      expiresAt: 'NON-EXPIRING (PUBLIC)',
-    },
-  ]
-}
+      expiresAt: formatExpiry(foundWasit?.expires_at),
+    })
 
-function persistArenaPins(arenaId: string) {
-  const seats = arenaData.value[arenaId]
-  if (!seats) return
-  const toSave: Record<string, string> = {}
-  seats.forEach(s => {
-    if (s.role === 'judge') toSave[String(s.seatNumber)] = s.pin
-    if (s.role === 'wasit') toSave['wasit'] = s.pin
-  })
-  try {
-    localStorage.setItem(`device_pins_${arenaId}`, JSON.stringify(toSave))
-  } catch {
-    // ignore
+    arenaData.value[arenaId] = seats
+    arenaDeviceCounts.value[arenaId] = seats.length
+  } catch (err: any) {
+    console.error('Gagal mengambil PIN gelanggang dari backend:', err)
+  } finally {
+    isLoadingPins.value = false
   }
 }
 
-// Ensure seats exist for selected arena
+watch(
+  selectedArena,
+  (newArena) => {
+    if (newArena) {
+      fetchPinsForArena(newArena)
+    }
+  },
+  { immediate: true }
+)
+
 const currentSeats = computed(() => {
   const aid = selectedArena.value
   if (!aid) return []
-  if (!arenaData.value[aid]) {
-    arenaData.value[aid] = getInitialSeatsForArena(aid)
-  }
-  return arenaData.value[aid]
+  return arenaData.value[aid] || []
 })
 
 function getSeatCount(arenaId: string): number {
-  const seats = arenaData.value[arenaId] || getInitialSeatsForArena(arenaId)
-  return seats.length
+  if (arenaDeviceCounts.value[arenaId] !== undefined) {
+    return arenaDeviceCounts.value[arenaId]
+  }
+  const seats = arenaData.value[arenaId]
+  if (seats && seats.length > 0) {
+    return seats.length
+  }
+  return judgeFormat.value === '3' ? 4 : 6
 }
 
 // Toast Notification
@@ -214,61 +251,93 @@ function copyPin(pin: string, label: string) {
   showToast('PIN Disalin!', `PIN ${label} (${pin}) berhasil disalin ke clipboard.`, 'success')
 }
 
+// Helper to safely obtain valid arena ID
+function getValidArenaId(): string | null {
+  if (selectedArena.value && displayArenas.value.some(a => a.id === selectedArena.value)) {
+    return selectedArena.value
+  }
+  if (displayArenas.value.length > 0) {
+    selectedArena.value = displayArenas.value[0].id
+    return selectedArena.value
+  }
+  return null
+}
+
 // Reset / Generate Single PIN
 async function generatePinForSeat(seat: DeviceSeat) {
-  let randomPin = String(Math.floor(100000 + Math.random() * 900000))
+  const aid = getValidArenaId()
+  if (!aid) {
+    await refetchArenas()
+    showToast('Gagal Reset PIN', 'Tidak ada data gelanggang aktif yang valid.', 'warning')
+    return
+  }
 
   try {
     const compId = compIdRef.value
     const roleForBackend = seat.role === 'wasit' ? 'wasit' : 'juri'
     const res = await authApi.createPin({
       competition_id: compId,
-      arena_id: selectedArena.value,
+      arena_id: aid,
       role: roleForBackend,
       seat_number: seat.seatNumber,
-      pin: randomPin,
+      pin: '',
       ttl_hours: 12,
     })
-    if (res?.pin) {
-      randomPin = res.pin
-    }
+    await fetchPinsForArena(aid)
+    await loadAllArenasDeviceCounts()
+    const formattedPin = res?.pin ? formatPin(res.pin) : seat.pin
+    showToast('PIN Diperbarui', `PIN baru untuk ${seat.label}: ${formattedPin}`, 'success')
   } catch (err: any) {
-    // Fallback locally
+    if (err?.status === 404 || err?.message?.includes('tidak ditemukan')) {
+      await refetchArenas()
+    }
+    showToast('Gagal Reset PIN', err.message || 'Terjadi kesalahan sistem.', 'warning')
   }
-
-  const formattedPin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
-  seat.pin = formattedPin
-  persistArenaPins(selectedArena.value)
-  showToast('PIN Diperbarui', `PIN baru untuk ${seat.label}: ${formattedPin}`, 'success')
 }
 
 // Batch Generate All Judges PIN for Arena
 async function handleBatchGenerate() {
-  const judges = currentSeats.value.filter(s => s.role === 'judge')
-  for (const j of judges) {
-    let randomPin = String(Math.floor(100000 + Math.random() * 900000))
+  const aid = getValidArenaId()
+  if (!aid) {
+    await refetchArenas()
+    showToast('Gagal Generate Semua PIN', 'Tidak ada data gelanggang aktif yang valid.', 'warning')
+    return
+  }
 
-    try {
-      const compId = compIdRef.value
-      const res = await authApi.createPin({
+  try {
+    const compId = compIdRef.value
+    const maxJudge = judgeFormat.value === '3' ? 3 : 5
+    for (let s = 1; s <= maxJudge; s++) {
+      await authApi.createPin({
         competition_id: compId,
-        arena_id: selectedArena.value,
+        arena_id: aid,
         role: 'juri',
-        seat_number: j.seatNumber,
-        pin: randomPin,
+        seat_number: s,
+        pin: '',
         ttl_hours: 12,
       })
-      if (res?.pin) {
-        randomPin = res.pin
-      }
-    } catch {
-      // offline fallback
     }
-
-    j.pin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
+    await authApi.createPin({
+      competition_id: compId,
+      arena_id: aid,
+      role: 'wasit',
+      seat_number: 0,
+      pin: '',
+      ttl_hours: 12,
+    })
+    await fetchPinsForArena(aid)
+    await loadAllArenasDeviceCounts()
+    showToast(
+      'Batch Generate Selesai',
+      `Seluruh PIN ${maxJudge} Juri & Wasit di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang dan disimpan ke server.`,
+      'success'
+    )
+  } catch (err: any) {
+    if (err?.status === 404 || err?.message?.includes('tidak ditemukan')) {
+      await refetchArenas()
+    }
+    showToast('Gagal Generate Semua PIN', err.message || 'Terjadi kesalahan.', 'warning')
   }
-  persistArenaPins(selectedArena.value)
-  showToast('Batch Generate Selesai', `Seluruh PIN Juri di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang.`, 'success')
 }
 
 // Ping / Test Device Vibrations
@@ -290,40 +359,35 @@ const customPinInput = ref('')
 const customTtl = ref(12)
 
 async function handleSaveCustomPin() {
-  let pinValue = customPinInput.value || String(Math.floor(100000 + Math.random() * 900000))
+  const aid = getValidArenaId()
+  if (!aid) {
+    await refetchArenas()
+    showToast('Gagal Simpan PIN Kustom', 'Tidak ada data gelanggang aktif yang valid.', 'warning')
+    return
+  }
 
   try {
     const compId = compIdRef.value
     const res = await authApi.createPin({
       competition_id: compId,
-      arena_id: selectedArena.value,
+      arena_id: aid,
       role: customRole.value,
       seat_number: customRole.value === 'juri' ? customSeat.value : 0,
-      pin: pinValue,
+      pin: customPinInput.value || undefined,
       ttl_hours: customTtl.value,
     })
-    if (res?.pin) {
-      pinValue = res.pin
+    await fetchPinsForArena(aid)
+    await loadAllArenasDeviceCounts()
+    const formatted = res?.pin ? formatPin(res.pin) : (customPinInput.value ? formatPin(customPinInput.value) : '')
+    showToast('PIN Berhasil Dibuat', `PIN ${customRole.value.toUpperCase()} (${formatted}) tersimpan aman di server.`, 'success')
+    showCustomPinModal.value = false
+    customPinInput.value = ''
+  } catch (err: any) {
+    if (err?.status === 404 || err?.message?.includes('tidak ditemukan')) {
+      await refetchArenas()
     }
-  } catch {
-    // Fallback
+    showToast('Gagal Simpan PIN Kustom', err.message || 'Terjadi kesalahan.', 'warning')
   }
-
-  const formatted = `${pinValue.slice(0, 3)} ${pinValue.slice(3)}`
-  // Update in array if exists
-  const existing = currentSeats.value.find(s => {
-    if (customRole.value === 'juri') return s.role === 'judge' && s.seatNumber === customSeat.value
-    if (customRole.value === 'wasit') return s.role === 'wasit'
-    return false
-  })
-  if (existing) {
-    existing.pin = formatted
-  }
-
-  persistArenaPins(selectedArena.value)
-  showToast('PIN Berhasil Dibuat', `PIN ${customRole.value.toUpperCase()} (${formatted}) berhasil disimpan.`, 'success')
-  showCustomPinModal.value = false
-  customPinInput.value = ''
 }
 </script>
 
@@ -349,7 +413,7 @@ async function handleSaveCustomPin() {
       </div>
 
       <div class="pin-mgr-actions font-mono">
-        <AppButton variant="emerald" size="sm" @click="handleBatchGenerate">
+        <AppButton variant="emerald" size="sm" :disabled="displayArenas.length === 0 || isLoadingPins" @click="handleBatchGenerate">
           <template #icon>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
@@ -358,14 +422,14 @@ async function handleSaveCustomPin() {
           Generate Ulang Semua PIN
         </AppButton>
 
-        <button class="pin-action-btn font-mono" @click="showCustomPinModal = true">
+        <button class="pin-action-btn font-mono" :disabled="displayArenas.length === 0" @click="showCustomPinModal = true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14" />
           </svg>
           <span>Buat PIN Kustom</span>
         </button>
 
-        <button class="pin-action-btn font-mono" @click="showPrintModal = true">
+        <button class="pin-action-btn font-mono" :disabled="displayArenas.length === 0" @click="showPrintModal = true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 6 2 18 2 18 9" />
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
@@ -376,19 +440,44 @@ async function handleSaveCustomPin() {
       </div>
     </div>
 
-    <!-- ARENA SELECTOR TABS -->
+    <!-- ARENA SELECTOR TABS & FORMAT TOGGLE -->
     <div class="arena-tabs-row font-mono">
-      <button
-        v-for="arena in displayArenas"
-        :key="arena.id"
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === arena.id }"
-        @click="selectedArena = arena.id"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === arena.id }" />
-        {{ arena.name.toUpperCase() }}
-        <span class="arena-count-badge">{{ getSeatCount(arena.id) }} ALAT</span>
-      </button>
+      <div class="arena-tabs-list">
+        <div v-if="displayArenas.length === 0" class="text-xs text-neutral-400 py-2 italic">
+          Memuat gelanggang...
+        </div>
+        <button
+          v-for="arena in displayArenas"
+          :key="arena.id"
+          class="arena-tab-btn"
+          :class="{ 'arena-tab-btn--active': selectedArena === arena.id }"
+          @click="selectedArena = arena.id"
+        >
+          <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === arena.id }" />
+          {{ arena.name.toUpperCase() }}
+          <span class="arena-count-badge">{{ getSeatCount(arena.id) }} ALAT</span>
+        </button>
+      </div>
+
+      <div class="arena-format-toggle font-mono">
+        <span class="format-label">FORMAT JURI:</span>
+        <button
+          class="format-btn"
+          :class="{ 'format-btn--active': judgeFormat === '5' }"
+          title="Format PB IPSI Standar (5 Juri + 1 Wasit)"
+          @click="judgeFormat = '5'"
+        >
+          5 JURI
+        </button>
+        <button
+          class="format-btn"
+          :class="{ 'format-btn--active': judgeFormat === '3' }"
+          title="Format Ringkas Daerah (3 Juri + 1 Wasit)"
+          @click="judgeFormat = '3'"
+        >
+          3 JURI
+        </button>
+      </div>
     </div>
 
     <!-- DEVICE & SEAT PIN CARDS GRID -->
@@ -398,8 +487,7 @@ async function handleSaveCustomPin() {
         :key="seat.id"
         class="pin-device-card"
         :class="{
-          'pin-device-card--referee': seat.role === 'wasit',
-          'pin-device-card--scoreboard': seat.role === 'scoreboard'
+          'pin-device-card--referee': seat.role === 'wasit'
         }"
       >
         <!-- Card Header -->
@@ -439,7 +527,6 @@ async function handleSaveCustomPin() {
               {{ seat.pin }}
             </div>
             <button
-              v-if="seat.pin !== 'AKSES PUBLIK'"
               class="pin-copy-btn"
               title="Salin PIN"
               @click="copyPin(seat.pin, seat.label)"
@@ -458,7 +545,6 @@ async function handleSaveCustomPin() {
         <!-- Card Actions Footer -->
         <div class="pin-card-footer font-mono">
           <button
-            v-if="seat.role !== 'scoreboard'"
             class="card-action-btn"
             title="Generate PIN Baru"
             @click="generatePinForSeat(seat)"
@@ -502,16 +588,46 @@ async function handleSaveCustomPin() {
           >
             Buka Konsol Wasit →
           </router-link>
-
-          <router-link
-            v-if="seat.role === 'scoreboard'"
-            :to="`/scoreboard/${selectedArena}`"
-            target="_blank"
-            class="card-action-link"
-          >
-            Buka Layar TV →
-          </router-link>
         </div>
+      </div>
+    </div>
+
+    <!-- SCOREBOARD TV DISPLAY (LAYAR PUBLIK TANPA PIN) -->
+    <div class="scoreboard-public-card font-mono">
+      <div class="scoreboard-public-info">
+        <div class="scoreboard-public-badge">
+          <div class="scoreboard-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2">
+              <rect width="20" height="15" x="2" y="3" rx="2" />
+              <line x1="8" x2="16" y1="21" y2="21" />
+              <line x1="12" x2="12" y1="18" y2="21" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="seat-status-dot seat-status-dot--online" />
+              <span class="font-bold text-white text-sm">SCOREBOARD TV DISPLAY • {{ activeArenaObj.name.toUpperCase() }}</span>
+              <span class="latency-tag">AKSES PUBLIK (BEBAS PIN)</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-1">
+              LED Arena 65" • 4K Ultra HD Broadcast. Menampilkan skor langsung, sisa waktu, dan sanksi secara real-time untuk penonton & official venue tanpa otorisasi PIN.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="scoreboard-public-actions">
+        <router-link
+          :to="`/scoreboard/${selectedArena}`"
+          target="_blank"
+          class="scoreboard-open-btn font-mono"
+        >
+          <span>Buka Layar Scoreboard TV</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" x2="21" y1="14" y2="3" />
+          </svg>
+        </router-link>
       </div>
     </div>
 
@@ -717,9 +833,59 @@ async function handleSaveCustomPin() {
 .arena-tabs-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.arena-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.arena-format-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #0E1626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.format-label {
+  font-size: 0.6875rem;
+  color: #64748B;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-right: 4px;
+}
+
+.format-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.format-btn:hover {
+  color: #FFFFFF;
+  background-color: #162032;
+}
+
+.format-btn--active {
+  background-color: #10B981;
+  color: #0B192A;
+  font-weight: 800;
 }
 
 .arena-tab-btn {
@@ -766,6 +932,63 @@ async function handleSaveCustomPin() {
   background-color: rgba(255, 255, 255, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* Scoreboard Public Display Card */
+.scoreboard-public-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(180deg, #0B192A 0%, #0E1626 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  padding: 14px 20px;
+  margin-top: 4px;
+}
+
+.scoreboard-public-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scoreboard-public-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scoreboard-icon-box {
+  width: 40px;
+  height: 40px;
+  background-color: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scoreboard-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #0284C7;
+  color: #FFFFFF;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.scoreboard-open-btn:hover {
+  background-color: #0369A1;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
 }
 
 /* PIN Cards Grid */

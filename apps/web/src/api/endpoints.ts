@@ -12,6 +12,7 @@ export const ENDPOINTS = {
     CONTINGENT_LOGIN: '/api/v1/auth/contingent/login',
     LOGOUT: '/api/v1/auth/logout',
     CREATE_PIN: '/api/v1/auth/create-pin',
+    PINS: '/api/v1/auth/pins',
   },
 
   // Competitions

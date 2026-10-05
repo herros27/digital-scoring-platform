@@ -136,6 +136,21 @@
     - Dedicated `tests/` folder exclusively for end-to-end tournament scenario integration tests (`contingent_test.go`, `match_service_test.go`, `official_and_report_test.go`, `ruleset_crud_test.go`, `admin_features_test.go`, `p1_features_test.go`, `p2_features_test.go`).
 32. **Public Health Check Endpoint (`GET /api/v1/health`)** –
     - Mounted `GET /api/v1/health` in `internal/api/router.go` checking database ping and reporting service status.
+33. **Sinkronisasi Multi-Device & Penyimpanan Persisten PIN Gelanggang (`GET /api/v1/auth/pins` & Migrasi 017)** –
+    - Menambahkan migrasi database [`migrations/017_judge_pins_raw_pin.sql`](file:///d:/Freelance/DigitalScoring/migrations/017_judge_pins_raw_pin.sql) untuk kolom `raw_pin VARCHAR(20)` pada tabel `judge_pins`.
+    - Mengimplementasikan arsitektur penyimpanan ganda: `pin_hash` (bcrypt) untuk verifikasi login tablet juri/wasit (`POST /api/v1/auth/judge-login`), dan `raw_pin` untuk inspeksi authorized admin serta sinkronisasi multi-device panitia.
+    - Menambahkan endpoint `GET /api/v1/auth/pins?competition_id={compId}&arena_id={arenaId}` di [`internal/api/handler/auth.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/auth.go) yang dilindungi RBAC (`admin`, `dewan`).
+    - Mekanisme server-side auto-provisioning: jika kursi gelanggang (Juri 1–5 atau Wasit) belum memiliki PIN aktif atau sudah kadaluarsa, backend otomatis mem-generate PIN numerik kriptografis 6-digit baru (TTL 12 jam) dan menyimpannya secara persisten ke database PostgreSQL.
+    - Pembersihan duplikasi (stale cleanup): `POST /api/v1/auth/create-pin` secara otomatis menghapus rekaman PIN lama pada kursi/role yang sama sebelum menyimpan PIN baru.
+    - Integrasi frontend: [`apps/web/src/views/admin/DevicePinManager.vue`](file:///d:/Freelance/DigitalScoring/apps/web/src/views/admin/DevicePinManager.vue) beralih sepenuhnya ke sinkronisasi database server via `listPins`, mengeliminasi dependensi lokal `localStorage` dan string PIN hardcoded/palsu.
+    - Dokumentasi OpenAPI diperbarui di [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml) dan kredensial di [`docs/CREDENTIALS.md`](file:///d:/Freelance/DigitalScoring/docs/CREDENTIALS.md).
+34. **Validasi Keunikan Nama Gelanggang & Safe Deletion (`ArenaService` & `ArenaStore`)** –
+    - Menambahkan validasi `strings.EqualFold` pada [`ArenaService.CreateArena`](file:///d:/Freelance/DigitalScoring/internal/service/arena_service.go) dan `UpdateArena` untuk mencegah duplikasi nama gelanggang kembar dalam kompetisi yang sama.
+    - Menambahkan mekanisme safe deletion pada [`ArenaStore.Delete`](file:///d:/Freelance/DigitalScoring/internal/store/arena.go) untuk membersihkan relasi foreign key (`judge_pins` dan `matches.arena_id = NULL`) secara aman sebelum baris arena dihapus.
+35. **Validasi Eksistensi Gelanggang pada Pembuatan PIN & Defensive Guard Frontend** –
+    - Backend: Menambahkan `ErrArenaNotFound` pada [`internal/auth/pin.go`](file:///d:/Freelance/DigitalScoring/internal/auth/pin.go) yang memverifikasi eksistensi gelanggang di database sebelum melakukan insert ke tabel `judge_pins`. Di handler [`internal/api/handler/auth.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/auth.go), mengembalikan status HTTP 404 (`NOT_FOUND`) dengan pesan ramah jika ID gelanggang tidak valid atau sudah dihapus.
+    - Frontend: Memperbaiki [`apps/web/src/views/admin/DevicePinManager.vue`](file:///d:/Freelance/DigitalScoring/apps/web/src/views/admin/DevicePinManager.vue) dengan menghapus fallback ID statis palsu, menambahkan hook `onMounted` dan sinkronisasi otomatis `refetchArenas()`, serta menyematkan `getValidArenaId()` guard sebelum proses generate PIN agar tidak pernah mengirimkan ID gelanggang basi (*stale*) ke server.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

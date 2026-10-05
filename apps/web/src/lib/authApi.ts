@@ -45,7 +45,13 @@ export const authApi = {
     authService.createPin(payload),
 
   /**
-   * 6. POST /api/v1/auth/logout
+   * 6. GET /api/v1/auth/pins
+   */
+  listPins: (competitionId: string, arenaId: string): Promise<any[]> =>
+    authService.listPins(competitionId, arenaId),
+
+  /**
+   * 7. POST /api/v1/auth/logout
    */
   logout: (): Promise<void> => authService.logout(),
 }

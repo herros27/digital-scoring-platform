@@ -331,6 +331,15 @@ func (m *mockBracketRepo) UpdateWinner(slotID, winnerID string) error {
 	return nil
 }
 
+func (m *mockBracketRepo) DeleteByCompetitionCategory(competitionID, weightClass, gender string) error {
+	for k, s := range m.slots {
+		if s.CompetitionID == competitionID && s.WeightClass == weightClass && s.Gender == gender {
+			delete(m.slots, k)
+		}
+	}
+	return nil
+}
+
 func (m *mockBracketRepo) SetParticipant(slotID, participantID string) error {
 	if s, ok := m.slots[slotID]; ok {
 		s.ParticipantID = &participantID

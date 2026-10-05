@@ -136,6 +136,68 @@ curl -X POST http://localhost:8080/api/v1/auth/judge-login \
 }
 ```
 
+
+### 3.1 Manajemen & Sinkronisasi PIN Gelanggang (Admin / Dewan)
+
+Untuk memastikan operator di berbagai laptop atau perangkat selalu melihat PIN yang persisten dan sinkron dengan database (tanpa bergantung pada `localStorage` browser), backend menyediakan endpoint pengambilan dan pembuatan PIN:
+
+#### A. Mengambil Daftar PIN Aktif (`GET /api/v1/auth/pins`)
+Mengambil seluruh PIN aktif untuk gelanggang tertentu. Jika ada kursi (Juri 1–5 atau Wasit) yang belum memiliki PIN aktif atau sudah kadaluarsa, backend secara otomatis mem-provision PIN 6-digit baru dengan masa berlaku 12 jam.
+
+- **Header**: `Authorization: Bearer <ADMIN_OR_DEWAN_TOKEN>`
+- **Query Params**: `competition_id={UUID}&arena_id={UUID}`
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/auth/pins?competition_id=b26d7145-d341-4795-ac58-bff86d13cbf8&arena_id=c7397556-eb39-406f-aa89-6b3053a2fd08" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Format Response:**
+```json
+{
+  "code": "OK",
+  "data": [
+    {
+      "id": "5125fa0a-99ab-4139-bf88-2ca2a7b213b3",
+      "competition_id": "b26d7145-d341-4795-ac58-bff86d13cbf8",
+      "arena_id": "c7397556-eb39-406f-aa89-6b3053a2fd08",
+      "role": "referee",
+      "seat_number": 0,
+      "pin": "111111",
+      "expires_at": "2026-10-06T06:40:00Z",
+      "created_at": "2026-10-05T18:40:00Z"
+    },
+    {
+      "id": "b7134886-f63b-4831-aa9a-0e9f45e2275d",
+      "competition_id": "b26d7145-d341-4795-ac58-bff86d13cbf8",
+      "arena_id": "c7397556-eb39-406f-aa89-6b3053a2fd08",
+      "role": "judge",
+      "seat_number": 1,
+      "pin": "123001",
+      "expires_at": "2026-10-06T06:40:00Z",
+      "created_at": "2026-10-05T18:40:00Z"
+    }
+  ]
+}
+```
+
+#### B. Generate / Regenerate Custom PIN (`POST /api/v1/auth/create-pin`)
+Digunakan oleh Admin / Dewan untuk merotasi PIN secara manual atau menentukan PIN custom untuk kursi tertentu. Sistem secara otomatis menghapus PIN aktif sebelumnya pada kursi & gelanggang yang sama guna mencegah duplikasi.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/create-pin \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "competition_id": "b26d7145-d341-4795-ac58-bff86d13cbf8",
+    "arena_id": "c7397556-eb39-406f-aa89-6b3053a2fd08",
+    "role": "judge",
+    "seat_number": 1,
+    "pin": "654321",
+    "ttl_hours": 12
+  }'
+```
+
 ---
 
 ## 4. Logout Sesi (`POST /api/v1/auth/logout`)

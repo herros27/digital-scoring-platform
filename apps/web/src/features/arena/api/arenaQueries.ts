@@ -20,15 +20,17 @@ export function useArenasQuery(compId: Ref<string>) {
   })
 }
 
-/**
- * Create Arena mutation
- */
-export function useCreateArenaMutation(compId: Ref<string>) {
+export function useCreateArenaMutation(defaultCompId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (name: string) => arenaService.createArena(compId.value, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: arenaKeys.list(compId.value) })
+    mutationFn: (payload: string | { name: string; compId?: string }) => {
+      const name = typeof payload === 'string' ? payload : payload.name
+      const target = typeof payload === 'object' && payload.compId ? payload.compId : defaultCompId.value
+      return arenaService.createArena(target, name)
+    },
+    onSuccess: (_data, payload) => {
+      const target = typeof payload === 'object' && payload.compId ? payload.compId : defaultCompId.value
+      queryClient.invalidateQueries({ queryKey: arenaKeys.list(target) })
     },
   })
 }

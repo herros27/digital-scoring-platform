@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -75,6 +77,10 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 	ttl := time.Duration(req.TTLHours) * time.Hour
 	record, err := h.Pins.CreatePINWithSeat(req.CompetitionID, req.ArenaID, req.Role, req.SeatNumber, pin, ttl)
 	if err != nil {
+		if errors.Is(err, auth.ErrArenaNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
@@ -94,6 +100,84 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 	Ok(w, res)
 }
 
+// GET /api/v1/auth/pins (admin only)
+// Query: ?competition_id=...&arena_id=...
+func (h *AuthHandler) ListPINs(w http.ResponseWriter, r *http.Request) {
+	compID := r.URL.Query().Get("competition_id")
+	arenaID := r.URL.Query().Get("arena_id")
+	if compID == "" || arenaID == "" {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "competition_id and arena_id query parameters are required", nil)
+		return
+	}
+
+	records, err := h.Pins.GetByCompAndArena(compID, arenaID)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+
+	seatMap := make(map[string]auth.PinRecord)
+	for _, rec := range records {
+		key := fmt.Sprintf("%s-%d", rec.Role, rec.SeatNumber)
+		seatMap[key] = rec
+	}
+
+	requiredSeats := []struct {
+		Role string
+		Seat int
+	}{
+		{"judge", 1},
+		{"judge", 2},
+		{"judge", 3},
+		{"judge", 4},
+		{"judge", 5},
+		{"wasit", 0},
+	}
+
+	for _, req := range requiredSeats {
+		key := fmt.Sprintf("%s-%d", req.Role, req.Seat)
+		rec, exists := seatMap[key]
+		if !exists || rec.RawPIN == "" {
+			newPin, err := auth.GenerateRandomPIN()
+			if err == nil {
+				created, err := h.Pins.CreatePINWithSeat(compID, arenaID, req.Role, req.Seat, newPin, 12*time.Hour)
+				if err == nil && created != nil {
+					seatMap[key] = *created
+				}
+			}
+		}
+	}
+
+	type PinItem struct {
+		ID            string    `json:"id"`
+		CompetitionID string    `json:"competition_id"`
+		ArenaID       string    `json:"arena_id"`
+		Role          string    `json:"role"`
+		SeatNumber    int       `json:"seat_number"`
+		PIN           string    `json:"pin"`
+		ExpiresAt     time.Time `json:"expires_at"`
+	}
+
+	items := make([]PinItem, 0, len(seatMap))
+	// Urutkan sesuai kursi Juri 1-5 lalu Wasit
+	for _, req := range requiredSeats {
+		key := fmt.Sprintf("%s-%d", req.Role, req.Seat)
+		if r, ok := seatMap[key]; ok {
+			items = append(items, PinItem{
+				ID:            r.ID,
+				CompetitionID: r.CompetitionID,
+				ArenaID:       r.ArenaID,
+				Role:          r.Role,
+				SeatNumber:    r.SeatNumber,
+				PIN:           r.RawPIN,
+				ExpiresAt:     r.ExpiresAt,
+			})
+		}
+	}
+
+	Ok(w, items)
+}
+
 // POST /api/v1/auth/logout
 // ponytail: stateless JWT logout. Token destruction is client-side (clearing localStorage/Pinia).
 // Upgrade path: Redis/in-memory token blacklist (JTI revocation) if immediate invalidation is required.
@@ -102,3 +186,4 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		"message": "successfully logged out",
 	})
 }
+
