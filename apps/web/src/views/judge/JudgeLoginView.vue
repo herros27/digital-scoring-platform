@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppInput } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
-import { authApi } from '@/lib/authApi'
+import { authService } from '@/features/auth/api/authService'
 import { useHaptics } from '@/composables/useHaptics'
 
 const router = useRouter()
@@ -50,7 +50,7 @@ async function handleLogin() {
   errorMessage.value = ''
 
   try {
-    const res = await authApi.judgeLogin({
+    const res = await authService.judgeLogin({
       competition_id: competitionId.value.trim(),
       arena_id: arenaId.value,
       pin: pin.value.trim(),

@@ -115,7 +115,7 @@ const timer = useTimer()
 const haptics = useHaptics()
 
 // WebSocket
-const token = sessionStorage.getItem('token') || undefined
+const token = authStore.token || undefined
 const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value, token)
 
 // Control Actions

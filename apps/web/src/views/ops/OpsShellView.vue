@@ -3,9 +3,9 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AppButton, AppBadge } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
-import { authApi } from '@/lib/authApi'
+import { authService } from '@/features/auth/api/authService'
 import DevicePinManager from '@/views/admin/DevicePinManager.vue'
-import CompetitionsView from '@/views/admin/CompetitionsView.vue'
+import CompetitionsView from '@/features/competitions/views/CompetitionsView.vue'
 import ArenaOpsView from '@/features/arena/views/ArenaOpsView.vue'
 import CategoryOpsView from '@/features/categories/views/CategoryOpsView.vue'
 import AthletesOpsView from '@/features/athletes/views/AthletesOpsView.vue'
@@ -245,7 +245,7 @@ async function handleAdminLogin() {
   adminLoginLoading.value = true
   adminLoginError.value = ''
   try {
-    const res = await authApi.login({
+    const res = await authService.officialLogin({
       email: adminEmail.value,
       password: adminPassword.value,
     })

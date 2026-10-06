@@ -6,7 +6,7 @@ import { useTimer } from '@/composables/useTimer'
 import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
-import { authApi } from '@/lib/authApi'
+import { authService } from '@/features/auth/api/authService'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,7 +72,7 @@ const haptics = useHaptics()
 const timer = useTimer()
 
 // Real-Time WebSocket
-const currentToken = computed(() => authStore.token || (sessionStorage.getItem('token') as string) || undefined)
+const currentToken = computed(() => authStore.token || undefined)
 const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value, currentToken.value)
 
 // Active button tap animation state
@@ -103,7 +103,7 @@ async function handlePinSubmit() {
   pinLoading.value = true
   pinError.value = ''
   try {
-    const res = await authApi.judgeLogin({
+    const res = await authService.judgeLogin({
       competition_id: compId.value,
       arena_id: arenaId.value,
       pin: pinInput.value,

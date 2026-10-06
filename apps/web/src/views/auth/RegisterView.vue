@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppInput } from '@/components/ui'
-import { authApi } from '@/lib/authApi'
+import { authService } from '@/features/auth/api/authService'
 
 const router = useRouter()
 
@@ -41,7 +41,7 @@ async function handleRegister() {
   isLoading.value = true
 
   try {
-    const res = await authApi.contingentRegister({
+    const res = await authService.contingentRegister({
       name: form.value.name.trim(),
       pic_name: form.value.pic_name.trim(),
       email: form.value.email.trim(),

@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
-import { authApi } from '@/lib/authApi'
+import { authService } from '@/features/auth/api/authService'
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 
 interface Props {
@@ -63,7 +63,7 @@ async function loadAllArenasDeviceCounts() {
   await Promise.allSettled(
     displayArenas.value.map(async (arena) => {
       try {
-        const pins = await authApi.listPins(compId, arena.id)
+        const pins = await authService.listPins(compId, arena.id)
         const maxJudge = judgeFormat.value === '3' ? 3 : 5
         const validPins = (pins || []).filter((p: any) => {
           if (p.role === 'wasit') return true
@@ -155,7 +155,7 @@ async function fetchPinsForArena(arenaId: string) {
   isLoadingPins.value = true
   try {
     const compId = compIdRef.value
-    const pinsFromBackend = await authApi.listPins(compId, arenaId)
+    const pinsFromBackend = await authService.listPins(compId, arenaId)
 
     const maxJudge = judgeFormat.value === '3' ? 3 : 5
     const seats: DeviceSeat[] = []
@@ -275,7 +275,7 @@ async function generatePinForSeat(seat: DeviceSeat) {
   try {
     const compId = compIdRef.value
     const roleForBackend = seat.role === 'wasit' ? 'wasit' : 'juri'
-    const res = await authApi.createPin({
+    const res = await authService.createPin({
       competition_id: compId,
       arena_id: aid,
       role: roleForBackend,
@@ -308,7 +308,7 @@ async function handleBatchGenerate() {
     const compId = compIdRef.value
     const maxJudge = judgeFormat.value === '3' ? 3 : 5
     for (let s = 1; s <= maxJudge; s++) {
-      await authApi.createPin({
+      await authService.createPin({
         competition_id: compId,
         arena_id: aid,
         role: 'juri',
@@ -317,7 +317,7 @@ async function handleBatchGenerate() {
         ttl_hours: 12,
       })
     }
-    await authApi.createPin({
+    await authService.createPin({
       competition_id: compId,
       arena_id: aid,
       role: 'wasit',
@@ -368,7 +368,7 @@ async function handleSaveCustomPin() {
 
   try {
     const compId = compIdRef.value
-    const res = await authApi.createPin({
+    const res = await authService.createPin({
       competition_id: compId,
       arena_id: aid,
       role: customRole.value,

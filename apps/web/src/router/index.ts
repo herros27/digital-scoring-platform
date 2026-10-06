@@ -28,13 +28,13 @@ const routes: RouteRecordRaw[] = [
     path: '/referee',
     name: 'referee',
     component: () => import('../views/referee/RefereeConsoleView.vue'),
-    meta: { requiresAuth: true, allowedRoles: ['wasit', 'admin', 'dewan'] },
+    meta: { requiresAuth: true, allowedRoles: ['wasit', 'referee', 'admin', 'dewan'] },
   },
   {
     path: '/ops',
     name: 'operations panel',
     component: () => import('../views/ops/OpsShellView.vue'),
-    meta: { requiresAuth: false },
+    meta: { requiresAuth: true, allowedRoles: ['admin', 'dewan', 'operator', 'contingent'] },
   },
   {
     path: '/login',
@@ -71,7 +71,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/competitions',
     name: 'admin-competitions',
-    component: () => import('../views/admin/CompetitionsView.vue'),
+    component: () => import('../features/competitions/views/CompetitionsView.vue'),
     meta: { requiresAuth: true, allowedRoles: ['admin', 'dewan'], layout: 'AdminLayout' },
   },
   {
@@ -85,16 +85,47 @@ const router = createRouter({
   routes,
 })
 
+// Halaman tujuan default per role ketika akses ke rute ditolak
+function homeForRole(role: string): string {
+  switch (role) {
+    case 'judge':
+      return '/judge'
+    case 'wasit':
+    case 'referee':
+      return '/referee'
+    case 'admin':
+    case 'dewan':
+    case 'operator':
+    case 'contingent':
+      return '/ops'
+    default:
+      return '/login'
+  }
+}
+
 // RBAC & Auth Navigation Guard
-router.beforeEach((to, _from, next) => {
+router.beforeEach((to) => {
   const token = sessionStorage.getItem('ds_token')
   const requiresAuth = to.meta.requiresAuth === true
 
   if (requiresAuth && !token) {
-    return next({ path: '/login', query: { redirect: to.fullPath } })
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
-  next()
+  const allowedRoles = to.meta.allowedRoles as string[] | undefined
+  if (requiresAuth && allowedRoles?.length) {
+    let role = ''
+    try {
+      role = JSON.parse(sessionStorage.getItem('ds_auth_session') || 'null')?.role || ''
+    } catch {
+      // sesi rusak: perlakukan sebagai tidak punya role
+    }
+    if (!allowedRoles.includes(role)) {
+      const fallback = homeForRole(role)
+      // Hindari redirect loop bila halaman fallback juga tidak diizinkan
+      return fallback === to.path ? '/login' : fallback
+    }
+  }
 })
 
 export default router

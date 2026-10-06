@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { AppButton, AppInput } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
-import { authApi } from "@/lib/authApi";
+import { authService } from '@/features/auth/api/authService'
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -27,7 +27,7 @@ async function handleLogin() {
   try {
     // 1. Coba login sebagai Petugas Pertandingan (Admin, Dewan, Operator, Wasit)
     try {
-      const res = await authApi.login({
+      const res = await authService.officialLogin({
         email: email.value.trim(),
         password: password.value,
       });
@@ -54,7 +54,7 @@ async function handleLogin() {
     }
 
     // 2. Coba login sebagai Akun Manajer Kontingen
-    const contRes = await authApi.contingentLogin({
+    const contRes = await authService.contingentLogin({
       email: email.value.trim(),
       password: password.value,
     });
