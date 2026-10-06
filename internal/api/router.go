@@ -165,6 +165,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/pause", matchOperators(http.HandlerFunc(matchH.Pause)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/resume", matchOperators(http.HandlerFunc(matchH.Resume)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/finish", matchOperators(http.HandlerFunc(matchH.Finish)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/outcome", matchOperators(http.HandlerFunc(matchH.Outcome)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/cancel", matchOperators(http.HandlerFunc(matchH.Cancel)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule", matchOperators(http.HandlerFunc(matchH.Reschedule)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.GetScores)

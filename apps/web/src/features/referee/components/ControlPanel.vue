@@ -6,7 +6,7 @@ import type { WsTarget } from '@/composables/useWebSocket'
 import type { RefereeConsole } from '../composables/useRefereeConsole'
 import { formatClock, TARGET_LABEL } from '../lib/matchLog'
 import { penaltiesOf, penaltySummary, penaltyTotal } from '../lib/penalties'
-import { finishRequest, type default as ConfirmRequest } from './confirmRequest'
+import { finishRequest, outcomeRequest, type default as ConfirmRequest } from './confirmRequest'
 
 const props = defineProps<{ c: RefereeConsole }>()
 const emit = defineEmits<{
@@ -313,6 +313,26 @@ function askCancel() {
               <span class="ref-cmd-label">SELESAIKAN</span>
               <span class="ref-cmd-shortcut font-mono">SHORTCUT [ESC]</span>
             </div>
+          </button>
+        </div>
+
+        <div class="ref-outcome-strip">
+          <span class="ref-outcome-title font-mono">HASIL KHUSUS</span>
+          <button
+            v-for="o in c.outcomeCatalog"
+            :key="o.type"
+            class="ref-sec-btn"
+            :disabled="!c.canDeclare(o) || c.busy"
+            :title="
+              o.phase === 'before_start'
+                ? 'Hanya sebelum pertandingan dimulai'
+                : o.phase === 'in_match'
+                  ? 'Hanya setelah pertandingan dimulai'
+                  : ''
+            "
+            @click="emit('confirm', outcomeRequest(c, o))"
+          >
+            <span>{{ o.label.toUpperCase() }}</span>
           </button>
         </div>
 

@@ -25,6 +25,7 @@ func presetScoring() ScoringRule {
 			{Type: "catch_fall", Label: "Tangkapan + Jatuhan", Points: 4},
 		},
 		Penalties: DefaultPenalties(),
+		Outcomes:  DefaultOutcomes(),
 		Consensus: &ConsensusRule{Judges: 3, Majority: 2, WindowMs: 3000},
 		Tiebreak: &TiebreakRule{
 			Steps:             []string{StepFewestPenalties, StepTechniquePriority},

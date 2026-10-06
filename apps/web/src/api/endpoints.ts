@@ -75,6 +75,7 @@ export const ENDPOINTS = {
     RESUME: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/resume`,
     FINISH: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/finish`,
     CANCEL: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/cancel`,
+    OUTCOME: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/outcome`,
     RESCHEDULE: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/reschedule`,
     SCORES: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/scores`,
     SUBMIT_SCORE: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/scores`,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RefereeConsole } from '../composables/useRefereeConsole'
-import { finishRequest, isConfirmRequest, manualTieRequest } from './confirmRequest'
+import { finishRequest, isConfirmRequest, manualTieRequest, outcomeRequest } from './confirmRequest'
 
 function fakeConsole(over: Partial<Record<string, unknown>> = {}) {
   const c = {
@@ -54,5 +54,22 @@ describe('manualTieRequest', () => {
     expect(r.choices?.map((x) => x.value)).toEqual(['red', 'blue'])
     r.action('blue', 'coin_toss')
     expect(c.finish).toHaveBeenCalledWith('blue', 'coin_toss')
+  })
+})
+
+describe('outcomeRequest', () => {
+  it('meminta pemenang dan menyatakan hasil khusus dengan jenis yang dipilih', () => {
+    const c = fakeConsole({ declareOutcome: vi.fn() })
+    const r = outcomeRequest(c, { type: 'tko', label: 'Menang Teknik (TKO)' })
+    expect(r.danger).toBe(true)
+    expect(r.choices?.map((x) => x.value)).toEqual(['red', 'blue'])
+    r.action('blue')
+    expect(c.declareOutcome).toHaveBeenCalledWith('tko', 'blue')
+  })
+
+  it('tanpa pemilihan sudut tidak memanggil server', () => {
+    const c = fakeConsole({ declareOutcome: vi.fn() })
+    outcomeRequest(c, { type: 'ko', label: 'KO' }).action(undefined)
+    expect(c.declareOutcome).not.toHaveBeenCalled()
   })
 })

@@ -72,3 +72,21 @@ export function finishRequest(c: RefereeConsole): ConfirmRequest {
     action: () => c.finish(),
   }
 }
+
+/** Dialog hasil khusus (KO/TKO/WO/undur diri): wasit memilih sudut pemenang. */
+export function outcomeRequest(
+  c: RefereeConsole,
+  outcome: { type: string; label: string },
+): ConfirmRequest {
+  return {
+    title: `${outcome.label} — Tentukan Pemenang`,
+    message:
+      'Pertandingan langsung berakhir dengan hasil ini dan tidak dapat dibatalkan. Pilih sudut yang MENANG.',
+    confirmLabel: `Nyatakan ${outcome.label}`,
+    danger: true,
+    choices: fighterChoices(c),
+    action: (choice) => {
+      if (choice === 'red' || choice === 'blue') return c.declareOutcome(outcome.type, choice)
+    },
+  }
+}

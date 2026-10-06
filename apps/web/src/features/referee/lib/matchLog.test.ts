@@ -114,6 +114,20 @@ describe('toLogEntry', () => {
   })
 })
 
+describe('toLogEntry hasil khusus', () => {
+  it('outcome_declared memuat label, pemenang, dan catatan', () => {
+    const e = toLogEntry(
+      ev('outcome_declared', {
+        label: 'Menang Teknik (TKO)',
+        winner_corner: 'blue',
+        note: 'handuk',
+      }),
+    )
+    expect(e?.title).toBe('Menang Teknik (TKO)')
+    expect(e?.detail).toBe('Pemenang Sudut BIRU • handuk')
+  })
+})
+
 describe('countTechniques', () => {
   it('menghitung poin sah per teknik dan sudut, mengabaikan kejadian lain', () => {
     const events = [

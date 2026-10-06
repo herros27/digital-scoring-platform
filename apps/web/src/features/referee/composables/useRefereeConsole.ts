@@ -8,13 +8,14 @@ import {
   type WsPenaltyKind,
   type WsTechniqueKind,
   type WsTiebreak,
+  type WsOutcomeKind,
   type WsPresence,
   type WsRoundScore,
   type WsSyncResponse,
   type WsTarget,
 } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
-import { DEFAULT_TECHNIQUES } from '@/composables/techniques'
+import { DEFAULT_OUTCOMES, DEFAULT_TECHNIQUES } from '@/composables/techniques'
 import { playGong } from '@/composables/useGong'
 import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { arenaService } from '@/features/arena/api/arenaService'
@@ -81,6 +82,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const techniqueCatalog = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
   const judgeCount = ref(3)
   const tiebreak = ref<WsTiebreak | null>(null)
+  const outcomeCatalog = ref<WsOutcomeKind[]>(DEFAULT_OUTCOMES)
   const medicActive = ref(false)
   const varActive = ref(false)
   const presence = ref<WsPresence | null>(null)
@@ -140,6 +142,14 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const canResume = computed(() => status.value === 'paused')
   const canFinish = computed(() => hasMatch.value && !isFinished.value)
   const canAdjustTime = computed(() => inRound.value)
+  /** Pertandingan sudah dimulai (sedang ronde atau jeda antar ronde, belum selesai). */
+  const matchStarted = computed(() => inRound.value || matchState.value.startsWith('break'))
+  /** Apakah hasil khusus ini boleh dinyatakan sekarang (menurut `phase` pada ruleset). */
+  const canDeclare = (outcome: WsOutcomeKind): boolean =>
+    hasMatch.value &&
+    !isFinished.value &&
+    (outcome.phase === 'any' ||
+      (outcome.phase === 'in_match' ? matchStarted.value : !matchStarted.value))
   const canResetRound = computed(() => status.value === 'paused')
   const canPenalize = computed(
     () =>
@@ -179,6 +189,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     if (s.techniques?.length) techniqueCatalog.value = s.techniques
     if (s.judge_count) judgeCount.value = s.judge_count
     if (s.tiebreak) tiebreak.value = s.tiebreak
+    if (s.outcomes?.length) outcomeCatalog.value = s.outcomes
     if (s.medic_active !== undefined) medicActive.value = s.medic_active
     if (s.var_active !== undefined) varActive.value = s.var_active
     if (s.presence) presence.value = s.presence
@@ -410,6 +421,14 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
       busy.value = false
     }
   }
+  /** Nyatakan hasil khusus (KO, TKO, WO, undur diri) dengan `winner` sebagai pemenang. */
+  const declareOutcome = (outcome: string, winner: WsTarget, note?: string) =>
+    runControl(async () => {
+      const id = requireMatch()
+      if (!id) return
+      await matchService.declareOutcome(opts.compId, id, outcome, winner, note)
+      await refreshQueue()
+    }, 'Gagal menyatakan hasil pertandingan.')
   const cancelMatch = () =>
     runControl(async () => {
       const id = requireMatch()
@@ -540,6 +559,9 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     resume,
     finish,
     finishByTiebreak,
+    declareOutcome,
+    outcomeCatalog,
+    canDeclare,
     cancelMatch,
     rescheduleMatch,
     adjustTime,

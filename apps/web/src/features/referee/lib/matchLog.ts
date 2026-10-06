@@ -168,6 +168,15 @@ export function toLogEntry(ev: RawMatchEvent | WsMatchEvent): LogEntry | null {
         title: `${asString(p.label, 'Sanksi')} ${side} dibatalkan`,
         detail: `Poin dikembalikan +${asNumber(p.points)}`,
       }
+    case 'outcome_declared':
+      return {
+        ...base,
+        category: 'kontrol',
+        title: asString(p.label, 'Hasil khusus'),
+        detail:
+          `Pemenang Sudut ${TARGET_LABEL[asString(p.winner_corner)] ?? ''}` +
+          (asString(p.note) ? ` • ${asString(p.note)}` : ''),
+      }
     case 'tiebreak_resolved':
       return {
         ...base,

@@ -212,6 +212,30 @@ func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 	Ok(w, map[string]string{"status": "finished"})
 }
 
+// POST /api/v1/competitions/{comp_id}/matches/{id}/outcome
+// Body: {"outcome":"ko|tko|walkover|withdrawal","winner":"red|blue","note":"..."}
+func (h *MatchHandler) Outcome(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	matchID := r.PathValue("id")
+	var req struct {
+		Outcome string `json:"outcome" validate:"required,oneof=ko tko walkover withdrawal"`
+		Winner  string `json:"winner" validate:"required,oneof=red blue"`
+		Note    string `json:"note" validate:"omitempty,max=200"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	if err := h.Service.DeclareOutcome(matchID, req.Outcome, req.Winner, req.Note); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]string{"status": "finished", "result_type": req.Outcome})
+}
+
 // POST /api/v1/competitions/{comp_id}/matches/{id}/cancel
 func (h *MatchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")

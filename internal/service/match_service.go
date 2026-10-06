@@ -281,6 +281,15 @@ func (s *MatchService) FinishMatchWithDecision(matchID, winner, method string) e
 	return o.FinishWithDecision(winner, method)
 }
 
+// DeclareOutcome menyatakan hasil khusus (ko, tko, walkover, withdrawal) dengan winner = "red"/"blue".
+func (s *MatchService) DeclareOutcome(matchID, outcome, winner, note string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	return o.DeclareOutcome(outcome, winner, note)
+}
+
 func (s *MatchService) CancelMatch(matchID string) error {
 	o, err := s.GetOrchestrator(matchID)
 	if err != nil {

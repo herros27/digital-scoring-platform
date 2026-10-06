@@ -196,6 +196,24 @@ export const matchService = {
   },
 
   /**
+   * POST /api/v1/competitions/{comp_id}/matches/{id}/outcome
+   * Hasil khusus: ko | tko | walkover | withdrawal; `winner` = sudut pemenang.
+   */
+  async declareOutcome(
+    compId: string,
+    matchId: string,
+    outcome: string,
+    winner: 'red' | 'blue',
+    note?: string
+  ): Promise<{ status: string }> {
+    const res = await http.post<{ status: string }>(
+      ENDPOINTS.MATCHES.OUTCOME(compId, matchId),
+      { outcome, winner, ...(note ? { note } : {}) }
+    )
+    return res.data
+  },
+
+  /**
    * POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule
    * Partai yang dibatalkan kembali ke antrean dan diulang dari 0-0.
    */

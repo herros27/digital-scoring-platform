@@ -24,6 +24,54 @@ type ScoringRule struct {
 	Techniques []TechniqueRule `json:"techniques,omitempty"`
 	Consensus  *ConsensusRule  `json:"consensus,omitempty"`
 	Tiebreak   *TiebreakRule   `json:"tiebreak,omitempty"`
+	Outcomes   []OutcomeRule   `json:"outcomes,omitempty"`
+}
+
+// Jenis hasil khusus yang dapat dinyatakan wasit di luar skor, dan kapan boleh dinyatakan.
+const (
+	OutcomeKO         = "ko"         // Menang Mutlak: lawan tidak bangkit setelah serangan sah
+	OutcomeTKO        = "tko"        // Menang Teknik: lawan tidak dapat melanjutkan
+	OutcomeWalkover   = "walkover"   // Menang WO: lawan tidak hadir setelah panggilan
+	OutcomeWithdrawal = "withdrawal" // Undur Diri: lawan/manajer mengundurkan diri
+
+	PhaseBeforeStart = "before_start" // hanya sebelum ronde pertama dimulai
+	PhaseInMatch     = "in_match"     // hanya setelah pertandingan dimulai
+	PhaseAny         = "any"
+)
+
+// OutcomeRule satu jenis hasil khusus. `Type` menjadi `result_type` hasil pertandingan.
+type OutcomeRule struct {
+	Type  string `json:"type"`
+	Label string `json:"label"`
+	Phase string `json:"phase"`
+}
+
+// DefaultOutcomes hasil khusus bawaan menurut peraturan pertandingan.
+func DefaultOutcomes() []OutcomeRule {
+	return []OutcomeRule{
+		{Type: OutcomeKO, Label: "Menang Mutlak (KO)", Phase: PhaseInMatch},
+		{Type: OutcomeTKO, Label: "Menang Teknik (TKO)", Phase: PhaseInMatch},
+		{Type: OutcomeWalkover, Label: "Menang WO", Phase: PhaseBeforeStart},
+		{Type: OutcomeWithdrawal, Label: "Undur Diri", Phase: PhaseAny},
+	}
+}
+
+// EffectiveOutcomes hasil khusus yang berlaku (bawaan bila ruleset tidak mendefinisikan).
+func (s ScoringRule) EffectiveOutcomes() []OutcomeRule {
+	if len(s.Outcomes) > 0 {
+		return s.Outcomes
+	}
+	return DefaultOutcomes()
+}
+
+// Outcome mencari hasil khusus menurut kode.
+func (s ScoringRule) Outcome(t string) (OutcomeRule, bool) {
+	for _, o := range s.EffectiveOutcomes() {
+		if o.Type == t {
+			return o, true
+		}
+	}
+	return OutcomeRule{}, false
 }
 
 // Langkah seri otomatis (dihitung server dari data pertandingan) dan metode manual (diputuskan wasit).
@@ -230,6 +278,25 @@ func (s ScoringRule) Validate() error {
 		}
 		if t.Points <= 0 {
 			return fmt.Errorf("techniques: nilai %q harus lebih dari 0", t.Type)
+		}
+	}
+
+	seen = map[string]bool{}
+	for _, o := range s.Outcomes {
+		switch o.Type {
+		case OutcomeKO, OutcomeTKO, OutcomeWalkover, OutcomeWithdrawal:
+		default:
+			return fmt.Errorf("outcomes: jenis %q tidak dikenal (%s, %s, %s, %s)", o.Type, OutcomeKO, OutcomeTKO, OutcomeWalkover, OutcomeWithdrawal)
+		}
+		if seen[o.Type] {
+			return fmt.Errorf("outcomes: jenis %q ganda", o.Type)
+		}
+		seen[o.Type] = true
+		if o.Label == "" {
+			return fmt.Errorf("outcomes: label %q wajib diisi", o.Type)
+		}
+		if o.Phase != PhaseBeforeStart && o.Phase != PhaseInMatch && o.Phase != PhaseAny {
+			return fmt.Errorf("outcomes: phase %q tidak dikenal (%s, %s, %s)", o.Phase, PhaseBeforeStart, PhaseInMatch, PhaseAny)
 		}
 	}
 

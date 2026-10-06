@@ -1517,3 +1517,23 @@
   text-align: center;
   color: #fbbf24;
 }
+
+/* Hasil khusus (KO / TKO / WO / undur diri) */
+.ref-outcome-strip {
+  display: grid;
+  grid-template-columns: auto repeat(4, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.ref-outcome-title {
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+}
+
+.ref-sec-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

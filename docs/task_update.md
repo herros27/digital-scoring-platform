@@ -200,8 +200,15 @@
     - Seri skor bersih kini diselesaikan server menurut `scoring.tiebreak` ruleset: (1) potongan sanksi paling sedikit, (2) jumlah teknik terbanyak menurut urutan prioritas (bawaan dari nilai tertinggi: Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan). Berlaku saat waktu ronde terakhir habis dan saat `finish` manual. Jumlah teknik dihitung dari konsensus juri (`techCount` di orkestrator).
     - Bila semua langkah otomatis seri, wasit memutuskan manual: `finish` menerima `winner` + `method` (`extra_round`, `lighter_weight`, `coin_toss`; kosong = `referee_decision`). `result_type` baru: `tiebreak_penalties`, `tiebreak_technique`, `tiebreak_extra_round`, `tiebreak_lighter_weight`, `tiebreak_coin_toss`. Kejadian baru `tiebreak_resolved`; snapshot `sync_response` memuat `tiebreak` (aturan + `auto_result`).
     - Konsol wasit: "Selesaikan" saat seri menerapkan aturan seri otomatis; bila masih seri, dialog berlanjut ke pilihan dasar keputusan + pemenang. Label hasil di konsol dan scoreboard (`composables/matchResult.ts`).
-    - Tes: `internal/orchestrator/tiebreak_test.go` (urutan sanksi/teknik, seri penuh, kedaluwarsa ronde 3, metode manual), `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e 53 pemeriksaan; browser wasit 50/50.
+    - Tes: `internal/orchestrator/tiebreak_test.go` (urutan sanksi/teknik, seri penuh, kedaluwarsa ronde 3, metode manual), `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e lolos; browser wasit 50/50.
     - Batasan: kombinasi 1+2 dan 1+1 pada urutan regulasi belum menjadi jenis teknik terpisah; babak tambahan/timbang/koin dilakukan di luar sistem lalu dicatat wasit.
+
+43. **Hasil Khusus: KO, TKO, WO, Undur Diri** –
+    - Ruleset `scoring.outcomes` (`{type, label, phase}`; bawaan `ko`/`tko` in_match, `walkover` before_start, `withdrawal` any). Wasit menyatakan hasil lewat WebSocket `state_change` `declare_outcome` atau `POST /api/v1/competitions/{comp_id}/matches/{id}/outcome` (`outcome`, `winner`, `note` maks 200 karakter); `result_type` = jenis hasil, pemenang dimajukan di bagan seperti hasil lain. Partai yang baru dimuat (belum dimulai) tetap bisa diselesaikan lewat WO atau Undur Diri.
+    - Kejadian baru `outcome_declared` (label, sudut pemenang, catatan); snapshot `sync_response` memuat `outcomes`.
+    - Konsol wasit: baris "HASIL KHUSUS" di panel Kontrol Tanding; tombol aktif sesuai fase partai, dialog memilih sudut pemenang.
+    - Tes: `internal/orchestrator/outcome_test.go`, `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e 67 pemeriksaan (bagian 12 khusus hasil khusus); browser `outcome.mjs` 10/10.
+    - Belum: pencatatan hitungan wasit dan panggilan WO otomatis (3x panggilan, interval 30 detik) masih dilakukan manual oleh wasit.
 
 
 ## Status Backend Development & UAT Readiness

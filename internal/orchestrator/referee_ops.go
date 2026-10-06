@@ -293,6 +293,50 @@ func (o *Orchestrator) doDisqualify(target string) error {
 	return nil
 }
 
+// maxNoteLen panjang maksimum catatan wasit pada hasil khusus.
+const maxNoteLen = 200
+
+// doDeclareOutcome menyatakan hasil khusus (ko/tko/walkover/withdrawal): `winner` menang dengan
+// result_type = jenis hasil. Kapan boleh dinyatakan diatur `phase` pada ruleset.
+func (o *Orchestrator) doDeclareOutcome(outcome, winner, note string) error {
+	if !validTarget(winner) {
+		return fmt.Errorf("pemenang harus red atau blue")
+	}
+	if len([]rune(note)) > maxNoteLen {
+		return fmt.Errorf("catatan maksimal %d karakter", maxNoteLen)
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	rule, ok := o.ruleset.Scoring.Outcome(outcome)
+	if !ok {
+		return fmt.Errorf("jenis hasil %q tidak tersedia pada ruleset ini", outcome)
+	}
+	if o.sm.IsFinished() {
+		return fmt.Errorf("match is already finished")
+	}
+	started := o.sm.CurrentRoundNumber() > 0
+	switch {
+	case rule.Phase == rules.PhaseBeforeStart && started:
+		return fmt.Errorf("%s hanya dapat dinyatakan sebelum pertandingan dimulai", rule.Label)
+	case rule.Phase == rules.PhaseInMatch && !started:
+		return fmt.Errorf("%s hanya dapat dinyatakan setelah pertandingan dimulai", rule.Label)
+	}
+
+	// partai yang baru dimuat masih idle: majukan ke ready agar dapat diselesaikan
+	if o.sm.Current() == statemachine.StateIdle {
+		if err := o.sm.Transition(statemachine.EventStart); err != nil {
+			return err
+		}
+	}
+	o.forced = &forcedResult{Corner: winner, ResultType: rule.Type}
+	o.appendEvent("outcome_declared", map[string]any{
+		"outcome": rule.Type, "label": rule.Label, "winner_corner": winner, "note": note,
+	}, "")
+	o.finalize()
+	return nil
+}
+
 // doAdjustTime koreksi waktu ronde (+/- ms) saat pertandingan berada di dalam ronde.
 func (o *Orchestrator) doAdjustTime(deltaMS int64) error {
 	o.mu.Lock()
@@ -381,6 +425,7 @@ func (o *Orchestrator) extraSnapshotLocked() map[string]any {
 		"judge_count":       o.ruleset.Scoring.EffectiveConsensus().Judges,
 		"consensus":         o.ruleset.Scoring.EffectiveConsensus(),
 		"tiebreak":          o.tiebreakSnapshotLocked(),
+		"outcomes":          o.ruleset.Scoring.EffectiveOutcomes(),
 		"medic_active":      o.medicActive,
 		"var_active":        o.varActive,
 		"presence":          o.presenceLocked(),

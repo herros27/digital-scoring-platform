@@ -1397,6 +1397,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/competitions/{comp_id}/matches/{id}/outcome:
+    post:
+      summary: Nyatakan Hasil Khusus KO / TKO / WO / Undur Diri (Admin / Dewan / Wasit)
+      description: |
+        Mengakhiri partai dengan hasil di luar skor. `winner` adalah sudut yang MENANG; `result_type` hasil
+        pertandingan menjadi jenis hasil (`ko`, `tko`, `walkover`, `withdrawal`). Kapan tiap jenis boleh dinyatakan
+        diatur `outcomes[].phase` pada ruleset (bawaan: `ko`/`tko` setelah dimulai, `walkover` sebelum dimulai,
+        `withdrawal` kapan saja). Partai yang sudah selesai ditolak. Pemenang dimajukan di bagan seperti hasil lain.
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome, winner]
+              properties:
+                outcome: { type: string, enum: [ko, tko, walkover, withdrawal] }
+                winner: { type: string, enum: [red, blue] }
+                note: { type: string, maxLength: 200, example: "Lawan tidak hadir setelah 3x panggilan" }
+      responses:
+        '200':
+          description: Partai selesai dengan hasil khusus
+        '400':
+          description: Jenis hasil tidak tersedia pada ruleset, fase tidak sesuai, atau partai sudah selesai (`INVALID_STATE_TRANSITION`)
+
   /api/v1/competitions/{comp_id}/matches/{id}/reschedule:
     post:
       summary: Jadwalkan Ulang Partai yang Dibatalkan (Admin / Dewan / Wasit)
@@ -1793,6 +1831,18 @@ paths:
                             type: string
                             enum: [disqualify]
                             description: "`disqualify` = sanksi ini langsung mendiskualifikasi sudut yang dikenai"
+                    outcomes:
+                      type: array
+                      description: |
+                        Hasil khusus yang dapat dinyatakan wasit. Kosong = bawaan: `ko` (in_match), `tko` (in_match),
+                        `walkover` (before_start), `withdrawal` (any).
+                      items:
+                        type: object
+                        required: [type, label, phase]
+                        properties:
+                          type: { type: string, enum: [ko, tko, walkover, withdrawal] }
+                          label: { type: string, example: "Menang Teknik (TKO)" }
+                          phase: { type: string, enum: [before_start, in_match, any] }
                     tiebreak:
                       type: object
                       description: |
@@ -2329,6 +2379,10 @@ paths:
             bila tidak, `state_change` membawa `tie_pending: true` sampai wasit memutuskan.
           * `disqualify` + `"target": "red"|"blue"` — sudut itu didiskualifikasi, lawan menang (`result_type`
             `disqualification`), pertandingan berakhir.
+          * `declare_outcome` + `"outcome": "ko"|"tko"|"walkover"|"withdrawal"`, `"winner": "red"|"blue"`, opsional
+            `"note"` (maks 200 karakter) — hasil khusus; pemenang = `winner`, `result_type` = jenis hasil. Kapan boleh
+            dinyatakan diatur `phase` tiap jenis pada ruleset (`ko`/`tko` setelah dimulai, `walkover` sebelum dimulai,
+            `withdrawal` kapan saja).
           * `adjust_time` + `"delta_ms"` (+/-) — koreksi sisa waktu ronde (dibatasi 1 detik s/d durasi ronde);
             hanya saat berada di dalam ronde.
           * `reset_round` — kembalikan sisa waktu ronde ke durasi penuh; hanya saat dijeda.
@@ -2445,7 +2499,7 @@ paths:
           `{"id", "match_id", "event_type", "payload", "judge_id", "created_at"}`.
           Jenis: `match_started`, `match_paused`, `match_resumed`, `match_finished`, `match_cancelled`, `round_started`,
           `round_ended`, `judge_input`, `score_confirmed`, `penalty_applied`, `penalty_revoked`, `disqualified`,
-          `referee_decision`, `tiebreak_resolved`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
+          `referee_decision`, `outcome_declared`, `tiebreak_resolved`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
         * **Update Skor Resmi (`score_update`)**:
           ```json
           {

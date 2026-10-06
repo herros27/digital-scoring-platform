@@ -31,6 +31,13 @@ export interface WsTechniqueKind {
   points: number
 }
 
+/** Hasil khusus yang dapat dinyatakan wasit; `phase` = kapan boleh (before_start | in_match | any). */
+export interface WsOutcomeKind {
+  type: string
+  label: string
+  phase: string
+}
+
 /** Aturan seri dari ruleset beserta pratinjau hasil otomatis bila skor sedang seri. */
 export interface WsTiebreak {
   steps: string[]
@@ -123,6 +130,7 @@ export interface WsSyncResponse {
   techniques?: WsTechniqueKind[]
   judge_count?: number
   tiebreak?: WsTiebreak
+  outcomes?: WsOutcomeKind[]
   consensus?: WsConsensusRule
   medic_active?: boolean
   var_active?: boolean

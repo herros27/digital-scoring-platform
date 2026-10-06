@@ -139,6 +139,8 @@ func (o *Orchestrator) handleMessage(arenaID string, client *hub.Client, msg hub
 type controlPayload struct {
 	Action  string `json:"action"`
 	Winner  string `json:"winner,omitempty"`   // finish: pemenang keputusan wasit (wajib bila seri dan langkah otomatis masih seri)
+	Outcome string `json:"outcome,omitempty"`  // declare_outcome: ko | tko | walkover | withdrawal
+	Note    string `json:"note,omitempty"`     // declare_outcome: catatan wasit (opsional, maks 200 karakter)
 	Method  string `json:"method,omitempty"`   // finish: dasar keputusan (coin_toss, lighter_weight, extra_round; kosong = keputusan wasit)
 	Target  string `json:"target,omitempty"`   // disqualify: sudut yang didiskualifikasi
 	DeltaMS int64  `json:"delta_ms,omitempty"` // adjust_time: koreksi waktu (+/-)
@@ -176,6 +178,10 @@ func (o *Orchestrator) handleControl(client *hub.Client, msg hub.Message) {
 		}
 	case "cancel":
 		if err := o.doCancel(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
+	case "declare_outcome":
+		if err := o.doDeclareOutcome(p.Outcome, p.Winner, p.Note); err != nil {
 			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
 		}
 	case "disqualify":
@@ -822,6 +828,11 @@ func (o *Orchestrator) Finish() error {
 // FinishWithWinner mengakhiri pertandingan dengan pemenang yang ditentukan wasit (wajib bila seri).
 func (o *Orchestrator) FinishWithWinner(winner string) error {
 	return o.doFinish(winner, "")
+}
+
+// DeclareOutcome menyatakan hasil khusus (KO, TKO, WO, undur diri) dengan `winner` sebagai sudut pemenang.
+func (o *Orchestrator) DeclareOutcome(outcome, winner, note string) error {
+	return o.doDeclareOutcome(outcome, winner, note)
 }
 
 // FinishWithDecision seperti FinishWithWinner dengan metode keputusan (mis. coin_toss, lighter_weight).

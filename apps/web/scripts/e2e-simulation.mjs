@@ -409,6 +409,43 @@ async function runSimulation() {
   const after = await getJson(`/api/v1/live/scoreboard/${arena.id}`)
   check('REST /live/scoreboard kembali "no active match"', after.data.status === 'no active match', JSON.stringify(after.data))
 
+  // 12. Hasil khusus (KO/TKO/WO/undur diri) pada partai berikutnya di gelanggang yang sama
+  console.log('\n12. Hasil khusus: WO sebelum mulai, KO setelah mulai...')
+  const allMatches = await getJson(`/api/v1/competitions/${comp.id}/matches?limit=100`, authHeaders)
+  const idleMatches = allMatches.data.filter((m) => m.status === 'idle')
+  if (idleMatches.length < 2) {
+    check('Tersedia 2 partai idle untuk uji hasil khusus', false, String(idleMatches.length))
+  } else {
+    const post = (m, path, body) => fetch(`${BASE_HTTP}/api/v1/competitions/${comp.id}/matches/${m.id}/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: body ? JSON.stringify(body) : undefined,
+    })
+    const [mWo, mKo] = idleMatches
+    check('Muat partai untuk uji WO', (await post(mWo, 'load-arena', { arena_id: arena.id })).status === 200)
+    const koEarly = await post(mWo, 'outcome', { outcome: 'ko', winner: 'red' })
+    check('KO sebelum pertandingan dimulai ditolak', koEarly.status === 400, String(koEarly.status))
+    const badOutcome = await post(mWo, 'outcome', { outcome: 'sulap', winner: 'red' })
+    check('Jenis hasil tak dikenal ditolak', badOutcome.status === 400, String(badOutcome.status))
+    const wo = await post(mWo, 'outcome', { outcome: 'walkover', winner: 'blue', note: 'lawan tidak hadir 3x panggilan' })
+    check('WO sebelum mulai diterima', wo.status === 200, String(wo.status))
+    await sleep(500)
+    const woResult = last(sb.events, 'match_result')
+    check('match_result WO: biru menang dengan result_type walkover', woResult?.payload?.corner === 'blue' && woResult?.payload?.result_type === 'walkover', JSON.stringify(woResult?.payload))
+    const woMatch = await getJson(`/api/v1/competitions/${comp.id}/matches/${mWo.id}`, authHeaders)
+    check('Partai WO tersimpan selesai dengan pemenang', woMatch.data.status === 'finished' && !!woMatch.data.winner_id, JSON.stringify(woMatch.data.status))
+
+    check('Muat partai untuk uji KO', (await post(mKo, 'load-arena', { arena_id: arena.id })).status === 200)
+    check('Mulai partai', (await post(mKo, 'start')).status === 200)
+    const woLate = await post(mKo, 'outcome', { outcome: 'walkover', winner: 'red' })
+    check('WO setelah pertandingan dimulai ditolak', woLate.status === 400, String(woLate.status))
+    const ko = await post(mKo, 'outcome', { outcome: 'ko', winner: 'red', note: 'lawan tak bangkit hitungan ke-10' })
+    check('KO setelah mulai diterima', ko.status === 200, String(ko.status))
+    await sleep(500)
+    const koResult = last(sb.events, 'match_result')
+    check('match_result KO: merah menang dengan result_type ko', koResult?.payload?.corner === 'red' && koResult?.payload?.result_type === 'ko', JSON.stringify(koResult?.payload))
+    const koEvents = await getJson(`/api/v1/competitions/${comp.id}/matches/${mKo.id}/events`, authHeaders)
+    check('Log memuat outcome_declared dengan catatan wasit', koEvents.data.some((e) => e.event_type === 'outcome_declared' && JSON.stringify(e.payload).includes('hitungan ke-10')))
+  }
+
   const sbWs = sb.ws
   const refWs = ref.ws
 

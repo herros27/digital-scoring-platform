@@ -313,7 +313,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | Type | From | Payload |
 |------|------|---------|
 | `judge_input` | Judge | `{event_id, score_type, target, round}` (`event_id` = kunci idempotensi) |
-| `state_change` | Referee, Admin | `{action}` dengan `action` = `start` \| `pause` \| `resume` \| `finish` (+`winner` bila seri) \| `cancel` \| `disqualify` (+`target`) \| `adjust_time` (+`delta_ms`) \| `reset_round` |
+| `state_change` | Referee, Admin | `{action}` dengan `action` = `start` \| `pause` \| `resume` \| `finish` (+`winner` bila seri) \| `cancel` \| `disqualify` (+`target`) \| `declare_outcome` (+`outcome`, `winner`, `note`) \| `adjust_time` (+`delta_ms`) \| `reset_round` |
 | `penalty` | Referee, Admin | `{target, type}`; poin potongan ditentukan server dari katalog (`binaan_1/2`, `teguran_1/2`, `peringatan_1/2`) |
 | `penalty_revoke` | Referee, Admin | `{target}` membatalkan sanksi terakhir sudut itu |
 | `arena_signal` | Referee, Admin | `{signal: "gong"}` atau `{signal: "medic"\|"var", active}` |
@@ -383,6 +383,7 @@ Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikoso
 ```
 - **`techniques`**: tombol di tablet juri dan nilainya. `type` adalah `score_type` yang dikirim juri; jenis di luar daftar (selain `undo`) ditolak.
 - **`penalties`**: katalog sanksi konsol wasit. `points` = potongan nilai; `action: "disqualify"` membuat sanksi itu langsung mendiskualifikasi sudut yang dikenai. Bawaan: Binaan 1-2 (0), Teguran 1 (-1), Teguran 2 (-2), Peringatan 1 (-5), Peringatan 2 (-10), Peringatan 3 (diskualifikasi). **Cocokkan dengan peraturan event.**
+- **`outcomes`**: hasil khusus yang boleh dinyatakan wasit. Tiap item `{type, label, phase}` dengan `type` ∈ `ko`, `tko`, `walkover`, `withdrawal` dan `phase` ∈ `before_start`, `in_match`, `any`. Bawaan: KO dan TKO setelah pertandingan dimulai, WO sebelum dimulai, Undur Diri kapan saja. Dinyatakan lewat WebSocket `declare_outcome` atau `POST .../matches/{id}/outcome` dengan `winner` (sudut yang menang); `result_type` hasil = jenis hasil.
 - **`tiebreak`**: `steps` (`fewest_penalties`, `technique_priority`), `technique_priority` (kode teknik dari yang paling bernilai), `manual_methods` (`extra_round`, `lighter_weight`, `coin_toss`). Kosong = bawaan di bagian "Skor seri".
 - **`consensus`**: `judges` (1-5, jumlah kursi yang ditampilkan), `majority` (juri yang harus sepakat), `window_ms` (500-10000).
 - Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3).

@@ -114,3 +114,34 @@ func TestValidate_Tiebreak(t *testing.T) {
 		t.Errorf("konfigurasi valid ditolak: %v", err)
 	}
 }
+
+func TestOutcomes_DefaultsAndValidation(t *testing.T) {
+	sc := ScoringRule{RoundDuration: 120, TotalRounds: 3}
+	if got := len(sc.EffectiveOutcomes()); got != 4 {
+		t.Fatalf("hasil khusus bawaan = %d, want 4", got)
+	}
+	if o, ok := sc.Outcome(OutcomeWalkover); !ok || o.Phase != PhaseBeforeStart {
+		t.Fatalf("WO harus hanya sebelum mulai: %+v", o)
+	}
+	if o, _ := sc.Outcome(OutcomeWithdrawal); o.Phase != PhaseAny {
+		t.Fatalf("undur diri bisa kapan saja: %+v", o)
+	}
+	bad := [][]OutcomeRule{
+		{{Type: "menyerah", Label: "Menyerah", Phase: PhaseAny}},
+		{{Type: OutcomeKO, Label: "KO", Phase: "kapan_saja"}},
+		{{Type: OutcomeKO, Phase: PhaseAny}},
+		{{Type: OutcomeKO, Label: "KO", Phase: PhaseAny}, {Type: OutcomeKO, Label: "KO2", Phase: PhaseAny}},
+	}
+	for _, out := range bad {
+		s := sc
+		s.Outcomes = out
+		if err := s.Validate(); err == nil {
+			t.Errorf("%+v harus ditolak", out)
+		}
+	}
+	ok := sc
+	ok.Outcomes = []OutcomeRule{{Type: OutcomeKO, Label: "KO", Phase: PhaseInMatch}}
+	if err := ok.Validate(); err != nil {
+		t.Errorf("valid ditolak: %v", err)
+	}
+}

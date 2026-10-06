@@ -8,6 +8,10 @@ export const RESULT_LABEL: Record<string, string> = {
   tiebreak_extra_round: 'MENANG BABAK TAMBAHAN',
   tiebreak_lighter_weight: 'MENANG ATURAN SERI (BERAT BADAN LEBIH RINGAN)',
   tiebreak_coin_toss: 'MENANG UNDIAN KOIN',
+  ko: 'MENANG MUTLAK (KO)',
+  tko: 'MENANG TEKNIK (TKO)',
+  walkover: 'MENANG WO (LAWAN TIDAK HADIR)',
+  withdrawal: 'MENANG (LAWAN UNDUR DIRI)',
   draw: 'SERI (KEPUTUSAN WASIT)',
 }
 
