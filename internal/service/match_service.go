@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 
@@ -37,6 +38,7 @@ type MatchService struct {
 	bracketStore    orchestrator.BracketAdvancer
 	rulesetResolver RulesetResolver
 	arenaStore      *store.ArenaStore
+	runtimeStore    *store.MatchRuntimeStore
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
@@ -219,8 +221,57 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	}
 
 	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore)
+	if s.runtimeStore != nil {
+		orch.SetRuntimeStore(s.runtimeStore)
+	}
 	s.activeOrchestrators[matchID] = orch
 	return nil
+}
+
+// SetRuntimeStore memasang penyimpanan keadaan partai aktif untuk pemulihan setelah server restart.
+func (s *MatchService) SetRuntimeStore(rs *store.MatchRuntimeStore) { s.runtimeStore = rs }
+
+// RestoreActiveMatches memulihkan partai yang masih berlangsung saat server terakhir berhenti.
+// Mengembalikan jumlah partai yang dipulihkan. Baris untuk partai yang sudah selesai/dibatalkan atau
+// rusak dibersihkan. Ronde yang berjalan dipulihkan dalam keadaan dijeda (lihat orchestrator.Restore).
+func (s *MatchService) RestoreActiveMatches() (int, error) {
+	if s.runtimeStore == nil {
+		return 0, nil
+	}
+	records, err := s.runtimeStore.List()
+	if err != nil {
+		return 0, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	restored := 0
+	for _, rec := range records {
+		if _, exists := s.activeOrchestrators[rec.MatchID]; exists {
+			continue
+		}
+		if s.matchStore != nil {
+			if m, err := s.matchStore.GetByID(rec.MatchID); err != nil || m == nil || m.Status == "finished" || m.Status == "cancelled" {
+				_ = s.runtimeStore.Delete(rec.MatchID)
+				continue
+			}
+		}
+		var mStore orchestrator.MatchStore
+		if s.matchStore != nil {
+			mStore = s.matchStore
+		} else if s.matchRepo != nil {
+			mStore = s.matchRepo
+		}
+		orch, err := orchestrator.Restore(rec, s.hubManager.GetOrCreate(rec.ArenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore, s.runtimeStore)
+		if err != nil {
+			log.Printf("[match] gagal memulihkan partai %s: %v", rec.MatchID, err)
+			_ = s.runtimeStore.Delete(rec.MatchID)
+			continue
+		}
+		s.activeOrchestrators[rec.MatchID] = orch
+		restored++
+	}
+	return restored, nil
 }
 
 // GetOrchestrator mengambil Orchestrator berdasarkan matchID
@@ -462,6 +513,9 @@ func (s *MatchService) RescheduleMatch(matchID string) error {
 		delete(s.activeOrchestrators, matchID)
 	}
 	s.mu.Unlock()
+	if s.runtimeStore != nil {
+		_ = s.runtimeStore.Delete(matchID)
+	}
 	if s.eventStore != nil {
 		_ = s.eventStore.Append(&store.MatchEvent{MatchID: matchID, EventType: "match_rescheduled", Payload: "{}"})
 	}

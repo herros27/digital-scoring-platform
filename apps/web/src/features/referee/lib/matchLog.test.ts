@@ -114,6 +114,14 @@ describe('toLogEntry', () => {
   })
 })
 
+describe('toLogEntry pemulihan', () => {
+  it('match_recovered memuat sisa waktu', () => {
+    const e = toLogEntry(ev('match_recovered', { state: 'round_1', remaining_ms: 98000 }))
+    expect(e?.title).toBe('Server dimulai ulang')
+    expect(e?.detail).toBe('Partai dipulihkan • sisa waktu 01:38')
+  })
+})
+
 describe('toLogEntry hasil khusus', () => {
   it('outcome_declared memuat label, pemenang, dan catatan', () => {
     const e = toLogEntry(

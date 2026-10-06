@@ -104,6 +104,18 @@ function askCancel() {
         </div>
       </section>
 
+      <section
+        v-if="c.recovered && c.status === 'paused'"
+        class="ref-result-banner ref-result-banner--muted font-mono"
+        data-test="recovered-banner"
+      >
+        <strong>SERVER DIMULAI ULANG</strong>
+        <span>
+          Partai dipulihkan dalam keadaan dijeda dengan skor, sanksi, dan sisa waktu terakhir.
+          Periksa waktu (±10 detik bila perlu), lalu tekan Lanjutkan.
+        </span>
+      </section>
+
       <section v-if="c.tiePending" class="ref-result-banner ref-result-banner--muted font-mono">
         <strong>WAKTU HABIS — SKOR SERI</strong>
         <span>Tentukan pemenang sebagai keputusan wasit.</span>

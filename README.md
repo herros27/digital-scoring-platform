@@ -394,6 +394,23 @@ Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikoso
 
 ---
 
+## Pemulihan Setelah Server Restart
+
+Keadaan partai yang sedang berlangsung disimpan di tabel `match_runtime` (satu baris per partai aktif) setiap ada perubahan (dimuat, mulai, jeda, lanjut, skor sah, sanksi, sinyal dokter/VAR, koreksi waktu, pergantian babak) dan sisa waktu dicatat tiap 5 detik selama timer berjalan. Isinya: state mesin, sisa waktu, skor per babak, sanksi aktif, hitungan teknik (untuk aturan seri), keputusan wasit yang sudah ditetapkan, dan **ruleset yang dipakai saat partai dimuat** (mengubah ruleset di editor tidak mengubah partai yang berjalan, juga setelah restart). Baris dihapus saat partai selesai, dibatalkan, atau dijadwalkan ulang.
+
+Saat server start, semua partai tersimpan dipulihkan ke gelanggang yang sama (gelanggang tetap terkunci oleh partai itu):
+
+| Keadaan saat server mati | Setelah restart |
+|---|---|
+| Ronde berjalan atau dijeda | **Dijeda** dengan sisa waktu catatan terakhir; snapshot `recovered: true`, log mencatat `match_recovered`. Wasit memeriksa waktu (±10 detik) lalu menekan Lanjutkan |
+| Istirahat antar babak | Hitung mundur istirahat berlanjut otomatis |
+| Dimuat ke gelanggang, belum dimulai | Kembali apa adanya |
+| Selesai atau dibatalkan | Tidak dipulihkan |
+
+Tablet juri, konsol wasit, dan scoreboard tersambung ulang sendiri dan meminta sinkronisasi; konsol wasit menampilkan banner "Server dimulai ulang". Yang tidak ikut dipulihkan: input juri yang belum mencapai konsensus (jendela beberapa detik; juri cukup menekan lagi). Catatan sisa waktu berselang 5 detik, sehingga bila server mati saat ronde berjalan, waktu yang tersisa bisa paling banyak 5 detik lebih sedikit dari kenyataan, dan wasit dapat mengoreksinya. Basis data harus tetap tersedia (volume PostgreSQL persisten di Docker).
+
+---
+
 ## Deployment (Production)
 
 ### VPS Topology

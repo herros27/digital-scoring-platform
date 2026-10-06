@@ -131,6 +131,8 @@ export interface WsSyncResponse {
   judge_count?: number
   tiebreak?: WsTiebreak
   outcomes?: WsOutcomeKind[]
+  /** Server restart: partai dipulihkan dari keadaan tersimpan dan belum dilanjutkan wasit */
+  recovered?: boolean
   consensus?: WsConsensusRule
   medic_active?: boolean
   var_active?: boolean

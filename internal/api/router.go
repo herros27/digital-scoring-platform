@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"time"
 
@@ -43,6 +44,12 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	rulesetService := service.NewRulesetService(rulesetRepo)
 	matchService.SetRulesetResolver(rulesetService)
 	matchService.SetArenaStore(arenaRepo)
+	matchService.SetRuntimeStore(&store.MatchRuntimeStore{DB: db})
+	if n, err := matchService.RestoreActiveMatches(); err != nil {
+		log.Printf("[match] pemulihan partai gagal: %v", err)
+	} else if n > 0 {
+		log.Printf("[match] %d partai dipulihkan dalam keadaan dijeda setelah restart", n)
+	}
 	officialService := service.NewOfficialService(officialRepo)
 	contingentService := service.NewContingentService(contingentRepo)
 	reportService := service.NewReportService(compRepo, arenaRepo, categoryRepo, athleteRepo, matchRepo)

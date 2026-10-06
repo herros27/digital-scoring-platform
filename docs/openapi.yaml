@@ -2466,6 +2466,7 @@ paths:
               "medic_active": false,
               "var_active": false,
               "tie_pending": false,
+              "recovered": false,
               "result": null,
               "presence": {
                 "judges": [{"seat": 1, "connected": true, "inputs": 3, "last_input": {"score_type": "technique", "target": "red", "round": 1, "clock_ms": 98000, "at": "2026-10-04T06:29:55Z"}}],
@@ -2510,7 +2511,7 @@ paths:
           `{"id", "match_id", "event_type", "payload", "judge_id", "created_at"}`.
           Jenis: `match_started`, `match_paused`, `match_resumed`, `match_finished`, `match_cancelled`, `round_started`,
           `round_ended`, `judge_input`, `score_confirmed`, `penalty_applied`, `penalty_revoked`, `disqualified`,
-          `referee_decision`, `outcome_declared`, `tiebreak_resolved`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
+          `referee_decision`, `outcome_declared`, `match_recovered`, `tiebreak_resolved`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
         * **Update Skor Resmi (`score_update`)**:
           ```json
           {

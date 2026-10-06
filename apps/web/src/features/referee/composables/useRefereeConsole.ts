@@ -89,6 +89,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const result = ref<WsMatchOutcome | null>(null)
   const lastConfirmed = ref<{ target: WsTarget; points: number } | null>(null)
   const tiePending = ref(false)
+  const recovered = ref(false)
 
   // --- data pendukung (REST) ---
   const matchDto = shallowRef<MatchDTO | null>(null)
@@ -194,6 +195,10 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     if (s.var_active !== undefined) varActive.value = s.var_active
     if (s.presence) presence.value = s.presence
     tiePending.value = s.tie_pending ?? false
+    const wasRecovered = recovered.value
+    recovered.value = s.recovered ?? false
+    // kejadian "server dimulai ulang" dicatat sebelum klien tersambung: ambil dari REST agar muncul di log
+    if (recovered.value && !wasRecovered) void loadEvents()
     result.value = s.result ?? null
     if (s.match_id && s.match_id !== previous) void onMatchChanged()
   }
@@ -287,6 +292,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
         p.timer_ends_at_ms,
       )
     if (status.value === 'finished') timer.pause()
+    if (status.value === 'running') recovered.value = false
   })
 
   // koreksi berkala selama timer berjalan (server menyiarkan tenggat yang sama)
@@ -526,6 +532,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     presence,
     result,
     tiePending,
+    recovered,
     isTied,
     lastConfirmed,
     matchDto,

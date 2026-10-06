@@ -117,6 +117,7 @@ func (o *Orchestrator) penaltiesLocked() []penaltyEntry {
 }
 
 func (o *Orchestrator) broadcastPenalties() {
+	defer o.persistLocked()
 	o.h.Broadcast(hub.Message{
 		Type:    hub.MsgPenaltyUpdate,
 		Payload: map[string]any{"penalties": o.penaltiesLocked()},
@@ -266,6 +267,7 @@ func (o *Orchestrator) handleArenaSignal(client *hub.Client, msg hub.Message) {
 		return
 	}
 
+	o.persistLocked()
 	o.appendEvent("arena_signal", map[string]any{"signal": p.Signal, "active": active, "by": client.ID}, client.ID)
 	o.h.Broadcast(hub.Message{
 		Type:    hub.MsgArenaSignal,
@@ -425,6 +427,7 @@ func (o *Orchestrator) extraSnapshotLocked() map[string]any {
 		"judge_count":       o.ruleset.Scoring.EffectiveConsensus().Judges,
 		"consensus":         o.ruleset.Scoring.EffectiveConsensus(),
 		"tiebreak":          o.tiebreakSnapshotLocked(),
+		"recovered":         o.recovered,
 		"outcomes":          o.ruleset.Scoring.EffectiveOutcomes(),
 		"medic_active":      o.medicActive,
 		"var_active":        o.varActive,

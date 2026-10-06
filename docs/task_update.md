@@ -217,6 +217,14 @@
     - API: `POST/PUT/DELETE /rulesets` menjawab 409 `CONFLICT` untuk nama+versi ganda dan ruleset yang masih dipakai kejuaraan.
     - Tes: `rulesetDraft.test.ts`, `ruleset_service_test.go`; browser `rulesetui.mjs` 16/16 (duplikat IPSI → 5 juri/3 sepakat/Jatuhan 5/tanpa KO → dipakai kejuaraan → sync_response partai memuatnya → hapus ditolak saat dipakai).
 
+45. **Pemulihan Partai Setelah Server Restart** –
+    - Tabel `match_runtime` (migrasi `020`) menyimpan keadaan partai aktif: state, sisa waktu, skor, sanksi, hitungan teknik, sinyal dokter/VAR, keputusan wasit, dan ruleset yang dipakai saat dimuat. Ditulis pada setiap perubahan (hook di `broadcastState`/`broadcastScoreUpdate`/`broadcastPenalties`/sinyal arena) dan tiap 5 detik selama timer berjalan; dihapus saat selesai/dibatalkan/dijadwalkan ulang.
+    - `MatchService.RestoreActiveMatches` dipanggil saat router dibuat: ronde berjalan **dipulihkan dijeda** dengan sisa waktu catatan terakhir (`recovered: true`, kejadian `match_recovered`), istirahat dilanjutkan otomatis, partai yang belum dimulai kembali apa adanya; partai selesai/dibatalkan/rusak dibersihkan.
+    - Konsol wasit menampilkan banner "SERVER DIMULAI ULANG" selama masih dijeda dan memuat ulang log (kejadian pemulihan dicatat sebelum klien tersambung).
+    - Ditemukan dan diperbaiki saat tes: setelah ronde berakhir, keadaan istirahat sempat tersimpan dengan timer lama karena siaran terjadi sebelum timer istirahat dibuat; kini disimpan lagi setelah timer istirahat berjalan.
+    - Tes: `internal/orchestrator/runtime_test.go` (simpan→pulihkan identik, lanjut+konsensus+selesai, catatan jeda/koreksi waktu, istirahat, idle, data rusak/selesai, batal/DQ menghapus, tie_pending); `restart.mjs` (kill -9 terhadap server nyata, 19 pemeriksaan) dan `restartui.mjs` (konsol wasit tersambung ulang sendiri, 6 pemeriksaan).
+    - Batasan: input juri yang belum mencapai konsensus tidak dipulihkan; catatan sisa waktu berselang 5 detik.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

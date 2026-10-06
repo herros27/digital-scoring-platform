@@ -63,6 +63,10 @@ type Orchestrator struct {
 	result        map[string]any
 	// techCount jumlah poin sah per sudut dan jenis teknik (untuk aturan seri)
 	techCount map[string]map[string]int
+
+	// pemulihan setelah server restart (lihat runtime.go)
+	runtimeStore RuntimeStore
+	recovered    bool // dipulihkan dari keadaan tersimpan dan belum dilanjutkan wasit
 }
 
 func New(
@@ -220,6 +224,7 @@ func (o *Orchestrator) doStart() error {
 		return err
 	}
 
+	o.recovered = false
 	o.appendEvent("match_started", map[string]any{"round": o.sm.CurrentRoundNumber()}, "")
 	o.startRoundTimer()
 	o.broadcastState()
@@ -257,6 +262,7 @@ func (o *Orchestrator) doResume() error {
 	if o.timer != nil {
 		o.timer.Start()
 	}
+	o.recovered = false
 	o.appendEvent("match_resumed", nil, "")
 	o.broadcastState()
 	return nil
@@ -322,6 +328,7 @@ func (o *Orchestrator) doCancel() error {
 	}
 	o.appendEvent("match_cancelled", nil, "")
 	o.broadcastState()
+	o.clearRuntimeLocked()
 	return nil
 }
 
@@ -615,6 +622,7 @@ func (o *Orchestrator) onRoundExpired() {
 	breakDur := time.Duration(o.ruleset.Scoring.BreakDuration) * time.Second
 	o.timer = o.newTimer(breakDur, o.onBreakExpired)
 	o.timer.Start()
+	o.persistLocked() // simpan lagi: siaran di atas terjadi sebelum timer istirahat dibuat
 }
 
 func (o *Orchestrator) onBreakExpired() {
@@ -701,6 +709,7 @@ func (o *Orchestrator) finalize() {
 			"scores":      o.scores[1:4],
 		},
 	})
+	o.clearRuntimeLocked()
 }
 
 // Hitung total skor semua ronde, tentukan pemenang
@@ -729,9 +738,11 @@ func (o *Orchestrator) broadcastState() {
 	payload["round"] = o.sm.CurrentRoundNumber()
 	payload["tie_pending"] = o.tiePendingLocked()
 	o.h.Broadcast(hub.Message{Type: hub.MsgStateChange, Payload: payload})
+	o.persistLocked()
 }
 
 func (o *Orchestrator) broadcastScoreUpdate(round int) {
+	defer o.persistLocked()
 	o.h.Broadcast(hub.Message{
 		Type: hub.MsgScoreUpdate,
 		Payload: map[string]any{

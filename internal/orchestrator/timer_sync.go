@@ -38,6 +38,12 @@ func (o *Orchestrator) newTimer(d time.Duration, onExpired func()) *Timer {
 	t := NewTimer(d, onExpired)
 	t.SetSync(timerSyncInterval, func() {
 		o.h.Broadcast(hub.Message{Type: hub.MsgTimerSync, Payload: timerPayload(t)})
+		// catatan sisa waktu untuk pemulihan setelah server restart
+		o.mu.Lock()
+		if o.timer == t {
+			o.persistLocked()
+		}
+		o.mu.Unlock()
 	})
 	return t
 }
