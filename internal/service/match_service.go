@@ -442,7 +442,10 @@ func (s *MatchService) RescheduleMatch(matchID string) error {
 		return fmt.Errorf("%w: hanya partai yang dibatalkan yang dapat dijadwalkan ulang", domain.ErrInvalidStateTransition)
 	}
 	s.mu.Lock()
-	delete(s.activeOrchestrators, matchID)
+	if old, ok := s.activeOrchestrators[matchID]; ok {
+		old.Release()
+		delete(s.activeOrchestrators, matchID)
+	}
 	s.mu.Unlock()
 	if s.eventStore != nil {
 		_ = s.eventStore.Append(&store.MatchEvent{MatchID: matchID, EventType: "match_rescheduled", Payload: "{}"})

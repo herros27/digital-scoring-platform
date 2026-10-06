@@ -29,6 +29,8 @@ type Hub struct {
 	OnMessage func(arenaID string, client *Client, msg Message)
 	// onPresence dipanggil (di luar kunci hub) setiap ada klien yang terhubung/terputus
 	onPresence func()
+	// owner pemilik callback saat ini (orchestrator), dipakai Release agar tidak melepas milik partai lain
+	owner any
 }
 
 // Presence ringkasan perangkat yang sedang terhubung di arena.
@@ -57,6 +59,27 @@ func (h *Hub) Presence() Presence {
 		}
 	}
 	return p
+}
+
+// Attach memasang owner (orchestrator) sebagai penerima pesan dan perubahan kehadiran arena ini.
+func (h *Hub) Attach(owner any, onMessage func(arenaID string, client *Client, msg Message), onPresence func()) {
+	h.mu.Lock()
+	h.owner = owner
+	h.OnMessage = onMessage
+	h.onPresence = onPresence
+	h.mu.Unlock()
+}
+
+// Release melepas callback bila owner masih pemiliknya; tidak berpengaruh bila partai lain
+// sudah dimuat ke arena ini. Setelah dilepas, sync_request tidak lagi dijawab partai lama.
+func (h *Hub) Release(owner any) {
+	h.mu.Lock()
+	if h.owner == owner {
+		h.owner = nil
+		h.OnMessage = nil
+		h.onPresence = nil
+	}
+	h.mu.Unlock()
 }
 
 // SetOnPresence memasang callback perubahan kehadiran (aman dipanggil saat hub berjalan).
@@ -113,8 +136,11 @@ func (h *Hub) Run() {
 
 		case inbound := <-h.inbound:
 			// judge tidak bisa lihat input judge lain
-			if h.OnMessage != nil {
-				h.OnMessage(h.ArenaID, inbound.client, inbound.msg)
+			h.mu.RLock()
+			onMessage := h.OnMessage
+			h.mu.RUnlock()
+			if onMessage != nil {
+				onMessage(h.ArenaID, inbound.client, inbound.msg)
 			}
 		}
 	}

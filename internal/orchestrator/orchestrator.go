@@ -89,9 +89,13 @@ func New(
 		inputCount:   make(map[int]int),
 	}
 	// Pasang callback: setiap message dari hub masuk ke sini
-	h.OnMessage = o.handleMessage
-	h.SetOnPresence(o.broadcastPresence)
+	h.Attach(o, o.handleMessage, o.broadcastPresence)
 	return o
+}
+
+// Release melepas orchestrator dari hub arena (dipakai saat partai dijadwalkan ulang).
+func (o *Orchestrator) Release() {
+	o.h.Release(o)
 }
 
 func decodePayload(payload interface{}, dest interface{}) error {
