@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
 import { useHaptics } from '@/composables/useHaptics'
+import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 
 import { useAuthStore } from '@/stores/auth'
 import { matchService } from '@/features/matches/api/matchService'
+import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,33 +23,33 @@ const activeTab = ref('kontrol-tanding')
 
 // --- Match Context ---
 const tournamentTitle = ref('KEJUARAAN NASIONAL PENCAK SILAT 2025')
-const matchHeader = ref('DEWASA PUTRA — KELAS C (55-60 KG) • PARTAI 42 SEMIFINAL')
-const refereeName = ref('WASIT: H. SUPRAPTO (INA)')
-const tableOfficer = ref('PETUGAS MEJA: DEDY KURNIAWAN, S.PD (PENGDA JATENG)')
+const matchHeader = ref('PERTANDINGAN TANDING')
+const refereeName = computed(() => `WASIT: ${authStore.name || '-'}`)
+const tableOfficer = ref('')
 const rulesetLabel = ref('PERSILAT REVISED 2024')
 
 // Match State
-const currentRound = ref(2)
+const currentRound = ref(1)
 const totalRounds = ref(3)
-const roundStatus = ref<'idle' | 'ready' | 'running' | 'paused' | 'break' | 'finished'>('running')
+const roundStatus = ref<MatchStatus>('idle')
 
 // Athletes
 const redAthlete = ref({
-  name: 'AHMAD FAUZI',
-  team: 'KONTINGEN JAWA TENGAH',
-  corner: 'Sudut A • Kelas C Putra',
-  score: 14,
-  techniques: { pukulan: 4, tendangan: 5, jatuhan: 0, kuncian: 0 },
-  penalties: { binaan: 1, teguran1: true, teguran2: false, peringatan1: false, peringatan2: false },
+  name: 'MENUNGGU PERTANDINGAN',
+  team: '',
+  corner: 'Sudut Merah',
+  score: 0,
+  techniques: { pukulan: 0, tendangan: 0, jatuhan: 0, kuncian: 0 },
+  penalties: { binaan: 0, teguran1: false, teguran2: false, peringatan1: false, peringatan2: false },
 })
 
 const blueAthlete = ref({
-  name: 'BAYU PRATAMA',
-  team: 'KONTINGEN JAWA TIMUR',
-  corner: 'Sudut B • Kelas C Putra',
-  score: 11,
-  techniques: { pukulan: 6, tendangan: 6, jatuhan: 0, kuncian: 0 },
-  penalties: { binaan: 2, teguran1: true, teguran2: true, peringatan1: true, peringatan2: false },
+  name: 'MENUNGGU PERTANDINGAN',
+  team: '',
+  corner: 'Sudut Biru',
+  score: 0,
+  techniques: { pukulan: 0, tendangan: 0, jatuhan: 0, kuncian: 0 },
+  penalties: { binaan: 0, teguran1: false, teguran2: false, peringatan1: false, peringatan2: false },
 })
 
 // Real-time Event Feed
@@ -59,36 +61,23 @@ interface MatchLogEvent {
   type: 'score' | 'penalty' | 'var' | 'doctor' | 'control'
 }
 
-const eventLogs = ref<MatchLogEvent[]>([
-  {
-    id: '1',
-    timeStr: '01:31',
-    title: 'Poin Sah Sudut Merah (+2 Tendangan)',
-    detail: 'Konsensus Juri (J1, J2) diverifikasi otomatis',
-    type: 'score',
-  },
-  {
-    id: '2',
-    timeStr: '01:15',
-    title: 'Teguran 2 (-1) Sudut Biru',
-    detail: 'Disahkan Wasit • Tarikan Pakaian',
-    type: 'penalty',
-  },
-  {
-    id: '3',
-    timeStr: '00:58',
-    title: 'Poin Sah Sudut Merah (+1 Pukulan)',
-    detail: 'Konsensus Juri (J1, J3) sah',
-    type: 'score',
-  },
-])
+const eventLogs = ref<MatchLogEvent[]>([])
 
 // Jury Monitor List
-const juryList = ref([
-  { seat: 1, name: 'M. RIDWAN', latency: '14ms', lastAction: 'Tendangan Merah (+2)', timeStr: '01:31', corner: 'MERAH' },
-  { seat: 2, name: 'S. ANWAR', latency: '18ms', lastAction: 'Tendangan Merah (+2)', timeStr: '01:31', corner: 'MERAH' },
-  { seat: 3, name: 'Y. PRANOTO', latency: '12ms', lastAction: 'Pukulan Biru (+1)', timeStr: '01:25', corner: 'BIRU' },
-])
+const juryList = ref<
+  { seat: number; name: string; latency: string; lastAction: string; timeStr: string; corner: string }[]
+>([])
+
+// Nama atlet dari pertandingan yang sedang aktif di gelanggang ini (bila ada)
+async function loadAthleteNames() {
+  try {
+    const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
+    if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete
+    if (snapshot.blue_athlete) blueAthlete.value.name = snapshot.blue_athlete
+  } catch {
+    // tetap memakai placeholder
+  }
+}
 
 // Audio / Gong Feedback
 const isGongRinging = ref(false)
@@ -271,6 +260,7 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
+  void loadAthleteNames()
   window.addEventListener('keydown', handleKeyDown)
   // Set default initial timer to 01:38 (98000ms) matching Figma 03_referee_console.png
   timer.sync(98000, true)
@@ -280,12 +270,7 @@ onMounted(() => {
 
   onMessage('sync_response', (payload) => {
     if (payload.round) currentRound.value = payload.round
-    if (payload.state) {
-      if (payload.state.includes('round')) roundStatus.value = 'running'
-      else if (payload.state.includes('break')) roundStatus.value = 'break'
-      else if (payload.state === 'paused') roundStatus.value = 'paused'
-      else if (payload.state === 'finished') roundStatus.value = 'finished'
-    }
+    roundStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? roundStatus.value
     if (payload.timer_remaining_ms !== undefined) {
       timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
     }
@@ -295,14 +280,9 @@ onMounted(() => {
 
   onMessage('state_change', (payload) => {
     if (payload.round) currentRound.value = payload.round
-    if (payload.state) {
-      if (payload.state.includes('round')) roundStatus.value = 'running'
-      else if (payload.state.includes('break')) roundStatus.value = 'break'
-      else if (payload.state === 'paused') roundStatus.value = 'paused'
-      else if (payload.state === 'finished') roundStatus.value = 'finished'
-    }
+    roundStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? roundStatus.value
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, roundStatus.value === 'running')
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? roundStatus.value === 'running')
     }
   })
 

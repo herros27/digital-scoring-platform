@@ -8,6 +8,7 @@ import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
+import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,21 +26,12 @@ const currentRound = ref(1)
 const roundStatus = ref('BERJALAN')
 const latencyMs = ref(12)
 
-const redAthlete = ref({
-  name: 'AHMAD FAUZI',
-  team: 'KONTINGEN JAWA TENGAH',
-  category: 'KELAS C (55-60 KG)',
-})
-
-const blueAthlete = ref({
-  name: 'BAYU PRATAMA',
-  team: 'KONTINGEN JAWA TIMUR',
-  category: 'KELAS C (55-60 KG)',
-})
+const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
+const blueAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
 
 // Consensus Indicators (5 dots per side)
-const redConsensusDots = ref([true, true, true, false, false])
-const blueConsensusDots = ref([true, true, true, true, false])
+const redConsensusDots = ref([false, false, false, false, false])
+const blueConsensusDots = ref([false, false, false, false, false])
 
 // Touch Logs
 interface TouchLog {
@@ -50,21 +42,20 @@ interface TouchLog {
   idempotencyKey: string
 }
 
-const lastRedTouch = ref<TouchLog | null>({
-  technique: 'PUKULAN',
-  points: 1,
-  target: 'red',
-  timeStr: '01:32',
-  idempotencyKey: 'init-red',
-})
+const lastRedTouch = ref<TouchLog | null>(null)
 
-const lastBlueTouch = ref<TouchLog | null>({
-  technique: 'TENDANGAN',
-  points: 2,
-  target: 'blue',
-  timeStr: '01:31',
-  idempotencyKey: 'init-blue',
-})
+const lastBlueTouch = ref<TouchLog | null>(null)
+
+// Nama atlet dari pertandingan yang sedang aktif di gelanggang ini (bila ada)
+async function loadAthleteNames() {
+  try {
+    const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
+    if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete
+    if (snapshot.blue_athlete) blueAthlete.value.name = snapshot.blue_athlete
+  } catch {
+    // tetap memakai placeholder
+  }
+}
 
 // Haptics
 const haptics = useHaptics()
@@ -206,8 +197,7 @@ function handleCancelLast() {
 }
 
 onMounted(() => {
-  // Sync initial timer to 01:28 (88000ms) as shown in Figma 02_judge_tablet_pwa.png
-  timer.sync(88000, true)
+  void loadAthleteNames()
 
   // Request state sync from backend hub
   sendMessage('sync_request', {})
@@ -222,7 +212,7 @@ onMounted(() => {
   onMessage('state_change', (payload) => {
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, true)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? true)
     }
   })
 

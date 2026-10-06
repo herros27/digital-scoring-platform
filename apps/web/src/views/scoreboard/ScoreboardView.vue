@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
+import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
@@ -10,55 +11,53 @@ const arenaId = computed(() => (route.params.arena_id as string) || 'gelanggang-
 
 // --- Match State ---
 const competitionTitle = ref('KEJUARAAN NASIONAL PENCAK SILAT 2025')
-const tournamentSeries = ref('PENCAK SILAT WORLD CHAMPIONSHIPS')
-const arenaName = ref('GELANGGANG 1')
-const categoryName = ref('DEWASA PUTRA — KELAS C (55–60 KG)')
-const matchNumber = ref('MATCH #M-2025-04')
-const rulesetLabel = ref('PERSILAT RULES 2024')
+const tournamentSeries = ref('PENCAK SILAT DIGITAL SCORING')
+const arenaName = ref('GELANGGANG')
+const categoryName = ref('KATEGORI TANDING')
+const matchNumber = ref('')
+const rulesetLabel = ref('PERSILAT RULES')
 
 // Round & State
-const currentRound = ref(2)
-const matchStatus = ref<'idle' | 'ready' | 'running' | 'break' | 'paused' | 'finished'>('running')
+const currentRound = ref(1)
+const matchStatus = ref<MatchStatus>('idle')
 
 // Athletes
-const redAthlete = ref({
-  name: 'AHMAD FAUZI',
-  team: 'KONTINGEN JAWA TENGAH',
-  idTag: 'ID: INA-204',
-})
+const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', idTag: '' })
+const blueAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', idTag: '' })
 
-const blueAthlete = ref({
-  name: 'BAYU PRATAMA',
-  team: 'KONTINGEN JAWA TIMUR',
-  idTag: 'ID: INA-188',
-})
-
-// Scores per round
+// Scores per round (red/blue = poin teknik, redPen/bluePen = potongan hukuman)
 const roundScores = ref([
-  { round: 1, red: 4, blue: 5, redPen: 0, bluePen: 0 },
-  { round: 2, red: 8, blue: 4, redPen: 1, bluePen: 2 },
-  { round: 3, red: 2, blue: 2, redPen: 0, bluePen: 1 },
+  { round: 1, red: 0, blue: 0, redPen: 0, bluePen: 0 },
+  { round: 2, red: 0, blue: 0, redPen: 0, bluePen: 0 },
+  { round: 3, red: 0, blue: 0, redPen: 0, bluePen: 0 },
 ])
 
-// Penalties
-const redPenalties = ref({ binaan: 0, teguran: 1, peringatan: 0 })
-const bluePenalties = ref({ binaan: 1, teguran: 2, peringatan: 1 })
+// Total bersih = poin teknik dikurangi potongan hukuman (sama dengan red_total/blue_total server)
+const redTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.red - r.redPen, 0))
+const blueTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.blue - r.bluePen, 0))
+const redPenaltyTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.redPen, 0))
+const bluePenaltyTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.bluePen, 0))
 
-// Totals
-const redTotal = computed(() => {
-  return roundScores.value.reduce((acc, r) => acc + r.red, 0)
-})
-
-const blueTotal = computed(() => {
-  return roundScores.value.reduce((acc, r) => acc + r.blue, 0)
-})
-
-// Jury Consensus status banner
+// Banner status skor
 const consensusStatus = computed(() => {
-  if (redTotal.value > blueTotal.value) return 'MERAH MEMIMPIN (3/5)'
-  if (blueTotal.value > redTotal.value) return 'BIRU MEMIMPIN (3/5)'
-  return 'SKOR IMBANG (5/5)'
+  if (redTotal.value > blueTotal.value) return 'MERAH MEMIMPIN'
+  if (blueTotal.value > redTotal.value) return 'BIRU MEMIMPIN'
+  return 'SKOR IMBANG'
 })
+
+// Chip status per babak, diturunkan dari babak aktif dan status pertandingan
+const roundChips = computed(() =>
+  [1, 2, 3].map((round) => {
+    if (matchStatus.value === 'finished' || round < currentRound.value) {
+      return { round, kind: 'done' as const, label: 'SELESAI' }
+    }
+    if (round > currentRound.value || matchStatus.value === 'idle' || matchStatus.value === 'ready') {
+      return { round, kind: 'waiting' as const, label: 'MENUNGGU' }
+    }
+    const label = { running: 'AKTIF', paused: 'DIJEDA', break: 'ISTIRAHAT' }[matchStatus.value]
+    return { round, kind: 'active' as const, label: label ?? 'AKTIF' }
+  }),
+)
 
 // Floating Score Animation Toasts
 interface ScoreToast {
@@ -101,7 +100,6 @@ const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value)
 
 onMounted(async () => {
   // Initialize timer to 01:41 (101 seconds) as depicted in Figma 01_arena_scoreboard.png
-  timer.sync(101000, true)
 
   try {
     const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
@@ -120,21 +118,25 @@ onMounted(async () => {
   // Listen to WebSocket broadcasts
   onMessage('sync_response', (payload) => {
     if (payload.round) currentRound.value = payload.round
+    matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.timer_remaining_ms !== undefined) {
       timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
     }
+    payload.scores?.forEach((score, i) => {
+      const row = roundScores.value[i]
+      if (!row) return
+      row.red = score.RedTechnical
+      row.blue = score.BlueTechnical
+      row.redPen = score.RedPenalties
+      row.bluePen = score.BluePenalties
+    })
   })
 
   onMessage('state_change', (payload) => {
     if (payload.round) currentRound.value = payload.round
-    if (payload.state) {
-      if (payload.state.includes('round')) matchStatus.value = 'running'
-      else if (payload.state.includes('break')) matchStatus.value = 'break'
-      else if (payload.state === 'paused') matchStatus.value = 'paused'
-      else if (payload.state === 'finished') matchStatus.value = 'finished'
-    }
+    matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, matchStatus.value === 'running')
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? matchStatus.value === 'running')
     }
   })
 
@@ -154,6 +156,8 @@ onMounted(async () => {
     if (idx !== -1) {
       if (payload.red_technical !== undefined) roundScores.value[idx].red = payload.red_technical
       if (payload.blue_technical !== undefined) roundScores.value[idx].blue = payload.blue_technical
+      if (payload.red_penalties !== undefined) roundScores.value[idx].redPen = payload.red_penalties
+      if (payload.blue_penalties !== undefined) roundScores.value[idx].bluePen = payload.blue_penalties
     }
   })
 
@@ -229,32 +233,27 @@ onMounted(async () => {
     <section class="sb-timer-strip">
       <!-- Round Badges (Left) -->
       <div class="sb-round-chips">
-        <div class="sb-round-chip" :class="{ 'sb-round-chip--done': currentRound > 1 }">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <div
+          v-for="chip in roundChips"
+          :key="chip.round"
+          class="sb-round-chip"
+          :class="{
+            'sb-round-chip--done': chip.kind === 'done',
+            'sb-round-chip--active': chip.kind === 'active',
+            'sb-round-chip--dim': chip.kind === 'waiting',
+          }"
+        >
+          <svg v-if="chip.kind === 'done'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <div class="sb-round-chip__text">
-            <span>BABAK 1</span>
-            <strong>SELESAI</strong>
-          </div>
-        </div>
-
-        <div class="sb-round-chip sb-round-chip--active">
-          <span class="sb-round-chip__dot" />
-          <div class="sb-round-chip__text">
-            <span>BABAK 2</span>
-            <strong>AKTIF</strong>
-          </div>
-        </div>
-
-        <div class="sb-round-chip" :class="{ 'sb-round-chip--dim': currentRound < 3 }">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <span v-else-if="chip.kind === 'active'" class="sb-round-chip__dot" />
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <div class="sb-round-chip__text">
-            <span>BABAK 3</span>
-            <strong>MENUNGGU</strong>
+            <span>BABAK {{ chip.round }}</span>
+            <strong>{{ chip.label }}</strong>
           </div>
         </div>
       </div>
@@ -356,11 +355,9 @@ onMounted(async () => {
             <span>HUKUMAN :</span>
           </div>
           <div class="sb-penalties-chips font-mono">
-            <span class="sb-pen-chip">BINAAN: <strong>{{ redPenalties.binaan }}</strong></span>
-            <span class="sb-pen-chip sb-pen-chip--alert-red">
-              TEGURAN: <strong>{{ redPenalties.teguran }} (-{{ redPenalties.teguran }})</strong>
+            <span class="sb-pen-chip" :class="{ 'sb-pen-chip--alert-red': redPenaltyTotal > 0 }">
+              POTONGAN: <strong>{{ redPenaltyTotal > 0 ? `-${redPenaltyTotal}` : 0 }}</strong>
             </span>
-            <span class="sb-pen-chip">PERINGATAN: <strong>{{ redPenalties.peringatan }}</strong></span>
           </div>
         </footer>
       </section>
@@ -434,12 +431,8 @@ onMounted(async () => {
             <span>HUKUMAN :</span>
           </div>
           <div class="sb-penalties-chips font-mono">
-            <span class="sb-pen-chip">BINAAN: <strong>{{ bluePenalties.binaan }}</strong></span>
-            <span class="sb-pen-chip sb-pen-chip--alert-blue">
-              TEGURAN: <strong>{{ bluePenalties.teguran }} (-{{ bluePenalties.teguran }})</strong>
-            </span>
-            <span class="sb-pen-chip sb-pen-chip--alert-red">
-              PERINGATAN: <strong>{{ bluePenalties.peringatan }} (-5)</strong>
+            <span class="sb-pen-chip" :class="{ 'sb-pen-chip--alert-blue': bluePenaltyTotal > 0 }">
+              POTONGAN: <strong>{{ bluePenaltyTotal > 0 ? `-${bluePenaltyTotal}` : 0 }}</strong>
             </span>
           </div>
         </footer>

@@ -15,16 +15,6 @@ export interface ParticipantDTO {
   created_at: string
 }
 
-export interface BracketSlotDTO {
-  id: string
-  round: number
-  slot_number: number
-  match_id?: string
-  athlete_red_id?: string
-  athlete_blue_id?: string
-  winner_id?: string
-}
-
 /** Slot bagan sebagaimana dikembalikan GET /competitions/{comp_id}/brackets (domain.BracketSlot). */
 export interface BracketSlotRecord {
   id: string
@@ -59,8 +49,8 @@ export const bracketService = {
   /**
    * POST /api/v1/competitions/{comp_id}/brackets/generate
    */
-  async generateBracket(compId: string, payload: GenerateBracketPayload): Promise<BracketSlotDTO[]> {
-    const res = await http.post<BracketSlotDTO[]>(
+  async generateBracket(compId: string, payload: GenerateBracketPayload): Promise<BracketSlotRecord[]> {
+    const res = await http.post<BracketSlotRecord[]>(
       ENDPOINTS.BRACKETS.GENERATE(compId),
       payload
     )

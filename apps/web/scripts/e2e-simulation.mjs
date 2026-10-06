@@ -9,6 +9,29 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Setiap pemeriksaan dicatat; skrip keluar dengan kode 1 bila ada yang gagal.
+const failures = []
+function check(name, condition, detail = '') {
+  if (condition) {
+    console.log(`   ✔ ${name}`)
+  } else {
+    console.log(`   ✘ ${name} ${detail}`)
+    failures.push(name)
+  }
+}
+
+function connect(url) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url)
+    const events = []
+    ws.onmessage = (event) => events.push(JSON.parse(event.data))
+    ws.onopen = () => resolve({ ws, events })
+    ws.onerror = () => reject(new Error(`WS gagal terhubung: ${url.split('?')[0]}`))
+  })
+}
+
+const last = (events, type) => [...events].reverse().find((e) => e.type === type)
+
 async function postJson(path, body, headers = {}) {
   const res = await fetch(`${BASE_HTTP}${path}`, {
     method: 'POST',
@@ -124,140 +147,120 @@ async function runSimulation() {
   // 6. Establish WebSocket Connections
   console.log('\n6. Connecting WebSockets for all match officials...')
 
-  // A. Scoreboard Display (Public, No Token)
-  const scoreboardEvents = []
-  const sbWs = new WebSocket(`${BASE_WS}/ws/arena/${arena.id}`)
-  await new Promise((resolve, reject) => {
-    sbWs.onopen = () => {
-      console.log('   ✅ Scoreboard TV connected (Public Spectator Mode)')
-      resolve()
-    }
-    sbWs.onerror = (e) => reject(new Error('Scoreboard WS error: ' + e.message))
+  // Wasit login via PIN (alur aplikasi: token terikat arena, role "wasit")
+  await postJson(
+    '/api/v1/auth/create-pin',
+    { competition_id: comp.id, arena_id: arena.id, role: 'wasit', seat_number: 0, pin: '999000', ttl_hours: 12 },
+    authHeaders
+  )
+  const wasitLogin = await postJson('/api/v1/auth/judge-login', {
+    competition_id: comp.id,
+    arena_id: arena.id,
+    pin: '999000',
   })
-  sbWs.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    scoreboardEvents.push(data)
-    console.log(`   📺 [Scoreboard Recv] ${data.type}`, data.payload || '')
-  }
+  const wasitToken = wasitLogin.data.token
+  check('Login PIN wasit mengembalikan role "wasit"', wasitLogin.data.role === 'wasit', wasitLogin.data.role)
 
-  // B. Referee Console (Wasit/Admin Token)
-  const refereeEvents = []
-  const refWs = new WebSocket(`${BASE_WS}/ws/arena/${arena.id}?token=${adminToken}`)
-  await new Promise((resolve, reject) => {
-    refWs.onopen = () => {
-      console.log('   ✅ Referee Console connected')
-      resolve()
-    }
-    refWs.onerror = (e) => reject(new Error('Referee WS error: ' + e.message))
-  })
-  refWs.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    refereeEvents.push(data)
-    console.log(`   🟨 [Referee Recv] ${data.type}`, data.payload || '')
-  }
+  // A. Scoreboard TV: publik, tanpa token
+  const sb = await connect(`${BASE_WS}/ws/arena/${arena.id}`)
+  check('Scoreboard TV publik (tanpa token) bisa terhubung', true)
 
-  // C. 3 Judge Tablets
+  // B. Konsol wasit (token PIN, role wasit)
+  const ref = await connect(`${BASE_WS}/ws/arena/${arena.id}?token=${wasitToken}`)
+  check('Konsol wasit (token PIN) bisa terhubung', true)
+
+  // C. 3 tablet juri
   const judgeSockets = []
   for (const j of judges) {
-    const ws = new WebSocket(`${BASE_WS}/ws/arena/${arena.id}?token=${j.token}`)
-    await new Promise((resolve, reject) => {
-      ws.onopen = () => {
-        console.log(`   ✅ Judge ${j.seat} Tablet connected`);
-        resolve();
-      }
-      ws.onerror = (e) => reject(new Error(`Judge ${j.seat} WS error: ` + e.message))
-    })
-    judgeSockets.push(ws)
+    judgeSockets.push(await connect(`${BASE_WS}/ws/arena/${arena.id}?token=${j.token}`))
   }
+  check('3 tablet juri terhubung', judgeSockets.length === 3)
+
+  // D. Token arena lain ditolak, arena tanpa hub ditolak untuk penonton
+  const otherArena = arenas.data.find((a) => a.id !== arena.id)
+  if (otherArena) {
+    await connect(`${BASE_WS}/ws/arena/${otherArena.id}?token=${wasitToken}`).then(
+      () => check('Token arena lain ditolak', false),
+      () => check('Token arena lain ditolak', true)
+    )
+  }
+  await connect(`${BASE_WS}/ws/arena/${randomUUID()}`).then(
+    () => check('Penonton ke arena tanpa pertandingan ditolak', false),
+    () => check('Penonton ke arena tanpa pertandingan ditolak', true)
+  )
 
   await sleep(400)
 
-  // 7. Referee starts match
-  console.log('\n7. Referee triggers match START...')
-  refWs.send(JSON.stringify({
-    type: 'state_change',
-    payload: { action: 'start' }
-  }))
+  // 7. Hak akses perintah: juri & penonton tidak boleh mengendalikan pertandingan
+  console.log('\n7. Access control for match control commands...')
+  judgeSockets[0].ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'start' } }))
+  sb.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'start' } }))
+  await sleep(400)
+  check('Juri ditolak (FORBIDDEN) saat mencoba start', last(judgeSockets[0].events, 'error')?.payload?.code === 'FORBIDDEN')
+  check('Penonton ditolak (FORBIDDEN) saat mencoba start', last(sb.events, 'error')?.payload?.code === 'FORBIDDEN')
+  check('Pertandingan belum mulai setelah percobaan ilegal', !last(sb.events, 'state_change'))
+
+  // 8. Wasit memulai pertandingan
+  console.log('\n8. Referee triggers match START...')
+  ref.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'start' } }))
   await sleep(600)
+  const started = last(sb.events, 'state_change')
+  check('Scoreboard menerima state_change round_1', started?.payload?.state === 'round_1', JSON.stringify(started?.payload))
+  check('state_change membawa timer_running=true', started?.payload?.timer_running === true)
 
-  // 8. Test Consensus Engine: Judge 1 & Judge 2 submit punch (pukulan) for Red within 1.5s window
-  console.log('\n8. Simulating Judge Scoring (Red Punch +1)...')
-  console.log('   - Judge 1 taps Red Technique (+1)')
-  judgeSockets[0].send(JSON.stringify({
-    type: 'judge_input',
-    payload: {
-      event_id: randomUUID(),
-      idempotency_key: randomUUID(),
-      score_type: 'technique',
-      target: 'red',
-      round: 1
-    }
-  }))
+  const live = await getJson(`/api/v1/live/scoreboard/${arena.id}`)
+  check('REST /live/scoreboard menampilkan pertandingan aktif', live.data.status === 'round_1' && live.data.match_id === targetMatch.id, JSON.stringify(live.data))
+  check('REST /live/scoreboard memuat nama atlet', !!live.data.red_athlete && !!live.data.blue_athlete)
 
-  await sleep(300)
-
-  console.log('   - Judge 2 taps Red Technique (+1) (forming 2/3 majority consensus)...')
-  judgeSockets[1].send(JSON.stringify({
-    type: 'judge_input',
-    payload: {
-      event_id: randomUUID(),
-      idempotency_key: randomUUID(),
-      score_type: 'technique',
-      target: 'red',
-      round: 1
-    }
-  }))
-
+  // 9. Konsensus: 2 dari 3 juri menilai sama dalam jendela waktu
+  console.log('\n9. Simulating Judge Scoring (Red Technique +1, 2/3 majority)...')
+  for (const idx of [0, 1]) {
+    judgeSockets[idx].ws.send(JSON.stringify({
+      type: 'judge_input',
+      payload: { event_id: randomUUID(), idempotency_key: randomUUID(), score_type: 'technique', target: 'red', round: 1 },
+    }))
+    await sleep(300)
+  }
   await sleep(1000)
 
-  // 9. Check Scoreboard and Referee received score_confirmed & score_update
-  const confirmedScore = scoreboardEvents.find(e => e.type === 'score_confirmed')
-  const scoreUpdate = scoreboardEvents.find(e => e.type === 'score_update')
+  const confirmed = last(sb.events, 'score_confirmed')
+  check('Scoreboard menerima score_confirmed', confirmed?.payload?.target === 'red' && confirmed?.payload?.points === 1, JSON.stringify(confirmed?.payload))
+  check('Wasit menerima score_confirmed', !!last(ref.events, 'score_confirmed'))
+  const update = last(sb.events, 'score_update')
+  check('score_update: merah=1, biru=0', update?.payload?.red_technical === 1 && update?.payload?.blue_technical === 0, JSON.stringify(update?.payload))
 
-  if (confirmedScore) {
-    console.log(`\n🎉 CONSENSUS REACHED! Scoreboard received:`)
-    console.log(`   Type: ${confirmedScore.type}`)
-    console.log(`   Target: ${confirmedScore.payload?.target}, Points: +${confirmedScore.payload?.points}`)
-  } else {
-    console.log('\n⚠️ No score_confirmed in scoreboard events yet. Events received:', scoreboardEvents.map(e => e.type))
-  }
-
-  if (scoreUpdate) {
-    console.log(`   Score Update: Red = ${scoreUpdate.payload?.red_technical}, Blue = ${scoreUpdate.payload?.blue_technical}`)
-  }
-
-  // 10. Referee pauses and resumes match
+  // 10. Pause & resume
   console.log('\n10. Referee tests PAUSE and RESUME...')
-  refWs.send(JSON.stringify({
-    type: 'state_change',
-    payload: { action: 'pause' }
-  }))
+  ref.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'pause' } }))
   await sleep(400)
-  refWs.send(JSON.stringify({
-    type: 'state_change',
-    payload: { action: 'resume' }
-  }))
+  check('Pause: timer_running=false', last(sb.events, 'state_change')?.payload?.timer_running === false)
+  ref.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'resume' } }))
   await sleep(400)
+  check('Resume: timer_running=true', last(sb.events, 'state_change')?.payload?.timer_running === true)
 
-  // 11. Clean finish
+  // 11. Selesai
   console.log('\n11. Finishing match...')
-  refWs.send(JSON.stringify({
-    type: 'state_change',
-    payload: { action: 'finish' }
-  }))
+  ref.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'finish' } }))
   await sleep(600)
 
-  const matchResult = scoreboardEvents.find(e => e.type === 'match_result')
-  if (matchResult) {
-    console.log(`🏆 MATCH COMPLETED! Winner: Sudut ${matchResult.payload?.corner.toUpperCase()} (${matchResult.payload?.result_type})`)
-  }
+  const matchResult = last(sb.events, 'match_result')
+  check('match_result: sudut merah menang angka', matchResult?.payload?.corner === 'red' && matchResult?.payload?.result_type === 'point_win', JSON.stringify(matchResult?.payload))
+  const after = await getJson(`/api/v1/live/scoreboard/${arena.id}`)
+  check('REST /live/scoreboard kembali "no active match"', after.data.status === 'no active match', JSON.stringify(after.data))
+
+  const sbWs = sb.ws
+  const refWs = ref.ws
 
   // Close all sockets
   sbWs.close()
   refWs.close()
-  judgeSockets.forEach(ws => ws.close())
+  judgeSockets.forEach(({ ws }) => ws.close())
 
   console.log('\n✅ All WebSocket connections cleanly closed.')
+  if (failures.length > 0) {
+    console.error(`\n❌ ${failures.length} pemeriksaan gagal:\n - ${failures.join('\n - ')}`)
+    process.exit(1)
+  }
   console.log('🥋 === DIGITAL SCORING END-TO-END SIMULATION FINISHED SUCCESSFULLY === 🥋\n')
 }
 

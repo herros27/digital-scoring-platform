@@ -4,6 +4,14 @@ import { ref, onMounted, onUnmounted } from 'vue'
 /** Status mesin pertandingan yang dikirim server. */
 export type WsMatchState = string
 
+/** Skor satu ronde pada `sync_response.scores` (struct Go tanpa tag JSON, jadi PascalCase). */
+export interface WsRoundScore {
+  RedTechnical: number
+  BlueTechnical: number
+  RedPenalties: number
+  BluePenalties: number
+}
+
 export interface WsSyncResponse {
   round?: number
   state?: WsMatchState
@@ -11,12 +19,16 @@ export interface WsSyncResponse {
   timer_running?: boolean
   red_total?: number
   blue_total?: number
+  /** Skor per ronde, indeks 0 = ronde 1 */
+  scores?: WsRoundScore[]
 }
 
 export interface WsStateChange {
   round?: number
   state?: WsMatchState
   timer_remaining_ms?: number
+  /** false saat wasit menjeda pertandingan; state tetap `round_N` */
+  timer_running?: boolean
 }
 
 export interface WsTimerSync {
