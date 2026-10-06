@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bufio"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -196,6 +198,32 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.statusCode = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack meneruskan ke ResponseWriter asli agar upgrade WebSocket tetap bekerja
+// melalui middleware ini (gorilla/websocket memeriksa http.Hijacker lewat type assertion).
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("underlying ResponseWriter does not implement http.Hijacker")
+	}
+	conn, rw, err := hj.Hijack()
+	if err == nil {
+		r.statusCode = http.StatusSwitchingProtocols
+	}
+	return conn, rw, err
+}
+
+// Flush meneruskan ke ResponseWriter asli bila didukung (SSE/streaming).
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap memungkinkan http.NewResponseController menjangkau writer asli.
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
 
 // MetricsMiddleware tracks HTTP request latency and total requests for Prometheus.

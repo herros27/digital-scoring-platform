@@ -282,3 +282,30 @@ func (s *MatchService) SubmitScoreInput(matchID string, input consensus.JudgeInp
 	}
 	return o.SubmitJudgeInput(input, idempotencyKey)
 }
+
+// GetLiveSnapshot mengembalikan keadaan pertandingan yang sedang aktif di sebuah arena
+// untuk layar scoreboard publik. ok=false bila tidak ada pertandingan aktif.
+func (s *MatchService) GetLiveSnapshot(arenaID string) (snapshot map[string]any, ok bool) {
+	s.mu.RLock()
+	var live *orchestrator.Orchestrator
+	for _, orch := range s.activeOrchestrators {
+		if orch.GetArenaID() == arenaID && orch.IsActive() {
+			live = orch
+			break
+		}
+	}
+	s.mu.RUnlock()
+	if live == nil {
+		return nil, false
+	}
+
+	snapshot = live.Snapshot()
+	snapshot["status"] = snapshot["state"]
+	if s.matchStore != nil {
+		if red, blue, err := s.matchStore.GetCornerNames(live.GetMatchID()); err == nil {
+			snapshot["red_athlete"] = red
+			snapshot["blue_athlete"] = blue
+		}
+	}
+	return snapshot, true
+}

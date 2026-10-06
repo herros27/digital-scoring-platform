@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/herros27/digital-scoring/internal/auth"
 	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/consensus"
@@ -62,28 +64,49 @@ func (h *MatchHandler) Create(w http.ResponseWriter, r *http.Request) {
 	Ok(w, m)
 }
 
-// GET /ws/arena/{arena_id}?token=eyJ...
-// WS upgrade — auth via query param (WS tidak support custom header saat handshake)
+// GET /ws/arena/{arena_id}[?token=eyJ...]
+// WS upgrade — auth via query param (WS tidak support custom header saat handshake).
+//
+//   - Tanpa token: penonton publik (scoreboard TV), role "scoreboard". Hanya bisa
+//     menerima siaran dan sync_request; semua perintah ditolak orchestrator.
+//     Hub tidak dibuat untuk penonton, sehingga arena yang belum punya pertandingan
+//     aktif dijawab 404 (klien akan mencoba lagi).
+//   - Dengan token PIN: arena pada token harus sama dengan arena yang dituju.
+//   - Dengan token login email (tanpa arena): hanya admin, dewan, dan wasit.
 func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 	arenaID := r.PathValue("arena_id")
 
 	tokenStr := r.URL.Query().Get("token")
 	if tokenStr == "" {
-		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing token", nil)
+		spectatorHub, err := h.HubManager.Get(arenaID)
+		if err != nil {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "no active match in this arena", nil)
+			return
+		}
+		spectatorHub.HandleWSWithSeat(w, r, "scoreboard-"+uuid.NewString(), hub.RoleScoreboard, 0)
 		return
 	}
+
 	claims, err := auth.ParseToken(tokenStr)
 	if err != nil {
 		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 		return
 	}
-	// pastikan token scoped ke arena yang benar
-	if claims.ArenaID != arenaID {
+	// Token PIN selalu terikat ke satu arena dan harus cocok. Token login email
+	// (tanpa arena) hanya diterima untuk petugas: admin, dewan, wasit.
+	unscopedOperator := claims.ArenaID == "" && hub.IsOperatorClaim(claims.Role)
+	if claims.ArenaID != arenaID && !unscopedOperator {
 		Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch", nil)
 		return
 	}
 
-	h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, claims.JudgePinID, hub.Role(claims.Role), claims.SeatNumber)
+	// Token login email (admin/dewan/wasit) tidak membawa pin_id; beri ID unik per koneksi
+	clientID := claims.JudgePinID
+	if clientID == "" {
+		clientID = "official-" + uuid.NewString()
+	}
+
+	h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, clientID, hub.RoleFromClaim(claims.Role), claims.SeatNumber)
 }
 
 // POST /api/v1/competitions/{comp_id}/matches/{id}/load-arena

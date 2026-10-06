@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"golang.org/x/time/rate"
 )
 
@@ -144,5 +146,30 @@ func TestRateLimitFunction(t *testing.T) {
 	testHandler.ServeHTTP(rec2, req2)
 	if rec2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", rec2.Code)
+	}
+}
+
+func TestMetricsMiddleware_AllowsWebSocketUpgrade(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade melalui MetricsMiddleware gagal: %v", err)
+			return
+		}
+		defer conn.Close()
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("halo"))
+	})
+	srv := httptest.NewServer(MetricsMiddleware(mux))
+	defer srv.Close()
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(srv.URL, "http")+"/ws", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+	if _, msg, err := conn.ReadMessage(); err != nil || string(msg) != "halo" {
+		t.Fatalf("pesan = %q, err = %v", msg, err)
 	}
 }

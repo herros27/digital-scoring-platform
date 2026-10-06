@@ -51,7 +51,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	compH := &handler.CompetitionHandler{Service: compService}
 	arenaH := &handler.ArenaHandler{Service: arenaService}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
-	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo}
+	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo, Matches: matchService}
 	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
 	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache}

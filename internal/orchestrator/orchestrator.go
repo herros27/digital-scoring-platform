@@ -399,13 +399,15 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 		}
 	}
 
-	o.appendEvent("score_confirmed", map[string]any{
+	confirmed := map[string]any{
 		"score_type": result.ScoreType,
 		"target":     result.Target,
 		"points":     pts,
 		"count":      result.Count,
 		"round":      round,
-	}, "")
+	}
+	o.appendEvent("score_confirmed", confirmed, "")
+	o.h.Broadcast(hub.Message{Type: hub.MsgScoreConfirmed, Payload: confirmed})
 
 	o.broadcastScoreUpdate(round)
 
@@ -482,8 +484,24 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 
 func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
 	o.mu.Lock()
-	defer o.mu.Unlock()
+	payload := o.snapshotLocked()
+	o.mu.Unlock()
 
+	o.h.SendToClient(client.ID, hub.Message{
+		Type:    hub.MsgSyncResponse,
+		Payload: payload,
+	})
+}
+
+// Snapshot mengembalikan keadaan pertandingan saat ini (dipakai sync_response dan REST scoreboard).
+func (o *Orchestrator) Snapshot() map[string]any {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.snapshotLocked()
+}
+
+// snapshotLocked: pemanggil harus memegang o.mu.
+func (o *Orchestrator) snapshotLocked() map[string]any {
 	var remMs int64
 	var timerRunning bool
 	if o.timer != nil {
@@ -497,7 +515,7 @@ func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
 		blueTotal += o.scores[i].BlueTechnical - o.scores[i].BluePenalties
 	}
 
-	payload := map[string]any{
+	return map[string]any{
 		"match_id":           o.matchID,
 		"arena_id":           o.arenaID,
 		"state":              string(o.sm.Current()),
@@ -509,11 +527,6 @@ func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
 		"blue_total":         blueTotal,
 		"server_time":        time.Now().UTC().Format(time.RFC3339),
 	}
-
-	o.h.SendToClient(client.ID, hub.Message{
-		Type:    hub.MsgSyncResponse,
-		Payload: payload,
-	})
 }
 
 func (o *Orchestrator) startRoundTimer() {
@@ -657,6 +670,7 @@ func (o *Orchestrator) broadcastState() {
 				}
 				return 0
 			}(),
+			"timer_running": o.timer != nil && o.timer.IsRunning(),
 		},
 	})
 }

@@ -130,3 +130,17 @@ func (s *MatchStore) ListByCompetition(competitionID string) ([]Match, error) {
 	list, _, err := s.ListByCompetitionPaged(competitionID, "", 10000, 0)
 	return list, err
 }
+
+// GetCornerNames mengambil nama atlet sudut merah dan biru untuk sebuah pertandingan.
+func (s *MatchStore) GetCornerNames(matchID string) (red, blue string, err error) {
+	var r, b sql.NullString
+	err = s.DB.QueryRow(`
+		SELECT ra.name, ba.name
+		FROM matches m
+		LEFT JOIN participants rp ON rp.id = m.athlete_red_id
+		LEFT JOIN athletes ra ON ra.id = rp.athlete_id
+		LEFT JOIN participants bp ON bp.id = m.athlete_blue_id
+		LEFT JOIN athletes ba ON ba.id = bp.athlete_id
+		WHERE m.id = $1`, matchID).Scan(&r, &b)
+	return r.String, b.String, err
+}
