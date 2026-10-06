@@ -18,7 +18,11 @@ paths:
   /api/v1/auth/judge-login:
     post:
       summary: Login Tablet Juri / Wasit menggunakan PIN
-      description: Memvalidasi 6-digit PIN juri untuk arena tertentu dan mengembalikan token JWT untuk koneksi WebSocket.
+      description: |
+        Login hanya dengan PIN. Turnamen, gelanggang, role, dan kursi ditentukan server dari data PIN
+        (setiap PIN unik di seluruh sistem). PIN juri 6 digit, PIN wasit 8 digit. Mengembalikan token JWT
+        untuk koneksi WebSocket. Setelah 5 kali PIN salah beruntun dalam 15 menit, IP klien dikunci 15 menit
+        (HTTP 429 `TOO_MANY_ATTEMPTS` dengan header `Retry-After`).
       tags:
         - Authentication
       requestBody:
@@ -27,19 +31,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [competition_id, arena_id, pin]
+              required: [pin]
               properties:
-                competition_id:
-                  type: string
-                  format: uuid
-                  example: "3de882af-1b3e-4026-beb2-0d08e7e1c57d"
-                arena_id:
-                  type: string
-                  format: uuid
-                  example: "c48ee982-dccc-4f27-8ba4-f9672d1827bb"
                 pin:
                   type: string
-                  example: "123456"
+                  pattern: '^[0-9]{6,8}$'
+                  example: "123001"
       responses:
         '200':
           description: Login berhasil, token JWT diberikan
@@ -71,6 +68,12 @@ paths:
                         format: uuid
         '401':
           description: PIN salah atau kadaluarsa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Terlalu banyak PIN salah beruntun; IP dikunci sementara (lihat header `Retry-After`)
           content:
             application/json:
               schema:
@@ -243,7 +246,7 @@ paths:
                   example: 1
                 pin:
                   type: string
-                  description: Optional. Jika tidak diisi, server akan men-generate PIN 6 angka acak.
+                  description: Optional. Jika tidak diisi, server membuat PIN acak yang unik (6 digit; 8 digit untuk role wasit). PIN kustom harus berupa angka dengan panjang sesuai role dan unik di seluruh sistem; bila bentrok server menjawab HTTP 409 `PIN_TAKEN`.
                   example: "839201"
                 ttl_hours:
                   type: integer
@@ -2122,7 +2125,7 @@ paths:
         * **Tanpa token** — penonton publik (layar scoreboard TV), role `scoreboard`. Hanya menerima siaran dan
           boleh mengirim `sync_request`; perintah lain dijawab `error` `FORBIDDEN`. Hanya bisa terhubung ke
           gelanggang yang punya pertandingan aktif (hub dibuat saat `load-arena`); selain itu HTTP 404.
-        * **Token PIN** (`/auth/judge-login`) — terikat satu gelanggang; `arena_id` pada token harus sama dengan
+        * **Token PIN** (`/auth/judge-login`, login hanya dengan PIN) — terikat satu gelanggang; `arena_id` pada token harus sama dengan
           path, bila tidak HTTP 403. Role `judge` boleh mengirim `judge_input`; role `wasit` dipetakan menjadi
           `referee` dan boleh mengontrol pertandingan.
         * **Token login email** (`/auth/login`, tanpa arena) — hanya role `admin`, `dewan`, dan `wasit`,

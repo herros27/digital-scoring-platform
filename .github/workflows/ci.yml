@@ -10,6 +10,23 @@ jobs:
   test:
     name: Test & Lint
     runs-on: ubuntu-latest
+    # Tes login PIN (tests/pin_login_test.go) memakai database nyata; tanpa service ini tes dilewati.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: digital_scoring
+          POSTGRES_USER: scoring_user
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scoring_user -d digital_scoring"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DB_URL: postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

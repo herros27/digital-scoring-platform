@@ -132,10 +132,11 @@ MatchOrchestrator
 | Flow | Aktor | Method | Scope & Token Lifetime |
 |------|-------|--------|------------------------|
 | **Officials** | Admin, Dewan, Operator, Wasit | Email & Password (bcrypt) → JWT | 24 jam (`role: admin / dewan / operator / wasit`) |
-| **Juri Gelanggang** | Tablet Juri | 6-digit random PIN → JWT | Scoped ke: `competition_id`, `arena_id`, `role: judge`, `seat_number: 1..n` |
+| **Juri & Wasit Gelanggang** | Tablet Juri / Meja Wasit | PIN saja (juri 6 digit, wasit 8 digit) → JWT | Turnamen, gelanggang, role, dan kursi ditentukan server dari PIN; token scoped ke `competition_id`, `arena_id`, `role: judge/wasit`, `seat_number` |
 | **Kontingen** | Manajer Tim / Pelatih | Email & Password (bcrypt) → JWT | 24 jam (`role: contingent`) |
 
 - **Clean Architecture Juri**: Pemisahan tegas antara otorisasi (`role: "judge"`) dan nomor kursi fisik gelanggang (`seat_number`). Mendukung format juri dinamis (1, 3, 5, dst).
+- **Login PIN-saja**: setiap PIN unik di seluruh sistem (dicari lewat `judge_pins.pin_lookup`, HMAC-SHA256 terindeks). PIN salah 5x beruntun mengunci IP 15 menit (HTTP 429).
 - **Server-Side PIN & Multi-Device Sync**: PIN di-generate otomatis secara kriptografis (`crypto/rand`) dengan expiration time (`expires_at`), disimpan persisten dalam database (`judge_pins.raw_pin`), dan disinkronisasi ke seluruh perangkat admin/operator via `GET /api/v1/auth/pins`.
 
 ### 8. Pendaftaran Atlet & Verifikasi Panitia (Contingent Workflow)
@@ -200,7 +201,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/v1/auth/login` | Public | Login akun Official (Admin/Dewan/Operator/Wasit) via email & password |
-| POST | `/api/v1/auth/judge-login` | Public | Login Juri gelanggang via PIN 6-digit → JWT (claims: `role: judge`, `seat_number`) |
+| POST | `/api/v1/auth/judge-login` | Public | Login juri/wasit hanya dengan `{ "pin" }` (6 digit juri, 8 digit wasit) → JWT (claims: `role`, `arena_id`, `competition_id`, `seat_number`) |
 | POST | `/api/v1/auth/contingent/register` | Public | Registrasi akun manajer kontingen baru |
 | POST | `/api/v1/auth/contingent/login` | Public | Login akun kontingen via email & password → JWT (`role: contingent`) |
 | POST | `/api/v1/auth/create-pin` | Admin, Dewan | Generate PIN acak/custom untuk juri gelanggang tertentu |
