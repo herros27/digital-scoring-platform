@@ -46,7 +46,8 @@ export const ENDPOINTS = {
     BY_COMPETITION: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     REGISTER_TO_COMP: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     PARTICIPANTS: (compId: string) => `/api/v1/competitions/${compId}/participants`,
-    VERIFY_PARTICIPANT: (compId: string, id: string) => `/api/v1/competitions/${compId}/participants/${id}/verify`,
+    VERIFY_PARTICIPANT: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}/verify`,
   },
 
   // Contingents
@@ -69,16 +70,19 @@ export const ENDPOINTS = {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/matches`,
     DETAIL: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}`,
     CREATE: (compId: string) => `/api/v1/competitions/${compId}/matches`,
-    LOAD_ARENA: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/load-arena`,
+    LOAD_ARENA: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/matches/${id}/load-arena`,
     START: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/start`,
     PAUSE: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/pause`,
     RESUME: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/resume`,
     FINISH: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/finish`,
     CANCEL: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/cancel`,
     OUTCOME: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/outcome`,
-    RESCHEDULE: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/reschedule`,
+    RESCHEDULE: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/matches/${id}/reschedule`,
     SCORES: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/scores`,
-    SUBMIT_SCORE: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/scores`,
+    SUBMIT_SCORE: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/matches/${id}/scores`,
     EVENTS: (compId: string, id: string) => `/api/v1/competitions/${compId}/matches/${id}/events`,
   },
 
@@ -91,7 +95,8 @@ export const ENDPOINTS = {
   // Participants
   PARTICIPANTS: {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/participants`,
-    VERIFY: (compId: string, id: string) => `/api/v1/competitions/${compId}/participants/${id}/verify`,
+    VERIFY: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}/verify`,
   },
 
   // Rulesets

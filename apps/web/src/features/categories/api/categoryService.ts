@@ -23,7 +23,7 @@ export const categoryService = {
    */
   async createCategory(
     competitionId: string,
-    payload: CreateCategoryFormValues
+    payload: CreateCategoryFormValues,
   ): Promise<Category> {
     const url = ENDPOINTS.CATEGORIES.CREATE(competitionId)
     const res = await http.post<Category>(url, payload)
@@ -45,7 +45,7 @@ export const categoryService = {
    */
   async seedPresetCategories(
     competitionId: string,
-    customPresets?: StandardClassPreset[]
+    customPresets?: StandardClassPreset[],
   ): Promise<{ created: number; skipped: number }> {
     const presets = customPresets || IPSI_STANDARD_PRESETS
     const existing = await this.getCategories(competitionId)

@@ -2,10 +2,7 @@
 import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
-import {
-  useParticipantsQuery,
-  useVerifyParticipantMutation,
-} from '../api/athleteQueries'
+import { useParticipantsQuery, useVerifyParticipantMutation } from '../api/athleteQueries'
 import type { Participant } from '../types/athlete.schema'
 
 const props = withDefaults(
@@ -14,14 +11,20 @@ const props = withDefaults(
   }>(),
   {
     competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
-  }
+  },
 )
 
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
 
 // Queries
 const activeStatusFilter = ref<string>('all')
-const { data: rawParticipants, isLoading, isFetching, error, refetch } = useParticipantsQuery(activeCompId)
+const {
+  data: rawParticipants,
+  isLoading,
+  isFetching,
+  error,
+  refetch,
+} = useParticipantsQuery(activeCompId)
 const verifyMutation = useVerifyParticipantMutation(activeCompId)
 
 const participants = computed(() => rawParticipants.value || [])
@@ -32,10 +35,16 @@ const searchQuery = ref('')
 const selectedClassFilter = ref<string>('all')
 
 // Toast State
-const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
+const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
+  null,
+)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
+function showToast(
+  title: string,
+  message: string,
+  type: 'success' | 'danger' | 'info' = 'success',
+) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
   toastTimer = setTimeout(() => {
@@ -57,10 +66,14 @@ async function handleSetStatus(participant: Participant, newStatus: 'verified' |
     showToast(
       newStatus === 'verified' ? 'Verifikasi Berhasil' : 'Peserta Ditolak',
       `Peserta ${participant.name} ${actionLabel}.`,
-      newStatus === 'verified' ? 'success' : 'danger'
+      newStatus === 'verified' ? 'success' : 'danger',
     )
   } catch (err) {
-    showToast('Gagal Memperbarui Status', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
+    showToast(
+      'Gagal Memperbarui Status',
+      getErrorMessage(err, 'Terjadi kesalahan sistem.'),
+      'danger',
+    )
   } finally {
     processingId.value = null
   }
@@ -70,7 +83,9 @@ async function handleSetStatus(participant: Participant, newStatus: 'verified' |
 const stats = computed(() => {
   const all = participants.value
   const verified = all.filter((p) => p.registration_status === 'verified').length
-  const pending = all.filter((p) => p.registration_status === 'pending' || p.registration_status === 'registered').length
+  const pending = all.filter(
+    (p) => p.registration_status === 'pending' || p.registration_status === 'registered',
+  ).length
   const rejected = all.filter((p) => p.registration_status === 'rejected').length
   return {
     total: all.length,
@@ -88,7 +103,9 @@ const filteredParticipants = computed(() => {
   if (activeStatusFilter.value === 'verified') {
     list = list.filter((p) => p.registration_status === 'verified')
   } else if (activeStatusFilter.value === 'pending') {
-    list = list.filter((p) => p.registration_status === 'pending' || p.registration_status === 'registered')
+    list = list.filter(
+      (p) => p.registration_status === 'pending' || p.registration_status === 'registered',
+    )
   } else if (activeStatusFilter.value === 'rejected') {
     list = list.filter((p) => p.registration_status === 'rejected')
   }
@@ -112,7 +129,7 @@ const filteredParticipants = computed(() => {
       (p) =>
         (p.name && p.name.toLowerCase().includes(q)) ||
         (p.club && p.club.toLowerCase().includes(q)) ||
-        p.weight_class.toLowerCase().includes(q)
+        p.weight_class.toLowerCase().includes(q),
     )
   }
 
@@ -140,16 +157,28 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="verif-ops @container" role="region" aria-label="Meja Verifikasi Peserta & Timbang Badan">
+  <div
+    class="verif-ops @container"
+    role="region"
+    aria-label="Meja Verifikasi Peserta & Timbang Badan"
+  >
     <!-- Toast Notification -->
     <transition name="verif-fade">
-      <div v-if="toast" class="verif-toast" :class="`verif-toast--${toast.type}`" role="status" aria-live="polite">
+      <div
+        v-if="toast"
+        class="verif-toast"
+        :class="`verif-toast--${toast.type}`"
+        role="status"
+        aria-live="polite"
+      >
         <div class="verif-toast__dot" />
         <div class="verif-toast__content">
           <strong class="verif-toast__title">{{ toast.title }}</strong>
           <span class="verif-toast__msg">{{ toast.message }}</span>
         </div>
-        <button class="verif-toast__close" aria-label="Tutup notifikasi" @click="toast = null">✕</button>
+        <button class="verif-toast__close" aria-label="Tutup notifikasi" @click="toast = null">
+          ✕
+        </button>
       </div>
     </transition>
 
@@ -157,7 +186,14 @@ function formatDate(iso: string): string {
     <header class="verif-header">
       <div class="verif-header__left">
         <div class="verif-header__icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <path d="m9 11 3 3L22 4" />
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>
@@ -178,14 +214,16 @@ function formatDate(iso: string): string {
       </div>
 
       <div class="verif-header__actions font-mono">
-        <AppButton
-          variant="secondary"
-          size="sm"
-          :loading="isFetching"
-          @click="() => refetch()"
-        >
+        <AppButton variant="secondary" size="sm" :loading="isFetching" @click="() => refetch()">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
@@ -289,7 +327,11 @@ function formatDate(iso: string): string {
       <div class="verif-toolbar__search-group">
         <!-- Class Filter -->
         <div class="verif-filter-wrapper">
-          <select v-model="selectedClassFilter" class="verif-select font-mono" aria-label="Filter Kelas">
+          <select
+            v-model="selectedClassFilter"
+            class="verif-select font-mono"
+            aria-label="Filter Kelas"
+          >
             <option value="all">Semua Kelas</option>
             <option value="A">Kelas A</option>
             <option value="B">Kelas B</option>
@@ -307,7 +349,11 @@ function formatDate(iso: string): string {
 
         <!-- Gender Filter -->
         <div class="verif-filter-wrapper">
-          <select v-model="activeGenderTab" class="verif-select font-mono" aria-label="Filter Gender">
+          <select
+            v-model="activeGenderTab"
+            class="verif-select font-mono"
+            aria-label="Filter Gender"
+          >
             <option value="all">Semua Gender</option>
             <option value="male">Dewasa Putra</option>
             <option value="female">Dewasa Putri</option>
@@ -316,7 +362,15 @@ function formatDate(iso: string): string {
 
         <!-- Search Input -->
         <div class="verif-search-box">
-          <svg class="verif-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="verif-search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -352,23 +406,37 @@ function formatDate(iso: string): string {
     <!-- Error State -->
     <div v-else-if="error" class="verif-empty-state verif-empty-state--error">
       <div class="verif-empty-icon verif-empty-icon--error">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       </div>
       <h3 class="verif-empty-title">Gagal Memuat Antrean Verifikasi</h3>
-      <p class="verif-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat antrean.') }}</p>
-      <AppButton variant="secondary" size="md" @click="() => refetch()">
-        Coba Lagi
-      </AppButton>
+      <p class="verif-empty-desc">
+        {{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat antrean.') }}
+      </p>
+      <AppButton variant="secondary" size="md" @click="() => refetch()"> Coba Lagi </AppButton>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="filteredParticipants.length === 0" class="verif-empty-state">
       <div class="verif-empty-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="m9 12 2 2 4-4" />
         </svg>
@@ -383,12 +451,7 @@ function formatDate(iso: string): string {
             : 'Belum ada antrean peserta pada status ini atau semua peserta telah diverifikasi.'
         }}
       </p>
-      <AppButton
-        v-if="searchQuery"
-        variant="secondary"
-        size="md"
-        @click="searchQuery = ''"
-      >
+      <AppButton v-if="searchQuery" variant="secondary" size="md" @click="searchQuery = ''">
         Reset Pencarian
       </AppButton>
     </div>
@@ -403,15 +466,15 @@ function formatDate(iso: string): string {
         role="listitem"
       >
         <!-- Corner Accent Stripe -->
-        <div
-          class="verif-card__accent"
-          :class="`verif-accent--${part.registration_status}`"
-        />
+        <div class="verif-card__accent" :class="`verif-accent--${part.registration_status}`" />
 
         <!-- Card Header: Status & Class -->
         <header class="verif-card__header">
           <!-- Status Badge -->
-          <div class="verif-status-badge font-mono" :class="`verif-status-badge--${part.registration_status}`">
+          <div
+            class="verif-status-badge font-mono"
+            :class="`verif-status-badge--${part.registration_status}`"
+          >
             <svg
               v-if="part.registration_status === 'verified'"
               width="12"
@@ -441,8 +504,8 @@ function formatDate(iso: string): string {
                 part.registration_status === 'verified'
                   ? 'LOLOS VERIFIKASI'
                   : part.registration_status === 'rejected'
-                  ? 'DITOLAK'
-                  : 'MENUNGGU VERIFIKASI'
+                    ? 'DITOLAK'
+                    : 'MENUNGGU VERIFIKASI'
               }}
             </span>
           </div>
@@ -459,7 +522,9 @@ function formatDate(iso: string): string {
           <div class="verif-card__gender-row font-mono">
             <span
               class="verif-gender-chip"
-              :class="isMaleGender(part.gender) ? 'verif-gender-chip--male' : 'verif-gender-chip--female'"
+              :class="
+                isMaleGender(part.gender) ? 'verif-gender-chip--male' : 'verif-gender-chip--female'
+              "
             >
               {{ isMaleGender(part.gender) ? 'DEWASA PUTRA (MERAH)' : 'DEWASA PUTRI (BIRU)' }}
             </span>
@@ -485,7 +550,14 @@ function formatDate(iso: string): string {
           <!-- State 1: Verified (Lolos) -->
           <template v-if="part.registration_status === 'verified'">
             <div class="verif-verified-label">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span>Sah & Masuk Bagan</span>
@@ -496,7 +568,14 @@ function formatDate(iso: string): string {
               :disabled="processingId === part.id"
               @click="handleSetStatus(part, 'rejected')"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -507,7 +586,14 @@ function formatDate(iso: string): string {
           <!-- State 2: Rejected (Ditolak) -->
           <template v-else-if="part.registration_status === 'rejected'">
             <div class="verif-rejected-label">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -519,7 +605,14 @@ function formatDate(iso: string): string {
               :disabled="processingId === part.id"
               @click="handleSetStatus(part, 'verified')"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               Loloskan Peserta
@@ -534,7 +627,14 @@ function formatDate(iso: string): string {
               :disabled="processingId === part.id"
               @click="handleSetStatus(part, 'rejected')"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -547,7 +647,14 @@ function formatDate(iso: string): string {
               :disabled="processingId === part.id"
               @click="handleSetStatus(part, 'verified')"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               Loloskan
@@ -584,16 +691,52 @@ function formatDate(iso: string): string {
   border: 1px solid var(--border-card, #334155);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
-.verif-toast--success { border-left: 4px solid var(--color-emerald-500, #10b981); }
-.verif-toast--danger { border-left: 4px solid var(--color-primary-600, #dc2626); }
-.verif-toast--info { border-left: 4px solid var(--color-secondary-600, #2563eb); }
-.verif-toast__dot { width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; }
-.verif-toast__content { display: flex; flex-direction: column; gap: 2px; }
-.verif-toast__title { font-size: 0.875rem; font-weight: 700; }
-.verif-toast__msg { font-size: 0.8125rem; color: var(--color-neutral-400, #94a3b8); }
-.verif-toast__close { background: none; border: none; color: var(--color-neutral-500, #64748b); cursor: pointer; font-size: 1rem; }
-.verif-fade-enter-active, .verif-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.verif-fade-enter-from, .verif-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+.verif-toast--success {
+  border-left: 4px solid var(--color-emerald-500, #10b981);
+}
+.verif-toast--danger {
+  border-left: 4px solid var(--color-primary-600, #dc2626);
+}
+.verif-toast--info {
+  border-left: 4px solid var(--color-secondary-600, #2563eb);
+}
+.verif-toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+.verif-toast__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.verif-toast__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.verif-toast__msg {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.verif-toast__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-500, #64748b);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.verif-fade-enter-active,
+.verif-fade-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.verif-fade-enter-from,
+.verif-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 
 /* Header */
 .verif-header {
@@ -607,7 +750,11 @@ function formatDate(iso: string): string {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-lg, 12px);
 }
-.verif-header__left { display: flex; align-items: center; gap: 16px; }
+.verif-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .verif-header__icon-box {
   display: flex;
   align-items: center;
@@ -630,9 +777,18 @@ function formatDate(iso: string): string {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
-.verif-bullet { color: var(--color-neutral-600, #475569); }
-.verif-tag { color: var(--color-emerald-400, #34d399); }
-.verif-pulse-wrapper { display: inline-flex; align-items: center; gap: 5px; color: var(--color-emerald-400, #34d399); }
+.verif-bullet {
+  color: var(--color-neutral-600, #475569);
+}
+.verif-tag {
+  color: var(--color-emerald-400, #34d399);
+}
+.verif-pulse-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-emerald-400, #34d399);
+}
 .verif-pulse-dot {
   width: 6px;
   height: 6px;
@@ -642,8 +798,15 @@ function formatDate(iso: string): string {
   animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 .verif-header__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
@@ -653,7 +816,12 @@ function formatDate(iso: string): string {
   color: #ffffff;
   line-height: 1.2;
 }
-.verif-header__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.verif-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 /* Metrics */
 .verif-metrics {
@@ -672,9 +840,15 @@ function formatDate(iso: string): string {
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
 }
-.verif-metric-card--verified { border-left: 3px solid var(--color-emerald-500, #10b981); }
-.verif-metric-card--pending { border-left: 3px solid #f59e0b; }
-.verif-metric-card--rejected { border-left: 3px solid var(--color-primary-600, #dc2626); }
+.verif-metric-card--verified {
+  border-left: 3px solid var(--color-emerald-500, #10b981);
+}
+.verif-metric-card--pending {
+  border-left: 3px solid #f59e0b;
+}
+.verif-metric-card--rejected {
+  border-left: 3px solid var(--color-primary-600, #dc2626);
+}
 .verif-metric-corner-tag {
   position: absolute;
   top: 10px;
@@ -691,7 +865,12 @@ function formatDate(iso: string): string {
   letter-spacing: 0.08em;
   color: var(--color-neutral-400, #94a3b8);
 }
-.verif-metric-value-row { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.verif-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
 .verif-metric-val {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.875rem;
@@ -699,9 +878,15 @@ function formatDate(iso: string): string {
   color: #ffffff;
   line-height: 1;
 }
-.verif-val-emerald { color: #34d399; }
-.verif-val-amber { color: #fbbf24; }
-.verif-val-red { color: #f87171; }
+.verif-val-emerald {
+  color: #34d399;
+}
+.verif-val-amber {
+  color: #fbbf24;
+}
+.verif-val-red {
+  color: #f87171;
+}
 .verif-metric-badge {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -710,10 +895,23 @@ function formatDate(iso: string): string {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-neutral-400, #94a3b8);
 }
-.verif-badge-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.verif-badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.verif-badge-red { background: rgba(220, 38, 38, 0.15); color: #f87171; }
-.verif-metric-desc { font-size: 0.75rem; color: var(--color-neutral-500, #64748b); margin-top: 2px; }
+.verif-badge-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+.verif-badge-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+.verif-badge-red {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+}
+.verif-metric-desc {
+  font-size: 0.75rem;
+  color: var(--color-neutral-500, #64748b);
+  margin-top: 2px;
+}
 
 /* Toolbar */
 .verif-toolbar {
@@ -727,7 +925,12 @@ function formatDate(iso: string): string {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
 }
-.verif-toolbar__tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.verif-toolbar__tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .verif-tab-btn {
   display: inline-flex;
   align-items: center;
@@ -742,15 +945,44 @@ function formatDate(iso: string): string {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.verif-tab-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
-.verif-tab-btn--active { background: rgba(255, 255, 255, 0.1); color: #ffffff; border-color: rgba(255, 255, 255, 0.15); }
-.verif-tab-btn--active-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.4); }
-.verif-tab-btn--active-verified { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
-.verif-tab-btn--active-rejected { background: rgba(220, 38, 38, 0.15); color: #fca5a5; border-color: rgba(220, 38, 38, 0.4); }
-.verif-tab-dot { width: 6px; height: 6px; border-radius: 50%; }
-.verif-dot-pending { background-color: #f59e0b; }
-.verif-dot-verified { background-color: var(--color-emerald-400, #34d399); }
-.verif-dot-rejected { background-color: var(--color-primary-500, #ef4444); }
+.verif-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+.verif-tab-btn--active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.verif-tab-btn--active-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.verif-tab-btn--active-verified {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.verif-tab-btn--active-rejected {
+  background: rgba(220, 38, 38, 0.15);
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.4);
+}
+.verif-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.verif-dot-pending {
+  background-color: #f59e0b;
+}
+.verif-dot-verified {
+  background-color: var(--color-emerald-400, #34d399);
+}
+.verif-dot-rejected {
+  background-color: var(--color-primary-500, #ef4444);
+}
 
 .verif-toolbar__search-group {
   display: flex;
@@ -771,8 +1003,19 @@ function formatDate(iso: string): string {
   outline: none;
   cursor: pointer;
 }
-.verif-search-box { position: relative; display: flex; align-items: center; flex: 1; min-width: 200px; }
-.verif-search-icon { position: absolute; left: 10px; color: var(--color-neutral-500, #64748b); pointer-events: none; }
+.verif-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+.verif-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-neutral-500, #64748b);
+  pointer-events: none;
+}
 .verif-search-input {
   width: 100%;
   padding: 8px 32px 8px 34px;
@@ -783,8 +1026,18 @@ function formatDate(iso: string): string {
   font-size: 0.75rem;
   outline: none;
 }
-.verif-search-input:focus { border-color: var(--color-emerald-400, #34d399); }
-.verif-search-clear { position: absolute; right: 10px; background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 0.8125rem; }
+.verif-search-input:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.verif-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
 
 /* Grid */
 .verif-grid {
@@ -793,10 +1046,14 @@ function formatDate(iso: string): string {
   gap: 16px;
 }
 @container (min-width: 640px) {
-  .verif-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .verif-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @container (min-width: 1024px) {
-  .verif-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .verif-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* Card */
@@ -809,17 +1066,33 @@ function formatDate(iso: string): string {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .verif-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
-.verif-card__accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-.verif-accent--verified { background: linear-gradient(90deg, #059669, #10b981); }
-.verif-accent--pending, .verif-accent--registered { background: linear-gradient(90deg, #d97706, #f59e0b); }
-.verif-accent--rejected { background: linear-gradient(90deg, #dc2626, #ef4444); }
+.verif-card__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.verif-accent--verified {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+.verif-accent--pending,
+.verif-accent--registered {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+.verif-accent--rejected {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+}
 
 .verif-card__header {
   display: flex;
@@ -837,19 +1110,60 @@ function formatDate(iso: string): string {
   border-radius: 4px;
   letter-spacing: 0.05em;
 }
-.verif-status-badge--verified { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.verif-status-badge--pending, .verif-status-badge--registered { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-.verif-status-badge--rejected { background: rgba(220, 38, 38, 0.15); color: #f87171; border: 1px solid rgba(220, 38, 38, 0.3); }
-.verif-status-dot-pending { width: 5px; height: 5px; border-radius: 50%; background: #fbbf24; }
+.verif-status-badge--verified {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.verif-status-badge--pending,
+.verif-status-badge--registered {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.verif-status-badge--rejected {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+.verif-status-dot-pending {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fbbf24;
+}
 
-.verif-class-tag { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.5625rem; color: var(--color-neutral-400, #94a3b8); }
-.verif-class-tag strong { font-size: 1.125rem; font-weight: 800; color: #ffffff; line-height: 1; }
+.verif-class-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.5625rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.verif-class-tag strong {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+}
 
-.verif-card__content { padding: 0 18px 14px 18px; }
-.verif-card__gender-row { margin-bottom: 6px; }
-.verif-gender-chip { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.05em; }
-.verif-gender-chip--male { color: #fca5a5; }
-.verif-gender-chip--female { color: #93c5fd; }
+.verif-card__content {
+  padding: 0 18px 14px 18px;
+}
+.verif-card__gender-row {
+  margin-bottom: 6px;
+}
+.verif-gender-chip {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.verif-gender-chip--male {
+  color: #fca5a5;
+}
+.verif-gender-chip--female {
+  color: #93c5fd;
+}
 .verif-card__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.125rem;
@@ -867,11 +1181,29 @@ function formatDate(iso: string): string {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
 }
-.verif-spec-item { display: flex; justify-content: space-between; align-items: center; }
-.verif-spec-label { font-size: 0.5625rem; color: var(--color-neutral-500, #64748b); }
-.verif-spec-value { font-size: 0.75rem; color: #ffffff; font-weight: 600; }
-.verif-spec-sub { font-size: 0.6875rem; color: var(--color-neutral-400, #94a3b8); }
-.verif-spec-divider { height: 1px; background: rgba(255, 255, 255, 0.06); margin: 2px 0; }
+.verif-spec-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.verif-spec-label {
+  font-size: 0.5625rem;
+  color: var(--color-neutral-500, #64748b);
+}
+.verif-spec-value {
+  font-size: 0.75rem;
+  color: #ffffff;
+  font-weight: 600;
+}
+.verif-spec-sub {
+  font-size: 0.6875rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.verif-spec-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 2px 0;
+}
 
 .verif-card__footer {
   display: flex;
@@ -983,18 +1315,40 @@ function formatDate(iso: string): string {
   gap: 12px;
 }
 .skeleton-line {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
 }
-.skeleton-header { width: 45%; height: 20px; }
-.skeleton-title { width: 75%; height: 24px; }
-.skeleton-specs { width: 100%; height: 36px; }
-.skeleton-btn { width: 100%; height: 32px; margin-top: auto; }
+.skeleton-header {
+  width: 45%;
+  height: 20px;
+}
+.skeleton-title {
+  width: 75%;
+  height: 24px;
+}
+.skeleton-specs {
+  width: 100%;
+  height: 36px;
+}
+.skeleton-btn {
+  width: 100%;
+  height: 32px;
+  margin-top: auto;
+}
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Empty State */
@@ -1020,7 +1374,10 @@ function formatDate(iso: string): string {
   color: var(--color-neutral-400, #94a3b8);
   margin-bottom: 16px;
 }
-.verif-empty-icon--error { background: rgba(220, 38, 38, 0.15); color: var(--color-primary-400, #f87171); }
+.verif-empty-icon--error {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--color-primary-400, #f87171);
+}
 .verif-empty-title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.25rem;

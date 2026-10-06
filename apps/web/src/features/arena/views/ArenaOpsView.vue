@@ -14,10 +14,7 @@ import {
   useCompetitionsQuery,
 } from '@/features/competitions/api/competitionQueries'
 import type { CompetitionFilterValues } from '@/features/competitions/types/competition.schema'
-import {
-  createArenaSchema,
-  type Arena,
-} from '../types/arena.schema'
+import { createArenaSchema, type Arena } from '../types/arena.schema'
 
 const props = withDefaults(
   defineProps<{
@@ -25,7 +22,7 @@ const props = withDefaults(
   }>(),
   {
     competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
-  }
+  },
 )
 
 const emit = defineEmits<{
@@ -55,10 +52,16 @@ const arenas = computed(() => rawArenas.value || [])
 const searchQuery = ref('')
 
 // Toast State
-const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
+const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
+  null,
+)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
+function showToast(
+  title: string,
+  message: string,
+  type: 'success' | 'danger' | 'info' = 'success',
+) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
   toastTimer = setTimeout(() => {
@@ -109,8 +112,13 @@ async function handleSubmitArena() {
         compId: targetId,
       })
       const targetCompName =
-        availableCompetitions.value.find((c) => c.id === targetId)?.name || activeCompetitionName.value
-      showToast('Gelanggang Dibuat', `${created.name} berhasil ditambahkan ke ${targetCompName}.`, 'success')
+        availableCompetitions.value.find((c) => c.id === targetId)?.name ||
+        activeCompetitionName.value
+      showToast(
+        'Gelanggang Dibuat',
+        `${created.name} berhasil ditambahkan ke ${targetCompName}.`,
+        'success',
+      )
 
       if (targetId !== activeCompId.value) {
         emit('switchCompetition', targetId)
@@ -120,11 +128,19 @@ async function handleSubmitArena() {
         id: editingArenaId.value,
         name: arenaName.value.trim(),
       })
-      showToast('Gelanggang Diperbarui', `Nama gelanggang diubah menjadi ${updated.name}.`, 'success')
+      showToast(
+        'Gelanggang Diperbarui',
+        `Nama gelanggang diubah menjadi ${updated.name}.`,
+        'success',
+      )
     }
     isModalOpen.value = false
   } catch (err) {
-    showToast('Terjadi Kesalahan', getErrorMessage(err, 'Gagal menyimpan data gelanggang.'), 'danger')
+    showToast(
+      'Terjadi Kesalahan',
+      getErrorMessage(err, 'Gagal menyimpan data gelanggang.'),
+      'danger',
+    )
   }
 }
 
@@ -152,14 +168,10 @@ async function handleSeedStandard() {
       showToast(
         'Template Gelanggang Diterapkan',
         `${result.created} gelanggang standar berhasil dibuat (${result.skipped} gelanggang dilewati).`,
-        'success'
+        'success',
       )
     } else {
-      showToast(
-        'Gelanggang Sudah Siap',
-        'Gelanggang standar kompetisi sudah terdaftar.',
-        'info'
-      )
+      showToast('Gelanggang Sudah Siap', 'Gelanggang standar kompetisi sudah terdaftar.', 'info')
     }
   } catch (err) {
     showToast('Gagal Menerapkan Template', getErrorMessage(err, 'Terjadi gangguan.'), 'danger')
@@ -190,13 +202,21 @@ const filteredArenas = computed(() => {
   <div class="arena-ops @container" role="region" aria-label="Manajemen dan Monitoring Gelanggang">
     <!-- Toast Notification -->
     <transition name="arena-fade">
-      <div v-if="toast" class="arena-toast" :class="`arena-toast--${toast.type}`" role="status" aria-live="polite">
+      <div
+        v-if="toast"
+        class="arena-toast"
+        :class="`arena-toast--${toast.type}`"
+        role="status"
+        aria-live="polite"
+      >
         <div class="arena-toast__dot" />
         <div class="arena-toast__content">
           <strong class="arena-toast__title">{{ toast.title }}</strong>
           <span class="arena-toast__msg">{{ toast.message }}</span>
         </div>
-        <button class="arena-toast__close" aria-label="Tutup notifikasi" @click="toast = null">✕</button>
+        <button class="arena-toast__close" aria-label="Tutup notifikasi" @click="toast = null">
+          ✕
+        </button>
       </div>
     </transition>
 
@@ -204,7 +224,14 @@ const filteredArenas = computed(() => {
     <header class="arena-header">
       <div class="arena-header__left">
         <div class="arena-header__icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <circle cx="12" cy="12" r="4" />
           </svg>
@@ -225,14 +252,16 @@ const filteredArenas = computed(() => {
       </div>
 
       <div class="arena-header__actions font-mono">
-        <AppButton
-          variant="secondary"
-          size="sm"
-          :loading="isFetching"
-          @click="() => refetch()"
-        >
+        <AppButton variant="secondary" size="sm" :loading="isFetching" @click="() => refetch()">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
@@ -249,7 +278,14 @@ const filteredArenas = computed(() => {
           @click="handleSeedStandard"
         >
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <rect width="7" height="7" x="3" y="3" rx="1" />
               <rect width="7" height="7" x="14" y="3" rx="1" />
               <rect width="7" height="7" x="14" y="14" rx="1" />
@@ -259,13 +295,16 @@ const filteredArenas = computed(() => {
           Template Standar (Gelanggang A-D)
         </AppButton>
 
-        <AppButton
-          variant="emerald"
-          size="sm"
-          @click="openCreateModal"
-        >
+        <AppButton variant="emerald" size="sm" @click="openCreateModal">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -321,7 +360,15 @@ const filteredArenas = computed(() => {
 
       <div class="arena-toolbar__search-group">
         <div class="arena-search-box">
-          <svg class="arena-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="arena-search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -357,23 +404,37 @@ const filteredArenas = computed(() => {
     <!-- Error State -->
     <div v-else-if="error" class="arena-empty-state arena-empty-state--error">
       <div class="arena-empty-icon arena-empty-icon--error">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       </div>
       <h3 class="arena-empty-title">Gagal Memuat Gelanggang</h3>
-      <p class="arena-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat gelanggang.') }}</p>
-      <AppButton variant="secondary" size="md" @click="() => refetch()">
-        Coba Lagi
-      </AppButton>
+      <p class="arena-empty-desc">
+        {{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat gelanggang.') }}
+      </p>
+      <AppButton variant="secondary" size="md" @click="() => refetch()"> Coba Lagi </AppButton>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="filteredArenas.length === 0" class="arena-empty-state">
       <div class="arena-empty-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
           <rect width="18" height="18" x="3" y="3" rx="2" />
           <circle cx="12" cy="12" r="4" />
         </svg>
@@ -390,12 +451,7 @@ const filteredArenas = computed(() => {
       </p>
 
       <div class="arena-empty-actions font-mono">
-        <AppButton
-          v-if="searchQuery"
-          variant="secondary"
-          size="md"
-          @click="searchQuery = ''"
-        >
+        <AppButton v-if="searchQuery" variant="secondary" size="md" @click="searchQuery = ''">
           Reset Pencarian
         </AppButton>
         <template v-else>
@@ -407,11 +463,7 @@ const filteredArenas = computed(() => {
           >
             Terapkan Gelanggang Standar (A s/d D)
           </AppButton>
-          <AppButton
-            variant="secondary"
-            size="md"
-            @click="openCreateModal"
-          >
+          <AppButton variant="secondary" size="md" @click="openCreateModal">
             Tambah Gelanggang Kustom
           </AppButton>
         </template>
@@ -420,12 +472,7 @@ const filteredArenas = computed(() => {
 
     <!-- Responsive Cards Grid -->
     <div v-else class="arena-grid" role="list">
-      <article
-        v-for="arena in filteredArenas"
-        :key="arena.id"
-        class="arena-card"
-        role="listitem"
-      >
+      <article v-for="arena in filteredArenas" :key="arena.id" class="arena-card" role="listitem">
         <!-- Corner Accent Stripe -->
         <div class="arena-card__accent" />
 
@@ -465,7 +512,14 @@ const filteredArenas = computed(() => {
               title="Buka layar scoreboard arena di tab baru"
               @click="openScoreboard(arena)"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <rect width="20" height="14" x="2" y="3" rx="2" />
                 <line x1="8" y1="21" x2="16" y2="21" />
                 <line x1="12" y1="17" x2="12" y2="21" />
@@ -479,7 +533,14 @@ const filteredArenas = computed(() => {
               title="Buka konsol wasit / dewan juri"
               @click="openRefereeConsole"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path d="M12 2v20" />
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
               </svg>
@@ -490,13 +551,16 @@ const filteredArenas = computed(() => {
 
         <!-- Footer -->
         <footer class="arena-card__footer font-mono">
-          <button
-            type="button"
-            class="arena-select-btn"
-            @click="emit('selectArena', arena)"
-          >
+          <button type="button" class="arena-select-btn" @click="emit('selectArena', arena)">
             <span>Pilih untuk Bagan</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
@@ -508,7 +572,14 @@ const filteredArenas = computed(() => {
               title="Ubah nama gelanggang"
               @click="openEditModal(arena)"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
               </svg>
             </button>
@@ -520,7 +591,14 @@ const filteredArenas = computed(() => {
               :disabled="deletingId === arena.id"
               @click="handleDeleteArena(arena)"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path d="M3 6h18" />
                 <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                 <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
@@ -548,15 +626,11 @@ const filteredArenas = computed(() => {
               {{ modalMode === 'create' ? 'Tambah Gelanggang Baru' : 'Ubah Data Gelanggang' }}
             </h3>
           </div>
-          <button
-            class="arena-modal__close"
-            aria-label="Tutup dialog"
-            @click="isModalOpen = false"
-          >
+          <button class="arena-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
           </button>
         </header>
- 
+
         <form class="arena-modal__body" @submit.prevent="handleSubmitArena">
           <!-- Interactive Competition Selector in Modal -->
           <div class="arena-form-group">
@@ -571,11 +645,7 @@ const filteredArenas = computed(() => {
                 :disabled="modalMode === 'edit'"
               >
                 <template v-if="availableCompetitions.length > 0">
-                  <option
-                    v-for="c in availableCompetitions"
-                    :key="c.id"
-                    :value="c.id"
-                  >
+                  <option v-for="c in availableCompetitions" :key="c.id" :value="c.id">
                     {{ c.name }} ({{ c.status.toUpperCase() }})
                   </option>
                 </template>
@@ -585,7 +655,11 @@ const filteredArenas = computed(() => {
               </select>
             </div>
             <span class="arena-form-help font-mono">
-              {{ modalMode === 'create' ? 'Pilih kejuaraan tempat gelanggang ini akan didaftarkan.' : 'Kejuaraan tempat gelanggang ini terdaftar.' }}
+              {{
+                modalMode === 'create'
+                  ? 'Pilih kejuaraan tempat gelanggang ini akan didaftarkan.'
+                  : 'Kejuaraan tempat gelanggang ini terdaftar.'
+              }}
             </span>
           </div>
 
@@ -603,16 +677,13 @@ const filteredArenas = computed(() => {
               required
             />
             <span v-if="formError" class="arena-form-error">{{ formError }}</span>
-            <span class="arena-form-help font-mono">Nama gelanggang resmi yang akan ditampilkan pada layar pertandingan.</span>
+            <span class="arena-form-help font-mono"
+              >Nama gelanggang resmi yang akan ditampilkan pada layar pertandingan.</span
+            >
           </div>
 
           <footer class="arena-modal__footer font-mono">
-            <AppButton
-              type="button"
-              variant="secondary"
-              size="md"
-              @click="isModalOpen = false"
-            >
+            <AppButton type="button" variant="secondary" size="md" @click="isModalOpen = false">
               Batal
             </AppButton>
             <AppButton
@@ -655,16 +726,52 @@ const filteredArenas = computed(() => {
   border: 1px solid var(--border-card, #334155);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
-.arena-toast--success { border-left: 4px solid var(--color-emerald-500, #10b981); }
-.arena-toast--danger { border-left: 4px solid var(--color-primary-600, #dc2626); }
-.arena-toast--info { border-left: 4px solid var(--color-secondary-600, #2563eb); }
-.arena-toast__dot { width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; }
-.arena-toast__content { display: flex; flex-direction: column; gap: 2px; }
-.arena-toast__title { font-size: 0.875rem; font-weight: 700; }
-.arena-toast__msg { font-size: 0.8125rem; color: var(--color-neutral-400, #94a3b8); }
-.arena-toast__close { background: none; border: none; color: var(--color-neutral-500, #64748b); cursor: pointer; font-size: 1rem; }
-.arena-fade-enter-active, .arena-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.arena-fade-enter-from, .arena-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+.arena-toast--success {
+  border-left: 4px solid var(--color-emerald-500, #10b981);
+}
+.arena-toast--danger {
+  border-left: 4px solid var(--color-primary-600, #dc2626);
+}
+.arena-toast--info {
+  border-left: 4px solid var(--color-secondary-600, #2563eb);
+}
+.arena-toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+.arena-toast__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.arena-toast__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.arena-toast__msg {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.arena-toast__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-500, #64748b);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.arena-fade-enter-active,
+.arena-fade-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.arena-fade-enter-from,
+.arena-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 
 /* Header */
 .arena-header {
@@ -678,7 +785,11 @@ const filteredArenas = computed(() => {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-lg, 12px);
 }
-.arena-header__left { display: flex; align-items: center; gap: 16px; }
+.arena-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .arena-header__icon-box {
   display: flex;
   align-items: center;
@@ -701,9 +812,18 @@ const filteredArenas = computed(() => {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
-.arena-bullet { color: var(--color-neutral-600, #475569); }
-.arena-tag { color: var(--color-primary-400, #f87171); }
-.arena-pulse-wrapper { display: inline-flex; align-items: center; gap: 5px; color: var(--color-emerald-400, #34d399); }
+.arena-bullet {
+  color: var(--color-neutral-600, #475569);
+}
+.arena-tag {
+  color: var(--color-primary-400, #f87171);
+}
+.arena-pulse-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-emerald-400, #34d399);
+}
 .arena-pulse-dot {
   width: 6px;
   height: 6px;
@@ -713,8 +833,15 @@ const filteredArenas = computed(() => {
   animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 .arena-header__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
@@ -724,7 +851,12 @@ const filteredArenas = computed(() => {
   color: #ffffff;
   line-height: 1.2;
 }
-.arena-header__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arena-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 /* Metrics */
 .arena-metrics {
@@ -743,7 +875,9 @@ const filteredArenas = computed(() => {
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
 }
-.arena-metric-card--active { border-left: 3px solid var(--color-emerald-500, #10b981); }
+.arena-metric-card--active {
+  border-left: 3px solid var(--color-emerald-500, #10b981);
+}
 .arena-metric-corner-tag {
   position: absolute;
   top: 10px;
@@ -760,7 +894,12 @@ const filteredArenas = computed(() => {
   letter-spacing: 0.08em;
   color: var(--color-neutral-400, #94a3b8);
 }
-.arena-metric-value-row { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.arena-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
 .arena-metric-val {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.875rem;
@@ -774,7 +913,10 @@ const filteredArenas = computed(() => {
   color: #ffffff;
   line-height: 1;
 }
-.text-emerald { color: var(--color-emerald-400, #34d399) !important; font-size: 1.25rem; }
+.text-emerald {
+  color: var(--color-emerald-400, #34d399) !important;
+  font-size: 1.25rem;
+}
 .arena-metric-badge {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -783,7 +925,11 @@ const filteredArenas = computed(() => {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-neutral-400, #94a3b8);
 }
-.arena-metric-desc { font-size: 0.75rem; color: var(--color-neutral-500, #64748b); margin-top: 2px; }
+.arena-metric-desc {
+  font-size: 0.75rem;
+  color: var(--color-neutral-500, #64748b);
+  margin-top: 2px;
+}
 
 /* Toolbar */
 .arena-toolbar {
@@ -797,11 +943,40 @@ const filteredArenas = computed(() => {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
 }
-.arena-toolbar__info { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 700; color: #ffffff; }
-.arena-indicator-dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-emerald-400, #34d399); }
-.arena-toolbar__search-group { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 380px; justify-content: flex-end; }
-.arena-search-box { position: relative; display: flex; align-items: center; width: 100%; }
-.arena-search-icon { position: absolute; left: 10px; color: var(--color-neutral-500, #64748b); pointer-events: none; }
+.arena-toolbar__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+.arena-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-emerald-400, #34d399);
+}
+.arena-toolbar__search-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 380px;
+  justify-content: flex-end;
+}
+.arena-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.arena-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-neutral-500, #64748b);
+  pointer-events: none;
+}
 .arena-search-input {
   width: 100%;
   padding: 8px 32px 8px 34px;
@@ -812,8 +987,18 @@ const filteredArenas = computed(() => {
   font-size: 0.75rem;
   outline: none;
 }
-.arena-search-input:focus { border-color: var(--color-emerald-400, #34d399); }
-.arena-search-clear { position: absolute; right: 10px; background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 0.8125rem; }
+.arena-search-input:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.arena-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
 
 /* Grid */
 .arena-grid {
@@ -822,10 +1007,14 @@ const filteredArenas = computed(() => {
   gap: 16px;
 }
 @container (min-width: 640px) {
-  .arena-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arena-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @container (min-width: 1024px) {
-  .arena-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .arena-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* Card */
@@ -838,7 +1027,10 @@ const filteredArenas = computed(() => {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .arena-card:hover {
   transform: translateY(-2px);
@@ -860,7 +1052,11 @@ const filteredArenas = computed(() => {
   align-items: center;
   padding: 16px 18px 10px 18px;
 }
-.arena-card__badge-row { display: flex; align-items: center; gap: 6px; }
+.arena-card__badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .arena-badge-mat {
   display: inline-flex;
   align-items: center;
@@ -873,11 +1069,24 @@ const filteredArenas = computed(() => {
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
-.arena-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: #34d399; }
-.arena-badge-status { font-size: 0.625rem; color: var(--color-neutral-400, #94a3b8); }
-.arena-chip-id { font-size: 0.625rem; color: var(--color-neutral-500, #64748b); }
+.arena-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #34d399;
+}
+.arena-badge-status {
+  font-size: 0.625rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.arena-chip-id {
+  font-size: 0.625rem;
+  color: var(--color-neutral-500, #64748b);
+}
 
-.arena-card__content { padding: 0 18px 14px 18px; }
+.arena-card__content {
+  padding: 0 18px 14px 18px;
+}
 .arena-card__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.25rem;
@@ -896,11 +1105,27 @@ const filteredArenas = computed(() => {
   border-radius: 6px;
   margin-bottom: 12px;
 }
-.arena-spec-row { display: flex; justify-content: space-between; align-items: center; }
-.arena-spec-label { font-size: 0.5625rem; color: var(--color-neutral-500, #64748b); font-weight: 600; }
-.arena-spec-val { font-size: 0.6875rem; color: #ffffff; font-weight: 700; }
+.arena-spec-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.arena-spec-label {
+  font-size: 0.5625rem;
+  color: var(--color-neutral-500, #64748b);
+  font-weight: 600;
+}
+.arena-spec-val {
+  font-size: 0.6875rem;
+  color: #ffffff;
+  font-weight: 700;
+}
 
-.arena-links-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.arena-links-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
 .arena-link-btn {
   display: inline-flex;
   align-items: center;
@@ -962,7 +1187,11 @@ const filteredArenas = computed(() => {
   border-color: rgba(16, 185, 129, 0.4);
   color: #34d399;
 }
-.arena-manage-btns { display: flex; align-items: center; gap: 4px; }
+.arena-manage-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .arena-btn-icon {
   display: flex;
   align-items: center;
@@ -976,8 +1205,14 @@ const filteredArenas = computed(() => {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.arena-btn-icon:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
-.arena-btn-icon--danger:hover { background: rgba(220, 38, 38, 0.2); color: #f87171; }
+.arena-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+.arena-btn-icon--danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
 
 /* Skeleton */
 .arena-skeleton-card {
@@ -991,18 +1226,40 @@ const filteredArenas = computed(() => {
   gap: 12px;
 }
 .skeleton-line {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
 }
-.skeleton-header { width: 45%; height: 20px; }
-.skeleton-title { width: 70%; height: 26px; }
-.skeleton-specs { width: 100%; height: 48px; }
-.skeleton-btn { width: 100%; height: 32px; margin-top: auto; }
+.skeleton-header {
+  width: 45%;
+  height: 20px;
+}
+.skeleton-title {
+  width: 70%;
+  height: 26px;
+}
+.skeleton-specs {
+  width: 100%;
+  height: 48px;
+}
+.skeleton-btn {
+  width: 100%;
+  height: 32px;
+  margin-top: auto;
+}
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Empty State */
@@ -1028,7 +1285,10 @@ const filteredArenas = computed(() => {
   color: var(--color-neutral-400, #94a3b8);
   margin-bottom: 16px;
 }
-.arena-empty-icon--error { background: rgba(220, 38, 38, 0.15); color: var(--color-primary-400, #f87171); }
+.arena-empty-icon--error {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--color-primary-400, #f87171);
+}
 .arena-empty-title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.25rem;
@@ -1043,7 +1303,11 @@ const filteredArenas = computed(() => {
   line-height: 1.5;
   margin-bottom: 20px;
 }
-.arena-empty-actions { display: flex; align-items: center; gap: 12px; }
+.arena-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
 /* Modal */
 .arena-modal-overlay {
@@ -1086,11 +1350,33 @@ const filteredArenas = computed(() => {
   font-weight: 800;
   color: #ffffff;
 }
-.arena-modal__close { background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 1.25rem; }
-.arena-modal__body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
-.arena-form-group { display: flex; flex-direction: column; gap: 6px; }
-.arena-form-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; color: var(--color-neutral-300, #cbd5e1); }
-.arena-req { color: var(--color-primary-500, #ef4444); }
+.arena-modal__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+.arena-modal__body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.arena-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.arena-form-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-300, #cbd5e1);
+}
+.arena-req {
+  color: var(--color-primary-500, #ef4444);
+}
 .arena-form-input {
   width: 100%;
   padding: 10px 14px;
@@ -1119,11 +1405,11 @@ const filteredArenas = computed(() => {
 .target-comp-label {
   font-size: 0.625rem;
   font-weight: 700;
-  color: #F59E0B;
+  color: #f59e0b;
   letter-spacing: 0.06em;
 }
 .arena-comp-badge {
-  color: #F59E0B;
+  color: #f59e0b;
   font-weight: 700;
 }
 .arena-form-select {
@@ -1151,5 +1437,10 @@ const filteredArenas = computed(() => {
   color: var(--color-neutral-400, #94a3b8);
   margin-top: 2px;
 }
-.arena-modal__footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.arena-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
 </style>

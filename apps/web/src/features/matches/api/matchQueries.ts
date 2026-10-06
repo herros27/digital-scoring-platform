@@ -7,8 +7,7 @@ export const matchKeys = {
   lists: () => [...matchKeys.all, 'list'] as const,
   list: (compId: string, status?: string) =>
     [...matchKeys.lists(), compId, status || 'all'] as const,
-  detail: (compId: string, id: string) =>
-    [...matchKeys.all, 'detail', compId, id] as const,
+  detail: (compId: string, id: string) => [...matchKeys.all, 'detail', compId, id] as const,
 }
 
 /**
@@ -59,8 +58,15 @@ export function useCreateMatchMutation(compId: Ref<string>) {
 export function useLoadArenaMutation(compId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ matchId, arenaId, rulesetPath }: { matchId: string; arenaId: string; rulesetPath?: string }) =>
-      matchService.loadArena(compId.value, matchId, arenaId, rulesetPath),
+    mutationFn: ({
+      matchId,
+      arenaId,
+      rulesetPath,
+    }: {
+      matchId: string
+      arenaId: string
+      rulesetPath?: string
+    }) => matchService.loadArena(compId.value, matchId, arenaId, rulesetPath),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: matchKeys.lists() })
     },

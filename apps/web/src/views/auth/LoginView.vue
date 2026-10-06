@@ -1,29 +1,29 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/api/error'
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { AppButton, AppInput } from "@/components/ui";
-import { useAuthStore } from "@/stores/auth";
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { AppButton, AppInput } from '@/components/ui'
+import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
 
-const router = useRouter();
-const authStore = useAuthStore();
+const router = useRouter()
+const authStore = useAuthStore()
 
-const email = ref("");
-const password = ref("");
-const rememberMe = ref(true);
-const isLoading = ref(false);
-const errorMessage = ref("");
-const showPassword = ref(false);
+const email = ref('')
+const password = ref('')
+const rememberMe = ref(true)
+const isLoading = ref(false)
+const errorMessage = ref('')
+const showPassword = ref(false)
 
 async function handleLogin() {
   if (!email.value || !password.value) {
-    errorMessage.value = "Harap isi alamat email dan kata sandi Anda.";
-    return;
+    errorMessage.value = 'Harap isi alamat email dan kata sandi Anda.'
+    return
   }
 
-  isLoading.value = true;
-  errorMessage.value = "";
+  isLoading.value = true
+  errorMessage.value = ''
 
   try {
     // 1. Coba login sebagai Petugas Pertandingan (Admin, Dewan, Operator, Wasit)
@@ -31,25 +31,25 @@ async function handleLogin() {
       const res = await authService.officialLogin({
         email: email.value.trim(),
         password: password.value,
-      });
+      })
 
-      const role = res.user?.role || "admin";
+      const role = res.user?.role || 'admin'
       authStore.setSession({
         token: res.token,
         role: role,
-        name: res.user?.name || "Ofisial Pertandingan",
+        name: res.user?.name || 'Ofisial Pertandingan',
         email: res.user?.email,
-      });
+      })
 
       // Redirect otomatis sesuai wewenang
-      if (role === "admin" || role === "dewan") {
-        router.push("/ops?tab=kompetisi");
-      } else if (role === "wasit") {
-        router.push("/referee");
+      if (role === 'admin' || role === 'dewan') {
+        router.push('/ops?tab=kompetisi')
+      } else if (role === 'wasit') {
+        router.push('/referee')
       } else {
-        router.push("/ops?tab=kompetisi");
+        router.push('/ops?tab=kompetisi')
       }
-      return;
+      return
     } catch {
       // Jika bukan akun ofisial, coba login sebagai Manajer Kontingen
     }
@@ -58,57 +58,56 @@ async function handleLogin() {
     const contRes = await authService.contingentLogin({
       email: email.value.trim(),
       password: password.value,
-    });
+    })
 
     authStore.setSession({
       token: contRes.token,
-      role: "contingent",
+      role: 'contingent',
       name: contRes.contingent?.name,
       email: contRes.contingent?.email,
       contingentId: contRes.contingent?.id,
-    });
+    })
 
-    router.push("/ops?tab=atlet");
+    router.push('/ops?tab=atlet')
   } catch (err) {
-    errorMessage.value =
-      getErrorMessage(err, "Alamat email atau kata sandi tidak sesuai.");
+    errorMessage.value = getErrorMessage(err, 'Alamat email atau kata sandi tidak sesuai.')
   } finally {
-    isLoading.value = false;
+    isLoading.value = false
   }
 }
 
 // Preset demo akun untuk kemudahan demonstrasi
-function fillDemo(type: "admin" | "contingent") {
-  if (type === "admin") {
-    email.value = "admin@silat.id";
-    password.value = "AdminSecret123!";
+function fillDemo(type: 'admin' | 'contingent') {
+  if (type === 'admin') {
+    email.value = 'admin@silat.id'
+    password.value = 'AdminSecret123!'
   } else {
-    email.value = "tapaksuci@example.com";
-    password.value = "Secret123!";
+    email.value = 'tapaksuci@example.com'
+    password.value = 'Secret123!'
   }
-  errorMessage.value = "";
+  errorMessage.value = ''
 }
 
 async function handleLogoutSession() {
-  isLoading.value = true;
+  isLoading.value = true
   try {
-    await authStore.logout();
-    email.value = "";
-    password.value = "";
+    await authStore.logout()
+    email.value = ''
+    password.value = ''
   } finally {
-    isLoading.value = false;
+    isLoading.value = false
   }
 }
 
 function handleContinueSession() {
-  if (authStore.role === "admin" || authStore.role === "dewan") {
-    router.push("/ops?tab=kompetisi");
-  } else if (authStore.role === "wasit") {
-    router.push("/referee");
-  } else if (authStore.role === "contingent") {
-    router.push("/ops?tab=atlet");
+  if (authStore.role === 'admin' || authStore.role === 'dewan') {
+    router.push('/ops?tab=kompetisi')
+  } else if (authStore.role === 'wasit') {
+    router.push('/referee')
+  } else if (authStore.role === 'contingent') {
+    router.push('/ops?tab=atlet')
   } else {
-    router.push("/ops?tab=kompetisi");
+    router.push('/ops?tab=kompetisi')
   }
 }
 </script>
@@ -127,22 +126,19 @@ function handleContinueSession() {
             stroke="currentColor"
             stroke-width="2.2"
             stroke-linecap="round"
-            stroke-linejoin="round">
+            stroke-linejoin="round"
+          >
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M2 17l10 5 10-5" />
             <path d="M2 12l10 5 10-5" />
           </svg>
         </div>
         <h1 class="brand-title">Digital Scoring Silat</h1>
-        <p class="brand-subtitle">
-          Masuk ke sistem pertandingan & pendaftaran kontingen
-        </p>
+        <p class="brand-subtitle">Masuk ke sistem pertandingan & pendaftaran kontingen</p>
       </header>
 
       <!-- Active Session Notice -->
-      <div
-        v-if="authStore.isAuthenticated"
-        class="active-session-banner font-mono">
+      <div v-if="authStore.isAuthenticated" class="active-session-banner font-mono">
         <div class="active-session-info">
           <div class="active-session-dot" />
           <span
@@ -152,28 +148,22 @@ function handleContinueSession() {
           >
         </div>
         <div class="active-session-actions">
-          <button
-            type="button"
-            class="btn-session-dash font-mono"
-            @click="handleContinueSession">
+          <button type="button" class="btn-session-dash font-mono" @click="handleContinueSession">
             Lanjut ke Dashboard →
           </button>
           <button
             type="button"
             class="btn-session-logout font-mono"
             :disabled="isLoading"
-            @click="handleLogoutSession">
+            @click="handleLogoutSession"
+          >
             Keluar (Logout)
           </button>
         </div>
       </div>
 
       <!-- Error Notification -->
-      <div
-        v-if="errorMessage"
-        class="error-banner"
-        role="alert"
-        aria-live="polite">
+      <div v-if="errorMessage" class="error-banner" role="alert" aria-live="polite">
         <svg
           width="18"
           height="18"
@@ -181,7 +171,8 @@ function handleContinueSession() {
           fill="none"
           stroke="currentColor"
           stroke-width="2"
-          aria-hidden="true">
+          aria-hidden="true"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -200,7 +191,8 @@ function handleContinueSession() {
             placeholder="nama@email.com"
             :disabled="isLoading"
             autocomplete="email"
-            required />
+            required
+          />
         </div>
 
         <div class="form-group">
@@ -216,36 +208,28 @@ function handleContinueSession() {
               placeholder="Masukkan kata sandi"
               :disabled="isLoading"
               autocomplete="current-password"
-              required />
+              required
+            />
             <button
               type="button"
               class="toggle-pwd-btn"
-              :aria-label="
-                showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'
-              "
+              :aria-label="showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
               @click="showPassword = !showPassword"
-              tabindex="-1">
-              {{ showPassword ? "Sembunyikan" : "Lihat" }}
+              tabindex="-1"
+            >
+              {{ showPassword ? 'Sembunyikan' : 'Lihat' }}
             </button>
           </div>
         </div>
 
         <div class="remember-row">
           <label class="checkbox-label">
-            <input
-              type="checkbox"
-              v-model="rememberMe"
-              class="custom-checkbox" />
+            <input type="checkbox" v-model="rememberMe" class="custom-checkbox" />
             <span>Ingat saya di perangkat ini</span>
           </label>
         </div>
 
-        <AppButton
-          type="submit"
-          variant="primary"
-          size="lg"
-          full-width
-          :loading="isLoading">
+        <AppButton type="submit" variant="primary" size="lg" full-width :loading="isLoading">
           Masuk ke Akun
         </AppButton>
       </form>
@@ -257,10 +241,7 @@ function handleContinueSession() {
           <button type="button" class="demo-chip" @click="fillDemo('admin')">
             Admin Pertandingan
           </button>
-          <button
-            type="button"
-            class="demo-chip"
-            @click="fillDemo('contingent')">
+          <button type="button" class="demo-chip" @click="fillDemo('contingent')">
             Official Kontingen
           </button>
         </div>
@@ -270,9 +251,7 @@ function handleContinueSession() {
       <footer class="auth-footer">
         <p class="register-prompt">
           Belum memiliki akun kontingen?
-          <router-link to="/register" class="link-primary"
-            >Daftar Kontingen</router-link
-          >
+          <router-link to="/register" class="link-primary">Daftar Kontingen</router-link>
         </p>
 
         <div class="divider" aria-hidden="true">
@@ -287,7 +266,8 @@ function handleContinueSession() {
             fill="none"
             stroke="currentColor"
             stroke-width="2"
-            aria-hidden="true">
+            aria-hidden="true"
+          >
             <rect width="18" height="12" x="3" y="6" rx="2" />
             <path d="M7 6v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
           </svg>
@@ -503,7 +483,7 @@ function handleContinueSession() {
 }
 .divider::before,
 .divider::after {
-  content: "";
+  content: '';
   flex: 1;
   border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }

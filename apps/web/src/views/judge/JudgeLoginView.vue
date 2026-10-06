@@ -85,7 +85,14 @@ async function handleLogoutSession() {
       <!-- Header -->
       <header class="card-header">
         <div class="header-icon" aria-hidden="true">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <rect width="18" height="12" x="3" y="6" rx="2" />
             <path d="M7 6v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
           </svg>
@@ -98,10 +105,18 @@ async function handleLogoutSession() {
       <div v-if="authStore.isAuthenticated" class="active-judge-session font-mono">
         <div class="active-judge-info">
           <span class="active-judge-dot" />
-          <span>Sesi Aktif: <strong>{{ authStore.name }}</strong> ({{ authStore.arenaId || 'Gelanggang' }})</span>
+          <span
+            >Sesi Aktif: <strong>{{ authStore.name }}</strong> ({{
+              authStore.arenaId || 'Gelanggang'
+            }})</span
+          >
         </div>
         <div class="active-judge-actions">
-          <button type="button" class="btn-judge-dash font-mono" @click="router.push(authStore.role === 'wasit' ? '/referee' : '/judge')">
+          <button
+            type="button"
+            class="btn-judge-dash font-mono"
+            @click="router.push(authStore.role === 'wasit' ? '/referee' : '/judge')"
+          >
             Lanjut ke Layar →
           </button>
           <button type="button" class="btn-judge-logout font-mono" @click="handleLogoutSession">
@@ -112,7 +127,15 @@ async function handleLogoutSession() {
 
       <!-- Error Banner -->
       <div v-if="errorMessage" class="error-banner" role="alert" aria-live="polite">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -155,12 +178,7 @@ async function handleLogoutSession() {
         >
           C
         </button>
-        <button
-          type="button"
-          class="keypad-btn"
-          :disabled="isLoading"
-          @click="handleKeypad(0)"
-        >
+        <button type="button" class="keypad-btn" :disabled="isLoading" @click="handleKeypad(0)">
           0
         </button>
         <button
@@ -176,22 +194,14 @@ async function handleLogoutSession() {
 
       <!-- Submit Action -->
       <div class="actions-wrapper">
-        <AppButton
-          variant="emerald"
-          size="lg"
-          full-width
-          :loading="isLoading"
-          @click="handleLogin"
-        >
+        <AppButton variant="emerald" size="lg" full-width :loading="isLoading" @click="handleLogin">
           Masuk
         </AppButton>
       </div>
 
       <!-- Back to main login -->
       <footer class="card-footer">
-        <router-link to="/login" class="back-link">
-          ← Kembali ke Login Email Utama
-        </router-link>
+        <router-link to="/login" class="back-link"> ← Kembali ke Login Email Utama </router-link>
       </footer>
     </div>
   </div>
@@ -214,7 +224,10 @@ async function handleLogoutSession() {
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 12px;
   padding: 28px 24px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.4),
+    0 2px 4px -2px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .card-header {
@@ -261,8 +274,6 @@ async function handleLogoutSession() {
   gap: 8px;
 }
 
-
-
 .form-label {
   display: block;
   font-size: 0.75rem;
@@ -270,8 +281,6 @@ async function handleLogoutSession() {
   color: #cbd5e1;
   margin-bottom: 6px;
 }
-
-
 
 .pin-display-wrapper {
   display: flex;
@@ -318,7 +327,9 @@ async function handleLogoutSession() {
   font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.1s ease, background-color 0.15s ease;
+  transition:
+    transform 0.1s ease,
+    background-color 0.15s ease;
   touch-action: manipulation;
   user-select: none;
 }
@@ -339,10 +350,6 @@ async function handleLogoutSession() {
 .actions-wrapper {
   margin-bottom: 14px;
 }
-
-
-
-
 
 .card-footer {
   text-align: center;
@@ -377,19 +384,19 @@ async function handleLogoutSession() {
   align-items: center;
   gap: 8px;
   font-size: 0.75rem;
-  color: #CBD5E1;
+  color: #cbd5e1;
 }
 
 .active-judge-info strong {
-  color: #34D399;
+  color: #34d399;
 }
 
 .active-judge-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background-color: #10B981;
-  box-shadow: 0 0 6px #10B981;
+  background-color: #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
 .active-judge-actions {
@@ -400,9 +407,9 @@ async function handleLogoutSession() {
 }
 
 .btn-judge-dash {
-  background-color: #10B981;
+  background-color: #10b981;
   border: 1px solid #059669;
-  color: #0F172A;
+  color: #0f172a;
   font-weight: 700;
   padding: 6px 12px;
   border-radius: 6px;
@@ -412,13 +419,13 @@ async function handleLogoutSession() {
 }
 
 .btn-judge-dash:hover {
-  background-color: #34D399;
+  background-color: #34d399;
 }
 
 .btn-judge-logout {
   background: transparent;
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #F87171;
+  color: #f87171;
   padding: 5px 10px;
   border-radius: 6px;
   font-size: 0.6875rem;
@@ -429,6 +436,6 @@ async function handleLogoutSession() {
 
 .btn-judge-logout:hover {
   background-color: rgba(239, 68, 68, 0.15);
-  border-color: #EF4444;
+  border-color: #ef4444;
 }
 </style>

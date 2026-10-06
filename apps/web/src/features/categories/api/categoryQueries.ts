@@ -1,10 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { categoryService } from './categoryService'
-import type {
-  CreateCategoryFormValues,
-  StandardClassPreset,
-} from '../types/category.schema'
+import type { CreateCategoryFormValues, StandardClassPreset } from '../types/category.schema'
 
 /**
  * Query Key Factory for Categories domain

@@ -24,7 +24,13 @@ async function handleRegister() {
   errorMessage.value = ''
   successMessage.value = ''
 
-  if (!form.value.name || !form.value.pic_name || !form.value.email || !form.value.phone || !form.value.password) {
+  if (
+    !form.value.name ||
+    !form.value.pic_name ||
+    !form.value.email ||
+    !form.value.phone ||
+    !form.value.password
+  ) {
     errorMessage.value = 'Semua data formulir pendaftaran wajib diisi.'
     return
   }
@@ -56,7 +62,10 @@ async function handleRegister() {
       router.push('/login')
     }, 1600)
   } catch (err) {
-    errorMessage.value = getErrorMessage(err, 'Pendaftaran gagal. Pastikan email belum pernah terdaftar.')
+    errorMessage.value = getErrorMessage(
+      err,
+      'Pendaftaran gagal. Pastikan email belum pernah terdaftar.',
+    )
   } finally {
     isLoading.value = false
   }
@@ -69,7 +78,16 @@ async function handleRegister() {
       <!-- Header -->
       <header class="brand-header">
         <div class="brand-logo" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
             <circle cx="9" cy="7" r="4" />
             <line x1="19" y1="8" x2="19" y2="14" />
@@ -82,7 +100,15 @@ async function handleRegister() {
 
       <!-- Feedback Banners -->
       <div v-if="successMessage" class="success-banner" role="status" aria-live="polite">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
@@ -90,7 +116,15 @@ async function handleRegister() {
       </div>
 
       <div v-if="errorMessage" class="error-banner" role="alert" aria-live="polite">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -173,13 +207,7 @@ async function handleRegister() {
           </div>
         </div>
 
-        <AppButton
-          type="submit"
-          variant="primary"
-          size="lg"
-          full-width
-          :loading="isLoading"
-        >
+        <AppButton type="submit" variant="primary" size="lg" full-width :loading="isLoading">
           Daftarkan Kontingen
         </AppButton>
       </form>
@@ -212,7 +240,10 @@ async function handleRegister() {
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 12px;
   padding: 32px 28px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.4),
+    0 2px 4px -2px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .brand-header {

@@ -16,7 +16,7 @@ export const bracketKeys = {
 export function useBracketTreeQuery(
   compId: Ref<string>,
   weightClass: Ref<string>,
-  gender: Ref<string>
+  gender: Ref<string>,
 ) {
   return useQuery({
     queryKey: computed(() => bracketKeys.tree(compId.value, weightClass.value, gender.value)),

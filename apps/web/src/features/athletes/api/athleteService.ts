@@ -14,7 +14,11 @@ export const athleteService = {
   /**
    * 1. GET /api/v1/athletes
    */
-  async getAthletes(params?: { page?: number; limit?: number; gender?: string }): Promise<Athlete[]> {
+  async getAthletes(params?: {
+    page?: number
+    limit?: number
+    gender?: string
+  }): Promise<Athlete[]> {
     const query = new URLSearchParams()
     if (params?.page) query.append('page', String(params.page))
     if (params?.limit) query.append('limit', String(params.limit))
@@ -50,7 +54,7 @@ export const athleteService = {
    */
   async registerToCompetition(
     compId: string,
-    payload: RegisterParticipantPayload
+    payload: RegisterParticipantPayload,
   ): Promise<RegisterParticipantResult> {
     const url = ENDPOINTS.ATHLETES.REGISTER_TO_COMP(compId)
     const res = await http.post<RegisterParticipantResult>(url, payload)
@@ -76,7 +80,7 @@ export const athleteService = {
   async verifyParticipant(
     compId: string,
     participantId: string,
-    status: 'verified' | 'rejected'
+    status: 'verified' | 'rejected',
   ): Promise<VerifyParticipantResult> {
     const url = ENDPOINTS.ATHLETES.VERIFY_PARTICIPANT(compId, participantId)
     const res = await http.put<VerifyParticipantResult>(url, { status })

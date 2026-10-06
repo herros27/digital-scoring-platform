@@ -15,23 +15,59 @@ const activeDock = ref('home')
 const copiedColor = ref<string | null>(null)
 
 const primarySwatches = [
-  '#000000', '#450a0a', '#7f1d1d', '#991b1b', '#b91c1c',
-  '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca', '#ffffff',
+  '#000000',
+  '#450a0a',
+  '#7f1d1d',
+  '#991b1b',
+  '#b91c1c',
+  '#dc2626',
+  '#ef4444',
+  '#f87171',
+  '#fca5a5',
+  '#fecaca',
+  '#ffffff',
 ]
 
 const secondarySwatches = [
-  '#000000', '#172554', '#1e3a8a', '#1e40af', '#1d4ed8',
-  '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#ffffff',
+  '#000000',
+  '#172554',
+  '#1e3a8a',
+  '#1e40af',
+  '#1d4ed8',
+  '#2563eb',
+  '#3b82f6',
+  '#60a5fa',
+  '#93c5fd',
+  '#bfdbfe',
+  '#ffffff',
 ]
 
 const tertiarySwatches = [
-  '#000000', '#022c22', '#064e3b', '#065f46', '#047857',
-  '#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#ffffff',
+  '#000000',
+  '#022c22',
+  '#064e3b',
+  '#065f46',
+  '#047857',
+  '#10b981',
+  '#34d399',
+  '#6ee7b7',
+  '#a7f3d0',
+  '#d1fae5',
+  '#ffffff',
 ]
 
 const neutralSwatches = [
-  '#000000', '#080d1a', '#0f172a', '#1e293b', '#334155',
-  '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#ffffff',
+  '#000000',
+  '#080d1a',
+  '#0f172a',
+  '#1e293b',
+  '#334155',
+  '#475569',
+  '#64748b',
+  '#94a3b8',
+  '#cbd5e1',
+  '#e2e8f0',
+  '#ffffff',
 ]
 
 function copyHex(hex: string) {
@@ -55,15 +91,11 @@ function copyHex(hex: string) {
         <h1 class="ds-title">Design System & UI Tokens</h1>
       </div>
       <div class="ds-header__actions">
-        <AppButton variant="secondary" size="sm" @click="$router.push('/')">
-          ← Beranda
-        </AppButton>
+        <AppButton variant="secondary" size="sm" @click="$router.push('/')"> ← Beranda </AppButton>
       </div>
     </header>
 
-    <div v-if="copiedColor" class="ds-copy-toast">
-      Hex copied: {{ copiedColor }}
-    </div>
+    <div v-if="copiedColor" class="ds-copy-toast">Hex copied: {{ copiedColor }}</div>
 
     <!-- Main Grid Layout (Mirroring 00_design_system.png) -->
     <div class="ds-grid">
@@ -150,9 +182,7 @@ function copyHex(hex: string) {
             <span class="typo-card__role">Headline</span>
             <span class="typo-card__font font-mono">Space Grotesk</span>
           </div>
-          <div class="typo-card__preview font-sans">
-            Aa
-          </div>
+          <div class="typo-card__preview font-sans">Aa</div>
         </div>
 
         <!-- Body: Space Grotesk -->
@@ -161,9 +191,7 @@ function copyHex(hex: string) {
             <span class="typo-card__role">Body</span>
             <span class="typo-card__font font-mono">Space Grotesk</span>
           </div>
-          <div class="typo-card__preview typo-card__preview--peach font-sans">
-            Aa
-          </div>
+          <div class="typo-card__preview typo-card__preview--peach font-sans">Aa</div>
         </div>
 
         <!-- Label: JetBrains Mono -->
@@ -172,9 +200,7 @@ function copyHex(hex: string) {
             <span class="typo-card__role">Label</span>
             <span class="typo-card__font font-mono">JetBrains Mono</span>
           </div>
-          <div class="typo-card__preview typo-card__preview--peach font-mono">
-            Aa
-          </div>
+          <div class="typo-card__preview typo-card__preview--peach font-mono">Aa</div>
         </div>
       </section>
 
@@ -192,11 +218,7 @@ function copyHex(hex: string) {
               <AppButton variant="outlined">Outlined</AppButton>
             </div>
             <div class="ds-search-row">
-              <AppInput
-                v-model="searchValue"
-                icon
-                placeholder="Search"
-              />
+              <AppInput v-model="searchValue" icon placeholder="Search" />
             </div>
           </div>
         </AppCard>
@@ -220,14 +242,32 @@ function copyHex(hex: string) {
           <div class="ds-icons-row">
             <!-- Green check square -->
             <AppIconBadge variant="emerald" clickable>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </AppIconBadge>
 
             <!-- Red label button with pencil -->
             <button class="ds-label-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
               </svg>
               <span>Label</span>
@@ -236,12 +276,32 @@ function copyHex(hex: string) {
             <!-- 4 action icons: magic, nodes, tag, trash -->
             <div class="ds-icon-group">
               <AppIconBadge variant="peach" clickable title="Magic Action">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"
+                  />
                 </svg>
               </AppIconBadge>
               <AppIconBadge variant="blue" clickable title="Tournament Tree">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <rect width="6" height="6" x="9" y="3" rx="1" />
                   <rect width="6" height="6" x="3" y="15" rx="1" />
                   <rect width="6" height="6" x="15" y="15" rx="1" />
@@ -250,13 +310,33 @@ function copyHex(hex: string) {
                 </svg>
               </AppIconBadge>
               <AppIconBadge variant="emerald" clickable title="Tag / Category">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"
+                  />
                   <path d="M7 7h.01" />
                 </svg>
               </AppIconBadge>
               <AppIconBadge variant="red" clickable title="Delete / Trash">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M3 6h18" />
                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                   <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />

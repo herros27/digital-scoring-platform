@@ -18,21 +18,36 @@ async function handleLogout() {
       </div>
       <h1 class="home-title">Komando Digital Scoring Silat</h1>
       <p class="home-desc">
-        Arsitektur Frontend Real-Time terintegrasi penuh dengan Go Backend WebSocket & Konsensus Juri.
+        Arsitektur Frontend Real-Time terintegrasi penuh dengan Go Backend WebSocket & Konsensus
+        Juri.
       </p>
 
       <div v-if="authStore.isAuthenticated" class="home-user-session font-mono">
         <div class="user-pill">
           <span class="user-dot" />
-          <span>Sesi Aktif: <strong>{{ authStore.name }}</strong> ({{ (authStore.role || 'user').toUpperCase() }})</span>
+          <span
+            >Sesi Aktif: <strong>{{ authStore.name }}</strong> ({{
+              (authStore.role || 'user').toUpperCase()
+            }})</span
+          >
         </div>
         <div class="session-btns">
-          <AppButton variant="emerald" size="lg" @click="$router.push(authStore.role === 'admin' || authStore.role === 'dewan' ? '/ops?tab=kompetisi' : authStore.role === 'contingent' ? '/ops?tab=atlet' : '/ops')">
+          <AppButton
+            variant="emerald"
+            size="lg"
+            @click="
+              $router.push(
+                authStore.role === 'admin' || authStore.role === 'dewan'
+                  ? '/ops?tab=kompetisi'
+                  : authStore.role === 'contingent'
+                    ? '/ops?tab=atlet'
+                    : '/ops',
+              )
+            "
+          >
             Buka Panel Operasi →
           </AppButton>
-          <button class="home-logout-btn font-mono" @click="handleLogout">
-            Keluar (Logout)
-          </button>
+          <button class="home-logout-btn font-mono" @click="handleLogout">Keluar (Logout)</button>
         </div>
       </div>
       <div v-else class="home-actions">
@@ -60,7 +75,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>SELESAI</AppBadge>
           </template>
           <p class="card-desc">
-            Tokens warna (#DC2626 Merah, #2563EB Biru, #10B981 Hijau), font Space Grotesk & JetBrains Mono, tombol, input, progress bar, dan dock.
+            Tokens warna (#DC2626 Merah, #2563EB Biru, #10B981 Hijau), font Space Grotesk &
+            JetBrains Mono, tombol, input, progress bar, dan dock.
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/design-system')">
@@ -76,7 +92,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>SELESAI</AppBadge>
           </template>
           <p class="card-desc">
-            Layar LED TV stadium 16:9 fullscreen resolusi tinggi dengan timer digital raksasa, breakdown nilai per babak, dan status konsensus juri.
+            Layar LED TV stadium 16:9 fullscreen resolusi tinggi dengan timer digital raksasa,
+            breakdown nilai per babak, dan status konsensus juri.
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/scoreboard')">
@@ -92,7 +109,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>SELESAI</AppBadge>
           </template>
           <p class="card-desc">
-            Layar sentuh ergonomis landscape tablet juri gelanggang dengan tombol pukulan (+1), tendangan (+2), jatuhan (+3), dan anti-bias Pasal 28.
+            Layar sentuh ergonomis landscape tablet juri gelanggang dengan tombol pukulan (+1),
+            tendangan (+2), jatuhan (+3), dan anti-bias Pasal 28.
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/judge')">
@@ -108,7 +126,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>SELESAI</AppBadge>
           </template>
           <p class="card-desc">
-            Meja pengawas pertandingan: tombol kontrol timer, gong, dokter pertandingan, video VAR, dan panel sanksi teguran s/d diskualifikasi.
+            Meja pengawas pertandingan: tombol kontrol timer, gong, dokter pertandingan, video VAR,
+            dan panel sanksi teguran s/d diskualifikasi.
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/referee')">
@@ -124,7 +143,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>SELESAI</AppBadge>
           </template>
           <p class="card-desc">
-            Dashboard admin komando operasi, pohon bagan single-elimination, integrasi timbang badan sah, dan tombol load arena (Kirim ke Gelanggang).
+            Dashboard admin komando operasi, pohon bagan single-elimination, integrasi timbang badan
+            sah, dan tombol load arena (Kirim ke Gelanggang).
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/ops')">
@@ -140,7 +160,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>SELESAI</AppBadge>
           </template>
           <p class="card-desc">
-            Panel Admin Turnamen & Dewan Hakim: generate PIN juri 6-digit per kursi gelanggang, monitor baterai & latency perangkat, serta cetak slip meja juri.
+            Panel Admin Turnamen & Dewan Hakim: generate PIN juri 6-digit per kursi gelanggang,
+            monitor baterai & latency perangkat, serta cetak slip meja juri.
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/admin')">
@@ -156,7 +177,8 @@ async function handleLogout() {
             <AppBadge variant="emerald" dot>RESMI PERSILAT</AppBadge>
           </template>
           <p class="card-desc">
-            Halaman login terpadu (Admin, Operator, Dewan Hakim, dan Official Kontingen), pendaftaran kontingen baru, serta login tablet juri via PIN gelanggang.
+            Halaman login terpadu (Admin, Operator, Dewan Hakim, dan Official Kontingen),
+            pendaftaran kontingen baru, serta login tablet juri via PIN gelanggang.
           </p>
           <template #footer>
             <AppButton variant="outlined" size="sm" @click="$router.push('/login')">
@@ -256,19 +278,19 @@ async function handleLogout() {
   align-items: center;
   gap: 8px;
   font-size: 0.875rem;
-  color: #E2E8F0;
+  color: #e2e8f0;
 }
 
 .user-pill strong {
-  color: #34D399;
+  color: #34d399;
 }
 
 .user-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #10B981;
-  box-shadow: 0 0 8px #10B981;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
 }
 
 .session-btns {
@@ -280,7 +302,7 @@ async function handleLogout() {
 .home-logout-btn {
   background: transparent;
   border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #F87171;
+  color: #f87171;
   padding: 10px 18px;
   border-radius: 6px;
   font-size: 0.8125rem;
@@ -291,6 +313,6 @@ async function handleLogout() {
 
 .home-logout-btn:hover {
   background: rgba(239, 68, 68, 0.15);
-  border-color: #EF4444;
+  border-color: #ef4444;
 }
 </style>

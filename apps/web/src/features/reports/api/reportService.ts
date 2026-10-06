@@ -8,9 +8,7 @@ export const reportService = {
    */
   async getSummary(compId: string): Promise<CompetitionSummary> {
     if (!compId) throw new Error('Competition ID is required')
-    const res = await http.get<CompetitionSummary>(
-      ENDPOINTS.REPORTS.SUMMARY(compId)
-    )
+    const res = await http.get<CompetitionSummary>(ENDPOINTS.REPORTS.SUMMARY(compId))
     return res.data
   },
 
@@ -19,9 +17,7 @@ export const reportService = {
    */
   async getMedalStandings(compId: string): Promise<MedalStanding[]> {
     if (!compId) return []
-    const res = await http.get<MedalStanding[]>(
-      ENDPOINTS.REPORTS.MEDALS(compId)
-    )
+    const res = await http.get<MedalStanding[]>(ENDPOINTS.REPORTS.MEDALS(compId))
     return res.data || []
   },
 
@@ -30,9 +26,7 @@ export const reportService = {
    */
   async getExport(compId: string): Promise<CompetitionExport> {
     if (!compId) throw new Error('Competition ID is required')
-    const res = await http.get<CompetitionExport>(
-      ENDPOINTS.REPORTS.EXPORT(compId)
-    )
+    const res = await http.get<CompetitionExport>(ENDPOINTS.REPORTS.EXPORT(compId))
     return res.data
   },
 }

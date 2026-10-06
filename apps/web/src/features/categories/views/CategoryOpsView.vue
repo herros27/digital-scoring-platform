@@ -22,7 +22,7 @@ const props = withDefaults(
   {
     competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
     competitionName: 'Kejuaraan Nasional Pencak Silat',
-  }
+  },
 )
 
 const emit = defineEmits<{
@@ -33,7 +33,13 @@ const emit = defineEmits<{
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
 
 // Queries & Mutations
-const { data: rawCategories, isLoading, isFetching, error, refetch } = useCategoriesQuery(activeCompId)
+const {
+  data: rawCategories,
+  isLoading,
+  isFetching,
+  error,
+  refetch,
+} = useCategoriesQuery(activeCompId)
 const createMutation = useCreateCategoryMutation(activeCompId)
 const seedMutation = useSeedPresetsMutation(activeCompId)
 
@@ -45,10 +51,16 @@ const searchQuery = ref('')
 const sortBy = ref<'class' | 'name'>('class')
 
 // Toast State
-const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
+const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
+  null,
+)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
+function showToast(
+  title: string,
+  message: string,
+  type: 'success' | 'danger' | 'info' = 'success',
+) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
   toastTimer = setTimeout(() => {
@@ -120,7 +132,11 @@ async function handleSubmitCategory() {
 
     const created = await createMutation.mutateAsync(payload)
     isModalOpen.value = false
-    showToast('Kategori Dibuat', `Kategori ${created.name} berhasil ditambahkan ke kompetisi.`, 'success')
+    showToast(
+      'Kategori Dibuat',
+      `Kategori ${created.name} berhasil ditambahkan ke kompetisi.`,
+      'success',
+    )
   } catch (err) {
     const message = getErrorMessage(err, 'Gagal menambahkan kategori ke server.')
     showToast('Terjadi Kesalahan', message, 'danger')
@@ -135,13 +151,13 @@ async function handleSeedPresets() {
       showToast(
         'Sinkronisasi Kategori Berhasil',
         `${result.created} kelas kategori standar IPSI berhasil dibuat (${result.skipped} kelas dilewati karena sudah ada).`,
-        'success'
+        'success',
       )
     } else {
       showToast(
         'Kategori Sudah Lengkap',
         `Semua ${result.skipped} kelas tanding standar IPSI sudah terdaftar di kompetisi ini.`,
-        'info'
+        'info',
       )
     }
   } catch (err) {
@@ -179,7 +195,7 @@ const filteredCategories = computed(() => {
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.weight_class.toLowerCase().includes(q) ||
-        (c.gender.toLowerCase().includes(q))
+        c.gender.toLowerCase().includes(q),
     )
   }
 
@@ -211,13 +227,21 @@ function handleCategoryClick(cat: Category) {
   <div class="cat-ops @container" role="region" aria-label="Manajemen Kategori Tanding">
     <!-- Toast Notification -->
     <transition name="cat-fade">
-      <div v-if="toast" class="cat-toast" :class="`cat-toast--${toast.type}`" role="status" aria-live="polite">
+      <div
+        v-if="toast"
+        class="cat-toast"
+        :class="`cat-toast--${toast.type}`"
+        role="status"
+        aria-live="polite"
+      >
         <div class="cat-toast__dot" />
         <div class="cat-toast__content">
           <strong class="cat-toast__title">{{ toast.title }}</strong>
           <span class="cat-toast__msg">{{ toast.message }}</span>
         </div>
-        <button class="cat-toast__close" aria-label="Tutup notifikasi" @click="toast = null">✕</button>
+        <button class="cat-toast__close" aria-label="Tutup notifikasi" @click="toast = null">
+          ✕
+        </button>
       </div>
     </transition>
 
@@ -225,7 +249,14 @@ function handleCategoryClick(cat: Category) {
     <header class="cat-header">
       <div class="cat-header__left">
         <div class="cat-header__icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
             <path d="M11 3 8 9l4 12 4-12-3-6" />
             <path d="M2 9h20" />
@@ -235,7 +266,9 @@ function handleCategoryClick(cat: Category) {
           <div class="cat-header__sub font-mono">
             <span>SISTEM ELIMINASI IPSI RULES 2023</span>
             <span class="cat-bullet">•</span>
-            <span class="cat-comp-badge">EVENT: {{ (competitionName || 'Kejuaraan').toUpperCase() }}</span>
+            <span class="cat-comp-badge"
+              >EVENT: {{ (competitionName || 'Kejuaraan').toUpperCase() }}</span
+            >
             <span class="cat-bullet">•</span>
             <span class="cat-pulse-wrapper">
               <span class="cat-pulse-dot" />
@@ -247,14 +280,16 @@ function handleCategoryClick(cat: Category) {
       </div>
 
       <div class="cat-header__actions font-mono">
-        <AppButton
-          variant="secondary"
-          size="sm"
-          :loading="isFetching"
-          @click="() => refetch()"
-        >
+        <AppButton variant="secondary" size="sm" :loading="isFetching" @click="() => refetch()">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
@@ -271,7 +306,14 @@ function handleCategoryClick(cat: Category) {
           @click="handleSeedPresets"
         >
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
               <path d="M6 6h10" />
               <path d="M6 10h10" />
@@ -280,13 +322,16 @@ function handleCategoryClick(cat: Category) {
           Template Standar IPSI
         </AppButton>
 
-        <AppButton
-          variant="emerald"
-          size="sm"
-          @click="openCreateModal"
-        >
+        <AppButton variant="emerald" size="sm" @click="openCreateModal">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -377,7 +422,15 @@ function handleCategoryClick(cat: Category) {
 
       <div class="cat-toolbar__search-group">
         <div class="cat-search-box">
-          <svg class="cat-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="cat-search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -420,23 +473,37 @@ function handleCategoryClick(cat: Category) {
     <!-- Error State -->
     <div v-else-if="error" class="cat-empty-state cat-empty-state--error">
       <div class="cat-empty-icon cat-empty-icon--error">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       </div>
       <h3 class="cat-empty-title">Gagal Memuat Kategori</h3>
-      <p class="cat-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat menghubungi server.') }}</p>
-      <AppButton variant="secondary" size="md" @click="() => refetch()">
-        Coba Lagi
-      </AppButton>
+      <p class="cat-empty-desc">
+        {{ getErrorMessage(error, 'Terjadi gangguan jaringan saat menghubungi server.') }}
+      </p>
+      <AppButton variant="secondary" size="md" @click="() => refetch()"> Coba Lagi </AppButton>
     </div>
 
     <!-- Empty State (No Categories) -->
     <div v-else-if="filteredCategories.length === 0" class="cat-empty-state">
       <div class="cat-empty-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
           <rect width="18" height="18" x="3" y="3" rx="2" />
           <path d="M9 3v18" />
           <path d="m14 9 3 3-3 3" />
@@ -454,12 +521,7 @@ function handleCategoryClick(cat: Category) {
       </p>
 
       <div class="cat-empty-actions font-mono">
-        <AppButton
-          v-if="searchQuery"
-          variant="secondary"
-          size="md"
-          @click="searchQuery = ''"
-        >
+        <AppButton v-if="searchQuery" variant="secondary" size="md" @click="searchQuery = ''">
           Reset Pencarian
         </AppButton>
         <template v-else>
@@ -471,11 +533,7 @@ function handleCategoryClick(cat: Category) {
           >
             Muat Template Standar IPSI (Kelas A-J)
           </AppButton>
-          <AppButton
-            variant="secondary"
-            size="md"
-            @click="openCreateModal"
-          >
+          <AppButton variant="secondary" size="md" @click="openCreateModal">
             Buat Kategori Kustom
           </AppButton>
         </template>
@@ -505,7 +563,9 @@ function handleCategoryClick(cat: Category) {
           <div class="cat-card__badges">
             <span
               class="cat-badge-gender font-mono"
-              :class="isMaleGender(cat.gender) ? 'cat-badge-gender--male' : 'cat-badge-gender--female'"
+              :class="
+                isMaleGender(cat.gender) ? 'cat-badge-gender--male' : 'cat-badge-gender--female'
+              "
             >
               <span class="cat-badge-dot" />
               {{ isMaleGender(cat.gender) ? 'PUTRA (MERAH)' : 'PUTRI (BIRU)' }}
@@ -531,7 +591,9 @@ function handleCategoryClick(cat: Category) {
             <div class="cat-spec-divider" />
             <div class="cat-spec-item">
               <span class="cat-spec-label">GOLONGAN</span>
-              <span class="cat-spec-value">{{ isMaleGender(cat.gender) ? 'DEWASA PUTRA' : 'DEWASA PUTRI' }}</span>
+              <span class="cat-spec-value">{{
+                isMaleGender(cat.gender) ? 'DEWASA PUTRA' : 'DEWASA PUTRI'
+              }}</span>
             </div>
           </div>
         </div>
@@ -541,11 +603,22 @@ function handleCategoryClick(cat: Category) {
           <button
             type="button"
             class="cat-view-bracket-btn font-mono"
-            :class="isMaleGender(cat.gender) ? 'cat-view-bracket-btn--male' : 'cat-view-bracket-btn--female'"
+            :class="
+              isMaleGender(cat.gender)
+                ? 'cat-view-bracket-btn--male'
+                : 'cat-view-bracket-btn--female'
+            "
             @click="handleCategoryClick(cat)"
           >
             <span>Lihat Bagan Partai</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+            >
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
             </svg>
@@ -569,11 +642,7 @@ function handleCategoryClick(cat: Category) {
             <div class="cat-modal__tag font-mono">FORM KATEGORI BARU</div>
             <h3 id="modal-title" class="cat-modal__title">Tambah Kategori Tanding</h3>
           </div>
-          <button
-            class="cat-modal__close"
-            aria-label="Tutup dialog"
-            @click="isModalOpen = false"
-          >
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
           </button>
         </header>
@@ -581,7 +650,15 @@ function handleCategoryClick(cat: Category) {
         <form class="cat-modal__body" @submit.prevent="handleSubmitCategory">
           <!-- Active Competition Target Banner -->
           <div class="cat-target-comp font-mono">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" class="flex-shrink-0">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#F59E0B"
+              stroke-width="2.2"
+              class="flex-shrink-0"
+            >
               <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
               <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
               <path d="M4 22h16" />
@@ -618,7 +695,9 @@ function handleCategoryClick(cat: Category) {
               </optgroup>
               <optgroup label="Dewasa Putri (Sudut Biru)">
                 <option
-                  v-for="(preset, idx) in IPSI_STANDARD_PRESETS.filter((p) => p.gender === 'female')"
+                  v-for="(preset, idx) in IPSI_STANDARD_PRESETS.filter(
+                    (p) => p.gender === 'female',
+                  )"
                   :key="idx"
                   :value="IPSI_STANDARD_PRESETS.indexOf(preset)"
                 >
@@ -626,7 +705,9 @@ function handleCategoryClick(cat: Category) {
                 </option>
               </optgroup>
             </select>
-            <span class="cat-form-help">Memilih template akan otomatis mengisi nama kategori dan rentang bobot.</span>
+            <span class="cat-form-help"
+              >Memilih template akan otomatis mengisi nama kategori dan rentang bobot.</span
+            >
           </div>
 
           <!-- Category Name -->
@@ -654,14 +735,12 @@ function handleCategoryClick(cat: Category) {
             <div class="cat-gender-toggle-group">
               <label
                 class="cat-gender-radio"
-                :class="{ 'cat-gender-radio--active-male': formState.gender === 'male' || formState.gender === 'putra' }"
+                :class="{
+                  'cat-gender-radio--active-male':
+                    formState.gender === 'male' || formState.gender === 'putra',
+                }"
               >
-                <input
-                  v-model="formState.gender"
-                  type="radio"
-                  value="male"
-                  class="sr-only"
-                />
+                <input v-model="formState.gender" type="radio" value="male" class="sr-only" />
                 <span class="cat-radio-indicator cat-radio-indicator--male" />
                 <div class="cat-radio-text">
                   <strong>DEWASA PUTRA</strong>
@@ -671,14 +750,12 @@ function handleCategoryClick(cat: Category) {
 
               <label
                 class="cat-gender-radio"
-                :class="{ 'cat-gender-radio--active-female': formState.gender === 'female' || formState.gender === 'putri' }"
+                :class="{
+                  'cat-gender-radio--active-female':
+                    formState.gender === 'female' || formState.gender === 'putri',
+                }"
               >
-                <input
-                  v-model="formState.gender"
-                  type="radio"
-                  value="female"
-                  class="sr-only"
-                />
+                <input v-model="formState.gender" type="radio" value="female" class="sr-only" />
                 <span class="cat-radio-indicator cat-radio-indicator--female" />
                 <div class="cat-radio-text">
                   <strong>DEWASA PUTRI</strong>
@@ -704,17 +781,14 @@ function handleCategoryClick(cat: Category) {
               maxlength="10"
               required
             />
-            <span v-if="formErrors.weight_class" class="cat-form-error">{{ formErrors.weight_class }}</span>
+            <span v-if="formErrors.weight_class" class="cat-form-error">{{
+              formErrors.weight_class
+            }}</span>
             <span class="cat-form-help">Kode kelas tanding resmi (A sampai J atau BEBAS).</span>
           </div>
 
           <footer class="cat-modal__footer font-mono">
-            <AppButton
-              type="button"
-              variant="secondary"
-              size="md"
-              @click="isModalOpen = false"
-            >
+            <AppButton type="button" variant="secondary" size="md" @click="isModalOpen = false">
               Batal
             </AppButton>
             <AppButton
@@ -794,7 +868,9 @@ function handleCategoryClick(cat: Category) {
 }
 .cat-fade-enter-active,
 .cat-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 .cat-fade-enter-from,
 .cat-fade-leave-to {
@@ -862,8 +938,15 @@ function handleCategoryClick(cat: Category) {
   animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 .cat-header__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
@@ -1116,7 +1199,10 @@ function handleCategoryClick(cat: Category) {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .cat-card:hover {
   transform: translateY(-2px);
@@ -1288,18 +1374,40 @@ function handleCategoryClick(cat: Category) {
   gap: 12px;
 }
 .skeleton-line {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
 }
-.skeleton-header { width: 50%; height: 20px; }
-.skeleton-title { width: 85%; height: 28px; }
-.skeleton-specs { width: 100%; height: 36px; }
-.skeleton-btn { width: 100%; height: 32px; margin-top: auto; }
+.skeleton-header {
+  width: 50%;
+  height: 20px;
+}
+.skeleton-title {
+  width: 85%;
+  height: 28px;
+}
+.skeleton-specs {
+  width: 100%;
+  height: 36px;
+}
+.skeleton-btn {
+  width: 100%;
+  height: 32px;
+  margin-top: auto;
+}
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Empty State */
@@ -1470,8 +1578,12 @@ function handleCategoryClick(cat: Category) {
   border: 2px solid var(--color-neutral-600, #475569);
   transition: all 0.15s ease;
 }
-.cat-radio-indicator--male { border-color: #dc2626; }
-.cat-radio-indicator--female { border-color: #2563eb; }
+.cat-radio-indicator--male {
+  border-color: #dc2626;
+}
+.cat-radio-indicator--female {
+  border-color: #2563eb;
+}
 .cat-radio-text {
   display: flex;
   flex-direction: column;
@@ -1509,7 +1621,7 @@ function handleCategoryClick(cat: Category) {
 }
 
 .cat-comp-badge {
-  color: #F59E0B;
+  color: #f59e0b;
   font-weight: 700;
 }
 .cat-target-comp {
@@ -1529,13 +1641,13 @@ function handleCategoryClick(cat: Category) {
 .target-comp-label {
   font-size: 0.625rem;
   font-weight: 700;
-  color: #F59E0B;
+  color: #f59e0b;
   letter-spacing: 0.06em;
 }
 .target-comp-name {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #F8FAFC;
+  color: #f8fafc;
 }
 .sr-only {
   position: absolute;

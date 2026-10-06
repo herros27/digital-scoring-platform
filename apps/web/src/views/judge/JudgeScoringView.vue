@@ -6,7 +6,11 @@ import { useTimer } from '@/composables/useTimer'
 import { DEFAULT_TECHNIQUES } from '@/composables/techniques'
 import { useConsensusFeedback } from '@/composables/consensusFeedback'
 import type { WsTechniqueKind } from '@/composables/useWebSocket'
-import { MATCH_STATUS_LABEL, matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
+import {
+  MATCH_STATUS_LABEL,
+  matchStatusFromState,
+  type MatchStatus,
+} from '@/composables/matchStatus'
 import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
@@ -19,7 +23,13 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 // Query or session params
-const arenaId = computed(() => authStore.arenaId || (route.query.arena_id as string) || (route.params.arena_id as string) || '')
+const arenaId = computed(
+  () =>
+    authStore.arenaId ||
+    (route.query.arena_id as string) ||
+    (route.params.arena_id as string) ||
+    '',
+)
 const compId = computed(() => authStore.competitionId || (route.query.comp_id as string) || '')
 const judgeSeat = computed(() => authStore.seatNumber || Number(route.query.seat) || 1)
 
@@ -238,10 +248,15 @@ onMounted(() => {
     }
     if (payload.techniques?.length) techniques.value = payload.techniques
     feedback.configure(payload.judge_count, payload.consensus?.majority)
-    matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
+    matchStatus.value =
+      matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? false,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
@@ -249,17 +264,26 @@ onMounted(() => {
   onMessage('score_confirmed', (payload) => feedback.onConfirmed(payload))
 
   onMessage('state_change', (payload) => {
-    matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
+    matchStatus.value =
+      matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (matchStatus.value === 'break' || matchStatus.value === 'finished') feedback.reset()
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? true, payload.timer_ends_at_ms)
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? true,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
   onMessage('timer_sync', (payload) => {
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? false,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 })
@@ -288,7 +312,14 @@ onMounted(() => {
           BABAK {{ currentRound }} - {{ roundStatus }}
         </div>
         <div class="judge-timer-badge font-mono">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
@@ -306,8 +337,17 @@ onMounted(() => {
         <span class="judge-chip-text">STATUS ARENA</span>
 
         <span class="judge-sync-chip">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#34D399"
+            stroke-width="2"
+          >
+            <path
+              d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+            />
           </svg>
           {{ latencyMs }}ms SYNCED
         </span>
@@ -319,7 +359,14 @@ onMounted(() => {
           title="Toggle Getaran / Haptics"
           @click="haptics.toggle"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
@@ -327,7 +374,14 @@ onMounted(() => {
 
         <!-- Cancel / Undo Button -->
         <button class="judge-batal-btn" @click="handleCancelLast">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
             <path d="M9 14 4 9l5-5" />
             <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
           </svg>
@@ -335,7 +389,14 @@ onMounted(() => {
         </button>
 
         <div class="judge-avatar" title="Ganti Sesi Juri / PIN" @click="showPinModal = true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
           </svg>
@@ -346,7 +407,14 @@ onMounted(() => {
     <!-- COMPLIANCE SUB-HEADER STRIP -->
     <section class="judge-compliance-strip font-mono">
       <div class="judge-comp-left">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#34D399"
+          stroke-width="2"
+        >
           <path d="m14 12-8.5 8.5a2.12 2.12 0 1 1-3-3L11 9" />
           <path d="M15 13 9 7l4-4 6 6z" />
         </svg>
@@ -354,7 +422,14 @@ onMounted(() => {
       </div>
 
       <div class="judge-comp-center">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" stroke-width="2">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#FCA5A5"
+          stroke-width="2"
+        >
           <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
           <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
           <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
@@ -377,9 +452,7 @@ onMounted(() => {
         <!-- Header Sudut Merah -->
         <div class="judge-corner__header">
           <div class="judge-athlete-info">
-            <div class="judge-corner-badge judge-corner-badge--red font-mono">
-              SUDUT MERAH
-            </div>
+            <div class="judge-corner-badge judge-corner-badge--red font-mono">SUDUT MERAH</div>
             <h2 class="judge-athlete-name">{{ redAthlete.name }}</h2>
             <div class="judge-athlete-meta font-mono">
               {{ redAthlete.team }} &bull; {{ redAthlete.category }}
@@ -420,12 +493,21 @@ onMounted(() => {
             @click="handleScoreTap('red', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <template v-if="tech.type === 'technique'">
                   <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
                   <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
                   <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                  <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                  <path
+                    d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+                  />
                 </template>
                 <template v-else-if="tech.type === 'knockdown'">
                   <circle cx="16" cy="4" r="2" />
@@ -452,19 +534,36 @@ onMounted(() => {
         <!-- Touch Feedback Strip Red -->
         <footer class="judge-touch-strip font-mono">
           <div class="judge-touch-last">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
               <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
               <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
             </svg>
             <span v-if="lastRedTouch">
-              SENTUHAN TERAKHIR: <strong>{{ lastRedTouch.technique }} (+{{ lastRedTouch.points }})</strong> [{{ lastRedTouch.timeStr }}]
+              SENTUHAN TERAKHIR:
+              <strong>{{ lastRedTouch.technique }} (+{{ lastRedTouch.points }})</strong> [{{
+                lastRedTouch.timeStr
+              }}]
             </span>
             <span v-else class="text-slate-500">BELUM ADA SENTUHAN</span>
           </div>
 
           <div v-if="lastRedTouch" class="judge-touch-status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#34D399"
+              stroke-width="2.5"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span>TERCATAT</span>
@@ -477,9 +576,7 @@ onMounted(() => {
         <!-- Header Sudut Biru -->
         <div class="judge-corner__header">
           <div class="judge-athlete-info">
-            <div class="judge-corner-badge judge-corner-badge--blue font-mono">
-              SUDUT BIRU
-            </div>
+            <div class="judge-corner-badge judge-corner-badge--blue font-mono">SUDUT BIRU</div>
             <h2 class="judge-athlete-name">{{ blueAthlete.name }}</h2>
             <div class="judge-athlete-meta font-mono">
               {{ blueAthlete.team }} &bull; {{ blueAthlete.category }}
@@ -520,12 +617,21 @@ onMounted(() => {
             @click="handleScoreTap('blue', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <template v-if="tech.type === 'technique'">
                   <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
                   <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
                   <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                  <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                  <path
+                    d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+                  />
                 </template>
                 <template v-else-if="tech.type === 'knockdown'">
                   <circle cx="16" cy="4" r="2" />
@@ -552,19 +658,36 @@ onMounted(() => {
         <!-- Touch Feedback Strip Blue -->
         <footer class="judge-touch-strip font-mono">
           <div class="judge-touch-last">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
               <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
               <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
             </svg>
             <span v-if="lastBlueTouch">
-              SENTUHAN TERAKHIR: <strong>{{ lastBlueTouch.technique }} (+{{ lastBlueTouch.points }})</strong> [{{ lastBlueTouch.timeStr }}]
+              SENTUHAN TERAKHIR:
+              <strong>{{ lastBlueTouch.technique }} (+{{ lastBlueTouch.points }})</strong> [{{
+                lastBlueTouch.timeStr
+              }}]
             </span>
             <span v-else class="text-slate-500">BELUM ADA SENTUHAN</span>
           </div>
 
           <div v-if="lastBlueTouch" class="judge-touch-status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#34D399"
+              stroke-width="2.5"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span>TERCATAT</span>
@@ -575,15 +698,11 @@ onMounted(() => {
 
     <!-- BOTTOM COMPLIANCE STRIP -->
     <footer class="judge-bottom-bar font-mono">
-      <div class="judge-bottom__left">
-        STANDAR RESMI PB IPSI / PERSILAT 2024
-      </div>
+      <div class="judge-bottom__left">STANDAR RESMI PB IPSI / PERSILAT 2024</div>
       <div class="judge-bottom__center text-emerald-400">
         TRANSMISI TERENKRIPSI KE KETUA PERTANDINGAN
       </div>
-      <div class="judge-bottom__right">
-        TOTAL SKOR DISEMBUNYIKAN (ATURAN PERSILAT PASAL 28)
-      </div>
+      <div class="judge-bottom__right">TOTAL SKOR DISEMBUNYIKAN (ATURAN PERSILAT PASAL 28)</div>
     </footer>
 
     <!-- PIN LOGIN ONBOARDING MODAL -->
@@ -591,7 +710,14 @@ onMounted(() => {
       <div class="judge-pin-modal">
         <div class="judge-pin-header">
           <div class="judge-pin-icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#10B981"
+              stroke-width="2.2"
+            >
               <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
@@ -634,12 +760,8 @@ onMounted(() => {
           <button v-for="n in 9" :key="n" class="numpad-btn" @click="handlePinNumber(n)">
             {{ n }}
           </button>
-          <button class="numpad-btn numpad-btn--clear" @click="handlePinClear">
-            C
-          </button>
-          <button class="numpad-btn" @click="handlePinNumber(0)">
-            0
-          </button>
+          <button class="numpad-btn numpad-btn--clear" @click="handlePinClear">C</button>
+          <button class="numpad-btn" @click="handlePinNumber(0)">0</button>
           <button
             class="numpad-btn numpad-btn--submit"
             :disabled="pinLoading || !isCompletePin(pinInput)"
@@ -650,7 +772,11 @@ onMounted(() => {
         </div>
 
         <div class="judge-pin-footer font-mono">
-          <button v-if="authStore.isAuthenticated" class="judge-link-btn text-rose-400" @click="handleJudgeLogout">
+          <button
+            v-if="authStore.isAuthenticated"
+            class="judge-link-btn text-rose-400"
+            @click="handleJudgeLogout"
+          >
             Keluar dari Tablet Juri (Logout)
           </button>
         </div>
@@ -893,15 +1019,23 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-.judge-comp-left, .judge-comp-center, .judge-comp-right {
+.judge-comp-left,
+.judge-comp-center,
+.judge-comp-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.text-peach-200 { color: #fca5a5; }
-.text-cyan-400 { color: #22d3ee; }
-.judge-bar-divider { opacity: 0.3; }
+.text-peach-200 {
+  color: #fca5a5;
+}
+.text-cyan-400 {
+  color: #22d3ee;
+}
+.judge-bar-divider {
+  opacity: 0.3;
+}
 
 /* --- Main Split Screen (Two Columns) --- */
 .judge-grid {
@@ -1000,9 +1134,15 @@ onMounted(() => {
   animation: judge-dot-pop 0.35s ease-out;
 }
 @keyframes judge-dot-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.7); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.7);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 .judge-consensus-indicator .judge-consensus-text {
   font-size: 0.625rem;
@@ -1058,7 +1198,10 @@ onMounted(() => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+  transition:
+    transform 0.08s ease,
+    filter 0.08s ease,
+    box-shadow 0.08s ease;
   user-select: none;
   min-height: 80px;
 }
@@ -1075,10 +1218,14 @@ onMounted(() => {
   background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
   border-color: rgba(239, 68, 68, 0.6);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 18px rgba(185, 28, 28, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px rgba(185, 28, 28, 0.35);
 }
 .judge-btn--red.judge-btn--active {
-  box-shadow: 0 0 35px rgba(239, 68, 68, 0.9), inset 0 0 15px rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 35px rgba(239, 68, 68, 0.9),
+    inset 0 0 15px rgba(255, 255, 255, 0.35);
 }
 
 /* Blue Button Styling */
@@ -1086,10 +1233,14 @@ onMounted(() => {
   background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
   border-color: rgba(96, 165, 250, 0.6);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 18px rgba(29, 78, 216, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px rgba(29, 78, 216, 0.35);
 }
 .judge-btn--blue.judge-btn--active {
-  box-shadow: 0 0 35px rgba(96, 165, 250, 0.9), inset 0 0 15px rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 35px rgba(96, 165, 250, 0.9),
+    inset 0 0 15px rgba(255, 255, 255, 0.35);
 }
 
 .judge-btn__icon-box {
@@ -1178,8 +1329,15 @@ onMounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 /* ==========================================================================
@@ -1197,7 +1355,7 @@ onMounted(() => {
 }
 
 .judge-pin-modal {
-  background-color: #0B1120;
+  background-color: #0b1120;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 14px;
   padding: 24px 28px;
@@ -1232,13 +1390,13 @@ onMounted(() => {
 .judge-pin-title {
   font-size: 1.125rem;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #ffffff;
   line-height: 1.2;
 }
 
 .judge-pin-desc {
   font-size: 0.6875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   margin-top: 2px;
 }
 
@@ -1247,7 +1405,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  background-color: #0F172A;
+  background-color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 6px 12px;
@@ -1256,12 +1414,12 @@ onMounted(() => {
 }
 
 .judge-pin-meta-item .label {
-  color: #64748B;
+  color: #64748b;
   margin-right: 6px;
 }
 
 .judge-pin-meta-item .val {
-  color: #38BDF8;
+  color: #38bdf8;
   font-weight: 700;
 }
 
@@ -1276,12 +1434,12 @@ onMounted(() => {
 }
 
 .judge-pin-dot--filled {
-  color: #10B981;
+  color: #10b981;
   text-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 }
 
 .judge-pin-error {
-  color: #EF4444;
+  color: #ef4444;
   font-size: 0.75rem;
   margin-bottom: 12px;
   text-align: center;
@@ -1299,7 +1457,7 @@ onMounted(() => {
   height: 52px;
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #F8FAFC;
+  color: #f8fafc;
   font-size: 1.25rem;
   font-weight: 700;
   border-radius: 8px;
@@ -1311,7 +1469,7 @@ onMounted(() => {
 }
 
 .numpad-btn:hover {
-  background-color: #1E293B;
+  background-color: #1e293b;
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
@@ -1321,19 +1479,19 @@ onMounted(() => {
 }
 
 .numpad-btn--clear {
-  color: #EF4444;
+  color: #ef4444;
   background-color: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.2);
 }
 
 .numpad-btn--submit {
-  color: #064E3B;
-  background-color: #10B981;
-  border-color: #10B981;
+  color: #064e3b;
+  background-color: #10b981;
+  border-color: #10b981;
 }
 
 .numpad-btn--submit:hover {
-  background-color: #34D399;
+  background-color: #34d399;
 }
 
 .numpad-btn--submit:disabled {
@@ -1350,7 +1508,7 @@ onMounted(() => {
 .judge-link-btn {
   background: transparent;
   border: none;
-  color: #64748B;
+  color: #64748b;
   font-size: 0.6875rem;
   cursor: pointer;
   text-decoration: underline;
@@ -1358,6 +1516,6 @@ onMounted(() => {
 }
 
 .judge-link-btn:hover {
-  color: #94A3B8;
+  color: #94a3b8;
 }
 </style>

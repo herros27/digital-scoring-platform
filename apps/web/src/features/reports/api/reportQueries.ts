@@ -38,7 +38,10 @@ export function useMedalStandingsQuery(compId: Ref<string>) {
 /**
  * Fetch full tournament export data
  */
-export function useCompetitionExportQuery(compId: Ref<string>, enabled: Ref<boolean> = computed(() => false)) {
+export function useCompetitionExportQuery(
+  compId: Ref<string>,
+  enabled: Ref<boolean> = computed(() => false),
+) {
   return useQuery({
     queryKey: computed(() => reportKeys.export(compId.value)),
     queryFn: () => reportService.getExport(compId.value),

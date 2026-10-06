@@ -33,7 +33,14 @@ async function confirmLogout() {
     <header class="admin-topbar">
       <div class="admin-topbar__brand">
         <div class="brand-badge">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
             <path d="M4 22h16" />
@@ -70,11 +77,7 @@ async function confirmLogout() {
         >
           PIN Perangkat
         </router-link>
-        <router-link
-          to="/scoreboard"
-          class="topbar-link"
-          target="_blank"
-        >
+        <router-link to="/scoreboard" class="topbar-link" target="_blank">
           Live Scoreboard ↗
         </router-link>
       </nav>
@@ -84,9 +87,7 @@ async function confirmLogout() {
           <span class="profile-name">{{ authStore.name || 'Petugas Pertandingan' }}</span>
           <span class="profile-role font-mono">{{ authStore.role.toUpperCase() }}</span>
         </div>
-        <button class="logout-btn" title="Keluar sesi" @click="handleLogout">
-          Keluar
-        </button>
+        <button class="logout-btn" title="Keluar sesi" @click="handleLogout">Keluar</button>
       </div>
     </header>
 
@@ -101,7 +102,14 @@ async function confirmLogout() {
     <div v-if="showLogoutModal" class="logout-modal-backdrop" @click.self="showLogoutModal = false">
       <div class="logout-modal">
         <div class="logout-modal-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#EF4444"
+            stroke-width="2.2"
+          >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" x2="9" y1="12" y2="12" />
@@ -264,7 +272,7 @@ async function confirmLogout() {
 }
 
 .logout-modal {
-  background-color: #0F172A;
+  background-color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   padding: 24px;
@@ -290,13 +298,13 @@ async function confirmLogout() {
 .logout-modal-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
   margin-bottom: 8px;
 }
 
 .logout-modal-desc {
   font-size: 0.8125rem;
-  color: #94A3B8;
+  color: #94a3b8;
   line-height: 1.5;
   margin-bottom: 20px;
 }
@@ -311,7 +319,7 @@ async function confirmLogout() {
 .logout-cancel-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #CBD5E1;
+  color: #cbd5e1;
   padding: 8px 18px;
   border-radius: 6px;
   font-size: 0.8125rem;
@@ -324,9 +332,9 @@ async function confirmLogout() {
 }
 
 .logout-confirm-btn {
-  background-color: #DC2626;
-  border: 1px solid #EF4444;
-  color: #FFFFFF;
+  background-color: #dc2626;
+  border: 1px solid #ef4444;
+  color: #ffffff;
   padding: 8px 18px;
   border-radius: 6px;
   font-size: 0.8125rem;
@@ -336,7 +344,7 @@ async function confirmLogout() {
 }
 
 .logout-confirm-btn:hover {
-  background-color: #B91C1C;
+  background-color: #b91c1c;
 }
 
 .logout-confirm-btn:disabled {

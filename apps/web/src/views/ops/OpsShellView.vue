@@ -16,7 +16,10 @@ import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
 import RulesetsOpsView from '@/features/rulesets/views/RulesetsOpsView.vue'
 import { matchService } from '@/features/matches/api/matchService'
 import type { BracketSlotRecord } from '@/features/tournament/api/bracketService'
-import { useBracketTreeQuery, useGenerateBracketMutation } from '@/features/tournament/api/bracketQueries'
+import {
+  useBracketTreeQuery,
+  useGenerateBracketMutation,
+} from '@/features/tournament/api/bracketQueries'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
@@ -50,11 +53,15 @@ watch(
       }
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 const activeCompId = computed(() => {
-  return authStore.competitionId || competitionsList.value[0]?.id || 'b26d7145-d341-4795-ac58-bff86d13cbf8'
+  return (
+    authStore.competitionId ||
+    competitionsList.value[0]?.id ||
+    'b26d7145-d341-4795-ac58-bff86d13cbf8'
+  )
 })
 
 const activeCompetition = computed(() => {
@@ -65,7 +72,11 @@ function switchCompetition(compId: string) {
   authStore.setCompetitionId(compId)
   router.replace({ query: { ...route.query, comp_id: compId } })
   const targetComp = competitionsList.value.find((c) => c.id === compId)
-  showToast('Kompetisi Aktif Diubah', `Kini mengelola data untuk: ${targetComp?.name || compId}`, 'success')
+  showToast(
+    'Kompetisi Aktif Diubah',
+    `Kini mengelola data untuk: ${targetComp?.name || compId}`,
+    'success',
+  )
 }
 
 // Queries for Real Data
@@ -78,7 +89,10 @@ const { data: rawMatches, refetch: refetchMatches } = useMatchesQuery(activeComp
 const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
 
 const categoryOptions = computed(() => {
-  const map = new Map<string, { id: string; name: string; weightClass: string; gender: 'male' | 'female' }>()
+  const map = new Map<
+    string,
+    { id: string; name: string; weightClass: string; gender: 'male' | 'female' }
+  >()
 
   // 1. Ambil dari master categories database
   for (const c of rawCategories.value || []) {
@@ -134,10 +148,11 @@ const currentWeightClass = computed(() => parsedClass.value.weightClass)
 const currentGender = computed(() => parsedClass.value.gender)
 
 // Real Bracket Tree Query
-const {
-  data: rawBracketSlots,
-  refetch: refetchBracket,
-} = useBracketTreeQuery(activeCompId, currentWeightClass, currentGender)
+const { data: rawBracketSlots, refetch: refetchBracket } = useBracketTreeQuery(
+  activeCompId,
+  currentWeightClass,
+  currentGender,
+)
 
 const generateBracketMutation = useGenerateBracketMutation(activeCompId)
 
@@ -182,10 +197,14 @@ function setNav(tab: typeof activeNav.value) {
 watch(
   () => route.query.tab,
   (newTab) => {
-    if (isNavKey(newTab) && newTab !== activeNav.value && (newTab !== 'regulasi' || canManageRulesets.value)) {
+    if (
+      isNavKey(newTab) &&
+      newTab !== activeNav.value &&
+      (newTab !== 'regulasi' || canManageRulesets.value)
+    ) {
       activeNav.value = newTab
     }
-  }
+  },
 )
 
 const selectedArena = ref('GELANGGANG A (UTAMA)')
@@ -244,11 +263,13 @@ const navConfig = {
 } as const
 
 const currentNavMeta = computed(() => {
-  return navConfig[activeNav.value] || {
-    title: 'KOMANDO OPERASI & TURNAMEN',
-    sub: 'SISTEM DIGITAL SCORING PENCAK SILAT',
-    hasArena: false,
-  }
+  return (
+    navConfig[activeNav.value] || {
+      title: 'KOMANDO OPERASI & TURNAMEN',
+      sub: 'SISTEM DIGITAL SCORING PENCAK SILAT',
+      hasArena: false,
+    }
+  )
 })
 
 function handleArenaSelect(arena: { name: string }) {
@@ -332,7 +353,12 @@ const drawHash = ref('#IPSI-2025-CL-A-9941')
 const telemetryMs = ref(12)
 
 // Notification / Toast
-const toast = ref<{ show: boolean; title: string; message: string; type: 'success' | 'info' | 'warning' } | null>(null)
+const toast = ref<{
+  show: boolean
+  title: string
+  message: string
+  type: 'success' | 'info' | 'warning'
+} | null>(null)
 
 function showToast(title: string, message: string, type: 'success' | 'info' | 'warning' = 'info') {
   toast.value = { show: true, title, message, type }
@@ -415,8 +441,12 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
     const slotBlue = slots[i + 1]
     const pairIndex = Math.floor(i / 2) + 1
 
-    const redParticipant = slotRed?.participant_id ? participantLookup.value[slotRed.participant_id] : null
-    const blueParticipant = slotBlue?.participant_id ? participantLookup.value[slotBlue.participant_id] : null
+    const redParticipant = slotRed?.participant_id
+      ? participantLookup.value[slotRed.participant_id]
+      : null
+    const blueParticipant = slotBlue?.participant_id
+      ? participantLookup.value[slotBlue.participant_id]
+      : null
 
     const hasRedBye = slotRed?.is_bye
     const hasBlueBye = slotBlue?.is_bye
@@ -429,7 +459,7 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
     const matchedMatch = (rawMatches.value || []).find(
       (m) =>
         (slotRed?.id && m.bracket_slot_id === slotRed.id) ||
-        (slotBlue?.id && m.bracket_slot_id === slotBlue.id)
+        (slotBlue?.id && m.bracket_slot_id === slotBlue.id),
     )
 
     const arenaName = matchedMatch?.arena_id
@@ -462,13 +492,17 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
           : 'neutral',
       isLive: matchedMatch?.status === 'running',
       red: {
-        name: redParticipant?.name || (hasRedBye ? 'BYE (Lolos Otomatis)' : 'Pemenang Babak Sebelumnya'),
+        name:
+          redParticipant?.name ||
+          (hasRedBye ? 'BYE (Lolos Otomatis)' : 'Pemenang Babak Sebelumnya'),
         contingent: redParticipant?.contingent || '-',
         score: isFinished ? (redWinner ? 'W' : 'L') : '-',
         isWinner: redWinner,
       },
       blue: {
-        name: blueParticipant?.name || (hasBlueBye ? 'BYE (Lolos Otomatis)' : 'Pemenang Babak Sebelumnya'),
+        name:
+          blueParticipant?.name ||
+          (hasBlueBye ? 'BYE (Lolos Otomatis)' : 'Pemenang Babak Sebelumnya'),
         contingent: blueParticipant?.contingent || '-',
         score: isFinished ? (blueWinner ? 'W' : 'L') : '-',
         isWinner: blueWinner,
@@ -530,7 +564,7 @@ const queuedMatch = computed(() => {
         m.red.name !== 'Menunggu Atlet' &&
         m.red.name !== 'Pemenang Babak Sebelumnya' &&
         m.blue.name !== 'Menunggu Atlet' &&
-        m.blue.name !== 'Pemenang Babak Sebelumnya'
+        m.blue.name !== 'Pemenang Babak Sebelumnya',
     )
     if (readyMatch) return readyMatch
   }
@@ -540,7 +574,11 @@ const queuedMatch = computed(() => {
 // Operations Actions
 function handleGenerateDraw() {
   if (isLocked.value) {
-    showToast('Bagan Terkunci', 'Buka kunci bagan terlebih dahulu sebelum me-reacak slot pertandingan.', 'warning')
+    showToast(
+      'Bagan Terkunci',
+      'Buka kunci bagan terlebih dahulu sebelum me-reacak slot pertandingan.',
+      'warning',
+    )
     return
   }
   modal.value = {
@@ -559,9 +597,17 @@ function handleGenerateDraw() {
         await refetchBracket()
         await refetchMatches()
         drawHash.value = `#IPSI-2025-CL-${currentWeightClass.value}-${Math.floor(1000 + Math.random() * 9000)}`
-        showToast('Bagan Berhasil Di-Generate', `Data slot bagan tersinkronisasi dari backend. Hash: ${drawHash.value}`, 'success')
+        showToast(
+          'Bagan Berhasil Di-Generate',
+          `Data slot bagan tersinkronisasi dari backend. Hash: ${drawHash.value}`,
+          'success',
+        )
       } catch (err) {
-        showToast('Gagal Generate Bagan', getErrorMessage(err, 'Pastikan minimal 2 atlet terverifikasi pada kelas ini.'), 'warning')
+        showToast(
+          'Gagal Generate Bagan',
+          getErrorMessage(err, 'Pastikan minimal 2 atlet terverifikasi pada kelas ini.'),
+          'warning',
+        )
       } finally {
         modal.value = null
       }
@@ -602,7 +648,7 @@ function handlePanggilAtlet() {
   showToast(
     'Panggilan Diumumkan',
     `Pengeras suara: Memanggil sudut Merah (${m.red.name}) dan sudut Biru (${m.blue.name}) menuju Gelanggang.`,
-    'info'
+    'info',
   )
 }
 
@@ -662,7 +708,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'kompetisi' }"
           @click="setNav('kompetisi')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
             <path d="M4 22h16" />
@@ -678,7 +731,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'gelanggang' }"
           @click="setNav('gelanggang')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <circle cx="12" cy="12" r="4" />
           </svg>
@@ -690,7 +750,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'kategori' }"
           @click="setNav('kategori')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
             <path d="M11 3 8 9l4 12 4-12-3-6" />
             <path d="M2 9h20" />
@@ -705,7 +772,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'atlet' }"
           @click="setNav('atlet')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
             <circle cx="9" cy="7" r="4" />
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -719,7 +793,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'verifikasi' }"
           @click="setNav('verifikasi')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
             <circle cx="9" cy="7" r="4" />
             <polyline points="16 11 18 13 22 9" />
@@ -734,7 +815,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'jadwal' }"
           @click="setNav('jadwal')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <rect width="18" height="18" x="3" y="4" rx="2" />
             <line x1="16" x2="16" y1="2" y2="6" />
             <line x1="8" x2="8" y1="2" y2="6" />
@@ -748,7 +836,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'bagan' }"
           @click="setNav('bagan')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <line x1="6" x2="6" y1="3" y2="15" />
             <circle cx="18" cy="6" r="3" />
             <circle cx="6" cy="18" r="3" />
@@ -762,7 +857,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'pin' }"
           @click="setNav('pin')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
@@ -775,7 +877,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'regulasi' }"
           @click="setNav('regulasi')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M4 4h16v16H4z" />
             <path d="M8 9h8" />
             <path d="M8 13h8" />
@@ -789,7 +898,14 @@ function handleLoadToMat1() {
           :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
           @click="setNav('laporan')"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" x2="8" y1="13" y2="13" />
@@ -806,11 +922,24 @@ function handleLoadToMat1() {
           <div class="ops-user__avatar font-mono">{{ userInitials }}</div>
           <div class="ops-user__meta">
             <div class="ops-user__name truncate">{{ authStore.name || 'Ketua Pertandingan' }}</div>
-            <div class="ops-user__role font-mono">{{ (authStore.role || 'Admin Arena').toUpperCase() }}</div>
+            <div class="ops-user__role font-mono">
+              {{ (authStore.role || 'Admin Arena').toUpperCase() }}
+            </div>
           </div>
         </div>
-        <button class="ops-logout-btn" title="Keluar dari Sesi (Logout)" @click="triggerLogoutPrompt">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button
+          class="ops-logout-btn"
+          title="Keluar dari Sesi (Logout)"
+          @click="triggerLogoutPrompt"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" x2="9" y1="12" y2="12" />
@@ -829,8 +958,19 @@ function handleLoadToMat1() {
         </div>
 
         <!-- COMPETITION SELECTOR (Global context switcher) -->
-        <div class="ops-topbar__comp-select font-mono" :title="`Kompetisi aktif: ${activeCompetition?.name || activeCompId}`">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" class="flex-shrink-0">
+        <div
+          class="ops-topbar__comp-select font-mono"
+          :title="`Kompetisi aktif: ${activeCompetition?.name || activeCompId}`"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#F59E0B"
+            stroke-width="2.2"
+            class="flex-shrink-0"
+          >
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
             <path d="M4 22h16" />
@@ -879,7 +1019,14 @@ function handleLoadToMat1() {
             <span>SERVER SYNC: 100%</span>
           </div>
           <div class="system-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#10B981"
+              stroke-width="2"
+            >
               <path d="M4 11a9 9 0 0 1 9 9" />
               <path d="M4 4a16 16 0 0 1 16 16" />
               <circle cx="5" cy="19" r="1" />
@@ -889,10 +1036,21 @@ function handleLoadToMat1() {
           <div
             class="ops-profile-badge"
             :class="{ 'ops-profile-badge--active': authStore.isAuthenticated }"
-            :title="authStore.isAuthenticated ? `Sesi aktif: ${authStore.name || 'Admin'} (Klik untuk Keluar)` : 'Login Admin / Ketua Pertandingan'"
+            :title="
+              authStore.isAuthenticated
+                ? `Sesi aktif: ${authStore.name || 'Admin'} (Klik untuk Keluar)`
+                : 'Login Admin / Ketua Pertandingan'
+            "
             @click="handleProfileClick"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
@@ -901,7 +1059,21 @@ function handleLoadToMat1() {
       </header>
 
       <!-- SCROLLABLE OPS VIEW -->
-      <div class="ops-content-scroll" :class="{ 'ops-content-scroll--pin': activeNav === 'pin' || activeNav === 'regulasi' || activeNav === 'laporan' || activeNav === 'kompetisi' || activeNav === 'gelanggang' || activeNav === 'kategori' || activeNav === 'atlet' || activeNav === 'verifikasi' || activeNav === 'jadwal' }">
+      <div
+        class="ops-content-scroll"
+        :class="{
+          'ops-content-scroll--pin':
+            activeNav === 'pin' ||
+            activeNav === 'regulasi' ||
+            activeNav === 'laporan' ||
+            activeNav === 'kompetisi' ||
+            activeNav === 'gelanggang' ||
+            activeNav === 'kategori' ||
+            activeNav === 'atlet' ||
+            activeNav === 'verifikasi' ||
+            activeNav === 'jadwal',
+        }"
+      >
         <!-- TAB KOMPETISI -->
         <CompetitionsView v-if="activeNav === 'kompetisi'" />
 
@@ -935,225 +1107,303 @@ function handleLoadToMat1() {
         />
 
         <!-- TAB JADWAL TANDING -->
-        <ScheduleOpsView
-          v-else-if="activeNav === 'jadwal'"
-          :competition-id="activeCompId"
-        />
+        <ScheduleOpsView v-else-if="activeNav === 'jadwal'" :competition-id="activeCompId" />
 
         <!-- TAB PERANGKAT & PIN JURI -->
-        <DevicePinManager
-          v-else-if="activeNav === 'pin'"
-          :competition-id="activeCompId"
-        />
+        <DevicePinManager v-else-if="activeNav === 'pin'" :competition-id="activeCompId" />
 
         <!-- TAB REGULASI & RULESET -->
         <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canManageRulesets" />
 
         <!-- TAB LAPORAN & EKSPOR -->
-        <ReportsOpsView
-          v-else-if="activeNav === 'laporan'"
-          :competition-id="activeCompId"
-        />
+        <ReportsOpsView v-else-if="activeNav === 'laporan'" :competition-id="activeCompId" />
 
         <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
         <template v-else>
-        <!-- HEADER BANNER & ACTION BUTTONS -->
-        <section class="ops-banner-row">
-          <div class="ops-banner-title-group">
-            <div class="ops-banner-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+          <!-- HEADER BANNER & ACTION BUTTONS -->
+          <section class="ops-banner-row">
+            <div class="ops-banner-title-group">
+              <div class="ops-banner-icon-box">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#10B981"
+                  stroke-width="2.2"
+                >
+                  <line x1="6" x2="6" y1="3" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 0 1-9 9" />
+                </svg>
+              </div>
+              <div>
+                <div class="ops-banner-sub font-mono">
+                  <span>SISTEM ELIMINASI TUNGGAL (IPSI RULES 2023)</span>
+                  <span class="ops-bullet">•</span>
+                  <span class="rev-tag">REV: 04.2-FINAL</span>
+                </div>
+                <h2 class="ops-banner-main-title">BAGAN PERTANDINGAN TURNAMEN</h2>
+              </div>
+            </div>
+
+            <div class="ops-banner-actions font-mono">
+              <AppButton variant="emerald" size="sm" @click="handleGenerateDraw">
+                <template #icon>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="m16 2-4 4-4-4" />
+                    <path d="M12 6v12" />
+                    <path d="m8 18 4 4 4-4" />
+                  </svg>
+                </template>
+                Generate Bagan Acak
+              </AppButton>
+
+              <button class="ops-action-btn-dark font-mono" @click="toggleLock">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span>{{ isLocked ? 'Kunci Draw (Locked)' : 'Buka Kunci' }}</span>
+              </button>
+
+              <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="6 9 6 2 18 2 18 9" />
+                  <path
+                    d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+                  />
+                  <rect width="12" height="8" x="6" y="14" />
+                </svg>
+                <span>Cetak PDF</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- FILTERS & QUALIFICATION ROW -->
+          <section class="ops-filter-grid">
+            <!-- Filter 1: Kategori & Kelas -->
+            <div class="filter-card">
+              <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
+              <div class="filter-select-wrapper">
+                <select v-model="selectedCategory" class="filter-select font-mono">
+                  <option v-for="c in categoryOptions" :key="c.id" :value="c.name">
+                    {{ c.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Card 2: Kualifikasi Timbang Badan -->
+            <div class="filter-card">
+              <label class="filter-label font-mono">KUALIFIKASI TIMBANG BADAN</label>
+              <div class="weigh-in-row font-mono">
+                <div class="weigh-in-status">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#10B981"
+                    stroke-width="2.5"
+                  >
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <span>Timbang Sah</span>
+                </div>
+                <AppBadge variant="emerald"
+                  >{{ rawParticipants?.length || 0 }} ATLET TERDAFTAR</AppBadge
+                >
+              </div>
+            </div>
+
+            <!-- Card 3: Integrasi Gelanggang -->
+            <div class="filter-card">
+              <label class="filter-label font-mono">INTEGRASI GELANGGANG</label>
+              <div class="arena-integration-row font-mono">
+                <div class="arena-ready">
+                  <span class="arena-ready__dot" />
+                  <span>{{
+                    rawArenas && rawArenas.length > 0
+                      ? `${rawArenas.length} GELANGGANG READY`
+                      : 'GELANGGANG SIAP'
+                  }}</span>
+                </div>
+                <span class="arena-lat">LAT: {{ telemetryMs }}ms</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- SUMMARY METRICS BAR -->
+          <section class="ops-metrics-bar font-mono">
+            <div class="metric-block">
+              <div class="metric-label">TOTAL PESERTA</div>
+              <div class="metric-val">
+                {{ rawParticipants?.length || 16 }} <span class="metric-unit">Atlet</span>
+              </div>
+            </div>
+            <div class="metric-block">
+              <div class="metric-label">PARTAI SELESAI</div>
+              <div class="metric-val">
+                {{ rawMatches?.filter((m) => m.status === 'finished').length || 0 }}
+                <span class="metric-unit">/ {{ rawMatches?.length || 15 }} Laga</span>
+              </div>
+            </div>
+            <div class="metric-block">
+              <div class="metric-label">SEDANG TANDING</div>
+              <div class="metric-val text-emerald-400">
+                {{ rawMatches?.filter((m) => m.status === 'running').length || 0 }}
+                <span class="metric-unit">LIVE</span>
+              </div>
+            </div>
+            <div class="metric-block">
+              <div class="metric-label">MENUNGGU ANTRIAN</div>
+              <div class="metric-val">
+                {{
+                  rawMatches?.filter((m) => m.status === 'ready' || m.status === 'idle').length ||
+                  (rawParticipants?.length ? Math.floor(rawParticipants.length / 2) : 0)
+                }}
+                <span class="metric-unit">Partai</span>
+              </div>
+            </div>
+            <div class="metric-block metric-block--progress">
+              <div class="metric-label">PROGRES BAGAN</div>
+              <div class="bracket-progress-wrapper">
+                <div class="bracket-progress-bar">
+                  <div
+                    class="bracket-progress-fill"
+                    :style="{
+                      width: `${rawMatches?.length ? Math.round((rawMatches.filter((m) => m.status === 'finished').length / rawMatches.length) * 100) : rawBracketSlots?.length ? 40 : 10}%`,
+                    }"
+                  />
+                </div>
+                <span class="progress-num"
+                  >{{
+                    rawMatches?.length
+                      ? Math.round(
+                          (rawMatches.filter((m) => m.status === 'finished').length /
+                            rawMatches.length) *
+                            100,
+                        )
+                      : rawBracketSlots?.length
+                        ? 40
+                        : 10
+                  }}%</span
+                >
+              </div>
+            </div>
+          </section>
+
+          <!-- TOURNAMENT BRACKET TREE COLUMNS (DYNAMIC BERDASARKAN HASIL UNDIAN KELAS) -->
+          <section v-if="bracketRounds.length > 0" class="bracket-tree-container">
+            <div v-for="round in bracketRounds" :key="round.roundNumber" class="bracket-column">
+              <div class="bracket-column__header font-mono">
+                <div class="col-title">
+                  <span class="col-dot" :class="round.badgeVariant" />
+                  <span>{{ round.title }}</span>
+                </div>
+                <AppBadge :variant="round.badgeVariant" size="sm">
+                  {{ round.matches.length }} PARTAI
+                </AppBadge>
+              </div>
+
+              <div
+                class="bracket-matches-list"
+                :class="`bracket-matches-list--round-${round.roundNumber}`"
+              >
+                <div
+                  v-for="m in round.matches"
+                  :key="m.id"
+                  class="bracket-match-card"
+                  :class="{ 'bracket-match-card--live': m.isLive }"
+                >
+                  <div class="match-card__header font-mono">
+                    <span class="match-partai">
+                      <span v-if="m.isLive" class="live-dot-pulse" />
+                      PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}
+                    </span>
+                    <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">
+                      {{ m.statusBadge }}
+                    </span>
+                  </div>
+
+                  <div
+                    class="match-card__athlete match-card__athlete--red"
+                    :class="{ 'athlete--winner': m.red.isWinner }"
+                  >
+                    <div class="athlete-name-group">
+                      <span class="corner-dot red" />
+                      <span class="athlete-name">{{ m.red.name }}</span>
+                      <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
+                    </div>
+                    <span class="athlete-score font-mono">{{ m.red.score }}</span>
+                  </div>
+
+                  <div
+                    class="match-card__athlete match-card__athlete--blue"
+                    :class="{ 'athlete--winner': m.blue.isWinner }"
+                  >
+                    <div class="athlete-name-group">
+                      <span class="corner-dot blue" />
+                      <span class="athlete-name">{{ m.blue.name }}</span>
+                      <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
+                    </div>
+                    <span class="athlete-score font-mono">{{ m.blue.score }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- EMPTY STATE JIKA BAGAN KATEGORI BELUM DI-GENERATE -->
+          <div v-else class="bracket-empty-state font-mono">
+            <div class="bracket-empty-icon">
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
                 <line x1="6" x2="6" y1="3" y2="15" />
                 <circle cx="18" cy="6" r="3" />
                 <circle cx="6" cy="18" r="3" />
                 <path d="M18 9a9 9 0 0 1-9 9" />
               </svg>
             </div>
-            <div>
-              <div class="ops-banner-sub font-mono">
-                <span>SISTEM ELIMINASI TUNGGAL (IPSI RULES 2023)</span>
-                <span class="ops-bullet">•</span>
-                <span class="rev-tag">REV: 04.2-FINAL</span>
-              </div>
-              <h2 class="ops-banner-main-title">BAGAN PERTANDINGAN TURNAMEN</h2>
-            </div>
-          </div>
-
-          <div class="ops-banner-actions font-mono">
-            <AppButton variant="emerald" size="sm" @click="handleGenerateDraw">
-              <template #icon>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="m16 2-4 4-4-4" />
-                  <path d="M12 6v12" />
-                  <path d="m8 18 4 4 4-4" />
-                </svg>
-              </template>
-              Generate Bagan Acak
+            <h3 class="bracket-empty-title">Bagan Pertandingan Belum Di-Generate</h3>
+            <p class="bracket-empty-desc">
+              Kategori {{ selectedCategory }} belum memiliki susunan bagan pertandingan resmi. Klik
+              tombol di bawah untuk mengundi susunan pohon pertandingan dari atlet terverifikasi.
+            </p>
+            <AppButton variant="emerald" size="md" @click="handleGenerateDraw">
+              Generate Bagan Acak Sekarang
             </AppButton>
-
-            <button class="ops-action-btn-dark font-mono" @click="toggleLock">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              <span>{{ isLocked ? 'Kunci Draw (Locked)' : 'Buka Kunci' }}</span>
-            </button>
-
-            <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 6 2 18 2 18 9" />
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                <rect width="12" height="8" x="6" y="14" />
-              </svg>
-              <span>Cetak PDF</span>
-            </button>
           </div>
-        </section>
-
-        <!-- FILTERS & QUALIFICATION ROW -->
-        <section class="ops-filter-grid">
-          <!-- Filter 1: Kategori & Kelas -->
-          <div class="filter-card">
-            <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
-            <div class="filter-select-wrapper">
-              <select v-model="selectedCategory" class="filter-select font-mono">
-                <option v-for="c in categoryOptions" :key="c.id" :value="c.name">
-                  {{ c.name }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Card 2: Kualifikasi Timbang Badan -->
-          <div class="filter-card">
-            <label class="filter-label font-mono">KUALIFIKASI TIMBANG BADAN</label>
-            <div class="weigh-in-row font-mono">
-              <div class="weigh-in-status">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <span>Timbang Sah</span>
-              </div>
-              <AppBadge variant="emerald">{{ rawParticipants?.length || 0 }} ATLET TERDAFTAR</AppBadge>
-            </div>
-          </div>
-
-          <!-- Card 3: Integrasi Gelanggang -->
-          <div class="filter-card">
-            <label class="filter-label font-mono">INTEGRASI GELANGGANG</label>
-            <div class="arena-integration-row font-mono">
-              <div class="arena-ready">
-                <span class="arena-ready__dot" />
-                <span>{{ rawArenas && rawArenas.length > 0 ? `${rawArenas.length} GELANGGANG READY` : 'GELANGGANG SIAP' }}</span>
-              </div>
-              <span class="arena-lat">LAT: {{ telemetryMs }}ms</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- SUMMARY METRICS BAR -->
-        <section class="ops-metrics-bar font-mono">
-          <div class="metric-block">
-            <div class="metric-label">TOTAL PESERTA</div>
-            <div class="metric-val">{{ rawParticipants?.length || 16 }} <span class="metric-unit">Atlet</span></div>
-          </div>
-          <div class="metric-block">
-            <div class="metric-label">PARTAI SELESAI</div>
-            <div class="metric-val">{{ rawMatches?.filter(m => m.status === 'finished').length || 0 }} <span class="metric-unit">/ {{ rawMatches?.length || 15 }} Laga</span></div>
-          </div>
-          <div class="metric-block">
-            <div class="metric-label">SEDANG TANDING</div>
-            <div class="metric-val text-emerald-400">{{ rawMatches?.filter(m => m.status === 'running').length || 0 }} <span class="metric-unit">LIVE</span></div>
-          </div>
-          <div class="metric-block">
-            <div class="metric-label">MENUNGGU ANTRIAN</div>
-            <div class="metric-val">{{ rawMatches?.filter(m => m.status === 'ready' || m.status === 'idle').length || (rawParticipants?.length ? Math.floor(rawParticipants.length / 2) : 0) }} <span class="metric-unit">Partai</span></div>
-          </div>
-          <div class="metric-block metric-block--progress">
-            <div class="metric-label">PROGRES BAGAN</div>
-            <div class="bracket-progress-wrapper">
-              <div class="bracket-progress-bar">
-                <div class="bracket-progress-fill" :style="{ width: `${rawMatches?.length ? Math.round((rawMatches.filter(m => m.status === 'finished').length / rawMatches.length) * 100) : (rawBracketSlots?.length ? 40 : 10)}%` }" />
-              </div>
-              <span class="progress-num">{{ rawMatches?.length ? Math.round((rawMatches.filter(m => m.status === 'finished').length / rawMatches.length) * 100) : (rawBracketSlots?.length ? 40 : 10) }}%</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- TOURNAMENT BRACKET TREE COLUMNS (DYNAMIC BERDASARKAN HASIL UNDIAN KELAS) -->
-        <section v-if="bracketRounds.length > 0" class="bracket-tree-container">
-          <div
-            v-for="round in bracketRounds"
-            :key="round.roundNumber"
-            class="bracket-column"
-          >
-            <div class="bracket-column__header font-mono">
-              <div class="col-title">
-                <span class="col-dot" :class="round.badgeVariant" />
-                <span>{{ round.title }}</span>
-              </div>
-              <AppBadge :variant="round.badgeVariant" size="sm">
-                {{ round.matches.length }} PARTAI
-              </AppBadge>
-            </div>
-
-            <div class="bracket-matches-list" :class="`bracket-matches-list--round-${round.roundNumber}`">
-              <div
-                v-for="m in round.matches"
-                :key="m.id"
-                class="bracket-match-card"
-                :class="{ 'bracket-match-card--live': m.isLive }"
-              >
-                <div class="match-card__header font-mono">
-                  <span class="match-partai">
-                    <span v-if="m.isLive" class="live-dot-pulse" />
-                    PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}
-                  </span>
-                  <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">
-                    {{ m.statusBadge }}
-                  </span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--red" :class="{ 'athlete--winner': m.red.isWinner }">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot red" />
-                    <span class="athlete-name">{{ m.red.name }}</span>
-                    <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
-                  </div>
-                  <span class="athlete-score font-mono">{{ m.red.score }}</span>
-                </div>
-
-                <div class="match-card__athlete match-card__athlete--blue" :class="{ 'athlete--winner': m.blue.isWinner }">
-                  <div class="athlete-name-group">
-                    <span class="corner-dot blue" />
-                    <span class="athlete-name">{{ m.blue.name }}</span>
-                    <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
-                  </div>
-                  <span class="athlete-score font-mono">{{ m.blue.score }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- EMPTY STATE JIKA BAGAN KATEGORI BELUM DI-GENERATE -->
-        <div v-else class="bracket-empty-state font-mono">
-          <div class="bracket-empty-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <line x1="6" x2="6" y1="3" y2="15" />
-              <circle cx="18" cy="6" r="3" />
-              <circle cx="6" cy="18" r="3" />
-              <path d="M18 9a9 9 0 0 1-9 9" />
-            </svg>
-          </div>
-          <h3 class="bracket-empty-title">Bagan Pertandingan Belum Di-Generate</h3>
-          <p class="bracket-empty-desc">
-            Kategori {{ selectedCategory }} belum memiliki susunan bagan pertandingan resmi. Klik tombol di bawah untuk mengundi susunan pohon pertandingan dari atlet terverifikasi.
-          </p>
-          <AppButton variant="emerald" size="md" @click="handleGenerateDraw">
-            Generate Bagan Acak Sekarang
-          </AppButton>
-        </div>
         </template>
       </div>
 
@@ -1161,7 +1411,14 @@ function handleLoadToMat1() {
       <footer v-if="activeNav === 'bagan'" class="ops-dock">
         <div class="ops-dock__match-info">
           <div class="ops-dock__athlete-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.2">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#DC2626"
+              stroke-width="2.2"
+            >
               <circle cx="12" cy="5" r="3" />
               <path d="M6.5 9 12 14l5.5-5" />
               <path d="M12 14v8" />
@@ -1175,7 +1432,11 @@ function handleLoadToMat1() {
               <span>{{ selectedCategory }}</span>
             </div>
             <div class="ops-dock__match-title">
-              {{ queuedMatch ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})` : 'Belum ada antrian partai aktif' }}
+              {{
+                queuedMatch
+                  ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})`
+                  : 'Belum ada antrian partai aktif'
+              }}
             </div>
           </div>
         </div>
@@ -1186,7 +1447,14 @@ function handleLoadToMat1() {
           </button>
           <AppButton variant="emerald" size="md" @click="handleLoadToMat1">
             <template #icon>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
             </template>
@@ -1201,7 +1469,14 @@ function handleLoadToMat1() {
             <div class="legal-hash">HASH-DRAW: {{ drawHash }}</div>
           </div>
           <div class="legal-shield">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#10B981"
+              stroke-width="2.2"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <polyline points="9 12 11 14 15 10" />
             </svg>
@@ -1225,14 +1500,8 @@ function handleLoadToMat1() {
           <h3 class="modal-title font-mono">{{ modal.title }}</h3>
           <p class="modal-msg">{{ modal.message }}</p>
           <div class="modal-actions font-mono">
-            <AppButton variant="outlined" size="sm" @click="modal = null">
-              Batal
-            </AppButton>
-            <AppButton
-              :variant="modal.confirmVariant || 'primary'"
-              size="sm"
-              @click="modal.action"
-            >
+            <AppButton variant="outlined" size="sm" @click="modal = null"> Batal </AppButton>
+            <AppButton :variant="modal.confirmVariant || 'primary'" size="sm" @click="modal.action">
               {{ modal.confirmText }}
             </AppButton>
           </div>
@@ -1242,42 +1511,86 @@ function handleLoadToMat1() {
 
     <!-- MODAL ADMIN / OPERATOR LOGIN -->
     <Transition name="modal-fade">
-      <div v-if="showAdminLoginModal" class="ops-modal-backdrop" @click.self="showAdminLoginModal = false">
+      <div
+        v-if="showAdminLoginModal"
+        class="ops-modal-backdrop"
+        @click.self="showAdminLoginModal = false"
+      >
         <div class="ops-modal">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div style="width: 38px; height: 38px; border-radius: 8px; background-color: rgba(220, 38, 38, 0.2); border: 1px solid rgba(220, 38, 38, 0.4); display: flex; align-items: center; justify-content: center; color: #EF4444; font-weight: 800;" class="font-mono">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px">
+            <div
+              style="
+                width: 38px;
+                height: 38px;
+                border-radius: 8px;
+                background-color: rgba(220, 38, 38, 0.2);
+                border: 1px solid rgba(220, 38, 38, 0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ef4444;
+                font-weight: 800;
+              "
+              class="font-mono"
+            >
               KP
             </div>
             <div>
-              <h3 class="modal-title font-mono" style="margin: 0; font-size: 1rem;">LOGIN KETUA PERTANDINGAN</h3>
-              <p style="font-size: 0.6875rem; color: #94A3B8; margin: 2px 0 0 0;">Akses otorisasi meja komando & manajemen PIN arena</p>
+              <h3 class="modal-title font-mono" style="margin: 0; font-size: 1rem">
+                LOGIN KETUA PERTANDINGAN
+              </h3>
+              <p style="font-size: 0.6875rem; color: #94a3b8; margin: 2px 0 0 0">
+                Akses otorisasi meja komando & manajemen PIN arena
+              </p>
             </div>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
-            <label class="font-mono" style="font-size: 0.6875rem; color: #64748B;">EMAIL OPERATOR / ADMIN</label>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px">
+            <label class="font-mono" style="font-size: 0.6875rem; color: #64748b"
+              >EMAIL OPERATOR / ADMIN</label
+            >
             <input
               v-model="adminEmail"
               type="email"
               placeholder="admin@silat.id"
-              style="background-color: #080D1A; border: 1px solid rgba(255, 255, 255, 0.12); color: #FFFFFF; padding: 8px 12px; border-radius: 6px; font-size: 0.8125rem; outline: none;"
+              style="
+                background-color: #080d1a;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 0.8125rem;
+                outline: none;
+              "
               class="font-mono"
-            >
+            />
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
-            <label class="font-mono" style="font-size: 0.6875rem; color: #64748B;">KATA SANDI</label>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px">
+            <label class="font-mono" style="font-size: 0.6875rem; color: #64748b">KATA SANDI</label>
             <input
               v-model="adminPassword"
               type="password"
               placeholder="••••••••"
-              style="background-color: #080D1A; border: 1px solid rgba(255, 255, 255, 0.12); color: #FFFFFF; padding: 8px 12px; border-radius: 6px; font-size: 0.8125rem; outline: none;"
+              style="
+                background-color: #080d1a;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 0.8125rem;
+                outline: none;
+              "
               class="font-mono"
               @keydown.enter="handleAdminLogin"
-            >
+            />
           </div>
 
-          <div v-if="adminLoginError" class="font-mono" style="font-size: 0.75rem; color: #EF4444; margin-bottom: 14px;">
+          <div
+            v-if="adminLoginError"
+            class="font-mono"
+            style="font-size: 0.75rem; color: #ef4444; margin-bottom: 14px"
+          >
             {{ adminLoginError }}
           </div>
 
@@ -1306,8 +1619,8 @@ function handleLoadToMat1() {
   display: flex;
   width: 100vw;
   height: 100vh;
-  background-color: #080D1A;
-  color: #E2E8F0;
+  background-color: #080d1a;
+  color: #e2e8f0;
   overflow: hidden;
   font-family: var(--font-display, 'Space Grotesk', sans-serif);
 }
@@ -1317,7 +1630,7 @@ function handleLoadToMat1() {
    ========================================================================== */
 .ops-sidebar {
   width: 250px;
-  background-color: #0B1120;
+  background-color: #0b1120;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
@@ -1340,8 +1653,8 @@ function handleLoadToMat1() {
 .ops-brand__logo {
   width: 36px;
   height: 36px;
-  background-color: #DC2626;
-  color: #FFFFFF;
+  background-color: #dc2626;
+  color: #ffffff;
   font-weight: 800;
   font-size: 1.125rem;
   display: flex;
@@ -1355,13 +1668,13 @@ function handleLoadToMat1() {
   font-size: 0.9375rem;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: #FFFFFF;
+  color: #ffffff;
   line-height: 1.2;
 }
 
 .ops-brand__sub {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
@@ -1379,19 +1692,19 @@ function handleLoadToMat1() {
 .telemetry-dot {
   width: 7px;
   height: 7px;
-  background-color: #10B981;
+  background-color: #10b981;
   border-radius: 50%;
-  box-shadow: 0 0 8px #10B981;
+  box-shadow: 0 0 8px #10b981;
 }
 
 .telemetry-text {
-  color: #94A3B8;
+  color: #94a3b8;
   letter-spacing: 0.06em;
 }
 
 .telemetry-ping {
   margin-left: auto;
-  color: #10B981;
+  color: #10b981;
   font-weight: 700;
 }
 
@@ -1421,7 +1734,7 @@ function handleLoadToMat1() {
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #94A3B8;
+  color: #94a3b8;
   font-size: 0.8125rem;
   text-align: left;
   cursor: pointer;
@@ -1430,14 +1743,14 @@ function handleLoadToMat1() {
 
 .ops-nav__item:hover {
   background-color: rgba(255, 255, 255, 0.04);
-  color: #F8FAFC;
+  color: #f8fafc;
 }
 
 .ops-nav__item--active {
-  background-color: #1E293B;
-  color: #38BDF8;
+  background-color: #1e293b;
+  color: #38bdf8;
   font-weight: 600;
-  box-shadow: inset 2px 0 0 #38BDF8;
+  box-shadow: inset 2px 0 0 #38bdf8;
 }
 
 .ops-sidebar__footer {
@@ -1446,7 +1759,7 @@ function handleLoadToMat1() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #0A0F1D;
+  background-color: #0a0f1d;
 }
 
 .ops-user {
@@ -1459,8 +1772,8 @@ function handleLoadToMat1() {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: #1E293B;
-  color: #38BDF8;
+  background-color: #1e293b;
+  color: #38bdf8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1472,27 +1785,27 @@ function handleLoadToMat1() {
 .ops-user__name {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #F1F5F9;
+  color: #f1f5f9;
   line-height: 1.2;
 }
 
 .ops-user__role {
   font-size: 0.625rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
 .ops-logout-btn {
   background: transparent;
   border: none;
-  color: #64748B;
+  color: #64748b;
   padding: 6px;
   cursor: pointer;
   border-radius: 4px;
 }
 
 .ops-logout-btn:hover {
-  color: #DC2626;
+  color: #dc2626;
   background-color: rgba(220, 38, 38, 0.1);
 }
 
@@ -1510,7 +1823,7 @@ function handleLoadToMat1() {
 /* Top Status Bar */
 .ops-topbar {
   height: 60px;
-  background-color: #0B1120;
+  background-color: #0b1120;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0 24px;
   display: flex;
@@ -1522,7 +1835,7 @@ function handleLoadToMat1() {
 
 .ops-topbar__sub {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.08em;
   line-height: 1.2;
 }
@@ -1530,7 +1843,7 @@ function handleLoadToMat1() {
 .ops-topbar__heading {
   font-size: 1.0625rem;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #ffffff;
   letter-spacing: 0.02em;
   line-height: 1.2;
 }
@@ -1539,7 +1852,7 @@ function handleLoadToMat1() {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #0F172A;
+  background-color: #0f172a;
   padding: 6px 14px;
   border-radius: 6px;
   border: 1px solid rgba(245, 158, 11, 0.25);
@@ -1548,7 +1861,7 @@ function handleLoadToMat1() {
 
 .comp-label {
   font-size: 0.6875rem;
-  color: #F59E0B;
+  color: #f59e0b;
   letter-spacing: 0.06em;
   font-weight: 700;
 }
@@ -1556,7 +1869,7 @@ function handleLoadToMat1() {
 .comp-dropdown {
   background: transparent;
   border: none;
-  color: #F8FAFC;
+  color: #f8fafc;
   font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
@@ -1565,15 +1878,15 @@ function handleLoadToMat1() {
 }
 
 .comp-dropdown option {
-  background-color: #0F172A;
-  color: #E2E8F0;
+  background-color: #0f172a;
+  color: #e2e8f0;
 }
 
 .ops-topbar__arena-select {
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: #0F172A;
+  background-color: #0f172a;
   padding: 6px 14px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1581,14 +1894,14 @@ function handleLoadToMat1() {
 
 .arena-label {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
 .arena-dropdown {
   background: transparent;
   border: none;
-  color: #38BDF8;
+  color: #38bdf8;
   font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
@@ -1596,8 +1909,8 @@ function handleLoadToMat1() {
 }
 
 .arena-dropdown option {
-  background-color: #0F172A;
-  color: #E2E8F0;
+  background-color: #0f172a;
+  color: #e2e8f0;
 }
 
 .ops-topbar__system-pills {
@@ -1615,7 +1928,7 @@ function handleLoadToMat1() {
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 0.6875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   letter-spacing: 0.04em;
 }
 
@@ -1623,8 +1936,8 @@ function handleLoadToMat1() {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background-color: #10B981;
-  box-shadow: 0 0 6px #10B981;
+  background-color: #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
 .ops-profile-badge {
@@ -1632,7 +1945,7 @@ function handleLoadToMat1() {
   height: 32px;
   border-radius: 50%;
   background-color: rgba(239, 68, 68, 0.2);
-  color: #EF4444;
+  color: #ef4444;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1642,7 +1955,7 @@ function handleLoadToMat1() {
 
 .ops-profile-badge--active {
   background-color: rgba(16, 185, 129, 0.2);
-  color: #10B981;
+  color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
@@ -1669,7 +1982,7 @@ function handleLoadToMat1() {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 18px 24px;
   border-radius: 10px;
@@ -1694,7 +2007,7 @@ function handleLoadToMat1() {
 
 .ops-banner-sub {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #94a3b8;
   letter-spacing: 0.06em;
   display: flex;
   align-items: center;
@@ -1707,14 +2020,14 @@ function handleLoadToMat1() {
 }
 
 .rev-tag {
-  color: #10B981;
+  color: #10b981;
 }
 
 .ops-banner-main-title {
   font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .ops-banner-actions {
@@ -1729,7 +2042,7 @@ function handleLoadToMat1() {
   gap: 8px;
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #E2E8F0;
+  color: #e2e8f0;
   padding: 8px 14px;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -1739,7 +2052,7 @@ function handleLoadToMat1() {
 }
 
 .ops-action-btn-dark:hover {
-  background-color: #1E293B;
+  background-color: #1e293b;
   border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -1751,7 +2064,7 @@ function handleLoadToMat1() {
 }
 
 .filter-card {
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 12px 16px;
@@ -1762,7 +2075,7 @@ function handleLoadToMat1() {
 
 .filter-label {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
@@ -1770,7 +2083,7 @@ function handleLoadToMat1() {
   width: 100%;
   background: transparent;
   border: none;
-  color: #F8FAFC;
+  color: #f8fafc;
   font-size: 0.8125rem;
   font-weight: 600;
   outline: none;
@@ -1778,8 +2091,8 @@ function handleLoadToMat1() {
 }
 
 .filter-select option {
-  background-color: #0F172A;
-  color: #F8FAFC;
+  background-color: #0f172a;
+  color: #f8fafc;
 }
 
 .weigh-in-row,
@@ -1796,7 +2109,7 @@ function handleLoadToMat1() {
   gap: 8px;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #F1F5F9;
+  color: #f1f5f9;
 }
 
 .arena-ready {
@@ -1805,20 +2118,20 @@ function handleLoadToMat1() {
   gap: 8px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #E2E8F0;
+  color: #e2e8f0;
 }
 
 .arena-ready__dot {
   width: 7px;
   height: 7px;
-  background-color: #10B981;
+  background-color: #10b981;
   border-radius: 50%;
-  box-shadow: 0 0 6px #10B981;
+  box-shadow: 0 0 6px #10b981;
 }
 
 .arena-lat {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
 }
 
 /* Metrics Bar */
@@ -1826,7 +2139,7 @@ function handleLoadToMat1() {
   display: grid;
   grid-template-columns: repeat(4, 1fr) 1.5fr;
   gap: 16px;
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 14px 20px;
@@ -1840,20 +2153,20 @@ function handleLoadToMat1() {
 
 .metric-label {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
 .metric-val {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .metric-unit {
   font-size: 0.75rem;
   font-weight: 400;
-  color: #94A3B8;
+  color: #94a3b8;
 }
 
 .bracket-progress-wrapper {
@@ -1866,21 +2179,21 @@ function handleLoadToMat1() {
 .bracket-progress-bar {
   flex: 1;
   height: 8px;
-  background-color: #1E293B;
+  background-color: #1e293b;
   border-radius: 4px;
   overflow: hidden;
 }
 
 .bracket-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10B981, #34D399);
+  background: linear-gradient(90deg, #10b981, #34d399);
   border-radius: 4px;
 }
 
 .progress-num {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #10B981;
+  color: #10b981;
 }
 
 /* ==========================================================================
@@ -1910,7 +2223,7 @@ function handleLoadToMat1() {
   justify-content: center;
   text-align: center;
   padding: 60px 24px;
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px dashed rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   gap: 16px;
@@ -1927,18 +2240,18 @@ function handleLoadToMat1() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #38BDF8;
+  color: #38bdf8;
 }
 
 .bracket-empty-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .bracket-empty-desc {
   font-size: 0.875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   line-height: 1.5;
   max-width: 440px;
 }
@@ -1958,7 +2271,7 @@ function handleLoadToMat1() {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: #CBD5E1;
+  color: #cbd5e1;
 }
 
 .col-dot {
@@ -1967,9 +2280,17 @@ function handleLoadToMat1() {
   border-radius: 50%;
 }
 
-.col-dot.neutral { background-color: #64748B; }
-.col-dot.blue { background-color: #38BDF8; box-shadow: 0 0 6px #38BDF8; }
-.col-dot.red { background-color: #EF4444; box-shadow: 0 0 6px #EF4444; }
+.col-dot.neutral {
+  background-color: #64748b;
+}
+.col-dot.blue {
+  background-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+.col-dot.red {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
 
 .bracket-matches-list {
   display: flex;
@@ -1991,7 +2312,7 @@ function handleLoadToMat1() {
 
 /* Match Card */
 .bracket-match-card {
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 10px 14px;
@@ -2003,13 +2324,13 @@ function handleLoadToMat1() {
 
 .bracket-match-card--live {
   border-color: rgba(16, 185, 129, 0.6);
-  background-color: #0B1924;
+  background-color: #0b1924;
   box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
 }
 
 .bracket-match-card--highlighted {
   border-color: rgba(56, 189, 248, 0.4);
-  background-color: #0D192E;
+  background-color: #0d192e;
   box-shadow: 0 0 20px rgba(56, 189, 248, 0.12);
   padding: 14px 16px;
 }
@@ -2019,7 +2340,7 @@ function handleLoadToMat1() {
   align-items: center;
   justify-content: space-between;
   font-size: 0.6875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   padding-bottom: 6px;
 }
@@ -2035,16 +2356,25 @@ function handleLoadToMat1() {
 .live-dot-pulse {
   width: 7px;
   height: 7px;
-  background-color: #10B981;
+  background-color: #10b981;
   border-radius: 50%;
-  box-shadow: 0 0 6px #10B981;
+  box-shadow: 0 0 6px #10b981;
   animation: pulse-ring 1.5s infinite;
 }
 
 @keyframes pulse-ring {
-  0% { transform: scale(0.95); opacity: 0.8; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.8; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
 }
 
 .match-status-badge {
@@ -2056,12 +2386,12 @@ function handleLoadToMat1() {
 
 .match-status-badge.neutral {
   background-color: rgba(100, 116, 139, 0.2);
-  color: #94A3B8;
+  color: #94a3b8;
 }
 
 .match-status-badge.emerald {
   background-color: rgba(16, 185, 129, 0.2);
-  color: #10B981;
+  color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
@@ -2099,33 +2429,39 @@ function handleLoadToMat1() {
   border-radius: 2px;
 }
 
-.corner-dot.red { background-color: #DC2626; box-shadow: 0 0 6px rgba(220, 38, 38, 0.5); }
-.corner-dot.blue { background-color: #2563EB; box-shadow: 0 0 6px rgba(37, 99, 235, 0.5); }
+.corner-dot.red {
+  background-color: #dc2626;
+  box-shadow: 0 0 6px rgba(220, 38, 38, 0.5);
+}
+.corner-dot.blue {
+  background-color: #2563eb;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.5);
+}
 
 .athlete-name {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #E2E8F0;
+  color: #e2e8f0;
 }
 
 .athlete-contingent {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
 }
 
 .athlete-score {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #CBD5E1;
+  color: #cbd5e1;
 }
 
 .athlete--winner .athlete-name {
-  color: #FFFFFF;
+  color: #ffffff;
   font-weight: 700;
 }
 
 .athlete--winner .athlete-score {
-  color: #10B981;
+  color: #10b981;
   font-weight: 800;
 }
 
@@ -2138,13 +2474,13 @@ function handleLoadToMat1() {
 
 .corner-tag.red {
   background-color: rgba(220, 38, 38, 0.2);
-  color: #EF4444;
+  color: #ef4444;
   border: 1px solid rgba(220, 38, 38, 0.3);
 }
 
 .corner-tag.blue {
   background-color: rgba(37, 99, 235, 0.2);
-  color: #38BDF8;
+  color: #38bdf8;
   border: 1px solid rgba(37, 99, 235, 0.3);
 }
 
@@ -2153,7 +2489,7 @@ function handleLoadToMat1() {
   align-items: center;
   justify-content: space-between;
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
   padding-top: 6px;
 }
@@ -2169,12 +2505,12 @@ function handleLoadToMat1() {
 
 .match-time-hint {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #94a3b8;
 }
 
 .load-arena-btn {
-  background-color: #10B981;
-  color: #064E3B;
+  background-color: #10b981;
+  color: #064e3b;
   border: none;
   border-radius: 6px;
   padding: 6px 12px;
@@ -2186,7 +2522,7 @@ function handleLoadToMat1() {
 }
 
 .load-arena-btn:hover {
-  background-color: #34D399;
+  background-color: #34d399;
   transform: translateY(-1px);
 }
 
@@ -2199,7 +2535,7 @@ function handleLoadToMat1() {
   left: 0;
   right: 0;
   height: 80px;
-  background-color: #090F1C;
+  background-color: #090f1c;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0 28px;
   display: flex;
@@ -2228,7 +2564,7 @@ function handleLoadToMat1() {
 
 .ops-dock__sub {
   font-size: 0.6875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   letter-spacing: 0.06em;
   display: flex;
   align-items: center;
@@ -2238,7 +2574,7 @@ function handleLoadToMat1() {
 .ops-dock__match-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .ops-dock__actions {
@@ -2250,7 +2586,7 @@ function handleLoadToMat1() {
 .ops-dock-btn-dark {
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #E2E8F0;
+  color: #e2e8f0;
   padding: 9px 16px;
   border-radius: 6px;
   font-size: 0.8125rem;
@@ -2259,7 +2595,7 @@ function handleLoadToMat1() {
 }
 
 .ops-dock-btn-dark:hover {
-  background-color: #1E293B;
+  background-color: #1e293b;
 }
 
 .ops-dock__legal {
@@ -2271,19 +2607,19 @@ function handleLoadToMat1() {
 
 .legal-label {
   font-size: 0.625rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.08em;
 }
 
 .legal-officials {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #CBD5E1;
+  color: #cbd5e1;
 }
 
 .legal-hash {
   font-size: 0.6875rem;
-  color: #10B981;
+  color: #10b981;
   letter-spacing: 0.06em;
 }
 
@@ -2305,7 +2641,7 @@ function handleLoadToMat1() {
   position: fixed;
   top: 76px;
   right: 28px;
-  background-color: #0F172A;
+  background-color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 12px 18px;
@@ -2313,19 +2649,25 @@ function handleLoadToMat1() {
   z-index: 100;
 }
 
-.ops-toast--success { border-color: #10B981; }
-.ops-toast--warning { border-color: #F59E0B; }
-.ops-toast--info { border-color: #38BDF8; }
+.ops-toast--success {
+  border-color: #10b981;
+}
+.ops-toast--warning {
+  border-color: #f59e0b;
+}
+.ops-toast--info {
+  border-color: #38bdf8;
+}
 
 .toast-title {
   font-size: 0.8125rem;
-  color: #FFFFFF;
+  color: #ffffff;
   margin-bottom: 2px;
 }
 
 .toast-msg {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #94a3b8;
 }
 
 .ops-modal-backdrop {
@@ -2340,7 +2682,7 @@ function handleLoadToMat1() {
 }
 
 .ops-modal {
-  background-color: #0F172A;
+  background-color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   padding: 24px;
@@ -2352,13 +2694,13 @@ function handleLoadToMat1() {
 .modal-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
 .modal-msg {
   font-size: 0.875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   line-height: 1.5;
   margin-bottom: 24px;
 }
@@ -2374,7 +2716,9 @@ function handleLoadToMat1() {
 .fade-leave-active,
 .modal-fade-enter-active,
 .modal-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .fade-enter-from,
@@ -2398,7 +2742,7 @@ function handleLoadToMat1() {
     display: none !important;
   }
   .ops-layout {
-    background: #FFFFFF !important;
+    background: #ffffff !important;
     color: #000000 !important;
     height: auto !important;
     overflow: visible !important;
@@ -2411,7 +2755,7 @@ function handleLoadToMat1() {
     overflow: visible !important;
   }
   .bracket-match-card {
-    background: #FFFFFF !important;
+    background: #ffffff !important;
     border: 1px solid #000000 !important;
     color: #000000 !important;
   }

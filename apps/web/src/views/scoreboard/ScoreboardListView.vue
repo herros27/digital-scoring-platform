@@ -38,7 +38,9 @@ onBeforeUnmount(() => clearInterval(timer))
   <main class="sbl">
     <header class="sbl__head">
       <h1>SCOREBOARD LIVE</h1>
-      <p class="font-mono">Pilih gelanggang untuk membuka papan skor. Daftar diperbarui otomatis.</p>
+      <p class="font-mono">
+        Pilih gelanggang untuk membuka papan skor. Daftar diperbarui otomatis.
+      </p>
     </header>
 
     <p v-if="failed" class="sbl__msg sbl__msg--error font-mono">
@@ -53,9 +55,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <router-link :to="`/scoreboard/${a.arena_id}`" class="sbl-card">
           <div class="sbl-card__top font-mono">
             <strong>{{ a.arena_name || 'GELANGGANG' }}</strong>
-            <span class="sbl-card__status">
-              BABAK {{ a.round }} · {{ statusLabel(a) }}
-            </span>
+            <span class="sbl-card__status"> BABAK {{ a.round }} · {{ statusLabel(a) }} </span>
           </div>
           <div class="sbl-card__fight">
             <span class="sbl-card__red">{{ a.red_athlete || 'Sudut Merah' }}</span>

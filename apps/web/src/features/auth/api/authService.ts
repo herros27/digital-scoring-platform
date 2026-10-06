@@ -20,10 +20,7 @@ export const authService = {
    * Official Login (Admin, Dewan, Wasit, Operator)
    */
   async officialLogin(payload: LoginFormValues): Promise<OfficialLoginResponse> {
-    const res = await http.post<OfficialLoginResponse>(
-      ENDPOINTS.AUTH.OFFICIAL_LOGIN,
-      payload
-    )
+    const res = await http.post<OfficialLoginResponse>(ENDPOINTS.AUTH.OFFICIAL_LOGIN, payload)
     return res.data
   },
 
@@ -31,10 +28,7 @@ export const authService = {
    * Judge PIN Login
    */
   async judgeLogin(payload: JudgeLoginFormValues): Promise<JudgeLoginResponse> {
-    const res = await http.post<JudgeLoginResponse>(
-      ENDPOINTS.AUTH.JUDGE_LOGIN,
-      payload
-    )
+    const res = await http.post<JudgeLoginResponse>(ENDPOINTS.AUTH.JUDGE_LOGIN, payload)
     return res.data
   },
 
@@ -42,20 +36,19 @@ export const authService = {
    * Contingent Manager Login
    */
   async contingentLogin(payload: LoginFormValues): Promise<ContingentLoginResponse> {
-    const res = await http.post<ContingentLoginResponse>(
-      ENDPOINTS.AUTH.CONTINGENT_LOGIN,
-      payload
-    )
+    const res = await http.post<ContingentLoginResponse>(ENDPOINTS.AUTH.CONTINGENT_LOGIN, payload)
     return res.data
   },
 
   /**
    * Contingent Self-Registration
    */
-  async contingentRegister(payload: ContingentRegisterFormValues): Promise<ContingentRegisterResponse> {
+  async contingentRegister(
+    payload: ContingentRegisterFormValues,
+  ): Promise<ContingentRegisterResponse> {
     const res = await http.post<ContingentRegisterResponse>(
       ENDPOINTS.AUTH.CONTINGENT_REGISTER,
-      payload
+      payload,
     )
     return res.data
   },
@@ -64,10 +57,7 @@ export const authService = {
    * Create Judge/Device PIN (Admin only)
    */
   async createPin(payload: CreatePinFormValues): Promise<CreatePinResponse> {
-    const res = await http.post<CreatePinResponse>(
-      ENDPOINTS.AUTH.CREATE_PIN,
-      payload
-    )
+    const res = await http.post<CreatePinResponse>(ENDPOINTS.AUTH.CREATE_PIN, payload)
     return res.data
   },
 

@@ -20,20 +20,22 @@ export const competitionSchema = z.object({
   created_at: z.string(),
 })
 
-export const createCompetitionSchema = z.object({
-  name: z.string().min(2, 'Nama kejuaraan minimal 2 karakter').max(100, 'Nama kejuaraan maksimal 100 karakter'),
-  location: z.string().min(1, 'Lokasi / venue wajib diisi'),
-  start_date: z.string().min(1, 'Tanggal mulai wajib dipilih'),
-  end_date: z.string().min(1, 'Tanggal selesai wajib dipilih'),
-  ruleset_name: z.string().min(1, 'Pilih ruleset pertandingan'),
-  ruleset_id: z.string().optional(),
-}).refine(
-  (data) => !data.start_date || !data.end_date || data.start_date <= data.end_date,
-  {
+export const createCompetitionSchema = z
+  .object({
+    name: z
+      .string()
+      .min(2, 'Nama kejuaraan minimal 2 karakter')
+      .max(100, 'Nama kejuaraan maksimal 100 karakter'),
+    location: z.string().min(1, 'Lokasi / venue wajib diisi'),
+    start_date: z.string().min(1, 'Tanggal mulai wajib dipilih'),
+    end_date: z.string().min(1, 'Tanggal selesai wajib dipilih'),
+    ruleset_name: z.string().min(1, 'Pilih ruleset pertandingan'),
+    ruleset_id: z.string().optional(),
+  })
+  .refine((data) => !data.start_date || !data.end_date || data.start_date <= data.end_date, {
     message: 'Tanggal selesai tidak boleh sebelum tanggal mulai',
     path: ['end_date'],
-  }
-)
+  })
 
 export const updateCompetitionSchema = z.object({
   name: z.string().min(2).max(100).optional(),

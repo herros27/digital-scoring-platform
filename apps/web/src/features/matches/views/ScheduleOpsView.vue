@@ -24,7 +24,7 @@ const props = withDefaults(
   }>(),
   {
     competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
-  }
+  },
 )
 
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
@@ -56,7 +56,8 @@ const arenaMap = computed(() => {
 })
 
 const participantMap = computed(() => {
-  const map: Record<string, { name: string; club: string; gender: string; weightClass: string }> = {}
+  const map: Record<string, { name: string; club: string; gender: string; weightClass: string }> =
+    {}
   for (const p of participants.value) {
     map[p.id] = {
       name: p.name || 'Pesilat',
@@ -73,10 +74,16 @@ const selectedArenaFilter = ref<string>('all')
 const searchQuery = ref('')
 
 // Toast State
-const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
+const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
+  null,
+)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
+function showToast(
+  title: string,
+  message: string,
+  type: 'success' | 'danger' | 'info' = 'success',
+) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
   toastTimer = setTimeout(() => {
@@ -95,7 +102,11 @@ async function handleLoadToArena(m: MatchDTO) {
   actionLoadingId.value = m.id
   try {
     await loadArenaMutation.mutateAsync({ matchId: m.id, arenaId: m.arena_id })
-    showToast('Dimuat ke Gelanggang', `Partai berhasil dimuat ke ${arenaMap.value[m.arena_id] || 'Gelanggang'}.`, 'success')
+    showToast(
+      'Dimuat ke Gelanggang',
+      `Partai berhasil dimuat ke ${arenaMap.value[m.arena_id] || 'Gelanggang'}.`,
+      'success',
+    )
   } catch (err) {
     showToast('Gagal Memuat', getErrorMessage(err, 'Gagal memuat partai.'), 'danger')
   } finally {
@@ -166,7 +177,9 @@ function openRefereeConsole() {
 const stats = computed(() => {
   const all = matches.value
   const running = all.filter((m) => m.status === 'running').length
-  const ready = all.filter((m) => m.status === 'ready' || m.status === 'idle' || m.status === 'paused').length
+  const ready = all.filter(
+    (m) => m.status === 'ready' || m.status === 'idle' || m.status === 'paused',
+  ).length
   const finished = all.filter((m) => m.status === 'finished').length
   return {
     total: all.length,
@@ -210,16 +223,28 @@ const filteredMatches = computed(() => {
 </script>
 
 <template>
-  <div class="sch-ops @container" role="region" aria-label="Manajemen Jadwal dan Partai Pertandingan">
+  <div
+    class="sch-ops @container"
+    role="region"
+    aria-label="Manajemen Jadwal dan Partai Pertandingan"
+  >
     <!-- Toast Notification -->
     <transition name="sch-fade">
-      <div v-if="toast" class="sch-toast" :class="`sch-toast--${toast.type}`" role="status" aria-live="polite">
+      <div
+        v-if="toast"
+        class="sch-toast"
+        :class="`sch-toast--${toast.type}`"
+        role="status"
+        aria-live="polite"
+      >
         <div class="sch-toast__dot" />
         <div class="sch-toast__content">
           <strong class="sch-toast__title">{{ toast.title }}</strong>
           <span class="sch-toast__msg">{{ toast.message }}</span>
         </div>
-        <button class="sch-toast__close" aria-label="Tutup notifikasi" @click="toast = null">✕</button>
+        <button class="sch-toast__close" aria-label="Tutup notifikasi" @click="toast = null">
+          ✕
+        </button>
       </div>
     </transition>
 
@@ -227,7 +252,14 @@ const filteredMatches = computed(() => {
     <header class="sch-header">
       <div class="sch-header__left">
         <div class="sch-header__icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
@@ -250,14 +282,16 @@ const filteredMatches = computed(() => {
       </div>
 
       <div class="sch-header__actions font-mono">
-        <AppButton
-          variant="secondary"
-          size="sm"
-          :loading="isFetching"
-          @click="() => refetch()"
-        >
+        <AppButton variant="secondary" size="sm" :loading="isFetching" @click="() => refetch()">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
@@ -361,7 +395,11 @@ const filteredMatches = computed(() => {
       <div class="sch-toolbar__search-group">
         <!-- Arena Select -->
         <div class="sch-filter-wrapper">
-          <select v-model="selectedArenaFilter" class="sch-select font-mono" aria-label="Filter Gelanggang">
+          <select
+            v-model="selectedArenaFilter"
+            class="sch-select font-mono"
+            aria-label="Filter Gelanggang"
+          >
             <option value="all">Semua Gelanggang</option>
             <option v-for="a in arenas" :key="a.id" :value="a.id">
               {{ a.name }}
@@ -371,7 +409,15 @@ const filteredMatches = computed(() => {
 
         <!-- Search Input -->
         <div class="sch-search-box">
-          <svg class="sch-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="sch-search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -406,23 +452,37 @@ const filteredMatches = computed(() => {
     <!-- Error State -->
     <div v-else-if="error" class="sch-empty-state sch-empty-state--error">
       <div class="sch-empty-icon sch-empty-icon--error">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       </div>
       <h3 class="sch-empty-title">Gagal Memuat Jadwal Pertandingan</h3>
-      <p class="sch-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat jadwal.') }}</p>
-      <AppButton variant="secondary" size="md" @click="() => refetch()">
-        Coba Lagi
-      </AppButton>
+      <p class="sch-empty-desc">
+        {{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat jadwal.') }}
+      </p>
+      <AppButton variant="secondary" size="md" @click="() => refetch()"> Coba Lagi </AppButton>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="filteredMatches.length === 0" class="sch-empty-state">
       <div class="sch-empty-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
           <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -441,12 +501,7 @@ const filteredMatches = computed(() => {
       </p>
 
       <div class="sch-empty-actions font-mono">
-        <AppButton
-          v-if="searchQuery"
-          variant="secondary"
-          size="md"
-          @click="searchQuery = ''"
-        >
+        <AppButton v-if="searchQuery" variant="secondary" size="md" @click="searchQuery = ''">
           Reset Pencarian
         </AppButton>
         <AppButton
@@ -486,10 +541,10 @@ const filteredMatches = computed(() => {
                 m.status === 'running'
                   ? 'LIVE PERTANDINGAN'
                   : m.status === 'finished'
-                  ? 'SELESAI'
-                  : m.status === 'paused'
-                  ? 'DIJEDA'
-                  : 'SIAP TANDING'
+                    ? 'SELESAI'
+                    : m.status === 'paused'
+                      ? 'DIJEDA'
+                      : 'SIAP TANDING'
               }}
             </span>
           </div>
@@ -501,7 +556,9 @@ const filteredMatches = computed(() => {
             <!-- Red Corner -->
             <div
               class="sch-fighter-box sch-fighter-box--red"
-              :class="{ 'sch-fighter-box--winner': m.winner_id && m.winner_id === m.athlete_red_id }"
+              :class="{
+                'sch-fighter-box--winner': m.winner_id && m.winner_id === m.athlete_red_id,
+              }"
             >
               <div class="sch-corner-bar sch-bar-red" />
               <div class="sch-fighter-info">
@@ -513,7 +570,11 @@ const filteredMatches = computed(() => {
                   {{ participantMap[m.athlete_red_id]?.club || 'Perguruan' }}
                 </span>
               </div>
-              <span v-if="m.winner_id && m.winner_id === m.athlete_red_id" class="sch-win-tag font-mono">MENANG</span>
+              <span
+                v-if="m.winner_id && m.winner_id === m.athlete_red_id"
+                class="sch-win-tag font-mono"
+                >MENANG</span
+              >
             </div>
 
             <!-- VS Center Badge -->
@@ -525,7 +586,9 @@ const filteredMatches = computed(() => {
             <!-- Blue Corner -->
             <div
               class="sch-fighter-box sch-fighter-box--blue"
-              :class="{ 'sch-fighter-box--winner': m.winner_id && m.winner_id === m.athlete_blue_id }"
+              :class="{
+                'sch-fighter-box--winner': m.winner_id && m.winner_id === m.athlete_blue_id,
+              }"
             >
               <div class="sch-corner-bar sch-bar-blue" />
               <div class="sch-fighter-info">
@@ -537,7 +600,11 @@ const filteredMatches = computed(() => {
                   {{ participantMap[m.athlete_blue_id]?.club || 'Perguruan' }}
                 </span>
               </div>
-              <span v-if="m.winner_id && m.winner_id === m.athlete_blue_id" class="sch-win-tag font-mono">MENANG</span>
+              <span
+                v-if="m.winner_id && m.winner_id === m.athlete_blue_id"
+                class="sch-win-tag font-mono"
+                >MENANG</span
+              >
             </div>
           </div>
         </div>
@@ -609,7 +676,14 @@ const filteredMatches = computed(() => {
             <!-- If finished -->
             <template v-else>
               <div class="sch-finished-badge">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
                 <span>Partai Resmi Selesai</span>
@@ -667,16 +741,52 @@ const filteredMatches = computed(() => {
   border: 1px solid var(--border-card, #334155);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
-.sch-toast--success { border-left: 4px solid var(--color-emerald-500, #10b981); }
-.sch-toast--danger { border-left: 4px solid var(--color-primary-600, #dc2626); }
-.sch-toast--info { border-left: 4px solid var(--color-secondary-600, #2563eb); }
-.sch-toast__dot { width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; }
-.sch-toast__content { display: flex; flex-direction: column; gap: 2px; }
-.sch-toast__title { font-size: 0.875rem; font-weight: 700; }
-.sch-toast__msg { font-size: 0.8125rem; color: var(--color-neutral-400, #94a3b8); }
-.sch-toast__close { background: none; border: none; color: var(--color-neutral-500, #64748b); cursor: pointer; font-size: 1rem; }
-.sch-fade-enter-active, .sch-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.sch-fade-enter-from, .sch-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+.sch-toast--success {
+  border-left: 4px solid var(--color-emerald-500, #10b981);
+}
+.sch-toast--danger {
+  border-left: 4px solid var(--color-primary-600, #dc2626);
+}
+.sch-toast--info {
+  border-left: 4px solid var(--color-secondary-600, #2563eb);
+}
+.sch-toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+.sch-toast__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sch-toast__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.sch-toast__msg {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.sch-toast__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-500, #64748b);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.sch-fade-enter-active,
+.sch-fade-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.sch-fade-enter-from,
+.sch-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 
 /* Header */
 .sch-header {
@@ -690,7 +800,11 @@ const filteredMatches = computed(() => {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-lg, 12px);
 }
-.sch-header__left { display: flex; align-items: center; gap: 16px; }
+.sch-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .sch-header__icon-box {
   display: flex;
   align-items: center;
@@ -713,9 +827,18 @@ const filteredMatches = computed(() => {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
-.sch-bullet { color: var(--color-neutral-600, #475569); }
-.sch-tag { color: var(--color-primary-400, #f87171); }
-.sch-pulse-wrapper { display: inline-flex; align-items: center; gap: 5px; color: var(--color-emerald-400, #34d399); }
+.sch-bullet {
+  color: var(--color-neutral-600, #475569);
+}
+.sch-tag {
+  color: var(--color-primary-400, #f87171);
+}
+.sch-pulse-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-emerald-400, #34d399);
+}
 .sch-pulse-dot {
   width: 6px;
   height: 6px;
@@ -725,8 +848,15 @@ const filteredMatches = computed(() => {
   animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 .sch-header__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
@@ -736,7 +866,12 @@ const filteredMatches = computed(() => {
   color: #ffffff;
   line-height: 1.2;
 }
-.sch-header__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sch-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 /* Metrics */
 .sch-metrics {
@@ -755,9 +890,15 @@ const filteredMatches = computed(() => {
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
 }
-.sch-metric-card--running { border-left: 3px solid var(--color-emerald-500, #10b981); }
-.sch-metric-card--ready { border-left: 3px solid #f59e0b; }
-.sch-metric-card--finished { border-left: 3px solid var(--color-secondary-600, #2563eb); }
+.sch-metric-card--running {
+  border-left: 3px solid var(--color-emerald-500, #10b981);
+}
+.sch-metric-card--ready {
+  border-left: 3px solid #f59e0b;
+}
+.sch-metric-card--finished {
+  border-left: 3px solid var(--color-secondary-600, #2563eb);
+}
 .sch-metric-corner-tag {
   position: absolute;
   top: 10px;
@@ -774,7 +915,12 @@ const filteredMatches = computed(() => {
   letter-spacing: 0.08em;
   color: var(--color-neutral-400, #94a3b8);
 }
-.sch-metric-value-row { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.sch-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
 .sch-metric-val {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.875rem;
@@ -782,9 +928,15 @@ const filteredMatches = computed(() => {
   color: #ffffff;
   line-height: 1;
 }
-.sch-val-emerald { color: #34d399; }
-.sch-val-amber { color: #fbbf24; }
-.sch-val-blue { color: #93c5fd; }
+.sch-val-emerald {
+  color: #34d399;
+}
+.sch-val-amber {
+  color: #fbbf24;
+}
+.sch-val-blue {
+  color: #93c5fd;
+}
 .sch-metric-badge {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -793,10 +945,23 @@ const filteredMatches = computed(() => {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-neutral-400, #94a3b8);
 }
-.sch-badge-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.sch-badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.sch-badge-blue { background: rgba(37, 99, 235, 0.15); color: #60a5fa; }
-.sch-metric-desc { font-size: 0.75rem; color: var(--color-neutral-500, #64748b); margin-top: 2px; }
+.sch-badge-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+.sch-badge-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+.sch-badge-blue {
+  background: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+}
+.sch-metric-desc {
+  font-size: 0.75rem;
+  color: var(--color-neutral-500, #64748b);
+  margin-top: 2px;
+}
 
 /* Toolbar */
 .sch-toolbar {
@@ -810,7 +975,12 @@ const filteredMatches = computed(() => {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
 }
-.sch-toolbar__tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sch-toolbar__tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .sch-tab-btn {
   display: inline-flex;
   align-items: center;
@@ -825,17 +995,53 @@ const filteredMatches = computed(() => {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.sch-tab-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
-.sch-tab-btn--active { background: rgba(255, 255, 255, 0.1); color: #ffffff; border-color: rgba(255, 255, 255, 0.15); }
-.sch-tab-btn--active-running { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
-.sch-tab-btn--active-ready { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.4); }
-.sch-tab-btn--active-finished { background: rgba(37, 99, 235, 0.15); color: #93c5fd; border-color: rgba(37, 99, 235, 0.4); }
-.sch-tab-dot { width: 6px; height: 6px; border-radius: 50%; }
-.sch-dot-emerald { background-color: var(--color-emerald-400, #34d399); }
-.sch-dot-amber { background-color: #f59e0b; }
-.sch-dot-blue { background-color: var(--color-secondary-500, #3b82f6); }
+.sch-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+.sch-tab-btn--active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.sch-tab-btn--active-running {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.sch-tab-btn--active-ready {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.sch-tab-btn--active-finished {
+  background: rgba(37, 99, 235, 0.15);
+  color: #93c5fd;
+  border-color: rgba(37, 99, 235, 0.4);
+}
+.sch-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.sch-dot-emerald {
+  background-color: var(--color-emerald-400, #34d399);
+}
+.sch-dot-amber {
+  background-color: #f59e0b;
+}
+.sch-dot-blue {
+  background-color: var(--color-secondary-500, #3b82f6);
+}
 
-.sch-toolbar__search-group { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 540px; justify-content: flex-end; }
+.sch-toolbar__search-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 540px;
+  justify-content: flex-end;
+}
 .sch-select {
   padding: 8px 12px;
   background: rgba(15, 23, 42, 0.7);
@@ -846,8 +1052,19 @@ const filteredMatches = computed(() => {
   outline: none;
   cursor: pointer;
 }
-.sch-search-box { position: relative; display: flex; align-items: center; flex: 1; min-width: 200px; }
-.sch-search-icon { position: absolute; left: 10px; color: var(--color-neutral-500, #64748b); pointer-events: none; }
+.sch-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+.sch-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-neutral-500, #64748b);
+  pointer-events: none;
+}
 .sch-search-input {
   width: 100%;
   padding: 8px 32px 8px 34px;
@@ -858,8 +1075,18 @@ const filteredMatches = computed(() => {
   font-size: 0.75rem;
   outline: none;
 }
-.sch-search-input:focus { border-color: var(--color-emerald-400, #34d399); }
-.sch-search-clear { position: absolute; right: 10px; background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 0.8125rem; }
+.sch-search-input:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.sch-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
 
 /* Grid */
 .sch-grid {
@@ -868,7 +1095,9 @@ const filteredMatches = computed(() => {
   gap: 16px;
 }
 @container (min-width: 900px) {
-  .sch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Match Card */
@@ -881,17 +1110,34 @@ const filteredMatches = computed(() => {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .sch-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
-.sch-card__accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-.sch-accent--running { background: linear-gradient(90deg, #059669, #10b981); }
-.sch-accent--ready, .sch-accent--idle, .sch-accent--paused { background: linear-gradient(90deg, #d97706, #f59e0b); }
-.sch-accent--finished { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+.sch-card__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.sch-accent--running {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+.sch-accent--ready,
+.sch-accent--idle,
+.sch-accent--paused {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+.sch-accent--finished {
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+}
 
 .sch-card__header {
   display: flex;
@@ -899,7 +1145,11 @@ const filteredMatches = computed(() => {
   align-items: center;
   padding: 14px 18px 10px 18px;
 }
-.sch-card__tag-group { display: flex; align-items: center; gap: 8px; }
+.sch-card__tag-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .sch-partai-badge {
   font-size: 0.6875rem;
   font-weight: 800;
@@ -908,7 +1158,11 @@ const filteredMatches = computed(() => {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
-.sch-arena-tag { font-size: 0.6875rem; font-weight: 700; color: var(--color-emerald-400, #34d399); }
+.sch-arena-tag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-emerald-400, #34d399);
+}
 
 .sch-status-pill {
   display: inline-flex;
@@ -919,9 +1173,23 @@ const filteredMatches = computed(() => {
   padding: 2px 8px;
   border-radius: 4px;
 }
-.sch-status-pill--running { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.sch-status-pill--ready, .sch-status-pill--idle, .sch-status-pill--paused { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-.sch-status-pill--finished { background: rgba(37, 99, 235, 0.15); color: #93c5fd; border: 1px solid rgba(37, 99, 235, 0.3); }
+.sch-status-pill--running {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.sch-status-pill--ready,
+.sch-status-pill--idle,
+.sch-status-pill--paused {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.sch-status-pill--finished {
+  background: rgba(37, 99, 235, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+}
 .sch-pulse-dot-live {
   width: 6px;
   height: 6px;
@@ -932,7 +1200,9 @@ const filteredMatches = computed(() => {
 }
 
 /* Matchup Grid */
-.sch-card__body { padding: 0 18px 14px 18px; }
+.sch-card__body {
+  padding: 0 18px 14px 18px;
+}
 .sch-matchup-grid {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -949,14 +1219,46 @@ const filteredMatches = computed(() => {
   border-radius: 8px;
   min-height: 80px;
 }
-.sch-corner-bar { position: absolute; top: 0; left: 0; bottom: 0; width: 4px; border-radius: 8px 0 0 8px; }
-.sch-bar-red { background-color: #dc2626; }
-.sch-bar-blue { background-color: #2563eb; }
-.sch-fighter-info { display: flex; flex-direction: column; gap: 2px; padding-left: 6px; }
-.sch-corner-label { font-size: 0.5625rem; font-weight: 700; color: var(--color-neutral-400, #94a3b8); letter-spacing: 0.05em; }
-.sch-fighter-name { font-size: 0.9375rem; font-weight: 700; color: #ffffff; line-height: 1.25; }
-.sch-fighter-club { font-size: 0.6875rem; color: var(--color-neutral-400, #94a3b8); }
-.sch-fighter-box--winner { border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); }
+.sch-corner-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.sch-bar-red {
+  background-color: #dc2626;
+}
+.sch-bar-blue {
+  background-color: #2563eb;
+}
+.sch-fighter-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 6px;
+}
+.sch-corner-label {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  color: var(--color-neutral-400, #94a3b8);
+  letter-spacing: 0.05em;
+}
+.sch-fighter-name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+}
+.sch-fighter-club {
+  font-size: 0.6875rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.sch-fighter-box--winner {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
 .sch-win-tag {
   align-self: flex-start;
   margin-top: auto;
@@ -976,8 +1278,17 @@ const filteredMatches = computed(() => {
   justify-content: center;
   gap: 2px;
 }
-.sch-vs-text { font-size: 1rem; font-weight: 900; color: var(--color-neutral-400, #94a3b8); letter-spacing: 0.08em; }
-.sch-round-sub { font-size: 0.5625rem; color: var(--color-neutral-500, #64748b); font-weight: 700; }
+.sch-vs-text {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--color-neutral-400, #94a3b8);
+  letter-spacing: 0.08em;
+}
+.sch-round-sub {
+  font-size: 0.5625rem;
+  color: var(--color-neutral-500, #64748b);
+  font-weight: 700;
+}
 
 /* Footer */
 .sch-card__footer {
@@ -988,7 +1299,12 @@ const filteredMatches = computed(() => {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.15);
 }
-.sch-footer__ops-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sch-footer__ops-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .sch-btn-action {
   flex: 1;
   padding: 7px 12px;
@@ -999,14 +1315,41 @@ const filteredMatches = computed(() => {
   border: 1px solid transparent;
   transition: all 0.15s ease;
 }
-.sch-btn--load { background: rgba(255, 255, 255, 0.08); color: #ffffff; border-color: rgba(255, 255, 255, 0.15); }
-.sch-btn--load:hover { background: rgba(255, 255, 255, 0.15); }
-.sch-btn--start { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.35); }
-.sch-btn--start:hover { background: rgba(16, 185, 129, 0.3); color: #ffffff; }
-.sch-btn--pause { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.35); }
-.sch-btn--pause:hover { background: rgba(245, 158, 11, 0.3); color: #ffffff; }
-.sch-btn--finish { background: rgba(37, 99, 235, 0.15); color: #93c5fd; border-color: rgba(37, 99, 235, 0.35); }
-.sch-btn--finish:hover { background: rgba(37, 99, 235, 0.3); color: #ffffff; }
+.sch-btn--load {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.sch-btn--load:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.sch-btn--start {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.sch-btn--start:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+}
+.sch-btn--pause {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.sch-btn--pause:hover {
+  background: rgba(245, 158, 11, 0.3);
+  color: #ffffff;
+}
+.sch-btn--finish {
+  background: rgba(37, 99, 235, 0.15);
+  color: #93c5fd;
+  border-color: rgba(37, 99, 235, 0.35);
+}
+.sch-btn--finish:hover {
+  background: rgba(37, 99, 235, 0.3);
+  color: #ffffff;
+}
 
 .sch-finished-badge {
   display: inline-flex;
@@ -1017,7 +1360,12 @@ const filteredMatches = computed(() => {
   font-weight: 700;
 }
 
-.sch-footer__links { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.sch-footer__links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
 .sch-link-btn {
   background: none;
   border: none;
@@ -1027,7 +1375,9 @@ const filteredMatches = computed(() => {
   cursor: pointer;
   text-decoration: underline;
 }
-.sch-link-btn:hover { color: #ffffff; }
+.sch-link-btn:hover {
+  color: #ffffff;
+}
 
 /* Skeleton */
 .sch-skeleton-card {
@@ -1041,17 +1391,36 @@ const filteredMatches = computed(() => {
   gap: 12px;
 }
 .skeleton-line {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
 }
-.skeleton-header { width: 40%; height: 20px; }
-.skeleton-matchup { width: 100%; height: 80px; }
-.skeleton-btn { width: 100%; height: 32px; margin-top: auto; }
+.skeleton-header {
+  width: 40%;
+  height: 20px;
+}
+.skeleton-matchup {
+  width: 100%;
+  height: 80px;
+}
+.skeleton-btn {
+  width: 100%;
+  height: 32px;
+  margin-top: auto;
+}
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Empty State */
@@ -1077,7 +1446,10 @@ const filteredMatches = computed(() => {
   color: var(--color-neutral-400, #94a3b8);
   margin-bottom: 16px;
 }
-.sch-empty-icon--error { background: rgba(220, 38, 38, 0.15); color: var(--color-primary-400, #f87171); }
+.sch-empty-icon--error {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--color-primary-400, #f87171);
+}
 .sch-empty-title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.25rem;
@@ -1092,7 +1464,11 @@ const filteredMatches = computed(() => {
   line-height: 1.5;
   margin-bottom: 20px;
 }
-.sch-empty-actions { display: flex; align-items: center; gap: 12px; }
+.sch-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
 /* Modal */
 .sch-modal-overlay {
@@ -1135,11 +1511,33 @@ const filteredMatches = computed(() => {
   font-weight: 800;
   color: #ffffff;
 }
-.sch-modal__close { background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 1.25rem; }
-.sch-modal__body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
-.sch-form-group { display: flex; flex-direction: column; gap: 6px; }
-.sch-form-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; color: var(--color-neutral-300, #cbd5e1); }
-.sch-req { color: var(--color-primary-500, #ef4444); }
+.sch-modal__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+.sch-modal__body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sch-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sch-form-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-300, #cbd5e1);
+}
+.sch-req {
+  color: var(--color-primary-500, #ef4444);
+}
 .sch-form-select {
   width: 100%;
   padding: 10px 14px;
@@ -1151,8 +1549,18 @@ const filteredMatches = computed(() => {
   outline: none;
   box-sizing: border-box;
 }
-.sch-form-select:focus { border-color: var(--color-emerald-400, #34d399); }
-.sch-form-error { font-size: 0.75rem; color: var(--color-primary-400, #f87171); }
+.sch-form-select:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.sch-form-error {
+  font-size: 0.75rem;
+  color: var(--color-primary-400, #f87171);
+}
 
-.sch-modal__footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.sch-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
 </style>

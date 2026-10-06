@@ -36,7 +36,12 @@ const filters = ref<CompetitionFilterValues>({
 const searchQuery = ref('')
 
 // TanStack Query for Server State (automatic caching, background refetch, and deduplication)
-const { data: competitionsData, isLoading: loading, error: queryError, refetch } = useCompetitionsQuery(filters)
+const {
+  data: competitionsData,
+  isLoading: loading,
+  error: queryError,
+  refetch,
+} = useCompetitionsQuery(filters)
 
 // TanStack Mutations for State Transitions
 const createMutation = useCreateCompetitionMutation()
@@ -50,9 +55,15 @@ const competitions = computed(() => competitionsData.value?.data || [])
 const totalCompetitions = computed(() => competitionsData.value?.pagination?.total || 0)
 
 // Feedback toast
-const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
+const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
+  null,
+)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
-function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
+function showToast(
+  title: string,
+  message: string,
+  type: 'success' | 'danger' | 'info' = 'success',
+) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
   toastTimer = setTimeout(() => {
@@ -143,7 +154,7 @@ const filteredCompetitions = computed(() => {
         c.name.toLowerCase().includes(q) ||
         (c.location && c.location.toLowerCase().includes(q)) ||
         (c.ruleset_name && c.ruleset_name.toLowerCase().includes(q)) ||
-        c.id.toLowerCase().includes(q)
+        c.id.toLowerCase().includes(q),
     )
   }
   return list
@@ -213,10 +224,18 @@ async function handleFormSubmit() {
 
     try {
       const created = await createMutation.mutateAsync(result.data)
-      showToast('Kejuaraan Dibuat', `Kejuaraan "${created.name}" berhasil dibuat sebagai Draft.`, 'success')
+      showToast(
+        'Kejuaraan Dibuat',
+        `Kejuaraan "${created.name}" berhasil dibuat sebagai Draft.`,
+        'success',
+      )
       isFormModalOpen.value = false
     } catch (err) {
-      showToast('Gagal Menyimpan', getErrorMessage(err, 'Terjadi kesalahan sistem saat membuat kejuaraan'), 'danger')
+      showToast(
+        'Gagal Menyimpan',
+        getErrorMessage(err, 'Terjadi kesalahan sistem saat membuat kejuaraan'),
+        'danger',
+      )
     }
   } else if (formMode.value === 'edit' && activeEditId.value) {
     const result = updateCompetitionSchema.safeParse(formPayload())
@@ -233,12 +252,27 @@ async function handleFormSubmit() {
         id: activeEditId.value,
         payload: result.data,
       })
-      showToast('Perubahan Disimpan', `Data kejuaraan "${updated.name}" berhasil diperbarui.`, 'success')
+      showToast(
+        'Perubahan Disimpan',
+        `Data kejuaraan "${updated.name}" berhasil diperbarui.`,
+        'success',
+      )
       isFormModalOpen.value = false
     } catch (err) {
-      showToast('Gagal Menyimpan', getErrorMessage(err, 'Terjadi kesalahan sistem saat memperbarui kejuaraan'), 'danger')
+      showToast(
+        'Gagal Menyimpan',
+        getErrorMessage(err, 'Terjadi kesalahan sistem saat memperbarui kejuaraan'),
+        'danger',
+      )
     }
   }
+}
+
+// Tombol "Buka Bagan" pada dialog detail: buka bagan lalu tutup dialog
+function openBracketFromDetail() {
+  if (!detailModal.value.competition) return
+  openBracketOps(detailModal.value.competition)
+  detailModal.value.open = false
 }
 
 // Detail View
@@ -289,7 +323,11 @@ function confirmFinish(c: Competition) {
     confirmVariant: 'primary',
     action: async () => {
       await finishMutation.mutateAsync(c.id)
-      showToast('Kejuaraan Selesai', `Kejuaraan "${c.name}" telah resmi ditutup dan selesai.`, 'success')
+      showToast(
+        'Kejuaraan Selesai',
+        `Kejuaraan "${c.name}" telah resmi ditutup dan selesai.`,
+        'success',
+      )
     },
   }
 }
@@ -338,7 +376,9 @@ function formatDate(dateStr?: string): string {
 }
 
 // Badge helpers
-function getStatusBadgeVariant(status: CompetitionStatus): 'emerald' | 'warning' | 'neutral' | 'primary' | 'red' {
+function getStatusBadgeVariant(
+  status: CompetitionStatus,
+): 'emerald' | 'warning' | 'neutral' | 'primary' | 'red' {
   switch (status) {
     case 'active':
       return 'emerald'
@@ -385,12 +425,20 @@ function openBracketOps(c: Competition) {
   <div class="comp-mgmt">
     <!-- Feedback Toast -->
     <Transition name="fade">
-      <div v-if="toast" class="comp-toast" :class="`comp-toast--${toast.type}`" role="status" aria-live="polite">
+      <div
+        v-if="toast"
+        class="comp-toast"
+        :class="`comp-toast--${toast.type}`"
+        role="status"
+        aria-live="polite"
+      >
         <div class="comp-toast__content">
           <span class="comp-toast__title">{{ toast.title }}</span>
           <span class="comp-toast__msg">{{ toast.message }}</span>
         </div>
-        <button class="comp-toast__close" aria-label="Tutup notifikasi" @click="toast = null">✕</button>
+        <button class="comp-toast__close" aria-label="Tutup notifikasi" @click="toast = null">
+          ✕
+        </button>
       </div>
     </Transition>
 
@@ -398,7 +446,14 @@ function openBracketOps(c: Competition) {
     <header class="comp-header">
       <div class="comp-header__left">
         <div class="comp-header__icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
             <path d="M4 22h16" />
@@ -425,7 +480,14 @@ function openBracketOps(c: Competition) {
       <div class="comp-header__actions font-mono">
         <AppButton variant="secondary" size="sm" :loading="loading" @click="() => refetch()">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M21 2v6h-6" />
               <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
               <path d="M3 22v-6h6" />
@@ -436,7 +498,14 @@ function openBracketOps(c: Competition) {
         </AppButton>
         <AppButton variant="emerald" size="sm" @click="openCreateModal">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -519,11 +588,7 @@ function openBracketOps(c: Competition) {
       </div>
 
       <div class="comp-toolbar__search">
-        <AppInput
-          v-model="searchQuery"
-          placeholder="Cari kejuaraan, venue, atau ID..."
-          icon
-        />
+        <AppInput v-model="searchQuery" placeholder="Cari kejuaraan, venue, atau ID..." icon />
       </div>
     </section>
 
@@ -543,14 +608,23 @@ function openBracketOps(c: Competition) {
       <div v-else-if="queryError && competitions.length === 0" class="comp-empty">
         <div class="comp-empty__icon comp-empty__icon--error">✕</div>
         <h3 class="comp-empty__title">Gagal Menghubungkan Backend</h3>
-        <p class="comp-empty__desc">{{ getErrorMessage(queryError, 'Terjadi gangguan jaringan') }}</p>
+        <p class="comp-empty__desc">
+          {{ getErrorMessage(queryError, 'Terjadi gangguan jaringan') }}
+        </p>
         <AppButton variant="secondary" size="md" @click="() => refetch()">Coba Lagi</AppButton>
       </div>
 
       <!-- Empty State -->
       <div v-else-if="filteredCompetitions.length === 0" class="comp-empty">
         <div class="comp-empty__icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
             <path d="M4 22h16" />
@@ -561,7 +635,11 @@ function openBracketOps(c: Competition) {
         </div>
         <h3 class="comp-empty__title">Tidak Ada Kejuaraan</h3>
         <p class="comp-empty__desc">
-          {{ searchQuery ? 'Tidak ada kejuaraan yang sesuai dengan pencarian Anda.' : 'Belum ada kejuaraan dengan status ini. Mulai dengan membuat kejuaraan baru.' }}
+          {{
+            searchQuery
+              ? 'Tidak ada kejuaraan yang sesuai dengan pencarian Anda.'
+              : 'Belum ada kejuaraan dengan status ini. Mulai dengan membuat kejuaraan baru.'
+          }}
         </p>
         <AppButton v-if="!searchQuery" variant="primary" size="md" @click="openCreateModal">
           Buat Kejuaraan Pertama
@@ -591,7 +669,9 @@ function openBracketOps(c: Competition) {
                 {{ c.ruleset_name || 'PERSILAT 2024' }}
               </AppBadge>
             </div>
-            <span class="comp-card__id font-mono tabular-nums" title="ID Kejuaraan">#{{ c.id.slice(0, 8) }}</span>
+            <span class="comp-card__id font-mono tabular-nums" title="ID Kejuaraan"
+              >#{{ c.id.slice(0, 8) }}</span
+            >
           </div>
 
           <!-- Card Body -->
@@ -600,20 +680,38 @@ function openBracketOps(c: Competition) {
 
             <div class="comp-card__meta">
               <div class="meta-row">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="meta-icon">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  class="meta-icon"
+                >
                   <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
                   <circle cx="12" cy="10" r="3" />
                 </svg>
                 <span class="meta-text">{{ c.location || 'Lokasi belum ditentukan' }}</span>
               </div>
               <div class="meta-row">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="meta-icon">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  class="meta-icon"
+                >
                   <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
                   <line x1="16" y1="2" x2="16" y2="6" />
                   <line x1="8" y1="2" x2="8" y2="6" />
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
-                <span class="meta-text tabular-nums">{{ formatDate(c.start_date) }} - {{ formatDate(c.end_date) }}</span>
+                <span class="meta-text tabular-nums"
+                  >{{ formatDate(c.start_date) }} - {{ formatDate(c.end_date) }}</span
+                >
               </div>
             </div>
           </div>
@@ -621,12 +719,8 @@ function openBracketOps(c: Competition) {
           <!-- Card Actions (Endpoints: Activate, Pause, Finish, Cancel, Update, Detail) -->
           <div class="comp-card__actions">
             <div class="primary-actions">
-              <AppButton variant="secondary" size="sm" @click="viewDetail(c)">
-                Detail
-              </AppButton>
-              <AppButton variant="outlined" size="sm" @click="openEditModal(c)">
-                Edit
-              </AppButton>
+              <AppButton variant="secondary" size="sm" @click="viewDetail(c)"> Detail </AppButton>
+              <AppButton variant="outlined" size="sm" @click="openEditModal(c)"> Edit </AppButton>
               <AppButton variant="primary" size="sm" @click="openBracketOps(c)">
                 Bagan & Arena
               </AppButton>
@@ -642,7 +736,14 @@ function openBracketOps(c: Competition) {
                 :disabled="activateMutation.isPending.value"
                 @click="confirmActivate(c)"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
                 Aktifkan
@@ -656,7 +757,14 @@ function openBracketOps(c: Competition) {
                 :disabled="pauseMutation.isPending.value"
                 @click="confirmPause(c)"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
                   <rect x="6" y="4" width="4" height="16" />
                   <rect x="14" y="4" width="4" height="16" />
                 </svg>
@@ -671,7 +779,14 @@ function openBracketOps(c: Competition) {
                 :disabled="finishMutation.isPending.value"
                 @click="confirmFinish(c)"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
@@ -686,7 +801,14 @@ function openBracketOps(c: Competition) {
                 :disabled="cancelMutation.isPending.value"
                 @click="confirmCancel(c)"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="15" y1="9" x2="9" y2="15" />
                   <line x1="9" y1="9" x2="15" y2="15" />
@@ -708,10 +830,20 @@ function openBracketOps(c: Competition) {
               {{ formMode === 'create' ? 'Buat Kejuaraan Baru' : 'Edit Data Kejuaraan' }}
             </h2>
             <p class="comp-modal__subtitle text-pretty">
-              {{ formMode === 'create' ? 'Inisialisasi turnamen silat baru ke dalam sistem scoring.' : 'Perbarui informasi venue, jadwal, atau regulasi kejuaraan.' }}
+              {{
+                formMode === 'create'
+                  ? 'Inisialisasi turnamen silat baru ke dalam sistem scoring.'
+                  : 'Perbarui informasi venue, jadwal, atau regulasi kejuaraan.'
+              }}
             </p>
           </div>
-          <button class="comp-modal__close" aria-label="Tutup modal" @click="isFormModalOpen = false">✕</button>
+          <button
+            class="comp-modal__close"
+            aria-label="Tutup modal"
+            @click="isFormModalOpen = false"
+          >
+            ✕
+          </button>
         </header>
 
         <form class="comp-modal__form" @submit.prevent="handleFormSubmit">
@@ -740,7 +872,9 @@ function openBracketOps(c: Competition) {
               placeholder="Contoh: Padepokan Pencak Silat TMII, Jakarta Timur"
               :error="formErrors.location"
             />
-            <span v-if="formErrors.location" class="field-error-msg">{{ formErrors.location }}</span>
+            <span v-if="formErrors.location" class="field-error-msg">{{
+              formErrors.location
+            }}</span>
           </div>
 
           <!-- Fields: Tanggal Mulai & Tanggal Selesai -->
@@ -756,7 +890,9 @@ function openBracketOps(c: Competition) {
                 class="native-date-input"
                 :class="{ 'input--error': formErrors.start_date }"
               />
-              <span v-if="formErrors.start_date" class="field-error-msg">{{ formErrors.start_date }}</span>
+              <span v-if="formErrors.start_date" class="field-error-msg">{{
+                formErrors.start_date
+              }}</span>
             </div>
 
             <div class="form-field">
@@ -770,7 +906,9 @@ function openBracketOps(c: Competition) {
                 class="native-date-input"
                 :class="{ 'input--error': formErrors.end_date }"
               />
-              <span v-if="formErrors.end_date" class="field-error-msg">{{ formErrors.end_date }}</span>
+              <span v-if="formErrors.end_date" class="field-error-msg">{{
+                formErrors.end_date
+              }}</span>
             </div>
           </div>
 
@@ -798,12 +936,16 @@ function openBracketOps(c: Competition) {
                   @change="chooseRuleset(r)"
                 />
                 <div class="ruleset-text">
-                  <strong class="ruleset-title">{{ r.name }} <small>v{{ r.version }}</small></strong>
+                  <strong class="ruleset-title"
+                    >{{ r.name }} <small>v{{ r.version }}</small></strong
+                  >
                   <span class="ruleset-desc">{{ summarize(r) }}</span>
                 </div>
               </label>
             </div>
-            <span v-if="formErrors.ruleset_name" class="field-error-msg">{{ formErrors.ruleset_name }}</span>
+            <span v-if="formErrors.ruleset_name" class="field-error-msg">{{
+              formErrors.ruleset_name
+            }}</span>
           </div>
 
           <!-- Modal Actions -->
@@ -825,11 +967,17 @@ function openBracketOps(c: Competition) {
     </div>
 
     <!-- Confirmation Dialog (AlertDialog standard from baseline-ui) -->
-    <div v-if="confirmModal.open" class="comp-modal-overlay" @click.self="confirmModal.open = false">
+    <div
+      v-if="confirmModal.open"
+      class="comp-modal-overlay"
+      @click.self="confirmModal.open = false"
+    >
       <div class="comp-modal comp-modal--confirm" role="alertdialog" aria-modal="true">
         <header class="comp-modal__header">
           <h2 class="comp-modal__title">{{ confirmModal.title }}</h2>
-          <button class="comp-modal__close" aria-label="Tutup" @click="confirmModal.open = false">✕</button>
+          <button class="comp-modal__close" aria-label="Tutup" @click="confirmModal.open = false">
+            ✕
+          </button>
         </header>
         <div class="comp-modal__body">
           <p class="confirm-message text-pretty">{{ confirmModal.message }}</p>
@@ -851,7 +999,11 @@ function openBracketOps(c: Competition) {
     </div>
 
     <!-- Competition Detail Drawer / Modal -->
-    <div v-if="detailModal.open && detailModal.competition" class="comp-modal-overlay" @click.self="detailModal.open = false">
+    <div
+      v-if="detailModal.open && detailModal.competition"
+      class="comp-modal-overlay"
+      @click.self="detailModal.open = false"
+    >
       <div class="comp-modal comp-modal--detail" role="dialog" aria-modal="true">
         <header class="comp-modal__header">
           <div>
@@ -863,11 +1015,19 @@ function openBracketOps(c: Competition) {
               >
                 {{ getStatusLabel(detailModal.competition.status) }}
               </AppBadge>
-              <span class="font-mono tabular-nums text-muted">ID: {{ detailModal.competition.id }}</span>
+              <span class="font-mono tabular-nums text-muted"
+                >ID: {{ detailModal.competition.id }}</span
+              >
             </div>
             <h2 class="comp-modal__title">{{ detailModal.competition.name }}</h2>
           </div>
-          <button class="comp-modal__close" aria-label="Tutup detail" @click="detailModal.open = false">✕</button>
+          <button
+            class="comp-modal__close"
+            aria-label="Tutup detail"
+            @click="detailModal.open = false"
+          >
+            ✕
+          </button>
         </header>
 
         <div class="comp-modal__body detail-specs">
@@ -879,18 +1039,23 @@ function openBracketOps(c: Competition) {
           <div class="spec-group">
             <span class="spec-label">PERIODE PERTANDINGAN</span>
             <span class="spec-value tabular-nums">
-              {{ formatDate(detailModal.competition.start_date) }} s/d {{ formatDate(detailModal.competition.end_date) }}
+              {{ formatDate(detailModal.competition.start_date) }} s/d
+              {{ formatDate(detailModal.competition.end_date) }}
             </span>
           </div>
 
           <div class="spec-group">
             <span class="spec-label">REGULASI & RULESET</span>
-            <span class="spec-value font-mono">{{ detailModal.competition.ruleset_name || 'PERSILAT 2024' }}</span>
+            <span class="spec-value font-mono">{{
+              detailModal.competition.ruleset_name || 'PERSILAT 2024'
+            }}</span>
           </div>
 
           <div class="spec-group">
             <span class="spec-label">TANGGAL DIBUAT SISTEM</span>
-            <span class="spec-value tabular-nums">{{ formatDate(detailModal.competition.created_at) }}</span>
+            <span class="spec-value tabular-nums">{{
+              formatDate(detailModal.competition.created_at)
+            }}</span>
           </div>
         </div>
 
@@ -898,7 +1063,11 @@ function openBracketOps(c: Competition) {
           <AppButton variant="secondary" size="md" @click="detailModal.open = false">
             Tutup
           </AppButton>
-          <AppButton variant="primary" size="md" @click="openBracketOps(detailModal.competition); detailModal.open = false">
+          <AppButton
+            variant="primary"
+            size="md"
+            @click="openBracketFromDetail"
+          >
             Buka Bagan Pertandingan
           </AppButton>
         </footer>
@@ -1004,9 +1173,18 @@ function openBracketOps(c: Competition) {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
-.comp-bullet { color: var(--color-neutral-600, #475569); }
-.comp-tag { color: var(--color-primary-400, #f87171); }
-.comp-pulse-wrapper { display: inline-flex; align-items: center; gap: 5px; color: var(--color-emerald-400, #34d399); }
+.comp-bullet {
+  color: var(--color-neutral-600, #475569);
+}
+.comp-tag {
+  color: var(--color-primary-400, #f87171);
+}
+.comp-pulse-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-emerald-400, #34d399);
+}
 .comp-pulse-dot {
   width: 6px;
   height: 6px;
@@ -1016,8 +1194,15 @@ function openBracketOps(c: Competition) {
   animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 .comp-header__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
@@ -1050,7 +1235,9 @@ function openBracketOps(c: Competition) {
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast);
 }
 .metric-card:hover {
   border-color: var(--border-active);
@@ -1078,9 +1265,15 @@ function openBracketOps(c: Competition) {
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
-.text-emerald { color: var(--color-emerald-400); }
-.text-amber { color: var(--color-amber-400); }
-.text-muted { color: var(--text-muted); }
+.text-emerald {
+  color: var(--color-emerald-400);
+}
+.text-amber {
+  color: var(--color-amber-400);
+}
+.text-muted {
+  color: var(--text-muted);
+}
 
 /* Controls Toolbar */
 .comp-toolbar {
@@ -1128,9 +1321,15 @@ function openBracketOps(c: Competition) {
   height: 6px;
   border-radius: 50%;
 }
-.dot-emerald { background-color: var(--color-emerald-400); }
-.dot-neutral { background-color: var(--color-neutral-400); }
-.dot-amber { background-color: var(--color-amber-400); }
+.dot-emerald {
+  background-color: var(--color-emerald-400);
+}
+.dot-neutral {
+  background-color: var(--color-neutral-400);
+}
+.dot-amber {
+  background-color: var(--color-amber-400);
+}
 .comp-toolbar__search {
   min-width: 280px;
 }
@@ -1149,7 +1348,10 @@ function openBracketOps(c: Competition) {
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
   padding: 20px;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .comp-card:hover {
   border-color: var(--border-active);
@@ -1304,19 +1506,42 @@ function openBracketOps(c: Competition) {
   gap: 16px;
 }
 .skeleton-line {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s infinite;
   border-radius: 4px;
 }
-.skeleton-title { height: 24px; width: 80%; }
-.skeleton-meta { height: 16px; width: 60%; }
-.skeleton-date { height: 16px; width: 50%; }
-.skeleton-actions { height: 32px; width: 100%; background-color: rgba(255,255,255,0.03); border-radius: 4px; }
+.skeleton-title {
+  height: 24px;
+  width: 80%;
+}
+.skeleton-meta {
+  height: 16px;
+  width: 60%;
+}
+.skeleton-date {
+  height: 16px;
+  width: 50%;
+}
+.skeleton-actions {
+  height: 32px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Empty State */
@@ -1555,7 +1780,9 @@ function openBracketOps(c: Competition) {
 /* Transitions */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 .fade-enter-from,
 .fade-leave-to {

@@ -1,4 +1,9 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios'
+import axios, {
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+  type AxiosResponse,
+} from 'axios'
 import { generateUUID } from '@/lib/uuid'
 import { AppApiError, type NormalizedApiError } from './error'
 
@@ -27,7 +32,7 @@ apiClient.interceptors.request.use(
     }
     return config
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 )
 
 // Response Interceptor: Normalize responses and catch 401/403 errors
@@ -44,18 +49,23 @@ apiClient.interceptors.response.use(
     const normalized: NormalizedApiError = {
       statusCode: status,
       code: data?.error?.code || data?.code || 'UNKNOWN_ERROR',
-      message: data?.error?.message || data?.message || error.message || 'Terjadi kesalahan pada server',
+      message:
+        data?.error?.message || data?.message || error.message || 'Terjadi kesalahan pada server',
       fieldErrors: data?.error?.details || data?.details,
     }
 
     // Auto-redirect if unauthorized and not on public auth views
-    if (status === 401 && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/judge/login')) {
+    if (
+      status === 401 &&
+      !window.location.pathname.startsWith('/login') &&
+      !window.location.pathname.startsWith('/judge/login')
+    ) {
       sessionStorage.removeItem('ds_token')
       sessionStorage.removeItem('ds_auth_session')
     }
 
     return Promise.reject(new AppApiError(normalized))
-  }
+  },
 )
 
 export interface Pagination {

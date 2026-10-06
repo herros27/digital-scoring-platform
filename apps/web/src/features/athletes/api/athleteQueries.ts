@@ -1,10 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { athleteService } from './athleteService'
-import type {
-  CreateAthleteFormValues,
-  RegisterParticipantPayload,
-} from '../types/athlete.schema'
+import type { CreateAthleteFormValues, RegisterParticipantPayload } from '../types/athlete.schema'
 
 export const athleteKeys = {
   allAthletes: ['athletes'] as const,
@@ -17,7 +14,9 @@ export const athleteKeys = {
 /**
  * Fetch all registered athletes in system
  */
-export function useAthletesQuery(params?: Ref<{ gender?: string; page?: number; limit?: number } | undefined>) {
+export function useAthletesQuery(
+  params?: Ref<{ gender?: string; page?: number; limit?: number } | undefined>,
+) {
   return useQuery({
     queryKey: computed(() => [
       ...athleteKeys.allAthletes,
@@ -98,8 +97,13 @@ export function useRegisterToCompetitionMutation(compId: Ref<string>) {
 export function useVerifyParticipantMutation(compId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ participantId, status }: { participantId: string; status: 'verified' | 'rejected' }) =>
-      athleteService.verifyParticipant(compId.value, participantId, status),
+    mutationFn: ({
+      participantId,
+      status,
+    }: {
+      participantId: string
+      status: 'verified' | 'rejected'
+    }) => athleteService.verifyParticipant(compId.value, participantId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
       queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })

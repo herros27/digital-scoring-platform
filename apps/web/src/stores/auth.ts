@@ -31,9 +31,13 @@ export const useAuthStore = defineStore('auth', () => {
   const role = computed(() => session.value?.role || 'public')
   const isAuthenticated = computed(() => !!session.value?.token)
   const isJudge = computed(() => session.value?.role === 'judge')
-  const isReferee = computed(() => session.value?.role === 'wasit' || session.value?.role === 'admin')
+  const isReferee = computed(
+    () => session.value?.role === 'wasit' || session.value?.role === 'admin',
+  )
   const isContingent = computed(() => session.value?.role === 'contingent')
-  const isAdminOrDewan = computed(() => session.value?.role === 'admin' || session.value?.role === 'dewan')
+  const isAdminOrDewan = computed(
+    () => session.value?.role === 'admin' || session.value?.role === 'dewan',
+  )
   const seatNumber = computed(() => session.value?.seatNumber)
   const arenaId = computed(() => session.value?.arenaId || '')
   const competitionId = computed(() => session.value?.competitionId || '')

@@ -39,9 +39,13 @@ export const bracketService = {
   /**
    * GET /api/v1/competitions/{comp_id}/brackets?weight_class=...&gender=...
    */
-  async getBracketTree(compId: string, weightClass: string, gender: string): Promise<BracketSlotRecord[]> {
+  async getBracketTree(
+    compId: string,
+    weightClass: string,
+    gender: string,
+  ): Promise<BracketSlotRecord[]> {
     const res = await http.get<BracketSlotRecord[]>(
-      `${ENDPOINTS.BRACKETS.TREE(compId)}?weight_class=${encodeURIComponent(weightClass)}&gender=${encodeURIComponent(gender)}`
+      `${ENDPOINTS.BRACKETS.TREE(compId)}?weight_class=${encodeURIComponent(weightClass)}&gender=${encodeURIComponent(gender)}`,
     )
     return res.data
   },
@@ -49,11 +53,11 @@ export const bracketService = {
   /**
    * POST /api/v1/competitions/{comp_id}/brackets/generate
    */
-  async generateBracket(compId: string, payload: GenerateBracketPayload): Promise<BracketSlotRecord[]> {
-    const res = await http.post<BracketSlotRecord[]>(
-      ENDPOINTS.BRACKETS.GENERATE(compId),
-      payload
-    )
+  async generateBracket(
+    compId: string,
+    payload: GenerateBracketPayload,
+  ): Promise<BracketSlotRecord[]> {
+    const res = await http.post<BracketSlotRecord[]>(ENDPOINTS.BRACKETS.GENERATE(compId), payload)
     return res.data
   },
 
@@ -61,9 +65,7 @@ export const bracketService = {
    * GET /api/v1/competitions/{comp_id}/participants
    */
   async getParticipants(compId: string): Promise<ParticipantDTO[]> {
-    const res = await http.get<ParticipantDTO[]>(
-      ENDPOINTS.PARTICIPANTS.LIST(compId)
-    )
+    const res = await http.get<ParticipantDTO[]>(ENDPOINTS.PARTICIPANTS.LIST(compId))
     return res.data || []
   },
 }

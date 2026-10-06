@@ -66,9 +66,7 @@ export const matchService = {
    */
   async getMatches(compId: string, status?: string): Promise<MatchDTO[]> {
     const qs = status ? `?status=${status}` : ''
-    const res = await http.get<MatchDTO[]>(
-      `${ENDPOINTS.MATCHES.LIST(compId)}${qs}`
-    )
+    const res = await http.get<MatchDTO[]>(`${ENDPOINTS.MATCHES.LIST(compId)}${qs}`)
     return res.data || []
   },
 
@@ -78,7 +76,7 @@ export const matchService = {
    */
   async getArenaQueue(compId: string, arenaId: string): Promise<MatchDTO[]> {
     const res = await http.get<MatchDTO[]>(
-      `${ENDPOINTS.MATCHES.LIST(compId)}?arena_id=${encodeURIComponent(arenaId)}&limit=100`
+      `${ENDPOINTS.MATCHES.LIST(compId)}?arena_id=${encodeURIComponent(arenaId)}&limit=100`,
     )
     return res.data || []
   },
@@ -95,9 +93,7 @@ export const matchService = {
    * GET /api/v1/competitions/{comp_id}/matches/{id}
    */
   async getMatch(compId: string, id: string): Promise<MatchDTO> {
-    const res = await http.get<MatchDTO>(
-      ENDPOINTS.MATCHES.DETAIL(compId, id)
-    )
+    const res = await http.get<MatchDTO>(ENDPOINTS.MATCHES.DETAIL(compId, id))
     return res.data
   },
 
@@ -112,26 +108,25 @@ export const matchService = {
       athlete_red_id: string
       athlete_blue_id: string
       current_round?: number
-    }
+    },
   ): Promise<MatchDTO> {
-    const res = await http.post<MatchDTO>(
-      ENDPOINTS.MATCHES.CREATE(compId),
-      payload
-    )
+    const res = await http.post<MatchDTO>(ENDPOINTS.MATCHES.CREATE(compId), payload)
     return res.data
   },
 
   /**
    * POST /api/v1/competitions/{comp_id}/matches/{id}/load-arena
    */
-  async loadArena(compId: string, matchId: string, arenaId: string, rulesetPath?: string): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.LOAD_ARENA(compId, matchId),
-      {
-        arena_id: arenaId,
-        ruleset_path: rulesetPath || '',
-      }
-    )
+  async loadArena(
+    compId: string,
+    matchId: string,
+    arenaId: string,
+    rulesetPath?: string,
+  ): Promise<{ status: string }> {
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.LOAD_ARENA(compId, matchId), {
+      arena_id: arenaId,
+      ruleset_path: rulesetPath || '',
+    })
     return res.data
   },
 
@@ -139,9 +134,7 @@ export const matchService = {
    * POST /api/v1/competitions/{comp_id}/matches/{id}/start
    */
   async startMatch(compId: string, matchId: string): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.START(compId, matchId)
-    )
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.START(compId, matchId))
     return res.data
   },
 
@@ -149,9 +142,7 @@ export const matchService = {
    * POST /api/v1/competitions/{comp_id}/matches/{id}/pause
    */
   async pauseMatch(compId: string, matchId: string): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.PAUSE(compId, matchId)
-    )
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.PAUSE(compId, matchId))
     return res.data
   },
 
@@ -159,9 +150,7 @@ export const matchService = {
    * POST /api/v1/competitions/{comp_id}/matches/{id}/resume
    */
   async resumeMatch(compId: string, matchId: string): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.RESUME(compId, matchId)
-    )
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.RESUME(compId, matchId))
     return res.data
   },
 
@@ -176,11 +165,11 @@ export const matchService = {
     compId: string,
     matchId: string,
     winner?: 'red' | 'blue',
-    method?: string
+    method?: string,
   ): Promise<{ status: string }> {
     const res = await http.post<{ status: string }>(
       ENDPOINTS.MATCHES.FINISH(compId, matchId),
-      winner ? { winner, ...(method ? { method } : {}) } : undefined
+      winner ? { winner, ...(method ? { method } : {}) } : undefined,
     )
     return res.data
   },
@@ -189,9 +178,7 @@ export const matchService = {
    * POST /api/v1/competitions/{comp_id}/matches/{id}/cancel
    */
   async cancelMatch(compId: string, matchId: string): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.CANCEL(compId, matchId)
-    )
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.CANCEL(compId, matchId))
     return res.data
   },
 
@@ -204,12 +191,13 @@ export const matchService = {
     matchId: string,
     outcome: string,
     winner: 'red' | 'blue',
-    note?: string
+    note?: string,
   ): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.OUTCOME(compId, matchId),
-      { outcome, winner, ...(note ? { note } : {}) }
-    )
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.OUTCOME(compId, matchId), {
+      outcome,
+      winner,
+      ...(note ? { note } : {}),
+    })
     return res.data
   },
 
@@ -218,9 +206,7 @@ export const matchService = {
    * Partai yang dibatalkan kembali ke antrean dan diulang dari 0-0.
    */
   async rescheduleMatch(compId: string, matchId: string): Promise<{ status: string }> {
-    const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.RESCHEDULE(compId, matchId)
-    )
+    const res = await http.post<{ status: string }>(ENDPOINTS.MATCHES.RESCHEDULE(compId, matchId))
     return res.data
   },
 
@@ -228,9 +214,7 @@ export const matchService = {
    * GET /api/v1/competitions/{comp_id}/matches/{id}/scores
    */
   async getMatchScores(compId: string, matchId: string): Promise<MatchScoresDTO> {
-    const res = await http.get<MatchScoresDTO>(
-      ENDPOINTS.MATCHES.SCORES(compId, matchId)
-    )
+    const res = await http.get<MatchScoresDTO>(ENDPOINTS.MATCHES.SCORES(compId, matchId))
     return res.data
   },
 
@@ -241,14 +225,14 @@ export const matchService = {
     compId: string,
     matchId: string,
     payload: { judge_id: string; score_type: string; target: string; event_id?: string },
-    idempotencyKey?: string
+    idempotencyKey?: string,
   ): Promise<SubmitScoreResult> {
     const res = await http.post<SubmitScoreResult>(
       ENDPOINTS.MATCHES.SUBMIT_SCORE(compId, matchId),
       payload,
       {
         headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
-      }
+      },
     )
     return res.data
   },

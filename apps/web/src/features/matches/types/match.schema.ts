@@ -9,7 +9,8 @@ export const createMatchSchema = z.object({
 
 export type CreateMatchFormValues = z.infer<typeof createMatchSchema>
 
-export type MatchStatus = 'idle' | 'ready' | 'running' | 'paused' | 'break' | 'finished' | 'cancelled'
+export type MatchStatus =
+  'idle' | 'ready' | 'running' | 'paused' | 'break' | 'finished' | 'cancelled'
 
 export interface Match {
   id: string

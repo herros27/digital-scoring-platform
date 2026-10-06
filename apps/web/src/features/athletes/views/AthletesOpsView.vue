@@ -7,9 +7,7 @@ import {
   useContingentsQuery,
   useRegisterToCompetitionMutation,
 } from '../api/athleteQueries'
-import {
-  createAthleteSchema,
-} from '../types/athlete.schema'
+import { createAthleteSchema } from '../types/athlete.schema'
 
 const props = withDefaults(
   defineProps<{
@@ -17,7 +15,7 @@ const props = withDefaults(
   }>(),
   {
     competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
-  }
+  },
 )
 
 const emit = defineEmits<{
@@ -27,7 +25,13 @@ const emit = defineEmits<{
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
 
 // Queries
-const { data: rawAthletes, isLoading, isFetching, error, refetch } = useCompetitionAthletesQuery(activeCompId)
+const {
+  data: rawAthletes,
+  isLoading,
+  isFetching,
+  error,
+  refetch,
+} = useCompetitionAthletesQuery(activeCompId)
 const { data: rawContingents } = useContingentsQuery()
 
 const registerMutation = useRegisterToCompetitionMutation(activeCompId)
@@ -42,10 +46,16 @@ const searchQuery = ref('')
 const sortBy = ref<'name' | 'team'>('name')
 
 // Toast State
-const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
+const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
+  null,
+)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
+function showToast(
+  title: string,
+  message: string,
+  type: 'success' | 'danger' | 'info' = 'success',
+) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
   toastTimer = setTimeout(() => {
@@ -107,10 +117,18 @@ async function handleSubmitAthlete() {
     })
 
     isModalOpen.value = false
-    showToast('Atlet Berhasil Didaftarkan', `${formState.value.name} telah didaftarkan ke kompetisi.`, 'success')
+    showToast(
+      'Atlet Berhasil Didaftarkan',
+      `${formState.value.name} telah didaftarkan ke kompetisi.`,
+      'success',
+    )
     refetch()
   } catch (err) {
-    showToast('Gagal Mendaftarkan Atlet', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
+    showToast(
+      'Gagal Mendaftarkan Atlet',
+      getErrorMessage(err, 'Terjadi kesalahan sistem.'),
+      'danger',
+    )
   }
 }
 
@@ -148,9 +166,7 @@ const filteredAthletes = computed(() => {
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase().trim()
     list = list.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        (a.team && a.team.toLowerCase().includes(q))
+      (a) => a.name.toLowerCase().includes(q) || (a.team && a.team.toLowerCase().includes(q)),
     )
   }
 
@@ -174,13 +190,21 @@ function isMaleGender(gender: string): boolean {
   <div class="atl-ops @container" role="region" aria-label="Manajemen Data Atlet dan Kontingen">
     <!-- Toast Notification -->
     <transition name="atl-fade">
-      <div v-if="toast" class="atl-toast" :class="`atl-toast--${toast.type}`" role="status" aria-live="polite">
+      <div
+        v-if="toast"
+        class="atl-toast"
+        :class="`atl-toast--${toast.type}`"
+        role="status"
+        aria-live="polite"
+      >
         <div class="atl-toast__dot" />
         <div class="atl-toast__content">
           <strong class="atl-toast__title">{{ toast.title }}</strong>
           <span class="atl-toast__msg">{{ toast.message }}</span>
         </div>
-        <button class="atl-toast__close" aria-label="Tutup notifikasi" @click="toast = null">✕</button>
+        <button class="atl-toast__close" aria-label="Tutup notifikasi" @click="toast = null">
+          ✕
+        </button>
       </div>
     </transition>
 
@@ -188,7 +212,14 @@ function isMaleGender(gender: string): boolean {
     <header class="atl-header">
       <div class="atl-header__left">
         <div class="atl-header__icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
             <circle cx="9" cy="7" r="4" />
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -211,14 +242,16 @@ function isMaleGender(gender: string): boolean {
       </div>
 
       <div class="atl-header__actions font-mono">
-        <AppButton
-          variant="secondary"
-          size="sm"
-          :loading="isFetching"
-          @click="() => refetch()"
-        >
+        <AppButton variant="secondary" size="sm" :loading="isFetching" @click="() => refetch()">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
@@ -228,13 +261,16 @@ function isMaleGender(gender: string): boolean {
           Segarkan
         </AppButton>
 
-        <AppButton
-          variant="secondary"
-          size="sm"
-          @click="emit('navigateVerification')"
-        >
+        <AppButton variant="secondary" size="sm" @click="emit('navigateVerification')">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="m9 11 3 3L22 4" />
               <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
             </svg>
@@ -242,13 +278,16 @@ function isMaleGender(gender: string): boolean {
           Buka Verifikasi Peserta
         </AppButton>
 
-        <AppButton
-          variant="emerald"
-          size="sm"
-          @click="openCreateModal"
-        >
+        <AppButton variant="emerald" size="sm" @click="openCreateModal">
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -340,7 +379,11 @@ function isMaleGender(gender: string): boolean {
 
       <div class="atl-toolbar__search-group">
         <div class="atl-filter-select-wrapper">
-          <select v-model="selectedContingentFilter" class="atl-filter-select font-mono" aria-label="Filter Kontingen">
+          <select
+            v-model="selectedContingentFilter"
+            class="atl-filter-select font-mono"
+            aria-label="Filter Kontingen"
+          >
             <option value="all">Semua Kontingen / Tim</option>
             <option v-for="c in contingents" :key="c.id" :value="c.name">
               {{ c.name }}
@@ -349,7 +392,15 @@ function isMaleGender(gender: string): boolean {
         </div>
 
         <div class="atl-search-box">
-          <svg class="atl-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="atl-search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -391,23 +442,37 @@ function isMaleGender(gender: string): boolean {
     <!-- Error State -->
     <div v-else-if="error" class="atl-empty-state atl-empty-state--error">
       <div class="atl-empty-icon atl-empty-icon--error">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       </div>
       <h3 class="atl-empty-title">Gagal Memuat Data Atlet</h3>
-      <p class="atl-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat data atlet.') }}</p>
-      <AppButton variant="secondary" size="md" @click="() => refetch()">
-        Coba Lagi
-      </AppButton>
+      <p class="atl-empty-desc">
+        {{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat data atlet.') }}
+      </p>
+      <AppButton variant="secondary" size="md" @click="() => refetch()"> Coba Lagi </AppButton>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="filteredAthletes.length === 0" class="atl-empty-state">
       <div class="atl-empty-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
           <circle cx="12" cy="7" r="4" />
           <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
         </svg>
@@ -424,20 +489,10 @@ function isMaleGender(gender: string): boolean {
       </p>
 
       <div class="atl-empty-actions font-mono">
-        <AppButton
-          v-if="searchQuery"
-          variant="secondary"
-          size="md"
-          @click="searchQuery = ''"
-        >
+        <AppButton v-if="searchQuery" variant="secondary" size="md" @click="searchQuery = ''">
           Reset Pencarian
         </AppButton>
-        <AppButton
-          v-else
-          variant="emerald"
-          size="md"
-          @click="openCreateModal"
-        >
+        <AppButton v-else variant="emerald" size="md" @click="openCreateModal">
           Daftarkan Atlet Pertama
         </AppButton>
       </div>
@@ -465,7 +520,9 @@ function isMaleGender(gender: string): boolean {
         <header class="atl-card__header">
           <span
             class="atl-badge-gender font-mono"
-            :class="isMaleGender(athlete.gender) ? 'atl-badge-gender--male' : 'atl-badge-gender--female'"
+            :class="
+              isMaleGender(athlete.gender) ? 'atl-badge-gender--male' : 'atl-badge-gender--female'
+            "
           >
             <span class="atl-badge-dot" />
             {{ isMaleGender(athlete.gender) ? 'PUTRA (MERAH)' : 'PUTRI (BIRU)' }}
@@ -495,7 +552,14 @@ function isMaleGender(gender: string): boolean {
             @click="emit('navigateVerification')"
           >
             Verifikasi
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M5 12h14" />
               <path d="m12 5 7 7-7 7" />
             </svg>
@@ -519,11 +583,7 @@ function isMaleGender(gender: string): boolean {
             <div class="atl-modal__tag font-mono">REGISTRASI PESERTA TURNAMEN</div>
             <h3 id="atl-modal-title" class="atl-modal__title">Daftarkan Atlet Baru</h3>
           </div>
-          <button
-            class="atl-modal__close"
-            aria-label="Tutup dialog"
-            @click="isModalOpen = false"
-          >
+          <button class="atl-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
           </button>
         </header>
@@ -554,14 +614,12 @@ function isMaleGender(gender: string): boolean {
             <div class="atl-gender-toggle-group">
               <label
                 class="atl-gender-radio"
-                :class="{ 'atl-gender-radio--active-male': formState.gender === 'male' || formState.gender === 'putra' }"
+                :class="{
+                  'atl-gender-radio--active-male':
+                    formState.gender === 'male' || formState.gender === 'putra',
+                }"
               >
-                <input
-                  v-model="formState.gender"
-                  type="radio"
-                  value="male"
-                  class="sr-only"
-                />
+                <input v-model="formState.gender" type="radio" value="male" class="sr-only" />
                 <span class="atl-radio-indicator atl-radio-indicator--male" />
                 <div class="atl-radio-text">
                   <strong>DEWASA PUTRA</strong>
@@ -571,14 +629,12 @@ function isMaleGender(gender: string): boolean {
 
               <label
                 class="atl-gender-radio"
-                :class="{ 'atl-gender-radio--active-female': formState.gender === 'female' || formState.gender === 'putri' }"
+                :class="{
+                  'atl-gender-radio--active-female':
+                    formState.gender === 'female' || formState.gender === 'putri',
+                }"
               >
-                <input
-                  v-model="formState.gender"
-                  type="radio"
-                  value="female"
-                  class="sr-only"
-                />
+                <input v-model="formState.gender" type="radio" value="female" class="sr-only" />
                 <span class="atl-radio-indicator atl-radio-indicator--female" />
                 <div class="atl-radio-text">
                   <strong>DEWASA PUTRI</strong>
@@ -634,12 +690,7 @@ function isMaleGender(gender: string): boolean {
           </div>
 
           <footer class="atl-modal__footer font-mono">
-            <AppButton
-              type="button"
-              variant="secondary"
-              size="md"
-              @click="isModalOpen = false"
-            >
+            <AppButton type="button" variant="secondary" size="md" @click="isModalOpen = false">
               Batal
             </AppButton>
             <AppButton
@@ -682,16 +733,52 @@ function isMaleGender(gender: string): boolean {
   border: 1px solid var(--border-card, #334155);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
-.atl-toast--success { border-left: 4px solid var(--color-emerald-500, #10b981); }
-.atl-toast--danger { border-left: 4px solid var(--color-primary-600, #dc2626); }
-.atl-toast--info { border-left: 4px solid var(--color-secondary-600, #2563eb); }
-.atl-toast__dot { width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; }
-.atl-toast__content { display: flex; flex-direction: column; gap: 2px; }
-.atl-toast__title { font-size: 0.875rem; font-weight: 700; }
-.atl-toast__msg { font-size: 0.8125rem; color: var(--color-neutral-400, #94a3b8); }
-.atl-toast__close { background: none; border: none; color: var(--color-neutral-500, #64748b); cursor: pointer; font-size: 1rem; }
-.atl-fade-enter-active, .atl-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.atl-fade-enter-from, .atl-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+.atl-toast--success {
+  border-left: 4px solid var(--color-emerald-500, #10b981);
+}
+.atl-toast--danger {
+  border-left: 4px solid var(--color-primary-600, #dc2626);
+}
+.atl-toast--info {
+  border-left: 4px solid var(--color-secondary-600, #2563eb);
+}
+.atl-toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+.atl-toast__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.atl-toast__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.atl-toast__msg {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.atl-toast__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-500, #64748b);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.atl-fade-enter-active,
+.atl-fade-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.atl-fade-enter-from,
+.atl-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 
 /* Header */
 .atl-header {
@@ -705,7 +792,11 @@ function isMaleGender(gender: string): boolean {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-lg, 12px);
 }
-.atl-header__left { display: flex; align-items: center; gap: 16px; }
+.atl-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .atl-header__icon-box {
   display: flex;
   align-items: center;
@@ -728,9 +819,18 @@ function isMaleGender(gender: string): boolean {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
-.atl-bullet { color: var(--color-neutral-600, #475569); }
-.atl-tag { color: var(--color-emerald-400, #34d399); }
-.atl-pulse-wrapper { display: inline-flex; align-items: center; gap: 5px; color: var(--color-emerald-400, #34d399); }
+.atl-bullet {
+  color: var(--color-neutral-600, #475569);
+}
+.atl-tag {
+  color: var(--color-emerald-400, #34d399);
+}
+.atl-pulse-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-emerald-400, #34d399);
+}
 .atl-pulse-dot {
   width: 6px;
   height: 6px;
@@ -740,8 +840,15 @@ function isMaleGender(gender: string): boolean {
   animation: pulse-dot 1.8s infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 .atl-header__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
@@ -751,7 +858,12 @@ function isMaleGender(gender: string): boolean {
   color: #ffffff;
   line-height: 1.2;
 }
-.atl-header__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.atl-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 /* Metrics */
 .atl-metrics {
@@ -770,8 +882,12 @@ function isMaleGender(gender: string): boolean {
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
 }
-.atl-metric-card--male { border-left: 3px solid var(--color-primary-600, #dc2626); }
-.atl-metric-card--female { border-left: 3px solid var(--color-secondary-600, #2563eb); }
+.atl-metric-card--male {
+  border-left: 3px solid var(--color-primary-600, #dc2626);
+}
+.atl-metric-card--female {
+  border-left: 3px solid var(--color-secondary-600, #2563eb);
+}
 .atl-metric-corner-tag {
   position: absolute;
   top: 10px;
@@ -788,7 +904,12 @@ function isMaleGender(gender: string): boolean {
   letter-spacing: 0.08em;
   color: var(--color-neutral-400, #94a3b8);
 }
-.atl-metric-value-row { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.atl-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
 .atl-metric-val {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.875rem;
@@ -796,8 +917,12 @@ function isMaleGender(gender: string): boolean {
   color: #ffffff;
   line-height: 1;
 }
-.atl-val-male { color: #fca5a5; }
-.atl-val-female { color: #93c5fd; }
+.atl-val-male {
+  color: #fca5a5;
+}
+.atl-val-female {
+  color: #93c5fd;
+}
 .atl-metric-val-text {
   font-size: 1.875rem;
   font-weight: 800;
@@ -812,9 +937,19 @@ function isMaleGender(gender: string): boolean {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-neutral-400, #94a3b8);
 }
-.atl-badge-male { background: rgba(220, 38, 38, 0.15); color: #f87171; }
-.atl-badge-female { background: rgba(37, 99, 235, 0.15); color: #60a5fa; }
-.atl-metric-desc { font-size: 0.75rem; color: var(--color-neutral-500, #64748b); margin-top: 2px; }
+.atl-badge-male {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+}
+.atl-badge-female {
+  background: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+}
+.atl-metric-desc {
+  font-size: 0.75rem;
+  color: var(--color-neutral-500, #64748b);
+  margin-top: 2px;
+}
 
 /* Toolbar */
 .atl-toolbar {
@@ -828,7 +963,12 @@ function isMaleGender(gender: string): boolean {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
 }
-.atl-toolbar__tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.atl-toolbar__tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .atl-tab-btn {
   display: inline-flex;
   align-items: center;
@@ -843,14 +983,42 @@ function isMaleGender(gender: string): boolean {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.atl-tab-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
-.atl-tab-btn--active { background: rgba(255, 255, 255, 0.1); color: #ffffff; border-color: rgba(255, 255, 255, 0.15); }
-.atl-tab-btn--active-male { background: rgba(220, 38, 38, 0.15); color: #fca5a5; border-color: rgba(220, 38, 38, 0.4); }
-.atl-tab-btn--active-female { background: rgba(37, 99, 235, 0.15); color: #93c5fd; border-color: rgba(37, 99, 235, 0.4); }
-.atl-tab-dot { width: 6px; height: 6px; border-radius: 50%; }
-.atl-dot-male { background-color: var(--color-primary-500, #ef4444); }
-.atl-dot-female { background-color: var(--color-secondary-500, #3b82f6); }
-.atl-tab-badge { font-size: 0.6875rem; padding: 1px 6px; border-radius: 10px; background: rgba(0, 0, 0, 0.25); }
+.atl-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+.atl-tab-btn--active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.atl-tab-btn--active-male {
+  background: rgba(220, 38, 38, 0.15);
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.4);
+}
+.atl-tab-btn--active-female {
+  background: rgba(37, 99, 235, 0.15);
+  color: #93c5fd;
+  border-color: rgba(37, 99, 235, 0.4);
+}
+.atl-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.atl-dot-male {
+  background-color: var(--color-primary-500, #ef4444);
+}
+.atl-dot-female {
+  background-color: var(--color-secondary-500, #3b82f6);
+}
+.atl-tab-badge {
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
 
 .atl-toolbar__search-group {
   display: flex;
@@ -861,8 +1029,19 @@ function isMaleGender(gender: string): boolean {
   max-width: 680px;
   justify-content: flex-end;
 }
-.atl-search-box { position: relative; display: flex; align-items: center; flex: 1; min-width: 200px; }
-.atl-search-icon { position: absolute; left: 10px; color: var(--color-neutral-500, #64748b); pointer-events: none; }
+.atl-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+.atl-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-neutral-500, #64748b);
+  pointer-events: none;
+}
 .atl-search-input {
   width: 100%;
   padding: 8px 32px 8px 34px;
@@ -873,9 +1052,20 @@ function isMaleGender(gender: string): boolean {
   font-size: 0.75rem;
   outline: none;
 }
-.atl-search-input:focus { border-color: var(--color-emerald-400, #34d399); }
-.atl-search-clear { position: absolute; right: 10px; background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 0.8125rem; }
-.atl-filter-select, .atl-sort-select {
+.atl-search-input:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.atl-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+.atl-filter-select,
+.atl-sort-select {
   padding: 8px 12px;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid var(--border-card, #334155);
@@ -893,10 +1083,14 @@ function isMaleGender(gender: string): boolean {
   gap: 16px;
 }
 @container (min-width: 640px) {
-  .atl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .atl-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @container (min-width: 1024px) {
-  .atl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .atl-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .atl-card {
@@ -908,16 +1102,29 @@ function isMaleGender(gender: string): boolean {
   border: 1px solid var(--border-card, #1e293b);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .atl-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
-.atl-card__accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-.atl-accent--male { background: linear-gradient(90deg, #dc2626, #ef4444); }
-.atl-accent--female { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+.atl-card__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.atl-accent--male {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+.atl-accent--female {
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+}
 
 .atl-card__header {
   display: flex;
@@ -934,12 +1141,30 @@ function isMaleGender(gender: string): boolean {
   padding: 2px 8px;
   border-radius: 4px;
 }
-.atl-badge-gender--male { background: rgba(220, 38, 38, 0.18); color: #fca5a5; border: 1px solid rgba(220, 38, 38, 0.35); }
-.atl-badge-gender--female { background: rgba(37, 99, 235, 0.18); color: #93c5fd; border: 1px solid rgba(37, 99, 235, 0.35); }
-.atl-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.atl-chip-id { font-size: 0.625rem; color: var(--color-neutral-500, #64748b); }
+.atl-badge-gender--male {
+  background: rgba(220, 38, 38, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+}
+.atl-badge-gender--female {
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+}
+.atl-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.atl-chip-id {
+  font-size: 0.625rem;
+  color: var(--color-neutral-500, #64748b);
+}
 
-.atl-card__content { padding: 0 18px 14px 18px; }
+.atl-card__content {
+  padding: 0 18px 14px 18px;
+}
 .atl-card__title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.125rem;
@@ -957,8 +1182,15 @@ function isMaleGender(gender: string): boolean {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
 }
-.atl-team-label { font-size: 0.5625rem; color: var(--color-neutral-500, #64748b); }
-.atl-team-value { font-size: 0.8125rem; color: #ffffff; font-weight: 600; }
+.atl-team-label {
+  font-size: 0.5625rem;
+  color: var(--color-neutral-500, #64748b);
+}
+.atl-team-value {
+  font-size: 0.8125rem;
+  color: #ffffff;
+  font-weight: 600;
+}
 
 .atl-card__footer {
   display: flex;
@@ -968,9 +1200,23 @@ function isMaleGender(gender: string): boolean {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.15);
 }
-.atl-card__status-row { display: flex; align-items: center; gap: 6px; }
-.atl-status-dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-emerald-400, #34d399); }
-.atl-status-text { font-size: 0.625rem; color: var(--color-emerald-400, #34d399); font-weight: 700; letter-spacing: 0.05em; }
+.atl-card__status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.atl-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-emerald-400, #34d399);
+}
+.atl-status-text {
+  font-size: 0.625rem;
+  color: var(--color-emerald-400, #34d399);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
 .atl-verify-link {
   display: inline-flex;
   align-items: center;
@@ -983,7 +1229,9 @@ function isMaleGender(gender: string): boolean {
   cursor: pointer;
   transition: color 0.15s ease;
 }
-.atl-verify-link:hover { color: #ffffff; }
+.atl-verify-link:hover {
+  color: #ffffff;
+}
 
 /* Skeleton */
 .atl-skeleton-card {
@@ -997,17 +1245,35 @@ function isMaleGender(gender: string): boolean {
   gap: 12px;
 }
 .skeleton-line {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
 }
-.skeleton-header { width: 40%; height: 20px; }
-.skeleton-title { width: 75%; height: 24px; }
-.skeleton-specs { width: 100%; height: 40px; }
+.skeleton-header {
+  width: 40%;
+  height: 20px;
+}
+.skeleton-title {
+  width: 75%;
+  height: 24px;
+}
+.skeleton-specs {
+  width: 100%;
+  height: 40px;
+}
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Empty State */
@@ -1033,7 +1299,10 @@ function isMaleGender(gender: string): boolean {
   color: var(--color-neutral-400, #94a3b8);
   margin-bottom: 16px;
 }
-.atl-empty-icon--error { background: rgba(220, 38, 38, 0.15); color: var(--color-primary-400, #f87171); }
+.atl-empty-icon--error {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--color-primary-400, #f87171);
+}
 .atl-empty-title {
   font-family: var(--font-sans, 'Space Grotesk', sans-serif);
   font-size: 1.25rem;
@@ -1048,7 +1317,11 @@ function isMaleGender(gender: string): boolean {
   line-height: 1.5;
   margin-bottom: 20px;
 }
-.atl-empty-actions { display: flex; align-items: center; gap: 12px; }
+.atl-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
 /* Modal */
 .atl-modal-overlay {
@@ -1091,12 +1364,35 @@ function isMaleGender(gender: string): boolean {
   font-weight: 800;
   color: #ffffff;
 }
-.atl-modal__close { background: none; border: none; color: var(--color-neutral-400, #94a3b8); cursor: pointer; font-size: 1.25rem; }
-.atl-modal__body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
-.atl-form-group { display: flex; flex-direction: column; gap: 6px; }
-.atl-form-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; color: var(--color-neutral-300, #cbd5e1); }
-.atl-req { color: var(--color-primary-500, #ef4444); }
-.atl-form-input, .atl-form-select {
+.atl-modal__close {
+  background: none;
+  border: none;
+  color: var(--color-neutral-400, #94a3b8);
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+.atl-modal__body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.atl-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.atl-form-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-300, #cbd5e1);
+}
+.atl-req {
+  color: var(--color-primary-500, #ef4444);
+}
+.atl-form-input,
+.atl-form-select {
   width: 100%;
   padding: 10px 14px;
   background: rgba(15, 23, 42, 0.8);
@@ -1107,11 +1403,23 @@ function isMaleGender(gender: string): boolean {
   outline: none;
   box-sizing: border-box;
 }
-.atl-form-input:focus, .atl-form-select:focus { border-color: var(--color-emerald-400, #34d399); }
-.atl-form-input--error { border-color: var(--color-primary-500, #ef4444) !important; }
-.atl-form-error { font-size: 0.6875rem; color: var(--color-primary-400, #f87171); }
+.atl-form-input:focus,
+.atl-form-select:focus {
+  border-color: var(--color-emerald-400, #34d399);
+}
+.atl-form-input--error {
+  border-color: var(--color-primary-500, #ef4444) !important;
+}
+.atl-form-error {
+  font-size: 0.6875rem;
+  color: var(--color-primary-400, #f87171);
+}
 
-.atl-gender-toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.atl-gender-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
 .atl-gender-radio {
   display: flex;
   align-items: center;
@@ -1123,18 +1431,53 @@ function isMaleGender(gender: string): boolean {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.atl-radio-indicator { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--color-neutral-600, #475569); }
-.atl-radio-indicator--male { border-color: #dc2626; }
-.atl-radio-indicator--female { border-color: #2563eb; }
-.atl-radio-text { display: flex; flex-direction: column; }
-.atl-radio-text strong { font-size: 0.75rem; color: #ffffff; }
-.atl-radio-text .atl-sub { font-size: 0.625rem; color: var(--color-neutral-400, #94a3b8); }
-.atl-gender-radio--active-male { background: rgba(220, 38, 38, 0.15); border-color: #dc2626; }
-.atl-gender-radio--active-male .atl-radio-indicator { background: #dc2626; box-shadow: 0 0 6px #dc2626; }
-.atl-gender-radio--active-female { background: rgba(37, 99, 235, 0.15); border-color: #2563eb; }
-.atl-gender-radio--active-female .atl-radio-indicator { background: #2563eb; box-shadow: 0 0 6px #2563eb; }
+.atl-radio-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--color-neutral-600, #475569);
+}
+.atl-radio-indicator--male {
+  border-color: #dc2626;
+}
+.atl-radio-indicator--female {
+  border-color: #2563eb;
+}
+.atl-radio-text {
+  display: flex;
+  flex-direction: column;
+}
+.atl-radio-text strong {
+  font-size: 0.75rem;
+  color: #ffffff;
+}
+.atl-radio-text .atl-sub {
+  font-size: 0.625rem;
+  color: var(--color-neutral-400, #94a3b8);
+}
+.atl-gender-radio--active-male {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: #dc2626;
+}
+.atl-gender-radio--active-male .atl-radio-indicator {
+  background: #dc2626;
+  box-shadow: 0 0 6px #dc2626;
+}
+.atl-gender-radio--active-female {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: #2563eb;
+}
+.atl-gender-radio--active-female .atl-radio-indicator {
+  background: #2563eb;
+  box-shadow: 0 0 6px #2563eb;
+}
 
-.atl-modal__footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.atl-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
 
 .sr-only {
   position: absolute;
