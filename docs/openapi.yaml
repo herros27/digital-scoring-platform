@@ -463,6 +463,13 @@ paths:
                 ruleset_name:
                   type: string
                   example: "IPSI 2024"
+                ruleset_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Ruleset dari `GET /api/v1/rulesets` yang dipakai partai kejuaraan ini. Bila diisi, ruleset ini
+                    dipakai saat partai dimuat ke gelanggang; bila kosong, server mencocokkan `ruleset_name`
+                    (nama lengkap, atau kata pertama seperti `ipsi`) dengan ruleset basis data, lalu berkas/bawaan.
       responses:
         '201':
           description: Kompetisi dibuat
@@ -518,6 +525,10 @@ paths:
                   format: date
                 ruleset_name:
                   type: string
+                ruleset_id:
+                  type: string
+                  format: uuid
+                  description: Ganti ruleset kejuaraan (berlaku untuk partai yang dimuat setelahnya). String kosong melepas ruleset.
       responses:
         '200':
           description: Data kompetisi berhasil diperbarui

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -36,6 +38,21 @@ type CreateRulesetInput struct {
 	Status  string            `json:"status" validate:"omitempty,oneof=draft active archived"`
 }
 
+// mapRulesetDBError menerjemahkan pelanggaran constraint basis data menjadi galat domain yang ramah:
+// nama+versi ganda (23505) dan ruleset yang masih dipakai kompetisi (23503) menjadi ErrConflict.
+func mapRulesetDBError(err error) error {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) {
+		switch pg.Code {
+		case "23505":
+			return fmt.Errorf("%w: ruleset dengan nama dan versi yang sama sudah ada", domain.ErrConflict)
+		case "23503":
+			return fmt.Errorf("%w: ruleset masih dipakai kompetisi", domain.ErrConflict)
+		}
+	}
+	return err
+}
+
 // CreateRuleset membuat ruleset baru secara dinamis
 func (s *RulesetService) CreateRuleset(input CreateRulesetInput) (*domain.Ruleset, error) {
 	if input.Name == "" || input.Version == "" {
@@ -58,7 +75,7 @@ func (s *RulesetService) CreateRuleset(input CreateRulesetInput) (*domain.Rulese
 
 	if s.repo != nil {
 		if err := s.repo.Create(rs); err != nil {
-			return nil, err
+			return nil, mapRulesetDBError(err)
 		}
 		return rs, nil
 	}
@@ -94,7 +111,7 @@ func (s *RulesetService) UpdateRuleset(id string, input CreateRulesetInput) (*do
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, domain.ErrNotFound
 			}
-			return nil, err
+			return nil, mapRulesetDBError(err)
 		}
 		return rs, nil
 	}
@@ -112,7 +129,7 @@ func (s *RulesetService) DeleteRuleset(id string) error {
 			if errors.Is(err, sql.ErrNoRows) {
 				return domain.ErrNotFound
 			}
-			return err
+			return mapRulesetDBError(err)
 		}
 	}
 	return nil
@@ -160,6 +177,12 @@ func (s *RulesetService) ResolveRuleset(identifier string) (*rules.Ruleset, erro
 		if list, err := s.repo.List(); err == nil {
 			for _, item := range list {
 				if item.Name == identifier || item.ID == identifier {
+					return toRulesStruct(&item)
+				}
+			}
+			// nama pendek ("ipsi", "persilat") cocok dengan ruleset basis data yang namanya diawali kata itu
+			for _, item := range list {
+				if first, _, _ := strings.Cut(item.Name, " "); strings.EqualFold(first, identifier) {
 					return toRulesStruct(&item)
 				}
 			}

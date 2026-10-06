@@ -210,6 +210,13 @@
     - Tes: `internal/orchestrator/outcome_test.go`, `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e 67 pemeriksaan (bagian 12 khusus hasil khusus); browser `outcome.mjs` 10/10.
     - Belum: pencatatan hitungan wasit dan panggilan WO otomatis (3x panggilan, interval 30 detik) masih dilakukan manual oleh wasit.
 
+44. **Editor Ruleset di Frontend & Penghubung Kejuaraan → Ruleset** –
+    - Tab **Regulasi & Ruleset** (`/ops?tab=regulasi`, admin/dewan): daftar, buat, ubah, duplikat, hapus. Editor memuat waktu/babak, teknik, sanksi (+diskualifikasi), konsensus (contoh kalimat otomatis), aturan seri (urutan prioritas teknik dengan tombol naik/turun, metode manual), dan hasil khusus (aktif/nonaktif + fase). Validasi klien mencerminkan server (`lib/rulesetDraft.ts`).
+    - **Perbaikan penghubung:** kolom `competitions.ruleset_id` sebelumnya tidak pernah dibaca/ditulis store sehingga partai selalu memakai ruleset bawaan Go (inilah sebab Jatuhan sempat bernilai 2). Kini `ruleset_id` tersimpan di create/update/list/get, divalidasi UUID, dan dipakai saat partai dimuat. Nama pendek lama (`ipsi`, `persilat`) juga dicocokkan ke ruleset basis data (kata pertama nama).
+    - Formulir kejuaraan memilih ruleset dari daftar basis data (sebelumnya dua radio tetap bernama `PERSILAT 2024`/`IPSI 2024` yang tidak cocok dengan ruleset mana pun).
+    - API: `POST/PUT/DELETE /rulesets` menjawab 409 `CONFLICT` untuk nama+versi ganda dan ruleset yang masih dipakai kejuaraan.
+    - Tes: `rulesetDraft.test.ts`, `ruleset_service_test.go`; browser `rulesetui.mjs` 16/16 (duplikat IPSI → 5 juri/3 sepakat/Jatuhan 5/tanpa KO → dipakai kejuaraan → sync_response partai memuatnya → hapus ditolak saat dipakai).
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

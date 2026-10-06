@@ -2,30 +2,48 @@ package store
 
 import "database/sql"
 
+// nullableID mengubah string kosong menjadi NULL untuk kolom UUID opsional.
+func nullableID(id *string) any {
+	if id == nil || *id == "" {
+		return nil
+	}
+	return *id
+}
+
+// setRulesetID menerjemahkan hasil scan kolom ruleset_id (NULL -> nil).
+func setRulesetID(c *Competition, v sql.NullString) {
+	if v.Valid {
+		id := v.String
+		c.RulesetID = &id
+	}
+}
+
 type CompetitionStore struct {
 	DB *sql.DB
 }
 
 func (s *CompetitionStore) Create(c *Competition) error {
 	query := `
-		INSERT INTO competitions (name, location, start_date, end_date, ruleset_name, status)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO competitions (name, location, start_date, end_date, ruleset_name, ruleset_id, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at`
-	return s.DB.QueryRow(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, c.Status).
+	return s.DB.QueryRow(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, nullableID(c.RulesetID), c.Status).
 		Scan(&c.ID, &c.CreatedAt)
 }
 
 func (s *CompetitionStore) GetByID(id string) (*Competition, error) {
 	c := &Competition{}
-	query := `SELECT id, name, location, start_date, end_date, ruleset_name, status, created_at FROM competitions WHERE id = $1`
+	query := `SELECT id, name, location, start_date, end_date, ruleset_name, ruleset_id, status, created_at FROM competitions WHERE id = $1`
+	var rulesetID sql.NullString
 	err := s.DB.QueryRow(query, id).Scan(
-		&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &c.Status, &c.CreatedAt,
+		&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &rulesetID, &c.Status, &c.CreatedAt,
 	)
+	setRulesetID(c, rulesetID)
 	return c, err
 }
 
 func (s *CompetitionStore) List() ([]Competition, error) {
-	rows, err := s.DB.Query(`SELECT id, name, location, start_date, end_date, ruleset_name, status, created_at FROM competitions ORDER BY created_at DESC`)
+	rows, err := s.DB.Query(`SELECT id, name, location, start_date, end_date, ruleset_name, ruleset_id, status, created_at FROM competitions ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +52,9 @@ func (s *CompetitionStore) List() ([]Competition, error) {
 	var list []Competition
 	for rows.Next() {
 		var c Competition
-		rows.Scan(&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &c.Status, &c.CreatedAt)
+		var rulesetID sql.NullString
+		rows.Scan(&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &rulesetID, &c.Status, &c.CreatedAt)
+		setRulesetID(&c, rulesetID)
 		list = append(list, c)
 	}
 	return list, rows.Err()
@@ -48,7 +68,7 @@ func (s *CompetitionStore) ListPaged(status string, limit, offset int) ([]Compet
 	}
 
 	query := `
-		SELECT id, name, location, start_date, end_date, ruleset_name, status, created_at 
+		SELECT id, name, location, start_date, end_date, ruleset_name, ruleset_id, status, created_at 
 		FROM competitions 
 		WHERE ($1 = '' OR status = $1) 
 		ORDER BY created_at DESC 
@@ -62,9 +82,11 @@ func (s *CompetitionStore) ListPaged(status string, limit, offset int) ([]Compet
 	var list []Competition
 	for rows.Next() {
 		var c Competition
-		if err := rows.Scan(&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &c.Status, &c.CreatedAt); err != nil {
+		var rulesetID sql.NullString
+		if err := rows.Scan(&c.ID, &c.Name, &c.Location, &c.StartDate, &c.EndDate, &c.RulesetName, &rulesetID, &c.Status, &c.CreatedAt); err != nil {
 			return nil, 0, err
 		}
+		setRulesetID(&c, rulesetID)
 		list = append(list, c)
 	}
 	if list == nil {
@@ -81,8 +103,8 @@ func (s *CompetitionStore) UpdateStatus(id, status string) error {
 func (s *CompetitionStore) Update(c *Competition) error {
 	query := `
 		UPDATE competitions 
-		SET name = $1, location = $2, start_date = $3, end_date = $4, ruleset_name = $5 
-		WHERE id = $6`
-	_, err := s.DB.Exec(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, c.ID)
+		SET name = $1, location = $2, start_date = $3, end_date = $4, ruleset_name = $5, ruleset_id = $6 
+		WHERE id = $7`
+	_, err := s.DB.Exec(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, nullableID(c.RulesetID), c.ID)
 	return err
 }

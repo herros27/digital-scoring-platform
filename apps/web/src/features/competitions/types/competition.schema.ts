@@ -25,7 +25,7 @@ export const createCompetitionSchema = z.object({
   location: z.string().min(1, 'Lokasi / venue wajib diisi'),
   start_date: z.string().min(1, 'Tanggal mulai wajib dipilih'),
   end_date: z.string().min(1, 'Tanggal selesai wajib dipilih'),
-  ruleset_name: z.string().default('PERSILAT 2024'),
+  ruleset_name: z.string().min(1, 'Pilih ruleset pertandingan'),
   ruleset_id: z.string().optional(),
 }).refine(
   (data) => !data.start_date || !data.end_date || data.start_date <= data.end_date,

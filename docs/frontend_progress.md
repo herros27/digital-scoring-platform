@@ -170,6 +170,7 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
+- **2026-10-06 (regulasi)**: editor ruleset (tab Regulasi & Ruleset), pemilihan ruleset di formulir kejuaraan, hasil khusus KO/TKO/WO/Undur Diri, aturan seri otomatis, dan tombol Jadwalkan Ulang partai batal di konsol wasit (lihat `docs/task_update.md` butir 40-44).
 - **2026-10-06 (konsol wasit)**:
   - Waktu pertandingan kini selaras di wasit, juri, dan scoreboard: timer server berbasis tenggat absolut, klien menghitung dari jam server (bukan penghitung 100 ms), plus siaran `timer_sync` tiap 5 detik. Pada pengukuran 3 layar nyata selisih terbesar turun dari 28 detik menjadi 1 detik (hanya di pergantian detik).
   - Tablet juri: mode demo dihapus total (tombol "Mode Uji Coba Offline", token palsu `mock-judge-demo-token`, dan `?demo=true`); ID gelanggang tidak lagi tampil di layar, diganti nama gelanggang dari server (judul "JURI 1 • GELANGGANG A" dan modal ganti sesi). Baris GELANGGANG/KURSI pada modal hanya muncul bila konteksnya diketahui.

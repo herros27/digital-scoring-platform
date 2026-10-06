@@ -13,6 +13,7 @@ import AthletesOpsView from '@/features/athletes/views/AthletesOpsView.vue'
 import ParticipantVerificationView from '@/features/athletes/views/ParticipantVerificationView.vue'
 import ScheduleOpsView from '@/features/matches/views/ScheduleOpsView.vue'
 import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
+import RulesetsOpsView from '@/features/rulesets/views/RulesetsOpsView.vue'
 import { matchService } from '@/features/matches/api/matchService'
 import type { BracketSlotRecord } from '@/features/tournament/api/bracketService'
 import { useBracketTreeQuery, useGenerateBracketMutation } from '@/features/tournament/api/bracketQueries'
@@ -150,6 +151,7 @@ const NAV_KEYS = [
   'jadwal',
   'bagan',
   'pin',
+  'regulasi',
   'laporan',
 ] as const
 type NavKey = (typeof NAV_KEYS)[number]
@@ -158,8 +160,13 @@ function isNavKey(value: unknown): value is NavKey {
   return typeof value === 'string' && (NAV_KEYS as readonly string[]).includes(value)
 }
 
+/** Tab Regulasi (ruleset) hanya untuk admin dan dewan. */
+const canManageRulesets = computed(() => ['admin', 'dewan'].includes(authStore.role || ''))
+
 const resolveDefaultNav = (): NavKey => {
-  if (isNavKey(route.query.tab)) return route.query.tab
+  if (isNavKey(route.query.tab) && (route.query.tab !== 'regulasi' || canManageRulesets.value)) {
+    return route.query.tab
+  }
   if (route.path.includes('/admin')) return 'pin'
   if (authStore.role === 'contingent') return 'atlet'
   return 'jadwal'
@@ -175,7 +182,7 @@ function setNav(tab: typeof activeNav.value) {
 watch(
   () => route.query.tab,
   (newTab) => {
-    if (isNavKey(newTab) && newTab !== activeNav.value) {
+    if (isNavKey(newTab) && newTab !== activeNav.value && (newTab !== 'regulasi' || canManageRulesets.value)) {
       activeNav.value = newTab
     }
   }
@@ -222,6 +229,11 @@ const navConfig = {
   pin: {
     title: 'PERANGKAT & PIN JURI',
     sub: 'OTORISASI TABLET JURI & WASIT PER ARENA',
+    hasArena: false,
+  },
+  regulasi: {
+    title: 'REGULASI & RULESET',
+    sub: 'NILAI TEKNIK, SANKSI, KONSENSUS JURI, ATURAN SERI',
     hasArena: false,
   },
   laporan: {
@@ -758,6 +770,21 @@ function handleLoadToMat1() {
         </button>
 
         <button
+          v-if="canManageRulesets"
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'regulasi' }"
+          @click="setNav('regulasi')"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16v16H4z" />
+            <path d="M8 9h8" />
+            <path d="M8 13h8" />
+            <path d="M8 17h5" />
+          </svg>
+          <span>Regulasi & Ruleset</span>
+        </button>
+
+        <button
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
           @click="setNav('laporan')"
@@ -874,7 +901,7 @@ function handleLoadToMat1() {
       </header>
 
       <!-- SCROLLABLE OPS VIEW -->
-      <div class="ops-content-scroll" :class="{ 'ops-content-scroll--pin': activeNav === 'pin' || activeNav === 'laporan' || activeNav === 'kompetisi' || activeNav === 'gelanggang' || activeNav === 'kategori' || activeNav === 'atlet' || activeNav === 'verifikasi' || activeNav === 'jadwal' }">
+      <div class="ops-content-scroll" :class="{ 'ops-content-scroll--pin': activeNav === 'pin' || activeNav === 'regulasi' || activeNav === 'laporan' || activeNav === 'kompetisi' || activeNav === 'gelanggang' || activeNav === 'kategori' || activeNav === 'atlet' || activeNav === 'verifikasi' || activeNav === 'jadwal' }">
         <!-- TAB KOMPETISI -->
         <CompetitionsView v-if="activeNav === 'kompetisi'" />
 
@@ -918,6 +945,9 @@ function handleLoadToMat1() {
           v-else-if="activeNav === 'pin'"
           :competition-id="activeCompId"
         />
+
+        <!-- TAB REGULASI & RULESET -->
+        <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canManageRulesets" />
 
         <!-- TAB LAPORAN & EKSPOR -->
         <ReportsOpsView

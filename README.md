@@ -367,6 +367,9 @@ Langkah 1-2 dihitung server dari data pertandingan; babak tambahan, timbang ulan
 ```
 Simpan di `rulesets/{name}.json` atau buat langsung via REST API `POST /api/v1/rulesets` (tersimpan di database PostgreSQL).
 
+### Mengelola ruleset dari antarmuka
+Admin dan dewan membuka **Regulasi & Ruleset** di panel operasional (`/ops?tab=regulasi`): daftar ruleset, **Ubah**, **Duplikat** (mis. salin preset IPSI lalu ubah angkanya), **Hapus**, dan **Ruleset Baru**. Editor memuat waktu dan babak, teknik dan nilainya, sanksi (termasuk centang Diskualifikasi), konsensus juri, aturan seri (urutan prioritas teknik), dan hasil khusus, dengan validasi yang sama seperti server. Ruleset dipilih saat membuat atau mengubah kejuaraan (disimpan sebagai `ruleset_id`); perubahan berlaku untuk partai yang dimuat ke gelanggang setelah disimpan, partai yang sedang berjalan tidak berubah. Ruleset yang masih dipakai kejuaraan tidak dapat dihapus (409 `CONFLICT`), begitu juga nama+versi ganda.
+
 ### Sanksi, teknik, dan konsensus per ruleset
 Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikosongkan, server memakai nilai turunan/bawaan sehingga ruleset lama tetap berjalan:
 

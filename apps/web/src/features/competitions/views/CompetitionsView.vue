@@ -4,6 +4,9 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppBadge, AppInput } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
+import { useRulesetsQuery } from '@/features/rulesets/api/rulesetQueries'
+import { summarize } from '@/features/rulesets/lib/rulesetDraft'
+import type { RulesetDTO } from '@/features/rulesets/types'
 import {
   useCompetitionsQuery,
   useCreateCompetitionMutation,
@@ -68,8 +71,28 @@ const formState = ref({
   location: '',
   start_date: '',
   end_date: '',
-  ruleset_name: 'PERSILAT 2024',
+  ruleset_name: '',
+  ruleset_id: '',
 })
+
+// Ruleset dari database (dikelola di tab Regulasi); kejuaraan menyimpan id + namanya
+const { data: rulesetData, isLoading: rulesetsLoading } = useRulesetsQuery()
+const rulesetOptions = computed<RulesetDTO[]>(() => {
+  const all = rulesetData.value ?? []
+  return all.filter((r) => r.status === 'active' || r.id === formState.value.ruleset_id)
+})
+function chooseRuleset(r: RulesetDTO) {
+  formState.value.ruleset_id = r.id
+  formState.value.ruleset_name = r.name
+}
+/** Kejuaraan lama hanya menyimpan nama ("ipsi"): cocokkan dengan ruleset yang namanya diawali kata itu. */
+function findRulesetByName(name: string): RulesetDTO | undefined {
+  const all = rulesetData.value ?? []
+  return (
+    all.find((r) => r.name === name) ??
+    all.find((r) => r.name.split(' ')[0].toLowerCase() === name.toLowerCase())
+  )
+}
 
 // Confirmation Dialog State
 const confirmModal = ref<{
@@ -137,8 +160,13 @@ function openCreateModal() {
     location: '',
     start_date: today,
     end_date: nextWeek,
-    ruleset_name: 'PERSILAT 2024',
+    ruleset_name: '',
+    ruleset_id: '',
   }
+  const initial =
+    (rulesetData.value ?? []).find((r) => r.status === 'active' && r.name.startsWith('IPSI')) ??
+    (rulesetData.value ?? []).find((r) => r.status === 'active')
+  if (initial) chooseRuleset(initial)
   formErrors.value = {}
   isFormModalOpen.value = true
 }
@@ -153,9 +181,20 @@ function openEditModal(c: Competition) {
     location: c.location || '',
     start_date: c.start_date ? c.start_date.split('T')[0] : '',
     end_date: c.end_date ? c.end_date.split('T')[0] : '',
-    ruleset_name: c.ruleset_name || 'PERSILAT 2024',
+    ruleset_name: c.ruleset_name || '',
+    ruleset_id: c.ruleset_id || '',
+  }
+  if (!formState.value.ruleset_id) {
+    const match = findRulesetByName(c.ruleset_name || '')
+    if (match) chooseRuleset(match)
   }
   isFormModalOpen.value = true
+}
+
+/** Badan permintaan: ruleset_id kosong tidak dikirim (server memakai nama). */
+function formPayload() {
+  const { ruleset_id, ...rest } = formState.value
+  return ruleset_id ? { ...rest, ruleset_id } : rest
 }
 
 // Submit Form with Zod Validation
@@ -163,7 +202,7 @@ async function handleFormSubmit() {
   formErrors.value = {}
 
   if (formMode.value === 'create') {
-    const result = createCompetitionSchema.safeParse(formState.value)
+    const result = createCompetitionSchema.safeParse(formPayload())
     if (!result.success) {
       result.error.issues.forEach((err) => {
         const field = String(err.path[0])
@@ -180,7 +219,7 @@ async function handleFormSubmit() {
       showToast('Gagal Menyimpan', getErrorMessage(err, 'Terjadi kesalahan sistem saat membuat kejuaraan'), 'danger')
     }
   } else if (formMode.value === 'edit' && activeEditId.value) {
-    const result = updateCompetitionSchema.safeParse(formState.value)
+    const result = updateCompetitionSchema.safeParse(formPayload())
     if (!result.success) {
       result.error.issues.forEach((err) => {
         const field = String(err.path[0])
@@ -740,33 +779,31 @@ function openBracketOps(c: Competition) {
             <label class="form-label">
               Regulasi & Ruleset Scoring <span class="required-star">*</span>
             </label>
-            <div class="ruleset-options">
-              <label class="ruleset-option" :class="{ 'ruleset-option--active': formState.ruleset_name === 'PERSILAT 2024' }">
+            <p v-if="rulesetsLoading" class="ruleset-desc">Memuat ruleset…</p>
+            <p v-else-if="!rulesetOptions.length" class="ruleset-desc">
+              Belum ada ruleset aktif. Buat di tab Regulasi &amp; Ruleset.
+            </p>
+            <div v-else class="ruleset-options">
+              <label
+                v-for="r in rulesetOptions"
+                :key="r.id"
+                class="ruleset-option"
+                :class="{ 'ruleset-option--active': formState.ruleset_id === r.id }"
+              >
                 <input
-                  v-model="formState.ruleset_name"
                   type="radio"
-                  value="PERSILAT 2024"
                   name="ruleset"
+                  :value="r.id"
+                  :checked="formState.ruleset_id === r.id"
+                  @change="chooseRuleset(r)"
                 />
                 <div class="ruleset-text">
-                  <strong class="ruleset-title">PERSILAT Rules 2024</strong>
-                  <span class="ruleset-desc">Regulasi Internasional: 3 babak @2 menit, sliding window consensus 2/3 juri, teknik jatuhan sah.</span>
-                </div>
-              </label>
-
-              <label class="ruleset-option" :class="{ 'ruleset-option--active': formState.ruleset_name === 'IPSI 2024' }">
-                <input
-                  v-model="formState.ruleset_name"
-                  type="radio"
-                  value="IPSI 2024"
-                  name="ruleset"
-                />
-                <div class="ruleset-text">
-                  <strong class="ruleset-title">IPSI Nasional 2024</strong>
-                  <span class="ruleset-desc">Regulasi Kejuaraan Nasional & Daerah: Verifikasi timbang badan otomatis, pembagian Pool 16/32.</span>
+                  <strong class="ruleset-title">{{ r.name }} <small>v{{ r.version }}</small></strong>
+                  <span class="ruleset-desc">{{ summarize(r) }}</span>
                 </div>
               </label>
             </div>
+            <span v-if="formErrors.ruleset_name" class="field-error-msg">{{ formErrors.ruleset_name }}</span>
           </div>
 
           <!-- Modal Actions -->
