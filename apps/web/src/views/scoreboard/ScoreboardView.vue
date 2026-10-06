@@ -295,7 +295,7 @@ onMounted(async () => {
         </div>
         <div class="sb-clock-caption font-mono">
           <span class="sb-pulse-dot" />
-          WAKTU BERTANDING
+          {{ matchStatus === 'break' ? 'WAKTU ISTIRAHAT' : 'WAKTU BERTANDING' }}
         </div>
       </div>
 

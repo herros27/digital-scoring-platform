@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
+import { MATCH_STATUS_LABEL, matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
@@ -40,7 +41,10 @@ const judgeIdTag = computed(() => `JURI-ID #${String(judgeSeat.value).padStart(2
 
 // --- Match Context ---
 const currentRound = ref(1)
-const roundStatus = ref('BERJALAN')
+const matchStatus = ref<MatchStatus>('idle')
+const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
+// Skor ditolak server saat istirahat; tombol dikunci agar juri tidak mengira input tercatat.
+const isBreak = computed(() => matchStatus.value === 'break')
 const latencyMs = ref(12)
 
 const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
@@ -206,6 +210,7 @@ onMounted(() => {
   sendMessage('sync_request', {})
 
   onMessage('sync_response', (payload) => {
+    matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
       timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
@@ -213,6 +218,7 @@ onMounted(() => {
   })
 
   onMessage('state_change', (payload) => {
+    matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
       timer.sync(payload.timer_remaining_ms, payload.timer_running ?? true, payload.timer_ends_at_ms)
@@ -255,6 +261,9 @@ onMounted(() => {
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <span>{{ timer.formattedTime.value }}</span>
+        </div>
+        <div v-if="isBreak" class="judge-break-note font-mono">
+          Babak berikutnya dimulai otomatis dalam {{ timer.formattedTime.value }}
         </div>
       </div>
 
@@ -364,6 +373,7 @@ onMounted(() => {
           <button
             class="judge-btn judge-btn--red"
             :class="{ 'judge-btn--active': activeBtn === 'red-technique' }"
+            :disabled="isBreak"
             @click="handleScoreTap('red', 'technique', 1, 'PUKULAN')"
           >
             <div class="judge-btn__icon-box">
@@ -386,6 +396,7 @@ onMounted(() => {
           <button
             class="judge-btn judge-btn--red"
             :class="{ 'judge-btn--active': activeBtn === 'red-knockdown' }"
+            :disabled="isBreak"
             @click="handleScoreTap('red', 'knockdown', 2, 'TENDANGAN')"
           >
             <div class="judge-btn__icon-box">
@@ -408,6 +419,7 @@ onMounted(() => {
           <button
             class="judge-btn judge-btn--red"
             :class="{ 'judge-btn--active': activeBtn === 'red-fall' }"
+            :disabled="isBreak"
             @click="handleScoreTap('red', 'fall', 3, 'JATUHAN')"
           >
             <div class="judge-btn__icon-box">
@@ -483,6 +495,7 @@ onMounted(() => {
           <button
             class="judge-btn judge-btn--blue"
             :class="{ 'judge-btn--active': activeBtn === 'blue-technique' }"
+            :disabled="isBreak"
             @click="handleScoreTap('blue', 'technique', 1, 'PUKULAN')"
           >
             <div class="judge-btn__icon-box">
@@ -505,6 +518,7 @@ onMounted(() => {
           <button
             class="judge-btn judge-btn--blue"
             :class="{ 'judge-btn--active': activeBtn === 'blue-knockdown' }"
+            :disabled="isBreak"
             @click="handleScoreTap('blue', 'knockdown', 2, 'TENDANGAN')"
           >
             <div class="judge-btn__icon-box">
@@ -527,6 +541,7 @@ onMounted(() => {
           <button
             class="judge-btn judge-btn--blue"
             :class="{ 'judge-btn--active': activeBtn === 'blue-fall' }"
+            :disabled="isBreak"
             @click="handleScoreTap('blue', 'fall', 3, 'JATUHAN')"
           >
             <div class="judge-btn__icon-box">
@@ -829,6 +844,20 @@ onMounted(() => {
 .judge-icon-btn--active {
   color: #34d399;
   border-color: #10b981;
+}
+
+.judge-break-note {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.judge-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
 }
 
 .judge-batal-btn {

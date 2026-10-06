@@ -171,6 +171,9 @@ function askCancel() {
             <span class="ref-chrono-max">{{ formatClock(c.roundDurationMs) }} MAX</span>
           </div>
           <div class="ref-chrono-time font-mono">{{ c.timer.formattedTime }}</div>
+          <div v-if="c.status === 'break'" class="ref-break-note font-mono">
+            Babak berikutnya otomatis dimulai saat hitung mundur habis
+          </div>
           <div class="ref-chrono-controls font-mono">
             <button
               class="ref-time-adj-btn"
