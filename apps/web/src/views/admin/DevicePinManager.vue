@@ -3,6 +3,7 @@ import { isNotFoundError } from '@/api/error'
 import { formatPin, pinLengthForRole, validateCustomPin } from '@/features/auth/lib/pin'
 import { getErrorMessage } from '@/api/error'
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
@@ -129,6 +130,17 @@ export interface DeviceSeat {
 // Reactive store of seats per arena ID
 const arenaData = ref<Record<string, DeviceSeat[]>>({})
 const isLoadingPins = ref(false)
+
+const router = useRouter()
+
+/**
+ * Buka halaman di tab baru DENGAN sesi login yang sama. Sesi disimpan di sessionStorage (per tab);
+ * browser hanya menyalinnya ke tab yang dibuka lewat window.open tanpa `noopener`. Tautan
+ * `target="_blank"` biasa membuka tab tanpa sesi sehingga langsung dilempar ke /login.
+ */
+function openInNewTab(path: string) {
+  window.open(router.resolve(path).href, '_blank')
+}
 
 function formatExpiry(isoStr?: string): string {
   if (!isoStr) return '12 Jam Tersisa'
@@ -575,23 +587,23 @@ async function handleSaveCustomPin() {
             <span>Ping</span>
           </button>
 
-          <router-link
+          <button
             v-if="seat.role === 'judge'"
-            :to="`/judge?arena_id=${selectedArena}&seat=${seat.seatNumber}&comp_id=${compIdRef}`"
-            target="_blank"
+            type="button"
             class="card-action-link"
+            @click="openInNewTab(`/judge?arena_id=${selectedArena}&seat=${seat.seatNumber}&comp_id=${compIdRef}`)"
           >
             Buka Tablet →
-          </router-link>
+          </button>
 
-          <router-link
+          <button
             v-if="seat.role === 'wasit'"
-            :to="`/referee?arena_id=${selectedArena}&comp_id=${compIdRef}`"
-            target="_blank"
+            type="button"
             class="card-action-link"
+            @click="openInNewTab(`/referee?arena_id=${selectedArena}&comp_id=${compIdRef}`)"
           >
             Buka Konsol Wasit →
-          </router-link>
+          </button>
         </div>
       </div>
     </div>
@@ -1174,6 +1186,11 @@ async function handleSaveCustomPin() {
   text-decoration: none;
   font-weight: 600;
   padding: 4px 6px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .card-action-link:hover {

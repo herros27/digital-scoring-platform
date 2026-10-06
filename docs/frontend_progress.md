@@ -171,6 +171,7 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
 - **2026-10-06 (konsol wasit)**:
+  - Tombol "Buka Konsol Wasit" dan "Buka Tablet" di Perangkat & PIN diperbaiki: tab baru kini membawa sesi login (dibuka lewat `window.open` tanpa `noopener`; tautan `target="_blank"` biasa membuat tab tanpa sesi sehingga terlempar ke `/login`).
   - `RefereeConsoleView` ditulis ulang menjadi cangkang + 5 panel menu (`features/referee/`) dengan composable `useRefereeConsole` yang menjadi satu-satunya pintu ke server; seluruh data dummy dihapus; menu "Bagan & Antrean" tidak lagi membuka `/design-system`.
   - Backend ditambah untuk mendukungnya (lihat `docs/task_update.md` butir 38): sanksi bertipe + pembatalan, diskualifikasi, koreksi waktu, sinyal arena, kehadiran perangkat, log real-time, antrean per gelanggang, dan keputusan wasit saat skor seri.
   - Scoreboard menampilkan banner dokter/VAR dan membunyikan gong; hasil diskualifikasi/keputusan wasit berlabel.
