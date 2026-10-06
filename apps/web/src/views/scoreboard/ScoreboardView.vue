@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
@@ -90,6 +90,15 @@ const RESULT_LABEL: Record<string, string> = {
 // Winner Announcement Modal
 const showWinnerModal = ref(false)
 const winnerData = ref<{ side: 'red' | 'blue'; name: string; resultType: string } | null>(null)
+
+// Tampilan kemenangan menutup sendiri agar scoreboard kembali terlihat.
+const WINNER_AUTO_CLOSE_MS = 30_000
+let winnerCloseTimer: ReturnType<typeof setTimeout> | undefined
+watch(showWinnerModal, (open) => {
+  clearTimeout(winnerCloseTimer)
+  if (open) winnerCloseTimer = setTimeout(() => (showWinnerModal.value = false), WINNER_AUTO_CLOSE_MS)
+})
+onBeforeUnmount(() => clearTimeout(winnerCloseTimer))
 
 // --- Timer ---
 const timer = useTimer()
