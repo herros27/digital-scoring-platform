@@ -246,6 +246,11 @@
     - Seluruh `apps/web/src` diformat (`npm run format`, commit terpisah) dan `npm run format:check` ditambahkan ke job frontend. Satu handler `@click` berisi dua pernyataan di `CompetitionsView` dipindah ke fungsi karena format Prettier-nya tidak diterima kompiler Vue.
     - Setelah format: lint, typecheck, 98 tes, build, dan seluruh skrip browser (wasit 50/50, hasil khusus, konsensus, ruleset, scoreboard, editor ruleset, juri) tetap lolos.
 
+50. **Image Docker Frontend & Compose Satu Pintu** –
+    - `apps/web/Dockerfile` (node:22-alpine membangun `dist`, nginx:1.27-alpine menyajikannya) dan `apps/web/nginx.conf`: SPA fallback, cache panjang untuk `/assets/`, proxy `/api/`, `/ws/` (WebSocket, timeout 1 jam), dan `/docs` ke layanan `app`; `X-Forwarded-For` ditimpa dengan alamat sambungan asli. Layanan `web` ditambahkan pada `docker-compose.yml` (`WEB_PORT`, bawaan 80); `JWT_SECRET` dapat diatur lewat environment (nilai bawaan lama tetap sebagai contoh).
+    - CI: job Docker membangun image backend dan web serta menjalankan `nginx -t` pada image web.
+    - Terverifikasi: `docker compose config` valid dan CI hijau (lihat riwayat run). Belum diuji di sini: menjalankan stack penuh (tidak ada daemon Docker pada lingkungan pengembangan ini).
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

@@ -45,7 +45,7 @@ rulesets/
   persilat_v7.json           # PERSILAT ruleset
 migrations/                  # SQL migrations (001 s/d 018) + Auto-migration engine
 tests/                       # End-to-end integration test scenarios (tournament lifecycle & workflows)
-docker-compose.yml           # Local PostgreSQL
+docker-compose.yml           # PostgreSQL + backend + frontend (nginx)
 docs/
   openapi.yaml               # OpenAPI 3.0 spec & WebSocket protocol contracts
   task_update.md             # Log progres & status fitur backend
@@ -165,8 +165,9 @@ Tabel database terstruktur & termigrasi lengkap:
 
 ### 1. Start Database
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
+*(`docker compose up -d` tanpa nama layanan membangun dan menjalankan seluruh sistem; lihat "Menjalankan Seluruh Sistem dengan Docker".)*
 Default: `postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable`
 
 ### 2. Configure Environment
@@ -392,6 +393,31 @@ Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikoso
 - **`consensus`**: `judges` (1-5, jumlah kursi yang ditampilkan), `majority` (juri yang harus sepakat), `window_ms` (500-10000).
 - Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3), serta "Kombinasi Pukulan + Tendangan" (1+2 = 3) dan "Kombinasi 2 Pukulan" (1+1 = 2) (migrasi 021 melengkapi preset yang sudah ada). Tablet juri menyusun tombol dua kolom bila teknik lebih dari 4.
 - `POST/PUT /api/v1/rulesets` memvalidasi bagian ini (kode unik huruf kecil/angka/underscore, nilai teknik > 0, potongan >= 0, `majority` <= `judges`).
+
+---
+
+## Menjalankan Seluruh Sistem dengan Docker
+
+`docker compose up -d --build` membangun dan menjalankan tiga layanan:
+
+| Layanan | Isi | Port host |
+|---|---|---|
+| `postgres` | PostgreSQL 16 (data di volume `postgres_data`) | 5432 |
+| `app` | Backend Go (`Dockerfile` di akar repo; migrasi otomatis) | 8080 |
+| `web` | Frontend Vue hasil `npm run build` disajikan nginx, plus proxy `/api/`, `/ws/`, `/docs` ke `app` (`apps/web/Dockerfile`, `apps/web/nginx.conf`) | `${WEB_PORT:-80}` |
+
+Semua perangkat cukup membuka satu alamat, `http://<alamat-server>/`: tablet juri `/judge/login`, konsol wasit `/referee` (lewat login PIN wasit), scoreboard `/scoreboard` (daftar gelanggang yang sedang berlangsung), panel operasi `/ops`, dokumentasi API `/docs`. Frontend memakai alamat relatif, jadi tidak ada alamat server yang tertanam dan WebSocket otomatis lewat proxy yang sama.
+
+```bash
+JWT_SECRET="rahasia-panjang-acak" WEB_PORT=80 docker compose up -d --build
+# data awal (akun admin, kompetisi contoh): dari mesin yang punya Go
+DB_URL="postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable" go run ./cmd/seed
+```
+
+Catatan:
+- nginx menimpa header `X-Forwarded-For` dengan alamat sambungan asli, sehingga pembatas percobaan PIN (15 menit setelah 5 salah) tidak bisa dihindari dengan header palsu. Jangan mempublikasikan port 8080 backend langsung ke jaringan venue bila ingin mengandalkan ini; hapus pemetaan `8080:8080` pada `docker-compose.yml` untuk produksi.
+- `JWT_SECRET` bawaan di compose hanya contoh; set lewat environment atau berkas `.env`. Database memakai `trust` tanpa kata sandi, cocok untuk jaringan venue tertutup saja.
+- CI membangun kedua image dan memeriksa sintaks konfigurasi nginx (`nginx -t`).
 
 ---
 

@@ -11,10 +11,23 @@ services:
       - PORT=8080
       - ENV=production
       - DB_URL=postgres://scoring_user@postgres:5432/digital_scoring?sslmode=disable
-      - JWT_SECRET=change-this-in-production-secret-key-123
+      # ganti lewat environment host (JWT_SECRET=... docker compose up) atau berkas .env
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production-secret-key-123}
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Frontend (Vue) + proxy API/WebSocket. Pintu masuk utama: http://<host>:${WEB_PORT:-80}/
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: scoring-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      - app
 
   postgres:
     image: postgres:16-alpine

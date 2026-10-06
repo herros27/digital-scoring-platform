@@ -106,5 +106,18 @@ jobs:
           context: .
           push: false
           tags: digital-scoring:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build Web Image (frontend + nginx)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          load: true
+          tags: digital-scoring-web:test
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # `app` adalah nama layanan backend pada docker compose; nginx meresolusinya saat memuat konfigurasi
+      - name: Validate nginx Config
+        run: docker run --rm --add-host app:127.0.0.1 digital-scoring-web:test nginx -t
