@@ -2248,6 +2248,8 @@ paths:
               "round": 2,
               "timer_remaining_ms": 75000,
               "timer_running": true,
+              "timer_ends_at_ms": 1791289800000,
+              "server_time_ms": 1791289725000,
               "scores": [
                 {"RedTechnical": 3, "BlueTechnical": 2, "RedPenalties": 0, "BluePenalties": 0},
                 {"RedTechnical": 1, "BlueTechnical": 4, "RedPenalties": 0, "BluePenalties": 1}
@@ -2285,10 +2287,21 @@ paths:
               "round": 1,
               "timer_remaining_ms": 118000,
               "timer_running": true,
+              "timer_ends_at_ms": 1791289800000,
+              "server_time_ms": 1791289682000,
               "tie_pending": false
             }
           }
           ```
+        * **Sinkronisasi Waktu (`timer_sync`)**: disiarkan server setiap 5 detik selama timer berjalan, dengan isi
+          `{timer_remaining_ms, timer_running, timer_ends_at_ms, server_time_ms}`. Sisa waktu dihitung server dari
+          jam (presisi milidetik, bukan kelipatan detik).
+
+          **Cara klien menampilkan waktu (wajib agar semua layar selaras):** jangan mengurangi sisa waktu per ketukan
+          interval. Hitung `sisa = timer_ends_at_ms − waktu_server_sekarang` pada setiap penyegaran tampilan, dengan
+          `waktu_server_sekarang = Date.now() + selisih_jam`; `selisih_jam` diperkirakan dari `server_time_ms` pada
+          setiap pesan (ambil sampel terbesar dalam beberapa pesan terakhir = tundaan jaringan terkecil). Dengan begitu
+          wasit, juri, dan scoreboard menampilkan angka yang sama dan tidak melenceng walau tab diperlambat browser.
         * **Daftar Sanksi (`penalties`)**: disiarkan ke semua klien setiap sanksi dijatuhkan/dibatalkan —
           `{"penalties": [{"id", "round", "target", "type", "label", "points", "clock_ms"}]}`.
         * **Sinyal Arena (`arena_signal`)**: `{"signal": "gong"|"medic"|"var", "active": true}`.

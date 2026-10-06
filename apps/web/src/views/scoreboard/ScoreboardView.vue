@@ -133,7 +133,7 @@ onMounted(async () => {
     if (payload.round) currentRound.value = payload.round
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
     }
     payload.scores?.forEach((score, i) => {
       const row = roundScores.value[i]
@@ -149,13 +149,17 @@ onMounted(async () => {
     if (payload.round) currentRound.value = payload.round
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? matchStatus.value === 'running')
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? matchStatus.value === 'running',
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
   onMessage('timer_sync', (payload) => {
-    if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running ?? false)
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
     }
   })
 

@@ -255,10 +255,11 @@ func TestAdjustTimeAndResetRound(t *testing.T) {
 
 	rem := func() int64 { return r.o.Snapshot()["timer_remaining_ms"].(int64) }
 	r.send(r.referee, hub.MsgStateChange, map[string]any{"action": "adjust_time", "delta_ms": -10000})
-	if got := rem(); got != 110000 {
-		t.Fatalf("setelah -10 detik = %d, want 110000", got)
+	// timer berbasis jam (presisi ms): jeda dalam hitungan ms setelah mulai, jadi beri toleransi
+	if got := rem(); got < 109800 || got > 110000 {
+		t.Fatalf("setelah -10 detik = %d, want ~110000", got)
 	}
-	if m := find(drain(r.tvCh), hub.MsgStateChange); m == nil || m.Payload.(map[string]any)["timer_remaining_ms"] != int64(110000) {
+	if m := find(drain(r.tvCh), hub.MsgStateChange); m == nil || m.Payload.(map[string]any)["timer_remaining_ms"].(int64) > 110000 {
 		t.Error("koreksi waktu harus disiarkan lewat state_change")
 	}
 
@@ -436,8 +437,8 @@ func TestRound3Expiry_TieWaitsForDecisionInsteadOfAwardingRed(t *testing.T) {
 	r := newRig(t)
 	r.start(t)
 	advanceToRound3(t, r)
+	r.o.timer.Stop() // dijeda dulu agar Reset(0) tidak memicu kedaluwarsa sungguhan
 	r.o.timer.Reset(0)
-	r.o.timer.Stop()
 	drain(r.tvCh)
 
 	r.o.onRoundExpired()
@@ -471,8 +472,8 @@ func TestRound3Expiry_NotTiedFinishesAutomatically(t *testing.T) {
 	r.start(t)
 	r.send(r.referee, hub.MsgPenalty, map[string]any{"target": "red", "type": "teguran_1"}) // biru unggul
 	advanceToRound3(t, r)
+	r.o.timer.Stop() // dijeda dulu agar Reset(0) tidak memicu kedaluwarsa sungguhan
 	r.o.timer.Reset(0)
-	r.o.timer.Stop()
 
 	r.o.onRoundExpired()
 

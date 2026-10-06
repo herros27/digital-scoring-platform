@@ -176,6 +176,13 @@
     - `appendEvent` kini menambah `clock_ms` + `round` ke setiap kejadian dan menyiarkannya sebagai `match_event` ke meja wasit/admin (log real-time); penonton publik dan juri tidak menerimanya.
     - `GET /competitions/{comp_id}/matches?arena_id=` mengembalikan antrean partai satu gelanggang (urutan antrean); snapshot menambah info ruleset (nama, durasi ronde/istirahat, total ronde).
     - Tes: `internal/orchestrator/referee_ops_test.go` (sanksi, pembatalan, DQ, koreksi waktu, sinyal, kehadiran, log, seri; telah diuji dengan mutasi) dan perluasan `apps/web/scripts/e2e-simulation.mjs` (49 pemeriksaan terhadap backend nyata).
+39. **Sinkronisasi Waktu Pertandingan Antar Layar (Timer Berbasis Tenggat)** –
+    - Masalah: waktu di wasit, juri, dan scoreboard sering berbeda sampai pertandingan dijeda. Penyebab: server mengurangi sisa waktu per 1 detik penuh (sisa waktu bisa basi hingga 1 detik, jeda menghilangkan pecahan detik) dan hanya mengirimnya saat ada event; klien menghitung mundur sendiri dengan `setInterval` yang dikurangi 100 ms per ketukan (melenceng, dan diperlambat browser pada tab/jendela tidak fokus), dimulai dari saat masing-masing menerima pesan.
+    - `Timer` ditulis ulang berbasis tenggat (`time.AfterFunc`, presisi ms; jeda/koreksi/reset menggeser tenggat; callback lama diabaikan lewat nomor generasi). Payload `state_change`, `sync_response`, dan `timer_sync` memuat `timer_ends_at_ms` + `server_time_ms`. Server menyiarkan `timer_sync` tiap 5 detik selama berjalan (berhenti saat dijeda).
+    - Klien: `serverClock` memperkirakan selisih jam dari `server_time_ms` (sampel terbesar = tundaan terkecil); `useTimer` menghitung `tenggat − jam server` tiap 100 ms. Tampilan dibulatkan ke atas.
+    - Pengukuran 3 layar nyata (wasit, juri dengan `setInterval` dilambatkan 1 detik, scoreboard; 30 detik): kode lama 74/74 sampel berbeda, selisih terbesar 28 detik; kode baru 2/74 berbeda (hanya di pergantian detik), selisih terbesar 1 detik.
+    - Tes: `internal/orchestrator/timer_test.go`, `timer_sync_test.go`; `serverClock.test.ts`, `useTimer.test.ts`.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

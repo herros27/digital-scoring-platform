@@ -497,13 +497,6 @@ func (o *Orchestrator) Snapshot() map[string]any {
 
 // snapshotLocked: pemanggil harus memegang o.mu.
 func (o *Orchestrator) snapshotLocked() map[string]any {
-	var remMs int64
-	var timerRunning bool
-	if o.timer != nil {
-		remMs = o.timer.Remaining().Milliseconds()
-		timerRunning = o.timer.IsRunning()
-	}
-
 	var redTotal, blueTotal int
 	for i := 1; i <= 3; i++ {
 		redTotal += o.scores[i].RedTechnical - o.scores[i].RedPenalties
@@ -511,16 +504,17 @@ func (o *Orchestrator) snapshotLocked() map[string]any {
 	}
 
 	snap := map[string]any{
-		"match_id":           o.matchID,
-		"arena_id":           o.arenaID,
-		"state":              string(o.sm.Current()),
-		"round":              o.sm.CurrentRoundNumber(),
-		"timer_remaining_ms": remMs,
-		"timer_running":      timerRunning,
-		"scores":             o.scores[1:4],
-		"red_total":          redTotal,
-		"blue_total":         blueTotal,
-		"server_time":        time.Now().UTC().Format(time.RFC3339),
+		"match_id":    o.matchID,
+		"arena_id":    o.arenaID,
+		"state":       string(o.sm.Current()),
+		"round":       o.sm.CurrentRoundNumber(),
+		"scores":      o.scores[1:4],
+		"red_total":   redTotal,
+		"blue_total":  blueTotal,
+		"server_time": time.Now().UTC().Format(time.RFC3339),
+	}
+	for k, v := range timerPayload(o.timer) {
+		snap[k] = v
 	}
 	for k, v := range o.extraSnapshotLocked() {
 		snap[k] = v
@@ -530,7 +524,7 @@ func (o *Orchestrator) snapshotLocked() map[string]any {
 
 func (o *Orchestrator) startRoundTimer() {
 	duration := time.Duration(o.ruleset.Scoring.RoundDuration) * time.Second
-	o.timer = NewTimer(duration, o.onRoundExpired)
+	o.timer = o.newTimer(duration, o.onRoundExpired)
 	o.timer.Start()
 }
 
@@ -561,7 +555,7 @@ func (o *Orchestrator) onRoundExpired() {
 
 	// Setelah break, mulai ronde berikutnya otomatis
 	breakDur := time.Duration(o.ruleset.Scoring.BreakDuration) * time.Second
-	o.timer = NewTimer(breakDur, o.onBreakExpired)
+	o.timer = o.newTimer(breakDur, o.onBreakExpired)
 	o.timer.Start()
 }
 
@@ -671,21 +665,11 @@ func (o *Orchestrator) determineWinner() (winnerID string, resultType string) {
 }
 
 func (o *Orchestrator) broadcastState() {
-	o.h.Broadcast(hub.Message{
-		Type: hub.MsgStateChange,
-		Payload: map[string]any{
-			"state": string(o.sm.Current()),
-			"round": o.sm.CurrentRoundNumber(),
-			"timer_remaining_ms": func() int64 {
-				if o.timer != nil {
-					return o.timer.Remaining().Milliseconds()
-				}
-				return 0
-			}(),
-			"timer_running": o.timer != nil && o.timer.IsRunning(),
-			"tie_pending":   o.tiePendingLocked(),
-		},
-	})
+	payload := timerPayload(o.timer)
+	payload["state"] = string(o.sm.Current())
+	payload["round"] = o.sm.CurrentRoundNumber()
+	payload["tie_pending"] = o.tiePendingLocked()
+	o.h.Broadcast(hub.Message{Type: hub.MsgStateChange, Payload: payload})
 }
 
 func (o *Orchestrator) broadcastScoreUpdate(round int) {

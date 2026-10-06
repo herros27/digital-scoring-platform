@@ -321,7 +321,8 @@ GET http://localhost:8080/docs/openapi.yaml
 | Type | To | Payload |
 |------|----|---------|
 | `sync_response` | Pengirim `sync_request` | `{match_id, arena_id, state, round, timer_remaining_ms, timer_running, scores[], red_total, blue_total, server_time, ruleset_name, round_duration_ms, break_duration_ms, total_rounds, penalties[], penalty_catalog[], medic_active, var_active, tie_pending, presence, result}` |
-| `state_change` | All | `{state, round, timer_remaining_ms, timer_running, tie_pending}` (saat dijeda `state` tetap `round_N`, `timer_running=false`; `tie_pending=true` bila waktu ronde terakhir habis dengan skor seri) |
+| `state_change` | All | `{state, round, timer_remaining_ms, timer_running, timer_ends_at_ms, server_time_ms, tie_pending}` (saat dijeda `state` tetap `round_N`, `timer_running=false`; `tie_pending=true` bila waktu ronde terakhir habis dengan skor seri) |
+| `timer_sync` | All | `{timer_remaining_ms, timer_running, timer_ends_at_ms, server_time_ms}` setiap 5 detik selama timer berjalan |
 | `penalties` | All | `{penalties: [{id, round, target, type, label, points, clock_ms}]}` |
 | `arena_signal` | All | `{signal, active}` |
 | `presence` | Referee, Admin | `{judges: [{seat, connected, inputs, last_input}], referees, admins, scoreboards}` |
@@ -331,7 +332,9 @@ GET http://localhost:8080/docs/openapi.yaml
 | `match_result` | All | `{winner, corner, result_type, scores}` |
 | `error` | Pengirim | `{code, message}` (mis. `FORBIDDEN`, `SCORING_NOT_ALLOWED`, `INVALID_STATE_TRANSITION`) |
 
-Timer berjalan di server; klien menyinkronkan lewat `state_change`/`sync_response` dan menghitung mundur secara lokal.
+Timer berjalan di server berbasis **tenggat absolut** (`timer_ends_at_ms`), bukan penghitung per detik. Klien menghitung `sisa = tenggat − jam server`
+pada tiap penyegaran tampilan (jam server diselaraskan dari `server_time_ms`), dan server menyiarkan `timer_sync` tiap 5 detik. Dengan begitu
+wasit, juri, dan scoreboard menampilkan waktu yang sama walau tab diperlambat browser.
 
 **Skor seri:** pertandingan tidak pernah dimenangkan otomatis oleh sudut merah. Menyelesaikan pertandingan dengan skor seri ditolak
 (`TIE_NEEDS_DECISION` lewat REST) kecuali wasit menentukan pemenang (`winner`, hasil `referee_decision`); bila waktu ronde terakhir

@@ -160,7 +160,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     if (s.round_duration_ms) roundDurationMs.value = s.round_duration_ms
     if (s.ruleset_name) rulesetName.value = s.ruleset_name
     if (s.timer_remaining_ms !== undefined)
-      timer.sync(s.timer_remaining_ms, s.timer_running ?? false)
+      timer.sync(s.timer_remaining_ms, s.timer_running ?? false, s.timer_ends_at_ms)
     if (s.scores) roundScores.value = s.scores.map((r) => ({ ...r }))
     if (s.penalties) penalties.value = s.penalties
     if (s.penalty_catalog) penaltyCatalog.value = s.penalty_catalog
@@ -255,8 +255,14 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     status.value = matchStatusFromState(p.state, p.timer_running) ?? status.value
     tiePending.value = p.tie_pending ?? false
     if (p.timer_remaining_ms !== undefined)
-      timer.sync(p.timer_remaining_ms, p.timer_running ?? status.value === 'running')
+      timer.sync(p.timer_remaining_ms, p.timer_running ?? status.value === 'running', p.timer_ends_at_ms)
     if (status.value === 'finished') timer.pause()
+  })
+
+  // koreksi berkala selama timer berjalan (server menyiarkan tenggat yang sama)
+  ws.onMessage('timer_sync', (p) => {
+    if (p.timer_remaining_ms !== undefined)
+      timer.sync(p.timer_remaining_ms, p.timer_running ?? false, p.timer_ends_at_ms)
   })
 
   ws.onMessage('score_update', (p) => {

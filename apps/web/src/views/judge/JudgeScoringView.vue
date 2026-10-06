@@ -208,20 +208,20 @@ onMounted(() => {
   onMessage('sync_response', (payload) => {
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
     }
   })
 
   onMessage('state_change', (payload) => {
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? true)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? true, payload.timer_ends_at_ms)
     }
   })
 
   onMessage('timer_sync', (payload) => {
-    if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running ?? false)
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false, payload.timer_ends_at_ms)
     }
   })
 })

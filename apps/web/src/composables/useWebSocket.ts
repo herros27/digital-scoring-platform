@@ -1,5 +1,6 @@
 import { getErrorMessage } from '@/api/error'
 import { ref, onMounted, onUnmounted } from 'vue'
+import { serverClock } from './serverClock'
 
 /** Status mesin pertandingan yang dikirim server. */
 export type WsMatchState = string
@@ -85,6 +86,8 @@ export interface WsPenaltyList {
 export interface WsSyncResponse {
   match_id?: string
   arena_id?: string
+  timer_ends_at_ms?: number
+  server_time_ms?: number
   tie_pending?: boolean
   ruleset_name?: string
   round_duration_ms?: number
@@ -110,15 +113,21 @@ export interface WsStateChange {
   round?: number
   state?: WsMatchState
   timer_remaining_ms?: number
+  timer_ends_at_ms?: number
+  server_time_ms?: number
   /** false saat wasit menjeda pertandingan; state tetap `round_N` */
   timer_running?: boolean
   /** Waktu ronde terakhir habis dengan skor seri: menunggu keputusan wasit */
   tie_pending?: boolean
 }
 
+/** Koreksi waktu berkala dari server selama timer berjalan. */
 export interface WsTimerSync {
-  remaining_ms?: number
-  running?: boolean
+  timer_remaining_ms?: number
+  timer_running?: boolean
+  /** Tenggat absolut (epoch ms); 0 bila berhenti */
+  timer_ends_at_ms?: number
+  server_time_ms?: number
 }
 
 export interface WsScoreConfirmed {
@@ -203,6 +212,9 @@ export function useWebSocket(arenaId: string, token?: string) {
       ws.value.onmessage = (event) => {
         try {
           const data: WsMessage = JSON.parse(event.data)
+          // selaraskan jam klien dengan jam server dari setiap pesan yang membawanya
+          const serverTime = (data.payload as { server_time_ms?: unknown } | null)?.server_time_ms
+          if (typeof serverTime === 'number') serverClock.observe(serverTime)
           const handlers = messageListeners.get(data.type) || []
           handlers.forEach((fn) => (fn as (payload: unknown) => void)(data.payload))
         } catch (err) {
