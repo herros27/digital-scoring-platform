@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 )
 
@@ -80,5 +81,18 @@ func TestConfig_DotEnvFile(t *testing.T) {
 	}
 	if cfg.JWTSecret != "from-dotenv-file" {
 		t.Errorf("expected JWTSecret from .env file, got %s", cfg.JWTSecret)
+	}
+}
+
+// .env.example harus memuat setiap variabel yang dibaca Config, agar dokumentasi konfigurasi tidak basi.
+func TestEnvExample_ListsEveryConfigVariable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".env.example"))
+	if err != nil {
+		t.Fatalf(".env.example tidak ditemukan: %v", err)
+	}
+	for _, key := range []string{"PORT", "ENV", "DB_URL", "JWT_SECRET", "AUTO_MIGRATE", "SEED_DATA", "POSTGRES_USER", "POSTGRES_DB"} {
+		if !regexp.MustCompile(`(?m)^` + key + `=`).Match(data) {
+			t.Errorf(".env.example tidak memuat %s", key)
+		}
 	}
 }

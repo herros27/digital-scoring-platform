@@ -251,6 +251,11 @@
     - CI: job Docker membangun image backend dan web serta menjalankan `nginx -t` pada image web.
     - Terverifikasi: `docker compose config` valid dan CI hijau (lihat riwayat run). Belum diuji di sini: menjalankan stack penuh (tidak ada daemon Docker pada lingkungan pengembangan ini).
 
+51. **Konfigurasi dari `.env` (Compose) dan Variabel CI** –
+    - `.env.example` ditambahkan (sebelumnya tidak ada dan `.gitignore` ikut mengabaikannya; kini `!.env.example`) memuat semua variabel backend, PostgreSQL, dan port host. `docker-compose.yml` memakai `${VAR:-bawaan}` untuk `POSTGRES_USER`, `POSTGRES_DB`, `JWT_SECRET`, `WEB_PORT`, `APP_PORT`, `POSTGRES_PORT`; `DB_URL` backend dirakit dari nilai yang sama dengan layanan postgres dan healthcheck memakai variabel di dalam container, sehingga tidak ada nama pengguna/database yang tertulis dua kali.
+    - `ci.yml`: nama database/pengguna (service postgres, healthcheck, `TEST_DB_URL`) memakai Repository Variables `POSTGRES_DB`/`POSTGRES_USER` dengan nilai bawaan yang sama. CI tidak dapat membaca `.env` lokal; versi alat tetap ditetapkan di tempatnya.
+    - Tes: `TestEnvExample_ListsEveryConfigVariable`; `docker compose config` diperiksa dengan nilai bawaan, nilai timpaan, dan `--env-file .env.example`.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

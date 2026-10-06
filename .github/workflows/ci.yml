@@ -15,18 +15,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: digital_scoring
-          POSTGRES_USER: scoring_user
+          # nilai bawaan sama dengan .env.example; timpa lewat Repository Variables bernama sama
+          POSTGRES_DB: ${{ vars.POSTGRES_DB || 'digital_scoring' }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER || 'scoring_user' }}
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U scoring_user -d digital_scoring"
+          --health-cmd "pg_isready -U ${{ vars.POSTGRES_USER || 'scoring_user' }} -d ${{ vars.POSTGRES_DB || 'digital_scoring' }}"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      TEST_DB_URL: postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable
+      TEST_DB_URL: postgres://${{ vars.POSTGRES_USER || 'scoring_user' }}@localhost:5432/${{ vars.POSTGRES_DB || 'digital_scoring' }}?sslmode=disable
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

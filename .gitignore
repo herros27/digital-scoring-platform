@@ -6,7 +6,7 @@ internal/docs
 
 # Environment
 .env
-.env.example
+!.env.example
 bin
 
 # Frontend

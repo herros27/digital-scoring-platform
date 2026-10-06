@@ -6,12 +6,13 @@ services:
     container_name: scoring-backend
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
     environment:
       - PORT=8080
       - ENV=production
-      - DB_URL=postgres://scoring_user@postgres:5432/digital_scoring?sslmode=disable
-      # ganti lewat environment host (JWT_SECRET=... docker compose up) atau berkas .env
+      # dirakit dari nilai yang sama dengan layanan postgres (lihat .env.example)
+      - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
+      # ganti lewat berkas .env atau environment host (JWT_SECRET=... docker compose up)
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production-secret-key-123}
     depends_on:
       postgres:
@@ -34,16 +35,17 @@ services:
     container_name: scoring-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: digital_scoring
-      POSTGRES_USER: scoring_user
+      POSTGRES_DB: ${POSTGRES_DB:-digital_scoring}
+      POSTGRES_USER: ${POSTGRES_USER:-scoring_user}
       POSTGRES_PASSWORD: ""
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scoring_user -d digital_scoring"]
+      # $$ = variabel diperluas di dalam container (nilai POSTGRES_USER/POSTGRES_DB di atas)
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5

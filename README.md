@@ -409,10 +409,16 @@ Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikoso
 Semua perangkat cukup membuka satu alamat, `http://<alamat-server>/`: tablet juri `/judge/login`, konsol wasit `/referee` (lewat login PIN wasit), scoreboard `/scoreboard` (daftar gelanggang yang sedang berlangsung), panel operasi `/ops`, dokumentasi API `/docs`. Frontend memakai alamat relatif, jadi tidak ada alamat server yang tertanam dan WebSocket otomatis lewat proxy yang sama.
 
 ```bash
-JWT_SECRET="rahasia-panjang-acak" WEB_PORT=80 docker compose up -d --build
+cp .env.example .env        # sekali saja; ubah JWT_SECRET dan nilai lain sesuai kebutuhan (.env tidak masuk git)
+docker compose up -d --build
 # data awal (akun admin, kompetisi contoh): dari mesin yang punya Go
 DB_URL="postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable" go run ./cmd/seed
 ```
+
+### Konfigurasi dari `.env`
+`.env.example` adalah daftar lengkap variabel (dan satu-satunya sumber nilai bawaan). Docker compose membaca `.env` otomatis untuk `${VAR}` pada `docker-compose.yml`: `POSTGRES_USER`, `POSTGRES_DB` (dipakai layanan `postgres`, healthcheck, dan `DB_URL` backend, jadi tidak perlu ditulis dua kali), `JWT_SECRET`, serta port host `WEB_PORT`, `APP_PORT`, `POSTGRES_PORT`. Backend yang dijalankan langsung (`go run ./cmd/server`) membaca `.env` yang sama lewat godotenv (`PORT`, `ENV`, `DB_URL`, `JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`). Variabel environment host mengalahkan `.env`.
+
+**CI GitHub tidak dapat membaca `.env`** (berkas itu sengaja tidak di-commit dan job berjalan di mesin lain). Untuk nilai non-rahasia, `ci.yml` memakai Repository Variables (Settings → Secrets and variables → Actions → Variables) bernama `POSTGRES_USER` dan `POSTGRES_DB`, dengan nilai bawaan yang sama dengan `.env.example` bila variabel itu tidak dibuat. Rahasia nyata (mis. `JWT_SECRET` produksi) tidak pernah dibutuhkan CI dan sebaiknya tidak disimpan di repo atau variabel biasa. Versi alat (Go dari `go.mod`, Node 22 pada `ci.yml` dan `apps/web/Dockerfile`) sengaja ditetapkan di tempatnya.
 
 Catatan:
 - nginx menimpa header `X-Forwarded-For` dengan alamat sambungan asli, sehingga pembatas percobaan PIN (15 menit setelah 5 salah) tidak bisa dihindari dengan header palsu. Jangan mempublikasikan port 8080 backend langsung ke jaringan venue bila ingin mengandalkan ini; hapus pemetaan `8080:8080` pada `docker-compose.yml` untuk produksi.
