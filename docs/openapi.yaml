@@ -2310,6 +2310,20 @@ paths:
                       arena_name:
                         type: string
                         description: Nama gelanggang (ada juga saat `no active match`)
+                      competition_name:
+                        type: string
+                        description: Nama kejuaraan (ada juga saat `no active match`)
+                      class_label:
+                        type: string
+                        description: Kelas partai, mis. "Kelas A Putri"
+                        example: "Kelas A Putri"
+                      red_athlete: { type: string }
+                      blue_athlete: { type: string }
+                      red_team: { type: string, description: Kontingen atlet sudut merah }
+                      blue_team: { type: string, description: Kontingen atlet sudut biru }
+                      match_number:
+                        type: integer
+                        description: Nomor urut partai pada antrean gelanggangnya (paling awal dibuat = 1)
                       status:
                         type: string
                         description: Status mesin pertandingan (`ready`, `round_1`, `break_1`, ...) atau `no active match`

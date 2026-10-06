@@ -42,6 +42,15 @@ export interface LiveArena {
 export interface LiveScoreboardSnapshot {
   status?: string
   arena_name?: string
+  competition_name?: string
+  /** Kelas partai, mis. "Kelas A Putri" */
+  class_label?: string
+  red_team?: string
+  blue_team?: string
+  /** Nomor urut partai pada antrean gelanggang */
+  match_number?: number
+  match_id?: string
+  ruleset_name?: string
   round?: number
   red_athlete?: string
   blue_athlete?: string

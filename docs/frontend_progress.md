@@ -150,9 +150,8 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
     - *Kebutuhan*: Cocokkan nilai sanksi dan teknik preset dengan peraturan pertandingan yang dipakai event.
 12. **Login Tablet via QR / Tautan**:
     - *Kebutuhan*: Tombol "Buka Tablet" pada `DevicePinManager.vue` menghasilkan tautan/QR yang langsung memasukkan perangkat (tanpa mengetik PIN); PIN tetap sebagai cadangan.
-13. **Label Arena/Kategori/Partai pada Scoreboard**:
-    - *Kondisi saat ini*: Judul turnamen (`KEJUARAAN NASIONAL PENCAK SILAT 2025`) tertanam di `ScoreboardView.vue`, sedangkan label gelanggang, kategori, dan nomor partai berisi teks generik karena `GET /live/scoreboard` belum mengembalikannya.
-    - *Kebutuhan*: Tambahkan nama turnamen, gelanggang, kategori, dan nomor partai pada snapshot backend lalu tampilkan.
+13. **Label Arena/Kategori/Partai pada Scoreboard** *(selesai; lihat `docs/task_update.md` butir 48)*:
+    - Snapshot `GET /live/scoreboard` memuat nama kejuaraan, gelanggang, kelas, atlet, kontingen, dan nomor partai; layar scoreboard menampilkannya dan menyesuaikan diri saat partai baru dimuat tanpa reload.
 14. **Format Prettier Belum Dipaksa di CI**:
     - *Kondisi saat ini*: Prettier terpasang (`npm run format:check`) tetapi kode lama belum diformat sehingga belum dijadikan syarat CI.
     - *Kebutuhan*: Jalankan `npm run format` sekali dalam commit terpisah, lalu tambahkan `format:check` ke job `frontend`.

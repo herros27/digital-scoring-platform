@@ -100,6 +100,12 @@ func New(
 	return o
 }
 
+// BroadcastSnapshot menyiarkan keadaan terkini ke semua klien arena sebagai sync_response
+// (dipakai saat partai baru dimuat agar layar yang sudah tersambung langsung menyesuaikan diri).
+func (o *Orchestrator) BroadcastSnapshot() {
+	o.h.Broadcast(hub.Message{Type: hub.MsgSyncResponse, Payload: o.Snapshot()})
+}
+
 // Release melepas orchestrator dari hub arena (dipakai saat partai dijadwalkan ulang).
 func (o *Orchestrator) Release() {
 	o.h.Release(o)

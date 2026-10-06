@@ -68,3 +68,21 @@ func TestConsensusProgress_DifferentTechniqueDoesNotAddUp(t *testing.T) {
 		t.Fatalf("red_total = %v, want 0", got)
 	}
 }
+
+func TestBroadcastSnapshot_ReachesAllClientsWithMatchContext(t *testing.T) {
+	r := newRig(t)
+	drain(r.tvCh)
+	drain(r.refCh)
+	drain(r.judgeCh)
+	r.o.BroadcastSnapshot()
+	for name, ch := range map[string]<-chan hub.Message{"scoreboard": r.tvCh, "wasit": r.refCh, "juri": r.judgeCh} {
+		m := find(drain(ch), hub.MsgSyncResponse)
+		if m == nil {
+			t.Fatalf("%s harus menerima sync_response saat partai dimuat", name)
+		}
+		p := m.Payload.(map[string]any)
+		if p["match_id"] != "match-1" || p["ruleset_name"] != "Uji" {
+			t.Errorf("%s: payload = %v", name, p["match_id"])
+		}
+	}
+}

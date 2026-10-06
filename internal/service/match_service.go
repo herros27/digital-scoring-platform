@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/herros27/digital-scoring/internal/consensus"
@@ -42,6 +43,35 @@ type MatchService struct {
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
+}
+
+// classLabel label kelas pertandingan, mis. "Kelas A Putri" (sama dengan konsol wasit).
+func classLabel(weightClass, gender string) string {
+	g := gender
+	switch strings.ToLower(gender) {
+	case "male", "putra":
+		g = "Putra"
+	case "female", "putri":
+		g = "Putri"
+	}
+	return strings.TrimSpace(fmt.Sprintf("Kelas %s %s", weightClass, g))
+}
+
+// ArenaContext nama gelanggang dan nama kejuaraannya (untuk layar scoreboard saat belum ada partai).
+func (s *MatchService) ArenaContext(arenaID string) (arenaName, competitionName string) {
+	if s.arenaStore == nil {
+		return "", ""
+	}
+	a, err := s.arenaStore.GetByID(arenaID)
+	if err != nil || a == nil {
+		return "", ""
+	}
+	if s.compRepo != nil {
+		if c, err := s.compRepo.GetByID(a.CompetitionID); err == nil && c != nil {
+			competitionName = c.Name
+		}
+	}
+	return a.Name, competitionName
 }
 
 // ArenaName mengembalikan nama gelanggang, atau "" bila tidak diketahui.
@@ -225,6 +255,8 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 		orch.SetRuntimeStore(s.runtimeStore)
 	}
 	s.activeOrchestrators[matchID] = orch
+	// beri tahu layar yang sudah tersambung (scoreboard, tablet, konsol) bahwa partai baru dimuat
+	orch.BroadcastSnapshot()
 	return nil
 }
 
@@ -432,9 +464,14 @@ func (s *MatchService) GetLiveSnapshot(arenaID string) (snapshot map[string]any,
 	snapshot["status"] = snapshot["state"]
 	snapshot["arena_name"] = s.ArenaName(arenaID)
 	if s.matchStore != nil {
-		if red, blue, err := s.matchStore.GetCornerNames(live.GetMatchID()); err == nil {
-			snapshot["red_athlete"] = red
-			snapshot["blue_athlete"] = blue
+		if info, err := s.matchStore.GetMatchInfo(live.GetMatchID()); err == nil {
+			snapshot["red_athlete"] = info.RedName
+			snapshot["blue_athlete"] = info.BlueName
+			snapshot["red_team"] = info.RedTeam
+			snapshot["blue_team"] = info.BlueTeam
+			snapshot["class_label"] = classLabel(info.WeightClass, info.Gender)
+			snapshot["competition_name"] = info.CompetitionName
+			snapshot["match_number"] = info.Number
 		}
 	}
 	return snapshot, true

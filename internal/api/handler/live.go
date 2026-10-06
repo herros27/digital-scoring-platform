@@ -34,7 +34,7 @@ func (h *LiveHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]string{"status": "no active match"}
 	if h.Matches != nil {
-		resp["arena_name"] = h.Matches.ArenaName(arenaID)
+		resp["arena_name"], resp["competition_name"] = h.Matches.ArenaContext(arenaID)
 	}
 	Ok(w, resp)
 }

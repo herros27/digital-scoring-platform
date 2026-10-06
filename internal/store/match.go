@@ -157,6 +157,42 @@ func (s *MatchStore) ListByCompetition(competitionID string) ([]Match, error) {
 	return list, err
 }
 
+// MatchInfo data tampilan sebuah partai untuk scoreboard publik.
+type MatchInfo struct {
+	RedName, BlueName   string
+	RedTeam, BlueTeam   string
+	WeightClass, Gender string
+	CompetitionName     string
+	// Number nomor urut partai pada antrean gelanggangnya (paling awal dibuat = 1)
+	Number int
+}
+
+// GetMatchInfo mengambil nama atlet, kontingen, kelas, nama kejuaraan, dan nomor partai.
+func (s *MatchStore) GetMatchInfo(matchID string) (MatchInfo, error) {
+	var info MatchInfo
+	var rn, bn, rt, bt, wc, g, cn sql.NullString
+	err := s.DB.QueryRow(`
+		SELECT ra.name, ba.name, ra.team, ba.team,
+		       COALESCE(rp.weight_class, bp.weight_class), COALESCE(rp.gender, bp.gender),
+		       c.name,
+		       (SELECT COUNT(*) FROM matches m2
+		         WHERE m2.competition_id = m.competition_id
+		           AND m2.arena_id IS NOT DISTINCT FROM m.arena_id
+		           AND (m2.created_at, m2.id) <= (m.created_at, m.id))
+		FROM matches m
+		JOIN competitions c ON c.id = m.competition_id
+		LEFT JOIN participants rp ON rp.id = m.athlete_red_id
+		LEFT JOIN athletes ra ON ra.id = rp.athlete_id
+		LEFT JOIN participants bp ON bp.id = m.athlete_blue_id
+		LEFT JOIN athletes ba ON ba.id = bp.athlete_id
+		WHERE m.id = $1`, matchID).Scan(&rn, &bn, &rt, &bt, &wc, &g, &cn, &info.Number)
+	info.RedName, info.BlueName = rn.String, bn.String
+	info.RedTeam, info.BlueTeam = rt.String, bt.String
+	info.WeightClass, info.Gender = wc.String, g.String
+	info.CompetitionName = cn.String
+	return info, err
+}
+
 // GetCornerNames mengambil nama atlet sudut merah dan biru untuk sebuah pertandingan.
 func (s *MatchStore) GetCornerNames(matchID string) (red, blue string, err error) {
 	var r, b sql.NullString

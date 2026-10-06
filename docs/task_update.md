@@ -235,6 +235,12 @@
     - Tablet juri menyusun tombol dua kolom bila teknik lebih dari 4 (semua tetap terlihat di 1280x800). Label teknik di log dan editor ruleset ikut.
     - Tes: `TestPresets_TiebreakOrderFollowsRegulation`, `TestTiebreak_CombinationsRankBetweenFallAndKnockdown`; browser `ruleset.mjs` (6 tombol, +1,+2,+3,+4,+3,+2).
 
+48. **Label Scoreboard dari Server** –
+    - `GET /live/scoreboard/{arena_id}` kini memuat `competition_name`, `class_label` (mis. "Kelas A Putri"), `red_team`, `blue_team`, dan `match_number` (urutan partai pada antrean gelanggang), selain nama atlet/gelanggang; saat belum ada partai tetap memuat `arena_name` dan `competition_name`. Query `MatchStore.GetMatchInfo`.
+    - Server menyiarkan `sync_response` ke semua klien gelanggang saat partai dimuat (`Orchestrator.BroadcastSnapshot`), sehingga scoreboard, tablet juri, dan konsol wasit yang sudah terbuka langsung menyesuaikan diri (nama atlet, ruleset, tampilan pemenang lama ditutup) tanpa reload.
+    - Scoreboard: judul kejuaraan, kelas "KELAS A PUTRI • TANDING", kontingen, "PARTAI #n", dan label ruleset tidak lagi tertanam.
+    - Tes: `TestBroadcastSnapshot_ReachesAllClientsWithMatchContext`, `TestClassLabel`; browser `scoreboard.mjs` 11/11.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

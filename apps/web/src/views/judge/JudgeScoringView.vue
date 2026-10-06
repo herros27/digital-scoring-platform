@@ -97,6 +97,8 @@ async function loadAthleteNames() {
   }
 }
 
+let syncedMatchId = ''
+
 // Haptics
 const haptics = useHaptics()
 
@@ -229,6 +231,11 @@ onMounted(() => {
   sendMessage('sync_request', {})
 
   onMessage('sync_response', (payload) => {
+    // partai baru dimuat ke gelanggang: muat ulang nama atlet
+    if (payload.match_id && payload.match_id !== syncedMatchId) {
+      syncedMatchId = payload.match_id
+      void loadAthleteNames()
+    }
     if (payload.techniques?.length) techniques.value = payload.techniques
     feedback.configure(payload.judge_count, payload.consensus?.majority)
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value

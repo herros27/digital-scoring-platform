@@ -12,12 +12,12 @@ const route = useRoute()
 const arenaId = computed(() => (route.params.arena_id as string) || 'gelanggang-1')
 
 // --- Match State ---
-const competitionTitle = ref('KEJUARAAN NASIONAL PENCAK SILAT 2025')
+const competitionTitle = ref('KEJUARAAN PENCAK SILAT')
 const tournamentSeries = ref('PENCAK SILAT DIGITAL SCORING')
 const arenaName = ref('GELANGGANG')
-const categoryName = ref('KATEGORI TANDING')
+const categoryName = ref('TANDING')
 const matchNumber = ref('')
-const rulesetLabel = ref('PERSILAT RULES')
+const rulesetLabel = ref('PENCAK SILAT DIGITAL SCORING')
 
 // Round & State
 const currentRound = ref(1)
@@ -114,26 +114,43 @@ function toggleFullscreen() {
 // --- Real-Time WebSocket Connection ---
 const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value)
 
-onMounted(async () => {
-  // Initialize timer to 01:41 (101 seconds) as depicted in Figma 01_arena_scoreboard.png
+const WAITING_NAME = 'MENUNGGU PERTANDINGAN'
+let loadedMatchId = ''
 
+/** Muat label tampilan (kejuaraan, gelanggang, kelas, atlet, kontingen, nomor partai) dari server. */
+async function loadLabels() {
   try {
     const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
     if (snapshot?.arena_name) arenaName.value = snapshot.arena_name.toUpperCase()
+    if (snapshot?.competition_name) competitionTitle.value = snapshot.competition_name.toUpperCase()
     if (snapshot && typeof snapshot === 'object' && snapshot.status !== 'no active match') {
       if (snapshot.round) currentRound.value = snapshot.round
-      if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete
-      if (snapshot.blue_athlete) blueAthlete.value.name = snapshot.blue_athlete
+      redAthlete.value = { name: snapshot.red_athlete || WAITING_NAME, team: snapshot.red_team ?? '', idTag: '' }
+      blueAthlete.value = { name: snapshot.blue_athlete || WAITING_NAME, team: snapshot.blue_team ?? '', idTag: '' }
+      categoryName.value = snapshot.class_label ? `${snapshot.class_label.toUpperCase()} • TANDING` : 'TANDING'
+      matchNumber.value = snapshot.match_number ? `PARTAI #${snapshot.match_number}` : ''
+      if (snapshot.ruleset_name) rulesetLabel.value = snapshot.ruleset_name.toUpperCase()
     }
   } catch {
     // Keep local baseline state
   }
+}
+
+onMounted(async () => {
+  await loadLabels()
 
   // Request sync from backend WebSocket hub
   sendMessage('sync_request', {})
 
   // Listen to WebSocket broadcasts
   onMessage('sync_response', (payload) => {
+    // partai baru dimuat ke gelanggang ini: tutup tampilan pemenang lama dan muat ulang label
+    if (payload.match_id && payload.match_id !== loadedMatchId) {
+      if (loadedMatchId) showWinnerModal.value = false
+      loadedMatchId = payload.match_id
+      void loadLabels()
+    }
+    if (payload.ruleset_name) rulesetLabel.value = payload.ruleset_name.toUpperCase()
     if (payload.medic_active !== undefined) medicActive.value = payload.medic_active
     if (payload.var_active !== undefined) varActive.value = payload.var_active
     if (payload.round) currentRound.value = payload.round
