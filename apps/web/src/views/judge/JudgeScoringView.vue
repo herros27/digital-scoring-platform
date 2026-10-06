@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { getErrorMessage } from '@/api/error'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
@@ -8,6 +7,7 @@ import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
+import { MAX_PIN_LENGTH, isCompletePin, pinLoginErrorMessage } from '@/features/auth/lib/pin'
 import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
@@ -73,11 +73,12 @@ const activeBtn = ref<string | null>(null)
 // PIN Modal State
 const showPinModal = ref(!authStore.isAuthenticated && route.query.demo !== 'true')
 const pinInput = ref('')
+const pinSlots = computed(() => (pinInput.value.length > 6 ? 8 : 6))
 const pinError = ref('')
 const pinLoading = ref(false)
 
 function handlePinNumber(num: number | string) {
-  if (pinInput.value.length < 6) {
+  if (pinInput.value.length < MAX_PIN_LENGTH) {
     pinInput.value += String(num)
   }
 }
@@ -88,29 +89,25 @@ function handlePinClear() {
 }
 
 async function handlePinSubmit() {
-  if (pinInput.value.length < 4) {
-    pinError.value = 'PIN minimal 4 - 6 digit'
+  if (!isCompletePin(pinInput.value)) {
+    pinError.value = 'PIN harus 6 digit (juri) atau 8 digit (wasit)'
     return
   }
   pinLoading.value = true
   pinError.value = ''
   try {
-    const res = await authService.judgeLogin({
-      competition_id: compId.value,
-      arena_id: arenaId.value,
-      pin: pinInput.value,
-    })
+    const res = await authService.judgeLogin({ pin: pinInput.value })
 
     authStore.setSession({
       token: res.token,
-      role: 'judge',
+      role: res.role || 'judge',
       seatNumber: res.seat_number,
       arenaId: res.arena_id,
       competitionId: res.competition_id,
     })
     showPinModal.value = false
   } catch (err) {
-    pinError.value = getErrorMessage(err, 'PIN salah atau gagal terhubung ke backend server')
+    pinError.value = pinLoginErrorMessage(err)
   } finally {
     pinLoading.value = false
   }
@@ -610,7 +607,7 @@ onMounted(() => {
         <!-- PIN Display Dots -->
         <div class="judge-pin-display font-mono">
           <span
-            v-for="i in 6"
+            v-for="i in pinSlots"
             :key="i"
             class="judge-pin-dot"
             :class="{ 'judge-pin-dot--filled': pinInput.length >= i }"
@@ -636,7 +633,7 @@ onMounted(() => {
           </button>
           <button
             class="numpad-btn numpad-btn--submit"
-            :disabled="pinLoading || pinInput.length < 4"
+            :disabled="pinLoading || !isCompletePin(pinInput)"
             @click="handlePinSubmit"
           >
             {{ pinLoading ? '...' : 'OK' }}

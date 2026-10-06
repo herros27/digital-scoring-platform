@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { isNotFoundError } from '@/api/error'
+import { formatPin, pinLengthForRole, validateCustomPin } from '@/features/auth/lib/pin'
 import { getErrorMessage } from '@/api/error'
 import { ref, computed, watch, onMounted } from 'vue'
 import { AppButton } from '@/components/ui'
@@ -128,14 +129,6 @@ export interface DeviceSeat {
 // Reactive store of seats per arena ID
 const arenaData = ref<Record<string, DeviceSeat[]>>({})
 const isLoadingPins = ref(false)
-
-function formatPin(raw: string): string {
-  const clean = (raw || '').replace(/\s+/g, '')
-  if (clean.length === 6) {
-    return `${clean.slice(0, 3)} ${clean.slice(3)}`
-  }
-  return clean || '------'
-}
 
 function formatExpiry(isoStr?: string): string {
   if (!isoStr) return '12 Jam Tersisa'
@@ -360,7 +353,16 @@ const customSeat = ref(1)
 const customPinInput = ref('')
 const customTtl = ref(12)
 
+const customPinLength = computed(() => pinLengthForRole(customRole.value))
+
 async function handleSaveCustomPin() {
+  if (customPinInput.value) {
+    const pinError = validateCustomPin(customRole.value, customPinInput.value)
+    if (pinError) {
+      showToast('PIN Tidak Valid', pinError, 'warning')
+      return
+    }
+  }
   const aid = getValidArenaId()
   if (!aid) {
     await refetchArenas()
@@ -669,12 +671,13 @@ async function handleSaveCustomPin() {
         </div>
 
         <div class="pin-form-group">
-          <label class="font-mono">NOMOR PIN (KOSONGKAN UNTUK ACAK 6-DIGIT)</label>
+          <label class="font-mono">NOMOR PIN (KOSONGKAN UNTUK ACAK {{ customPinLength }}-DIGIT)</label>
           <input
             v-model="customPinInput"
             type="text"
-            maxlength="10"
-            placeholder="Contoh: 839102"
+            :maxlength="customPinLength"
+            inputmode="numeric"
+            :placeholder="customPinLength === 8 ? 'Contoh: 71840293' : 'Contoh: 839102'"
             class="pin-form-input font-mono"
           >
         </div>

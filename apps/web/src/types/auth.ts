@@ -1,7 +1,6 @@
 // ponytail: auth request/response types mirroring Go backend endpoints in internal/api/handler/auth.go, official.go, contingent.go
+/** Login hanya dengan PIN; turnamen, gelanggang, role, dan kursi ditentukan server. */
 export interface JudgeLoginRequest {
-  competition_id: string
-  arena_id: string
   pin: string
 }
 

@@ -6,9 +6,7 @@ export const loginSchema = z.object({
 })
 
 export const judgeLoginSchema = z.object({
-  competition_id: z.string().min(1, 'ID Kompetisi tidak valid'),
-  arena_id: z.string().min(1, 'ID Arena tidak valid'),
-  pin: z.string().min(4, 'PIN minimal 4 digit').max(6, 'PIN maksimal 6 digit'),
+  pin: z.string().regex(/^(\d{6}|\d{8})$/, 'PIN harus 6 digit (juri) atau 8 digit (wasit)'),
 })
 
 export const contingentRegisterSchema = z.object({

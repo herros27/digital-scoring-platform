@@ -108,11 +108,7 @@ async function runSimulation() {
     )
 
     // Login Judge using PIN
-    const judgeLogin = await postJson('/api/v1/auth/judge-login', {
-      competition_id: comp.id,
-      arena_id: arena.id,
-      pin,
-    })
+    const judgeLogin = await postJson('/api/v1/auth/judge-login', { pin })
     judges.push({
       seat,
       token: judgeLogin.data.token,
@@ -150,15 +146,31 @@ async function runSimulation() {
   // Wasit login via PIN (alur aplikasi: token terikat arena, role "wasit")
   await postJson(
     '/api/v1/auth/create-pin',
-    { competition_id: comp.id, arena_id: arena.id, role: 'wasit', seat_number: 0, pin: '999000', ttl_hours: 12 },
+    { competition_id: comp.id, arena_id: arena.id, role: 'wasit', seat_number: 0, pin: '99900000', ttl_hours: 12 },
     authHeaders
   )
-  const wasitLogin = await postJson('/api/v1/auth/judge-login', {
-    competition_id: comp.id,
-    arena_id: arena.id,
-    pin: '999000',
-  })
+  // Login hanya dengan PIN: server menentukan turnamen, gelanggang, role, dan kursi
+  const wasitLogin = await postJson('/api/v1/auth/judge-login', { pin: '99900000' })
+  check('Login PIN menentukan arena dari PIN', wasitLogin.data.arena_id === arena.id && wasitLogin.data.competition_id === comp.id)
   const wasitToken = wasitLogin.data.token
+  const wrong = await fetch(`${BASE_HTTP}/api/v1/auth/judge-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: '00000000' }),
+  })
+  check('PIN salah ditolak 401', wrong.status === 401, String(wrong.status))
+  const malformed = await fetch(`${BASE_HTTP}/api/v1/auth/judge-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: '123' }),
+  })
+  check('PIN berformat salah ditolak 400', malformed.status === 400, String(malformed.status))
+  const taken = await fetch(`${BASE_HTTP}/api/v1/auth/create-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify({ competition_id: comp.id, arena_id: arena.id, role: 'juri', seat_number: 4, pin: '999001', ttl_hours: 1 }),
+  })
+  check('PIN kustom yang bentrok ditolak 409', taken.status === 409, String(taken.status))
   check('Login PIN wasit mengembalikan role "wasit"', wasitLogin.data.role === 'wasit', wasitLogin.data.role)
 
   // A. Scoreboard TV: publik, tanpa token
