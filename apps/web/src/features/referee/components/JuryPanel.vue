@@ -6,13 +6,15 @@ import { formatClock, SCORE_TYPE_LABEL, TARGET_LABEL } from '../lib/matchLog'
 const props = defineProps<{ c: RefereeConsole }>()
 defineEmits<{ goto: [tab: string] }>()
 
-/** Konsensus butuh minimal 3 juri online (2 dari 3 sepakat dalam jendela waktu). */
-const MIN_JUDGES = 3
-
-const judges = computed(() => props.c.presence?.judges ?? [])
+// hanya kursi sesuai format juri ruleset (3 atau 5) yang ditampilkan
+const judges = computed(() =>
+  (props.c.presence?.judges ?? []).filter((j) => j.seat <= props.c.judgeCount),
+)
 const online = computed(() => judges.value.filter((j) => j.connected))
 const missing = computed(() => judges.value.filter((j) => !j.connected).map((j) => j.seat))
-const ready = computed(() => online.value.length >= MIN_JUDGES)
+// siap bila seluruh kursi sesuai format juri ruleset sudah online
+const minJudges = computed(() => props.c.judgeCount)
+const ready = computed(() => online.value.length >= minJudges.value)
 
 function lastInputText(seat: number): string {
   const j = judges.value.find((x) => x.seat === seat)
@@ -36,7 +38,7 @@ function lastInputText(seat: number): string {
     <template v-else>
       <section class="ref-card ref-section">
         <div class="ref-card__head font-mono">
-          <span>VERIFIKASI JURI 1-5</span>
+          <span>VERIFIKASI JURI 1-{{ c.judgeCount }}</span>
           <span :class="ready ? 'ref-seat-state--online' : ''" class="ref-seat-state">
             <span class="ref-dot" :class="{ 'ref-dot--online': ready }" />
             {{ online.length }} dari {{ judges.length }} kursi online
@@ -47,11 +49,11 @@ function lastInputText(seat: number): string {
             >Semua juri online. Siap memulai pertandingan.</template
           >
           <template v-else-if="ready"
-            >Juri online cukup untuk konsensus (minimal {{ MIN_JUDGES }}). Belum terhubung: kursi
+            >Juri online cukup untuk konsensus (minimal {{ minJudges }}). Belum terhubung: kursi
             {{ missing.join(', ') }}.</template
           >
           <template v-else
-            >Menunggu juri: konsensus butuh minimal {{ MIN_JUDGES }} juri online. Belum terhubung:
+            >Menunggu juri: konsensus butuh minimal {{ minJudges }} juri online. Belum terhubung:
             kursi {{ missing.join(', ') }}.</template
           >
         </p>

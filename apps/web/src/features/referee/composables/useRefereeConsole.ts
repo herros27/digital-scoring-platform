@@ -6,12 +6,14 @@ import {
   type WsMatchOutcome,
   type WsPenaltyEntry,
   type WsPenaltyKind,
+  type WsTechniqueKind,
   type WsPresence,
   type WsRoundScore,
   type WsSyncResponse,
   type WsTarget,
 } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
+import { DEFAULT_TECHNIQUES } from '@/composables/techniques'
 import { playGong } from '@/composables/useGong'
 import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { arenaService } from '@/features/arena/api/arenaService'
@@ -75,6 +77,8 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const roundScores = ref<WsRoundScore[]>(emptyRounds())
   const penalties = ref<WsPenaltyEntry[]>([])
   const penaltyCatalog = ref<WsPenaltyKind[]>([])
+  const techniqueCatalog = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
+  const judgeCount = ref(3)
   const medicActive = ref(false)
   const varActive = ref(false)
   const presence = ref<WsPresence | null>(null)
@@ -115,7 +119,12 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const logEntries = computed<LogEntry[]>(() =>
     events.value.map(toLogEntry).filter((e): e is LogEntry => e !== null),
   )
-  const techniques = computed(() => countTechniques(events.value))
+  const techniques = computed(() =>
+    countTechniques(
+      events.value,
+      techniqueCatalog.value.map((t) => t.type),
+    ),
+  )
   const queue = computed(() =>
     buildQueue(queueMatches.value, competitors.value, activeMatchId.value),
   )
@@ -165,6 +174,8 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     if (s.scores) roundScores.value = s.scores.map((r) => ({ ...r }))
     if (s.penalties) penalties.value = s.penalties
     if (s.penalty_catalog) penaltyCatalog.value = s.penalty_catalog
+    if (s.techniques?.length) techniqueCatalog.value = s.techniques
+    if (s.judge_count) judgeCount.value = s.judge_count
     if (s.medic_active !== undefined) medicActive.value = s.medic_active
     if (s.var_active !== undefined) varActive.value = s.var_active
     if (s.presence) presence.value = s.presence
@@ -256,7 +267,11 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     status.value = matchStatusFromState(p.state, p.timer_running) ?? status.value
     tiePending.value = p.tie_pending ?? false
     if (p.timer_remaining_ms !== undefined)
-      timer.sync(p.timer_remaining_ms, p.timer_running ?? status.value === 'running', p.timer_ends_at_ms)
+      timer.sync(
+        p.timer_remaining_ms,
+        p.timer_running ?? status.value === 'running',
+        p.timer_ends_at_ms,
+      )
     if (status.value === 'finished') timer.pause()
   })
 
@@ -459,6 +474,8 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     blueTotal,
     penalties,
     penaltyCatalog,
+    techniqueCatalog,
+    judgeCount,
     medicActive,
     varActive,
     presence,

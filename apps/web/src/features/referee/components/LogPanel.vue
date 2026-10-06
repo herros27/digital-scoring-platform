@@ -93,17 +93,9 @@ const rounds = computed(() =>
               SUDUT {{ TARGET_LABEL[t] }}
             </div>
             <div class="ref-tech-grid font-mono">
-              <div class="ref-tech-cell">
-                <strong>{{ c.techniques[t].pukulan }}</strong
-                ><span>Pukulan</span>
-              </div>
-              <div class="ref-tech-cell">
-                <strong>{{ c.techniques[t].tendangan }}</strong
-                ><span>Tendangan</span>
-              </div>
-              <div class="ref-tech-cell">
-                <strong>{{ c.techniques[t].jatuhan }}</strong
-                ><span>Jatuhan</span>
+              <div v-for="k in c.techniqueCatalog" :key="k.type" class="ref-tech-cell">
+                <strong>{{ c.techniques[t].byType[k.type] ?? 0 }}</strong
+                ><span>{{ k.label }}</span>
               </div>
               <div class="ref-tech-cell">
                 <strong>{{ c.techniques[t].total }}</strong

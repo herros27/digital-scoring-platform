@@ -20,6 +20,22 @@ export interface WsPenaltyKind {
   type: string
   label: string
   points: number
+  /** `disqualify`: menjatuhkan sanksi ini langsung mendiskualifikasi sudut yang dikenai */
+  action?: string
+}
+
+/** Satu jenis teknik yang dapat dinilai juri, dari ruleset pertandingan (`type` = `score_type`). */
+export interface WsTechniqueKind {
+  type: string
+  label: string
+  points: number
+}
+
+/** Aturan konsensus juri dari ruleset. */
+export interface WsConsensusRule {
+  judges: number
+  majority: number
+  window_ms: number
 }
 
 /** Sanksi yang sudah dijatuhkan pada pertandingan berjalan. */
@@ -95,6 +111,9 @@ export interface WsSyncResponse {
   total_rounds?: number
   penalties?: WsPenaltyEntry[]
   penalty_catalog?: WsPenaltyKind[]
+  techniques?: WsTechniqueKind[]
+  judge_count?: number
+  consensus?: WsConsensusRule
   medic_active?: boolean
   var_active?: boolean
   presence?: WsPresence

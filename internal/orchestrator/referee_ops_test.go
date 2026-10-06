@@ -21,10 +21,14 @@ type testRig struct {
 
 func newRig(t *testing.T) *testRig {
 	t.Helper()
-	h := hub.NewHub("arena-1")
-	rs := &rules.Ruleset{Name: "Uji", Scoring: rules.ScoringRule{
+	return newRigWith(t, &rules.Ruleset{Name: "Uji", Scoring: rules.ScoringRule{
 		TechniquePoints: 1, KnockdownPoints: 2, FallPoints: 3, RoundDuration: 120, BreakDuration: 60, TotalRounds: 3,
-	}}
+	}})
+}
+
+func newRigWith(t *testing.T, rs *rules.Ruleset) *testRig {
+	t.Helper()
+	h := hub.NewHub("arena-1")
 	o := New("match-1", "arena-1", statemachine.New("match-1"), rs, h, nil, nil, nil, nil)
 
 	r := &testRig{o: o, h: h}
@@ -110,7 +114,7 @@ func TestPenalty_AppliedFromCatalogAndReflectedInSnapshot(t *testing.T) {
 	if find(drain(r.tvCh), hub.MsgPenaltyUpdate) == nil {
 		t.Error("scoreboard harus menerima daftar sanksi")
 	}
-	if len(snap["penalty_catalog"].([]penaltyKind)) != len(penaltyCatalog) {
+	if len(snap["penalty_catalog"].([]rules.PenaltyRule)) != len(rules.DefaultPenalties()) {
 		t.Error("katalog sanksi harus ada pada snapshot")
 	}
 }

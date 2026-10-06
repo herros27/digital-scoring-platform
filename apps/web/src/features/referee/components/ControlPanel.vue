@@ -170,9 +170,10 @@ function askCancel() {
             </div>
           </div>
           <div class="ref-tech-summary font-mono">
-            Pukulan: <strong>{{ red.tech.pukulan }}</strong> &bull; Tendangan:
-            <strong>{{ red.tech.tendangan }}</strong> &bull; Jatuhan:
-            <strong>{{ red.tech.jatuhan }}</strong>
+            <template v-for="(t, i) in c.techniqueCatalog" :key="t.type">
+              <template v-if="i"> &bull; </template>{{ t.label }}:
+              <strong>{{ red.tech.byType[t.type] ?? 0 }}</strong>
+            </template>
           </div>
         </div>
 
@@ -247,9 +248,10 @@ function askCancel() {
             </div>
           </div>
           <div class="ref-tech-summary font-mono">
-            Pukulan: <strong>{{ blue.tech.pukulan }}</strong> &bull; Tendangan:
-            <strong>{{ blue.tech.tendangan }}</strong> &bull; Jatuhan:
-            <strong>{{ blue.tech.jatuhan }}</strong>
+            <template v-for="(t, i) in c.techniqueCatalog" :key="t.type">
+              <template v-if="i"> &bull; </template>{{ t.label }}:
+              <strong>{{ blue.tech.byType[t.type] ?? 0 }}</strong>
+            </template>
           </div>
         </div>
       </section>

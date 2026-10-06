@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -40,8 +41,8 @@ func (s *RulesetService) CreateRuleset(input CreateRulesetInput) (*domain.Rulese
 	if input.Name == "" || input.Version == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	if input.Scoring.RoundDuration <= 0 || input.Scoring.TotalRounds <= 0 {
-		return nil, errors.New("round_duration and total_rounds must be greater than 0")
+	if err := input.Scoring.Validate(); err != nil {
+		return nil, fmt.Errorf("%w: %s", domain.ErrInvalidInput, err)
 	}
 	status := input.Status
 	if status == "" {
@@ -72,8 +73,8 @@ func (s *RulesetService) UpdateRuleset(id string, input CreateRulesetInput) (*do
 	if id == "" || input.Name == "" || input.Version == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	if input.Scoring.RoundDuration <= 0 || input.Scoring.TotalRounds <= 0 {
-		return nil, errors.New("round_duration and total_rounds must be greater than 0")
+	if err := input.Scoring.Validate(); err != nil {
+		return nil, fmt.Errorf("%w: %s", domain.ErrInvalidInput, err)
 	}
 	status := input.Status
 	if status == "" {

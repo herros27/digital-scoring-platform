@@ -3,6 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
+import { DEFAULT_TECHNIQUES } from '@/composables/techniques'
+import type { WsTechniqueKind } from '@/composables/useWebSocket'
 import { MATCH_STATUS_LABEL, matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
@@ -45,6 +47,16 @@ const matchStatus = ref<MatchStatus>('idle')
 const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
 // Skor ditolak server saat istirahat; tombol dikunci agar juri tidak mengira input tercatat.
 const isBreak = computed(() => matchStatus.value === 'break')
+
+// Daftar tombol teknik mengikuti ruleset pertandingan yang dimuat (nilai poin dari server)
+const techniques = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
+const TECHNIQUE_HINT: Record<string, string> = {
+  technique: 'SERANGAN TANGAN SAH',
+  knockdown: 'SERANGAN KAKI SAH',
+  fall: 'TEKNIK BANTINGAN / SAPUAN',
+  catch_fall: 'TANGKAPAN LALU JATUHKAN',
+}
+const techniqueHint = (type: string) => TECHNIQUE_HINT[type] ?? 'TEKNIK SAH'
 const latencyMs = ref(12)
 
 const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
@@ -140,7 +152,7 @@ async function handleJudgeLogout() {
   router.push('/judge/login')
 }
 
-function handleScoreTap(target: 'red' | 'blue', technique: 'technique' | 'knockdown' | 'fall', points: number, label: string) {
+function handleScoreTap(target: 'red' | 'blue', technique: string, points: number, label: string) {
   // 1. Tactile feedback
   haptics.trigger(50)
 
@@ -210,6 +222,7 @@ onMounted(() => {
   sendMessage('sync_request', {})
 
   onMessage('sync_response', (payload) => {
+    if (payload.techniques?.length) techniques.value = payload.techniques
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
@@ -369,73 +382,41 @@ onMounted(() => {
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Red -->
         <div class="judge-buttons-list">
-          <!-- PUKULAN (+1) -->
           <button
+            v-for="tech in techniques"
+            :key="tech.type"
             class="judge-btn judge-btn--red"
-            :class="{ 'judge-btn--active': activeBtn === 'red-technique' }"
+            :class="{ 'judge-btn--active': activeBtn === 'red-' + tech.type }"
             :disabled="isBreak"
-            @click="handleScoreTap('red', 'technique', 1, 'PUKULAN')"
+            @click="handleScoreTap('red', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
-              <!-- Glove Icon -->
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
-                <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                <template v-if="tech.type === 'technique'">
+                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+                  <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                </template>
+                <template v-else-if="tech.type === 'knockdown'">
+                  <circle cx="16" cy="4" r="2" />
+                  <path d="m14 7-3 4-4-1" />
+                  <path d="m11 11 3 5 4-1" />
+                  <path d="m5 17 5-2" />
+                </template>
+                <template v-else>
+                  <circle cx="7" cy="5" r="2" />
+                  <path d="M5 9h6l4 5" />
+                  <path d="M6 14l2 5" />
+                  <path d="M12 17l6 2" />
+                </template>
               </svg>
             </div>
             <div class="judge-btn__label-group">
-              <span class="judge-btn__title">PUKULAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN TANGAN SAH</span>
+              <span class="judge-btn__title">{{ tech.label.toUpperCase() }}</span>
+              <span class="judge-btn__subtitle font-mono">{{ techniqueHint(tech.type) }}</span>
             </div>
-            <div class="judge-btn__pts font-mono">+1</div>
-          </button>
-
-          <!-- TENDANGAN (+2) -->
-          <button
-            class="judge-btn judge-btn--red"
-            :class="{ 'judge-btn--active': activeBtn === 'red-knockdown' }"
-            :disabled="isBreak"
-            @click="handleScoreTap('red', 'knockdown', 2, 'TENDANGAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Martial Arts Leg/Kick Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="16" cy="4" r="2" />
-                <path d="m14 7-3 4-4-1" />
-                <path d="m11 11 3 5 4-1" />
-                <path d="m5 17 5-2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">TENDANGAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN KAKI SAH</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+2</div>
-          </button>
-
-          <!-- JATUHAN (+3) -->
-          <button
-            class="judge-btn judge-btn--red"
-            :class="{ 'judge-btn--active': activeBtn === 'red-fall' }"
-            :disabled="isBreak"
-            @click="handleScoreTap('red', 'fall', 3, 'JATUHAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Takedown/Sweep Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="7" cy="5" r="2" />
-                <path d="M5 9h6l4 5" />
-                <path d="M6 14l2 5" />
-                <path d="M12 17l6 2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">JATUHAN</span>
-              <span class="judge-btn__subtitle font-mono">TEKNIK BANTINGAN / SAPUAN</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+3</div>
+            <div class="judge-btn__pts font-mono">+{{ tech.points }}</div>
           </button>
         </div>
 
@@ -491,73 +472,41 @@ onMounted(() => {
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Blue -->
         <div class="judge-buttons-list">
-          <!-- PUKULAN (+1) -->
           <button
+            v-for="tech in techniques"
+            :key="tech.type"
             class="judge-btn judge-btn--blue"
-            :class="{ 'judge-btn--active': activeBtn === 'blue-technique' }"
+            :class="{ 'judge-btn--active': activeBtn === 'blue-' + tech.type }"
             :disabled="isBreak"
-            @click="handleScoreTap('blue', 'technique', 1, 'PUKULAN')"
+            @click="handleScoreTap('blue', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
-              <!-- Glove Icon -->
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
-                <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                <template v-if="tech.type === 'technique'">
+                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+                  <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                </template>
+                <template v-else-if="tech.type === 'knockdown'">
+                  <circle cx="16" cy="4" r="2" />
+                  <path d="m14 7-3 4-4-1" />
+                  <path d="m11 11 3 5 4-1" />
+                  <path d="m5 17 5-2" />
+                </template>
+                <template v-else>
+                  <circle cx="7" cy="5" r="2" />
+                  <path d="M5 9h6l4 5" />
+                  <path d="M6 14l2 5" />
+                  <path d="M12 17l6 2" />
+                </template>
               </svg>
             </div>
             <div class="judge-btn__label-group">
-              <span class="judge-btn__title">PUKULAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN TANGAN SAH</span>
+              <span class="judge-btn__title">{{ tech.label.toUpperCase() }}</span>
+              <span class="judge-btn__subtitle font-mono">{{ techniqueHint(tech.type) }}</span>
             </div>
-            <div class="judge-btn__pts font-mono">+1</div>
-          </button>
-
-          <!-- TENDANGAN (+2) -->
-          <button
-            class="judge-btn judge-btn--blue"
-            :class="{ 'judge-btn--active': activeBtn === 'blue-knockdown' }"
-            :disabled="isBreak"
-            @click="handleScoreTap('blue', 'knockdown', 2, 'TENDANGAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Kicking Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="16" cy="4" r="2" />
-                <path d="m14 7-3 4-4-1" />
-                <path d="m11 11 3 5 4-1" />
-                <path d="m5 17 5-2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">TENDANGAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN KAKI SAH</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+2</div>
-          </button>
-
-          <!-- JATUHAN (+3) -->
-          <button
-            class="judge-btn judge-btn--blue"
-            :class="{ 'judge-btn--active': activeBtn === 'blue-fall' }"
-            :disabled="isBreak"
-            @click="handleScoreTap('blue', 'fall', 3, 'JATUHAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Takedown Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="7" cy="5" r="2" />
-                <path d="M5 9h6l4 5" />
-                <path d="M6 14l2 5" />
-                <path d="M12 17l6 2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">JATUHAN</span>
-              <span class="judge-btn__subtitle font-mono">TEKNIK BANTINGAN / SAPUAN</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+3</div>
+            <div class="judge-btn__pts font-mono">+{{ tech.points }}</div>
           </button>
         </div>
 
@@ -1034,7 +983,7 @@ onMounted(() => {
   overflow: hidden;
   transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
   user-select: none;
-  min-height: 100px;
+  min-height: 80px;
 }
 
 /* Touch active tactile bevel */

@@ -23,6 +23,24 @@ const sides = computed(() =>
 
 const history = computed(() => [...props.c.penalties].reverse())
 
+function askPenalty(
+  target: WsTarget,
+  name: string,
+  kind: { type: string; label: string; action?: string },
+) {
+  if (kind.action !== 'disqualify') {
+    props.c.applyPenalty(target, kind.type)
+    return
+  }
+  emit('confirm', {
+    title: `${kind.label} — Diskualifikasi Sudut ${TARGET_LABEL[target]}?`,
+    message: `${name} langsung didiskualifikasi dan pertandingan berakhir dengan kemenangan sudut lawan. Tindakan ini tidak dapat dibatalkan.`,
+    confirmLabel: 'Jatuhkan Sanksi',
+    danger: true,
+    action: () => props.c.applyPenalty(target, kind.type),
+  })
+}
+
 function askDisqualify(target: WsTarget, name: string) {
   emit('confirm', {
     title: `Diskualifikasi Sudut ${TARGET_LABEL[target]}?`,
@@ -72,11 +90,20 @@ function askDisqualify(target: WsTarget, name: string) {
               class="ref-sanc-btn"
               :class="{ 'ref-sanc-btn--active': hasPenalty(c.penalties, s.target, k.type) }"
               :disabled="!c.canPenalize || hasPenalty(c.penalties, s.target, k.type)"
-              @click="c.applyPenalty(s.target, k.type)"
+              @click="askPenalty(s.target, s.name, k)"
             >
               <span>{{ hasPenalty(c.penalties, s.target, k.type) ? '✓' : '•' }} {{ k.label }}</span>
-              <strong class="ref-sanc-pts" :class="{ 'ref-sanc-pts--warn': k.points >= 5 }">
-                {{ k.points ? `-${k.points} POIN` : 'TANPA POTONGAN' }}
+              <strong
+                class="ref-sanc-pts"
+                :class="{ 'ref-sanc-pts--warn': k.points >= 5 || k.action === 'disqualify' }"
+              >
+                {{
+                  k.action === 'disqualify'
+                    ? 'DISKUALIFIKASI'
+                    : k.points
+                      ? `-${k.points} POIN`
+                      : 'TANPA POTONGAN'
+                }}
               </strong>
             </button>
 

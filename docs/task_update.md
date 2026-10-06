@@ -188,6 +188,14 @@
     - Log kejadian lama tetap di tabel `match_events` untuk audit; kejadian `match_rescheduled` menjadi batas, dan `GET .../events` hanya mengembalikan kejadian sejak batas itu.
     - Frontend: tombol "Jadwalkan Ulang" pada baris BATAL di antrean wasit dan banner "PARTAI DIBATALKAN" di Kontrol Tanding.
 
+41. **Ruleset Memuat Sanksi, Teknik, dan Konsensus (Regulasi Dapat Dikustomisasi)** –
+    - `scoring` ruleset kini punya bagian opsional `techniques`, `penalties`, `consensus` (`internal/rules`); kosong = nilai turunan/bawaan sehingga ruleset lama tetap jalan. Validasi pada `POST/PUT /rulesets`.
+    - Server membaca semuanya dari ruleset aktif: nilai teknik (`pointsFor`), katalog sanksi, engine konsensus (`NewEngineWith(window, majority)`); `score_type` di luar ruleset (selain `undo`) ditolak `BAD_PAYLOAD`. Sanksi ber-`action: disqualify` (Peringatan III) langsung mengakhiri partai dengan kemenangan lawan.
+    - Bawaan/preset: Teguran II = -2 (sebelumnya -1), Peringatan III = diskualifikasi, tombol baru Tangkapan + Jatuhan (1+3 = 4), konsensus 2 dari 3 juri dalam 3 detik. Migrasi `019` melengkapi preset `IPSI 2024` dan `PERSILAT International` yang sudah ada di database.
+    - Snapshot `sync_response` menambah `techniques`, `judge_count`, `consensus`. Frontend: tombol tablet juri dan ringkasan teknik mengikuti ruleset, panel Verifikasi Juri menampilkan 3 atau 5 kursi, Peringatan III meminta konfirmasi diskualifikasi.
+    - Tes: `internal/rules/ruleset_test.go`, `internal/orchestrator/ruleset_test.go`, `TestConsensusEngine_ConfigurableMajorityAndWindow`; e2e 51 pemeriksaan; browser wasit 50/50 dan juri (4 tombol, konsensus Tangkapan + Jatuhan = 4).
+    - Belum: tiebreak resmi otomatis, tombol KO/TKO/WO/undur diri, editor ruleset di frontend (langkah 3-5).
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

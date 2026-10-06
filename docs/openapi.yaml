@@ -1756,6 +1756,42 @@ paths:
                     total_rounds:
                       type: integer
                       example: 3
+                    techniques:
+                      type: array
+                      description: |
+                        Teknik yang dinilai juri (`type` = `score_type` pada `judge_input`). Kosong = diturunkan dari
+                        `technique_points`/`knockdown_points`/`fall_points` (Pukulan, Tendangan, Jatuhan).
+                        Kode `undo` dan `penalty` dicadangkan sistem.
+                      items:
+                        type: object
+                        required: [type, label, points]
+                        properties:
+                          type: { type: string, example: catch_fall, description: "huruf kecil/angka/underscore" }
+                          label: { type: string, example: "Tangkapan + Jatuhan" }
+                          points: { type: integer, minimum: 1, example: 4 }
+                    penalties:
+                      type: array
+                      description: |
+                        Tabel sanksi. Kosong = bawaan: Binaan 1-2 (0), Teguran 1 (-1), Teguran 2 (-2),
+                        Peringatan 1 (-5), Peringatan 2 (-10), Peringatan 3 (diskualifikasi).
+                      items:
+                        type: object
+                        required: [type, label]
+                        properties:
+                          type: { type: string, example: teguran_2 }
+                          label: { type: string, example: "Teguran 2" }
+                          points: { type: integer, minimum: 0, example: 2, description: "Potongan nilai bagi sudut yang dikenai" }
+                          action:
+                            type: string
+                            enum: [disqualify]
+                            description: "`disqualify` = sanksi ini langsung mendiskualifikasi sudut yang dikenai"
+                    consensus:
+                      type: object
+                      description: Aturan kesepakatan juri. Kosong = 3 juri, mayoritas 2, window 3000 ms.
+                      properties:
+                        judges: { type: integer, minimum: 1, maximum: 5, example: 3 }
+                        majority: { type: integer, minimum: 1, example: 2, description: "Jumlah juri yang harus sepakat (<= judges)" }
+                        window_ms: { type: integer, minimum: 500, maximum: 10000, example: 3000 }
                 status:
                   type: string
                   example: "active"

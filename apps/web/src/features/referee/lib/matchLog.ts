@@ -17,6 +17,7 @@ export const SCORE_TYPE_LABEL: Record<string, string> = {
   technique: 'Pukulan',
   knockdown: 'Tendangan',
   fall: 'Jatuhan',
+  catch_fall: 'Tangkapan + Jatuhan',
 }
 
 export const TARGET_LABEL: Record<string, string> = { red: 'MERAH', blue: 'BIRU' }
@@ -201,17 +202,20 @@ export function toLogEntry(ev: RawMatchEvent | WsMatchEvent): LogEntry | null {
 }
 
 export interface TechniqueCounts {
-  pukulan: number
-  tendangan: number
-  jatuhan: number
+  /** jumlah poin sah per kode teknik (`score_type`) */
+  byType: Record<string, number>
   total: number
 }
 
-const emptyCounts = (): TechniqueCounts => ({ pukulan: 0, tendangan: 0, jatuhan: 0, total: 0 })
+const emptyCounts = (): TechniqueCounts => ({ byType: {}, total: 0 })
 
-/** Hitung poin sah per teknik dari kejadian `score_confirmed` (satu kejadian = satu poin sah). */
+/**
+ * Hitung poin sah per teknik dari kejadian `score_confirmed` (satu kejadian = satu poin sah).
+ * `known` (kode teknik ruleset) membatasi yang dihitung; tanpa itu semua jenis yang berpoin dihitung.
+ */
 export function countTechniques(
   events: Array<Pick<RawMatchEvent, 'event_type' | 'payload'>>,
+  known?: string[],
 ): Record<WsTarget, TechniqueCounts> {
   const out: Record<WsTarget, TechniqueCounts> = { red: emptyCounts(), blue: emptyCounts() }
   for (const ev of events) {
@@ -220,10 +224,9 @@ export function countTechniques(
     const target = asTarget(p.target)
     if (!target) continue
     const type = asString(p.score_type)
-    if (type === 'technique') out[target].pukulan++
-    else if (type === 'knockdown') out[target].tendangan++
-    else if (type === 'fall') out[target].jatuhan++
-    else continue
+    if (!type || type === 'undo') continue
+    if (known ? !known.includes(type) : !(type in SCORE_TYPE_LABEL)) continue
+    out[target].byType[type] = (out[target].byType[type] ?? 0) + 1
     out[target].total++
   }
   return out

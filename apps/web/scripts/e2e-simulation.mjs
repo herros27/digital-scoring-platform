@@ -309,8 +309,15 @@ async function runSimulation() {
     }, 50)
   })
   check('sync_response memuat katalog sanksi, sanksi aktif, dan info ruleset',
-    sync.penalty_catalog?.length === 6 && sync.penalties?.length === 1 && sync.round_duration_ms === 120000 && sync.total_rounds === 3,
+    sync.penalty_catalog?.length === 7 && sync.penalties?.length === 1 && sync.round_duration_ms === 120000 && sync.total_rounds === 3,
     JSON.stringify({ cat: sync.penalty_catalog?.length, pen: sync.penalties?.length, dur: sync.round_duration_ms }))
+  const kinds = Object.fromEntries((sync.penalty_catalog ?? []).map((k) => [k.type, k]))
+  check('Katalog: Teguran II = -2, Peringatan III = diskualifikasi',
+    kinds.teguran_2?.points === 2 && kinds.peringatan_3?.action === 'disqualify', JSON.stringify(kinds.teguran_2) + JSON.stringify(kinds.peringatan_3))
+  check('sync_response memuat teknik ruleset (termasuk Tangkapan + Jatuhan = 4), jumlah juri, dan konsensus',
+    ['technique', 'knockdown', 'fall', 'catch_fall'].every((t) => sync.techniques?.some((x) => x.type === t)) &&
+      sync.techniques.find((x) => x.type === 'catch_fall')?.points === 4 && sync.judge_count === 3 && sync.consensus?.majority === 2,
+    JSON.stringify({ tech: sync.techniques, judges: sync.judge_count, c: sync.consensus }))
 
   const queueRes = await getJson(`/api/v1/competitions/${comp.id}/matches?arena_id=${arena.id}&limit=100`, authHeaders)
   check('Antrean per gelanggang: semua partai berada di arena ini', queueRes.data.length >= 1 && queueRes.data.every((m) => m.arena_id === arena.id), String(queueRes.data.length))

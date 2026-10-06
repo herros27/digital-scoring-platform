@@ -364,6 +364,26 @@ habis dengan skor seri, pertandingan menunggu keputusan wasit (`tie_pending`). D
 ```
 Simpan di `rulesets/{name}.json` atau buat langsung via REST API `POST /api/v1/rulesets` (tersimpan di database PostgreSQL).
 
+### Sanksi, teknik, dan konsensus per ruleset
+Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikosongkan, server memakai nilai turunan/bawaan sehingga ruleset lama tetap berjalan:
+
+```json
+"techniques": [
+  {"type": "technique",  "label": "Pukulan",             "points": 1},
+  {"type": "catch_fall", "label": "Tangkapan + Jatuhan", "points": 4}
+],
+"penalties": [
+  {"type": "teguran_2",    "label": "Teguran 2",    "points": 2},
+  {"type": "peringatan_3", "label": "Peringatan 3", "points": 0, "action": "disqualify"}
+],
+"consensus": {"judges": 3, "majority": 2, "window_ms": 3000}
+```
+- **`techniques`**: tombol di tablet juri dan nilainya. `type` adalah `score_type` yang dikirim juri; jenis di luar daftar (selain `undo`) ditolak.
+- **`penalties`**: katalog sanksi konsol wasit. `points` = potongan nilai; `action: "disqualify"` membuat sanksi itu langsung mendiskualifikasi sudut yang dikenai. Bawaan: Binaan 1-2 (0), Teguran 1 (-1), Teguran 2 (-2), Peringatan 1 (-5), Peringatan 2 (-10), Peringatan 3 (diskualifikasi). **Cocokkan dengan peraturan event.**
+- **`consensus`**: `judges` (1-5, jumlah kursi yang ditampilkan), `majority` (juri yang harus sepakat), `window_ms` (500-10000).
+- Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3).
+- `POST/PUT /api/v1/rulesets` memvalidasi bagian ini (kode unik huruf kecil/angka/underscore, nilai teknik > 0, potongan >= 0, `majority` <= `judges`).
+
 ---
 
 ## Deployment (Production)

@@ -78,7 +78,7 @@ func New(
 		arenaID:      arenaID,
 		sm:           sm,
 		ruleset:      ruleset,
-		engine:       consensus.NewEngine(),
+		engine:       newEngine(ruleset),
 		h:            h,
 		matchStore:   matchStore,
 		eventStore:   eventStore,
@@ -329,6 +329,11 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 		return
 	}
 
+	if !o.validScoreType(p.ScoreType) {
+		o.sendError(client, "BAD_PAYLOAD", fmt.Sprintf("score_type %q tidak dikenal pada ruleset ini", p.ScoreType))
+		return
+	}
+
 	key := p.EventID
 	if key == "" {
 		key = p.IdempotencyKey
@@ -391,6 +396,9 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyKey string) (*consensus.ConsensusResult, bool, error) {
 	if !o.sm.IsInRound() {
 		return nil, false, fmt.Errorf("scoring not allowed in state %s", o.sm.Current())
+	}
+	if !o.validScoreType(string(input.ScoreType)) {
+		return nil, false, fmt.Errorf("score_type %q tidak dikenal pada ruleset ini", input.ScoreType)
 	}
 
 	if idempotencyKey != "" {
@@ -468,17 +476,27 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	o.checkMidMatchWin(round)
 }
 
+// pointsFor nilai teknik menurut ruleset; 0 untuk jenis yang tidak dikenal (mis. "undo").
 func (o *Orchestrator) pointsFor(st consensus.ScoreType) int {
-	switch st {
-	case consensus.ScoreTechnique:
-		return o.ruleset.Scoring.TechniquePoints
-	case consensus.ScoreKnockdown:
-		return o.ruleset.Scoring.KnockdownPoints
-	case consensus.ScoreFall:
-		return o.ruleset.Scoring.FallPoints
-	default:
-		return 0
+	if t, ok := o.ruleset.Scoring.Technique(string(st)); ok {
+		return t.Points
 	}
+	return 0
+}
+
+// newEngine engine konsensus sesuai aturan ruleset (jumlah juri sepakat dan window waktu).
+func newEngine(rs *rules.Ruleset) *consensus.Engine {
+	c := rs.Scoring.EffectiveConsensus()
+	return consensus.NewEngineWith(c.Window(), c.Majority)
+}
+
+// validScoreType jenis input juri yang diterima: teknik ruleset atau "undo" (pembatalan dari tablet).
+func (o *Orchestrator) validScoreType(t string) bool {
+	if t == "undo" {
+		return true
+	}
+	_, ok := o.ruleset.Scoring.Technique(t)
+	return ok
 }
 
 func (o *Orchestrator) handleSyncRequest(client *hub.Client) {

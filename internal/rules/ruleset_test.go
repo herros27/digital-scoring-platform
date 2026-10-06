@@ -1,0 +1,78 @@
+package rules
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestDefaults_LegacyRulesetDerivesTechniquesAndDefaults(t *testing.T) {
+	sc := ScoringRule{TechniquePoints: 1, KnockdownPoints: 2, FallPoints: 3, RoundDuration: 120, TotalRounds: 3}
+
+	tech := sc.EffectiveTechniques()
+	if len(tech) != 3 || tech[2].Type != "fall" || tech[2].Points != 3 {
+		t.Fatalf("teknik turunan salah: %+v", tech)
+	}
+	if p, ok := sc.Penalty("teguran_2"); !ok || p.Points != 2 {
+		t.Fatalf("teguran_2 bawaan harus -2: %+v", p)
+	}
+	if p, ok := sc.Penalty("peringatan_3"); !ok || p.Action != ActionDisqualify {
+		t.Fatalf("peringatan_3 bawaan harus diskualifikasi: %+v", p)
+	}
+	if c := sc.EffectiveConsensus(); c != (ConsensusRule{Judges: 3, Majority: 2, WindowMs: 3000}) {
+		t.Fatalf("konsensus bawaan salah: %+v", c)
+	}
+	if err := sc.Validate(); err != nil {
+		t.Fatalf("ruleset lama harus valid: %v", err)
+	}
+}
+
+func TestPresets_AreValidAndIncludeCatchFall(t *testing.T) {
+	for _, name := range []string{"ipsi", "persilat"} {
+		rs, err := LoadRuleset(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rs.Scoring.Validate(); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+		if tech, ok := rs.Scoring.Technique("catch_fall"); !ok || tech.Points != 4 {
+			t.Errorf("%s: catch_fall harus 4 poin: %+v", name, tech)
+		}
+	}
+}
+
+func TestEffectiveConsensus_PartialOverrideKeepsDefaults(t *testing.T) {
+	sc := ScoringRule{Consensus: &ConsensusRule{Judges: 5, Majority: 3}}
+	c := sc.EffectiveConsensus()
+	if c.Judges != 5 || c.Majority != 3 || c.WindowMs != 3000 {
+		t.Fatalf("%+v", c)
+	}
+}
+
+func TestValidate_Rejects(t *testing.T) {
+	base := func() ScoringRule { return ScoringRule{RoundDuration: 120, TotalRounds: 3} }
+	cases := map[string]func(*ScoringRule){
+		"durasi nol":         func(s *ScoringRule) { s.RoundDuration = 0 },
+		"kode ganda":         func(s *ScoringRule) { s.Techniques = []TechniqueRule{{"a", "A", 1}, {"a", "B", 2}} },
+		"kode salah":         func(s *ScoringRule) { s.Penalties = []PenaltyRule{{Type: "Teguran 1", Label: "x"}} },
+		"nilai teknik nol":   func(s *ScoringRule) { s.Techniques = []TechniqueRule{{"a", "A", 0}} },
+		"kode dicadangkan":   func(s *ScoringRule) { s.Techniques = []TechniqueRule{{"undo", "Undo", 1}} },
+		"potongan negatif":   func(s *ScoringRule) { s.Penalties = []PenaltyRule{{Type: "x", Label: "X", Points: -1}} },
+		"action tak dikenal": func(s *ScoringRule) { s.Penalties = []PenaltyRule{{Type: "x", Label: "X", Action: "ban"}} },
+		"label kosong":       func(s *ScoringRule) { s.Penalties = []PenaltyRule{{Type: "x"}} },
+		"juri 6":             func(s *ScoringRule) { s.Consensus = &ConsensusRule{Judges: 6, Majority: 2, WindowMs: 3000} },
+		"mayoritas > juri":   func(s *ScoringRule) { s.Consensus = &ConsensusRule{Judges: 3, Majority: 4, WindowMs: 3000} },
+		"window terlalu kecil": func(s *ScoringRule) {
+			s.Consensus = &ConsensusRule{Judges: 3, Majority: 2, WindowMs: 100}
+		},
+	}
+	for name, mutate := range cases {
+		sc := base()
+		mutate(&sc)
+		if err := sc.Validate(); err == nil {
+			t.Errorf("%s: harus ditolak", name)
+		} else if strings.TrimSpace(err.Error()) == "" {
+			t.Errorf("%s: pesan kosong", name)
+		}
+	}
+}

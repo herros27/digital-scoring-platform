@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/herros27/digital-scoring/internal/rules"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/auth"
@@ -40,16 +41,7 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	summary := &SeedSummary{}
 
 	// 1. Rulesets (IPSI 2024 & PERSILAT 7.0)
-	scoringIPSI := map[string]any{
-		"technique_points":  1,
-		"knockdown_points":  2,
-		"fall_points":       3,
-		"max_penalties":     3,
-		"penalty_threshold": 1,
-		"round_duration":    120,
-		"break_duration":    60,
-		"total_rounds":      3,
-	}
+	scoringIPSI := rules.PresetScoring()
 	rawScoringIPSI, _ := json.Marshal(scoringIPSI)
 
 	var rulesetIPSIID string
@@ -63,16 +55,7 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	}
 	summary.RulesetIPSIID = rulesetIPSIID
 
-	scoringPersilat := map[string]any{
-		"technique_points":  1,
-		"knockdown_points":  2,
-		"fall_points":       3,
-		"max_penalties":     3,
-		"penalty_threshold": 1,
-		"round_duration":    120,
-		"break_duration":    60,
-		"total_rounds":      3,
-	}
+	scoringPersilat := rules.PresetScoring()
 	rawScoringPersilat, _ := json.Marshal(scoringPersilat)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO rulesets (name, version, scoring, status)

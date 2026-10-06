@@ -5,37 +5,10 @@ import (
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/hub"
+	"github.com/herros27/digital-scoring/internal/rules"
 	"github.com/herros27/digital-scoring/internal/statemachine"
 	"github.com/herros27/digital-scoring/internal/store"
 )
-
-// penaltyKind satu jenis sanksi resmi beserta potongan poinnya. Katalog ini adalah sumber
-// kebenaran tunggal: klien menampilkannya dari snapshot dan hanya mengirim `type`.
-type penaltyKind struct {
-	Type   string `json:"type"`
-	Label  string `json:"label"`
-	Points int    `json:"points"`
-}
-
-// penaltyCatalog nilai poin mengikuti tampilan konsol wasit sebelumnya (teguran -1 per tahap,
-// peringatan 1 = -5, peringatan 2 = -10, binaan tanpa potongan). Ubah di sini bila regulasi berbeda.
-var penaltyCatalog = []penaltyKind{
-	{Type: "binaan_1", Label: "Binaan 1", Points: 0},
-	{Type: "binaan_2", Label: "Binaan 2", Points: 0},
-	{Type: "teguran_1", Label: "Teguran 1", Points: 1},
-	{Type: "teguran_2", Label: "Teguran 2", Points: 1},
-	{Type: "peringatan_1", Label: "Peringatan 1", Points: 5},
-	{Type: "peringatan_2", Label: "Peringatan 2", Points: 10},
-}
-
-func findPenaltyKind(t string) (penaltyKind, bool) {
-	for _, k := range penaltyCatalog {
-		if k.Type == t {
-			return k, true
-		}
-	}
-	return penaltyKind{}, false
-}
 
 // penaltyEntry satu sanksi yang sudah dijatuhkan pada pertandingan ini.
 type penaltyEntry struct {
@@ -160,7 +133,7 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 		o.sendError(client, "BAD_PAYLOAD", err.Error())
 		return
 	}
-	kind, ok := findPenaltyKind(p.Type)
+	kind, ok := o.ruleset.Scoring.Penalty(p.Type)
 	if !validTarget(p.Target) || !ok {
 		o.sendError(client, "BAD_PAYLOAD", "target harus red/blue dan type harus salah satu jenis sanksi resmi")
 		return
@@ -196,6 +169,14 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 	}, client.ID)
 	o.broadcastScoreUpdate(round)
 	o.broadcastPenalties()
+
+	if kind.Action == rules.ActionDisqualify {
+		o.forced = &forcedResult{Corner: opposite(p.Target), ResultType: "disqualification"}
+		o.appendEvent("disqualified", map[string]any{
+			"target": p.Target, "winner_corner": o.forced.Corner, "reason": kind.Type,
+		}, client.ID)
+		o.finalize()
+	}
 }
 
 // handlePenaltyRevoke: {"target":"red"} membatalkan sanksi TERAKHIR pada sudut itu.
@@ -391,7 +372,10 @@ func (o *Orchestrator) extraSnapshotLocked() map[string]any {
 		"break_duration_ms": int64(o.ruleset.Scoring.BreakDuration) * 1000,
 		"total_rounds":      o.ruleset.Scoring.TotalRounds,
 		"penalties":         o.penaltiesLocked(),
-		"penalty_catalog":   penaltyCatalog,
+		"penalty_catalog":   o.ruleset.Scoring.EffectivePenalties(),
+		"techniques":        o.ruleset.Scoring.EffectiveTechniques(),
+		"judge_count":       o.ruleset.Scoring.EffectiveConsensus().Judges,
+		"consensus":         o.ruleset.Scoring.EffectiveConsensus(),
 		"medic_active":      o.medicActive,
 		"var_active":        o.varActive,
 		"presence":          o.presenceLocked(),

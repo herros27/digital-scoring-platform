@@ -126,7 +126,17 @@ describe('countTechniques', () => {
       ev('score_confirmed', { target: 'blue', score_type: 'aneh' }),
     ]
     const c = countTechniques(events)
-    expect(c.red).toEqual({ pukulan: 2, tendangan: 1, jatuhan: 0, total: 3 })
-    expect(c.blue).toEqual({ pukulan: 0, tendangan: 0, jatuhan: 1, total: 1 })
+    expect(c.red).toEqual({ byType: { technique: 2, knockdown: 1 }, total: 3 })
+    expect(c.blue).toEqual({ byType: { fall: 1 }, total: 1 })
+  })
+
+  it('memakai daftar teknik ruleset bila diberikan', () => {
+    const events = [
+      ev('score_confirmed', { target: 'red', score_type: 'catch_fall' }),
+      ev('score_confirmed', { target: 'red', score_type: 'fall' }),
+      ev('score_confirmed', { target: 'red', score_type: 'sapuan' }),
+    ]
+    const c = countTechniques(events, ['catch_fall', 'sapuan'])
+    expect(c.red).toEqual({ byType: { catch_fall: 1, sapuan: 1 }, total: 2 })
   })
 })
