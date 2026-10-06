@@ -2070,7 +2070,44 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Status live scoring gelanggang saat ini
+          description: |
+            Keadaan pertandingan yang sedang aktif di gelanggang (dibaca dari orchestrator di memori),
+            atau `{"status": "no active match"}` bila belum ada pertandingan yang dimuat / sudah selesai.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        description: Status mesin pertandingan (`ready`, `round_1`, `break_1`, ...) atau `no active match`
+                        example: round_1
+                      match_id:
+                        type: string
+                        format: uuid
+                      arena_id:
+                        type: string
+                        format: uuid
+                      round:
+                        type: integer
+                      timer_remaining_ms:
+                        type: integer
+                      timer_running:
+                        type: boolean
+                      red_total:
+                        type: integer
+                      blue_total:
+                        type: integer
+                      red_athlete:
+                        type: string
+                      blue_athlete:
+                        type: string
 
   # -------------------------------------------------------
   # WEBSOCKET REAL-TIME CHANNEL & PROTOCOL
@@ -2081,17 +2118,26 @@ paths:
       description: |
         Endpoint WebSocket dua arah untuk sinkronisasi live match, scoring konsensus juri, kontrol wasit, dan timer.
         
-        **Autentikasi**: Menggunakan Query Param `?token=<JWT_TOKEN>`.
+        **Autentikasi** (Query Param `?token=<JWT_TOKEN>`):
+        * **Tanpa token** — penonton publik (layar scoreboard TV), role `scoreboard`. Hanya menerima siaran dan
+          boleh mengirim `sync_request`; perintah lain dijawab `error` `FORBIDDEN`. Hanya bisa terhubung ke
+          gelanggang yang punya pertandingan aktif (hub dibuat saat `load-arena`); selain itu HTTP 404.
+        * **Token PIN** (`/auth/judge-login`) — terikat satu gelanggang; `arena_id` pada token harus sama dengan
+          path, bila tidak HTTP 403. Role `judge` boleh mengirim `judge_input`; role `wasit` dipetakan menjadi
+          `referee` dan boleh mengontrol pertandingan.
+        * **Token login email** (`/auth/login`, tanpa arena) — hanya role `admin`, `dewan`, dan `wasit`,
+          dan boleh terhubung ke gelanggang mana pun.
         
         ---
         ### 📡 Kontrak Pesan WebSocket (Protocol Contract):
         
         #### 1. Client ➔ Server
-        * **Input Penilaian Juri (`score_event`)**:
+        * **Input Penilaian Juri (`judge_input`)** — hanya role `judge`:
           ```json
           {
-            "type": "score_event",
+            "type": "judge_input",
             "payload": {
+              "event_id": "uuid (kunci idempotensi)",
               "score_type": "technique",
               "target": "red",
               "round": 1
@@ -2100,26 +2146,25 @@ paths:
           ```
           * `score_type`: `technique` (+1), `knockdown` (+2), `fall` (+2/3)
           * `target`: `red` atau `blue`
-        
-        * **Perintah Wasit / Kontrol Laga (`referee_command`)**:
+
+        * **Perintah Wasit / Kontrol Laga (`state_change`)** — hanya `referee` (wasit/dewan) dan `admin`:
           ```json
           {
-            "type": "referee_command",
+            "type": "state_change",
             "payload": {
               "action": "start"
             }
           }
           ```
           * `action`: `start`, `pause`, `resume`, `finish`, `cancel`
-          
-        * **Pemberian Peringatan / Hukuman (`penalty_event`)**:
+
+        * **Pemberian Peringatan / Hukuman (`penalty`)** — hanya `referee`:
           ```json
           {
-            "type": "penalty_event",
+            "type": "penalty",
             "payload": {
               "target": "blue",
-              "penalty_type": "warning",
-              "round": 1
+              "level": 1
             }
           }
           ```
@@ -2153,15 +2198,16 @@ paths:
             }
           }
           ```
-        * **Status & Timer Pertandingan (`state_change`)**:
+        * **Status & Timer Pertandingan (`state_change`)**: dikirim setiap start/pause/resume/finish/cancel
+          dan pergantian ronde. Saat dijeda, `state` tetap `round_N` dan `timer_running` bernilai `false`.
           ```json
           {
             "type": "state_change",
             "payload": {
-              "match_id": "uuid",
-              "status": "round_1",
+              "state": "round_1",
               "round": 1,
-              "remaining_ms": 118000
+              "timer_remaining_ms": 118000,
+              "timer_running": true
             }
           }
           ```
@@ -2196,7 +2242,8 @@ paths:
           {
             "type": "match_result",
             "payload": {
-              "winner": "red",
+              "winner": "uuid peserta pemenang",
+              "corner": "red",
               "result_type": "point_win",
               "scores": [...]
             }
