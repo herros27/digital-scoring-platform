@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
@@ -15,10 +15,27 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 // Query or session params
-const arenaId = computed(() => authStore.arenaId || (route.query.arena_id as string) || (route.params.arena_id as string) || 'gelanggang-1')
-const compId = computed(() => authStore.competitionId || (route.query.comp_id as string) || 'comp-default')
+const arenaId = computed(() => authStore.arenaId || (route.query.arena_id as string) || (route.params.arena_id as string) || '')
+const compId = computed(() => authStore.competitionId || (route.query.comp_id as string) || '')
 const judgeSeat = computed(() => authStore.seatNumber || Number(route.query.seat) || 1)
-const judgeName = computed(() => `JURI ${judgeSeat.value} • GELANGGANG ${arenaId.value.toUpperCase()}`)
+
+// Nama gelanggang dari server (ID hanya untuk koneksi, tidak ditampilkan ke pengguna)
+const arenaName = ref('')
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+async function loadArenaName() {
+  arenaName.value = ''
+  if (!authStore.token || !compId.value || !UUID_RE.test(arenaId.value)) return
+  try {
+    const arenas = await arenaService.getArenas(compId.value)
+    arenaName.value = arenas.find((a) => a.id === arenaId.value)?.name ?? ''
+  } catch {
+    // nama tidak tersedia: tampilan memakai label umum
+  }
+}
+watch([() => authStore.token, arenaId, compId], loadArenaName, { immediate: true })
+
+const arenaLabel = computed(() => (arenaName.value || 'GELANGGANG').toUpperCase())
+const judgeName = computed(() => `JURI ${judgeSeat.value} • ${arenaLabel.value}`)
 const judgeIdTag = computed(() => `JURI-ID #${String(judgeSeat.value).padStart(2, '0')}`)
 
 // --- Match Context ---
@@ -71,7 +88,7 @@ const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value, curr
 const activeBtn = ref<string | null>(null)
 
 // PIN Modal State
-const showPinModal = ref(!authStore.isAuthenticated && route.query.demo !== 'true')
+const showPinModal = ref(!authStore.isAuthenticated)
 const pinInput = ref('')
 const pinSlots = computed(() => (pinInput.value.length > 6 ? 8 : 6))
 const pinError = ref('')
@@ -111,17 +128,6 @@ async function handlePinSubmit() {
   } finally {
     pinLoading.value = false
   }
-}
-
-function handleEnterDemo() {
-  authStore.setSession({
-    token: 'mock-judge-demo-token',
-    role: 'judge',
-    seatNumber: Number(route.query.seat) || 1,
-    arenaId: arenaId.value,
-    competitionId: compId.value,
-  })
-  showPinModal.value = false
 }
 
 async function handleJudgeLogout() {
@@ -593,12 +599,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="judge-pin-meta font-mono">
+        <div v-if="arenaId" class="judge-pin-meta font-mono">
           <div class="judge-pin-meta-item">
             <span class="label">GELANGGANG:</span>
-            <span class="val">{{ arenaId }}</span>
+            <span class="val">{{ arenaLabel }}</span>
           </div>
-          <div class="judge-pin-meta-item">
+          <div v-if="authStore.seatNumber || route.query.seat" class="judge-pin-meta-item">
             <span class="label">KURSI:</span>
             <span class="val">JURI {{ judgeSeat }}</span>
           </div>
@@ -641,10 +647,7 @@ onMounted(() => {
         </div>
 
         <div class="judge-pin-footer font-mono">
-          <button class="demo-link-btn" @click="handleEnterDemo">
-            Mode Uji Coba Offline (Demo) →
-          </button>
-          <button v-if="authStore.isAuthenticated" class="demo-link-btn text-rose-400" @click="handleJudgeLogout">
+          <button v-if="authStore.isAuthenticated" class="judge-link-btn text-rose-400" @click="handleJudgeLogout">
             Keluar dari Tablet Juri (Logout)
           </button>
         </div>
@@ -1289,7 +1292,7 @@ onMounted(() => {
   text-align: center;
 }
 
-.demo-link-btn {
+.judge-link-btn {
   background: transparent;
   border: none;
   color: #64748B;
@@ -1299,7 +1302,7 @@ onMounted(() => {
   transition: color 0.15s ease;
 }
 
-.demo-link-btn:hover {
+.judge-link-btn:hover {
   color: #94A3B8;
 }
 </style>
