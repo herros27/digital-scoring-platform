@@ -47,7 +47,12 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	reportService := service.NewReportService(compRepo, arenaRepo, categoryRepo, athleteRepo, matchRepo)
 
 	// handlers
-	authH := &handler.AuthHandler{Pins: pinRepo}
+	authH := &handler.AuthHandler{
+		Pins: pinRepo,
+		// PIN salah 5x beruntun dalam 15 menit -> IP dikunci 15 menit (PIN 6-8 digit, login tanpa ID).
+		Lockout:   auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
+		ClientKey: ClientIP,
+	}
 	compH := &handler.CompetitionHandler{Service: compService}
 	arenaH := &handler.ArenaHandler{Service: arenaService}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}

@@ -379,20 +379,20 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	}
 
 	// 11. Judge & Referee PINs (Valid for 365 days)
-	// Gelanggang A PINs: Wasit=111111, Juri 1=123001, Juri 2=123002, Juri 3=123003
-	// Gelanggang B PINs: Wasit=222222, Juri 1=234001, Juri 2=234002, Juri 3=234003
+	// Gelanggang A PINs: Wasit=11110001, Juri 1=123001, Juri 2=123002, Juri 3=123003
+	// Gelanggang B PINs: Wasit=22220001, Juri 1=234001, Juri 2=234002, Juri 3=234003
 	pinsToSeed := []struct {
 		ArenaID    string
 		Role       string
 		SeatNumber int
 		PIN        string
 	}{
-		{ArenaID: summary.ArenaAID, Role: "wasit", SeatNumber: 0, PIN: "111111"},
+		{ArenaID: summary.ArenaAID, Role: "wasit", SeatNumber: 0, PIN: "11110001"},
 		{ArenaID: summary.ArenaAID, Role: "juri", SeatNumber: 1, PIN: "123001"},
 		{ArenaID: summary.ArenaAID, Role: "juri", SeatNumber: 2, PIN: "123002"},
 		{ArenaID: summary.ArenaAID, Role: "juri", SeatNumber: 3, PIN: "123003"},
 
-		{ArenaID: summary.ArenaBID, Role: "wasit", SeatNumber: 0, PIN: "222222"},
+		{ArenaID: summary.ArenaBID, Role: "wasit", SeatNumber: 0, PIN: "22220001"},
 		{ArenaID: summary.ArenaBID, Role: "juri", SeatNumber: 1, PIN: "234001"},
 		{ArenaID: summary.ArenaBID, Role: "juri", SeatNumber: 2, PIN: "234002"},
 		{ArenaID: summary.ArenaBID, Role: "juri", SeatNumber: 3, PIN: "234003"},
@@ -412,9 +412,9 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 			compID, p.ArenaID, p.Role, p.SeatNumber).Scan(&existingID)
 		if err == sql.ErrNoRows {
 			_, err = tx.ExecContext(ctx, `
-				INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, raw_pin, pin_hash, expires_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-				compID, p.ArenaID, p.Role, p.SeatNumber, p.PIN, hash, expiry)
+				INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, raw_pin, pin_hash, pin_lookup, expires_at)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				compID, p.ArenaID, p.Role, p.SeatNumber, p.PIN, hash, auth.PinLookup(p.PIN), expiry)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert judge pin for arena %s %s:%d: %w", p.ArenaID, p.Role, p.SeatNumber, err)
 			}
@@ -422,8 +422,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 			return nil, fmt.Errorf("failed to check existing pin: %w", err)
 		} else {
 			_, _ = tx.ExecContext(ctx, `
-				UPDATE judge_pins SET raw_pin = $1, pin_hash = $2, expires_at = $3 WHERE id = $4`,
-				p.PIN, hash, expiry, existingID)
+				UPDATE judge_pins SET raw_pin = $1, pin_hash = $2, pin_lookup = $3, expires_at = $4 WHERE id = $5`,
+				p.PIN, hash, auth.PinLookup(p.PIN), expiry, existingID)
 		}
 		summary.JudgePins++
 	}

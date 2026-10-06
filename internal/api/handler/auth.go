@@ -11,25 +11,48 @@ import (
 
 type AuthHandler struct {
 	Pins *auth.PinStore
+
+	// Lockout (opsional) mengunci klien setelah beberapa kali PIN salah beruntun.
+	// ClientKey menentukan kunci klien (biasanya IP); keduanya harus diisi agar aktif.
+	Lockout   *auth.AttemptLimiter
+	ClientKey func(*http.Request) string
 }
 
 // POST /api/v1/auth/judge-login
-// Body: { "competition_id", "arena_id", "pin" }
+// Body: { "pin" } — turnamen, gelanggang, role, dan kursi ditentukan server dari PIN.
 func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		CompetitionID string `json:"competition_id" validate:"required"`
-		ArenaID       string `json:"arena_id" validate:"required"`
-		PIN           string `json:"pin" validate:"required,min=4,max=10"`
+		PIN string `json:"pin" validate:"required,numeric,min=6,max=8"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
-	token, record, err := h.Pins.LoginWithPIN(req.CompetitionID, req.ArenaID, req.PIN)
+	var clientKey string
+	if h.Lockout != nil && h.ClientKey != nil {
+		clientKey = h.ClientKey(r)
+		if locked, retryAfter := h.Lockout.Check(clientKey); locked {
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())+1))
+			Fail(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "terlalu banyak PIN salah, coba lagi nanti", nil)
+			return
+		}
+	}
+
+	token, record, err := h.Pins.LoginWithPIN(req.PIN)
 	if err != nil {
-		Fail(w, http.StatusUnauthorized, "INVALID_PIN", "pin not found or expired", nil)
+		if errors.Is(err, auth.ErrInvalidPIN) {
+			if clientKey != "" {
+				h.Lockout.Fail(clientKey)
+			}
+			Fail(w, http.StatusUnauthorized, "INVALID_PIN", "pin not found or expired", nil)
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "login gagal", nil)
 		return
+	}
+	if clientKey != "" {
+		h.Lockout.Reset(clientKey)
 	}
 
 	res := map[string]any{
@@ -52,7 +75,7 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 		ArenaID       string `json:"arena_id" validate:"required"`
 		Role          string `json:"role" validate:"required,oneof=wasit juri dewan admin operator"`
 		SeatNumber    int    `json:"seat_number" validate:"min=0,max=10"`
-		PIN           string `json:"pin" validate:"omitempty,min=4,max=10"`
+		PIN           string `json:"pin" validate:"omitempty,numeric,min=6,max=8"`
 		TTLHours      int    `json:"ttl_hours" validate:"min=0,max=720"`
 	}
 	if err := Decode(r, &req); err != nil {
@@ -60,30 +83,36 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pin := req.PIN
-	if pin == "" {
-		var err error
-		pin, err = auth.GenerateRandomPIN()
-		if err != nil {
-			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to generate pin", nil)
-			return
-		}
-	}
-
 	if req.TTLHours <= 0 {
 		req.TTLHours = 12 // default 12 jam
 	}
-
 	ttl := time.Duration(req.TTLHours) * time.Hour
-	record, err := h.Pins.CreatePINWithSeat(req.CompetitionID, req.ArenaID, req.Role, req.SeatNumber, pin, ttl)
-	if err != nil {
-		if errors.Is(err, auth.ErrArenaNotFound) {
-			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+
+	// PIN kosong -> server membuat PIN acak yang unik; PIN kustom divalidasi (digit, panjang per role)
+	var record *auth.PinRecord
+	var err error
+	if req.PIN == "" {
+		record, err = h.Pins.CreateWithRandomPIN(req.CompetitionID, req.ArenaID, req.Role, req.SeatNumber, ttl)
+	} else {
+		role, _ := auth.NormalizeRoleAndSeat(req.Role, req.SeatNumber)
+		if verr := auth.ValidatePIN(role, req.PIN); verr != nil {
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", verr.Error(), nil)
 			return
 		}
-		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		record, err = h.Pins.CreatePINWithSeat(req.CompetitionID, req.ArenaID, req.Role, req.SeatNumber, req.PIN, ttl)
+	}
+	if err != nil {
+		switch {
+		case errors.Is(err, auth.ErrArenaNotFound):
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+		case errors.Is(err, auth.ErrPinTaken):
+			Fail(w, http.StatusConflict, "PIN_TAKEN", err.Error(), nil)
+		default:
+			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		}
 		return
 	}
+	pin := record.RawPIN
 
 	// Kembalikan plain PIN dan expires_at agar admin/operator dapat membagikannya kepada juri
 	res := map[string]any{
@@ -138,12 +167,9 @@ func (h *AuthHandler) ListPINs(w http.ResponseWriter, r *http.Request) {
 		key := fmt.Sprintf("%s-%d", req.Role, req.Seat)
 		rec, exists := seatMap[key]
 		if !exists || rec.RawPIN == "" {
-			newPin, err := auth.GenerateRandomPIN()
-			if err == nil {
-				created, err := h.Pins.CreatePINWithSeat(compID, arenaID, req.Role, req.Seat, newPin, 12*time.Hour)
-				if err == nil && created != nil {
-					seatMap[key] = *created
-				}
+			created, err := h.Pins.CreateWithRandomPIN(compID, arenaID, req.Role, req.Seat, 12*time.Hour)
+			if err == nil && created != nil {
+				seatMap[key] = *created
 			}
 		}
 	}
