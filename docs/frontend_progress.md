@@ -12,6 +12,7 @@ Dokumen ini melacak secara menyeluruh perkembangan antarmuka (*frontend web & PW
 | **Konektivitas API REST** | **95%** | Menggunakan TanStack Query v5 + Axios/Fetch client terstandarisasi. |
 | **Konektivitas WebSocket** | **90%** | Real-time scoring, sync timer, status arena, dan konsensus terpasang pada Juri, Wasit, & Scoreboard. |
 | **Kompilasi / Build Status** | **100% PASS** | Bebas error TypeScript (`vue-tsc -b`) dan lulus Vite production build. |
+| **Lint, Tes & CI** | **PASS** | ESLint tanpa error (`no-explicit-any` = error, tidak ada `any`), 28 tes Vitest, job `frontend` di CI (lint, typecheck, tes, build). Verifikasi end-to-end ke backend nyata lewat `apps/web/scripts/e2e-simulation.mjs`. |
 | **Desain & Responsivitas** | **85%** | Optimal pada layout tablet landscape (Juri/Wasit) dan desktop widescreen (Operator Ops). |
 
 ---
@@ -42,9 +43,9 @@ Dokumen ini melacak secara menyeluruh perkembangan antarmuka (*frontend web & PW
 ### 3.1. Autentikasi & Keamanan Sesi
 - [x] Login terpusat berbasis email dan password untuk Admin, Dewan Hakim, dan Wasit (`/login`).
 - [x] Pendaftaran dan login akun delegasi Kontingen (`/register`).
-- [x] Keypad login cepat berbasis 4–6 digit PIN untuk Tablet Juri (`/judge/login`).
+- [x] Keypad login hanya dengan PIN (juri 6 digit, wasit 8 digit) di `/judge/login`; turnamen, gelanggang, role, dan kursi ditentukan server dari PIN. Pesan error Indonesia untuk PIN salah dan terkunci (429).
 - [x] Penyimpanan token sesi aman pada `sessionStorage` dengan Pinia store (`stores/auth.ts`).
-- [x] RBAC Router Navigation Guard (`router.beforeEach`) untuk membatasi hak akses halaman berdasarkan role.
+- [x] RBAC Router Navigation Guard (`router.beforeEach`) memeriksa token **dan** `allowedRoles` per rute (role tidak berhak dialihkan ke halamannya sendiri); `/ops` wajib login (`admin`, `dewan`, `operator`, `contingent`). Dilindungi tes.
 
 ### 3.2. Komando Operasi Turnamen (`OpsShellView.vue`)
 - [x] Shell operasional modern dengan sidebar navigasi 9 modul kerja.
@@ -92,7 +93,7 @@ Dokumen ini melacak secara menyeluruh perkembangan antarmuka (*frontend web & PW
   - Pemicu sinyal Gong arena, panggilan tim medis, dan sinyal VAR.
 - [x] **Layar TV Scoreboard Publik (`ScoreboardView.vue`)**:
   - Layout kiosk 16:9 full-screen beresolusi tinggi (bebas login PIN).
-  - Tampilan skor besar, babak (ronde), waktu sisa, indikator pelanggaran, dan notifikasi animasi poin melayang.
+  - Tampilan skor besar, babak (ronde), waktu sisa, potongan hukuman, dan notifikasi animasi poin melayang. Skor, babak, dan timer diambil dari `sync_response`/`state_change`/`score_update` (TV yang baru menyala langsung memulihkan skor); data demo sudah dihapus. Jeda terlihat lewat `timer_running`.
   - Modal pengumuman pemenang pertandingan resmi.
 
 ### 3.8. Laporan & Ekspor (`ReportsOpsView.vue`)
@@ -141,6 +142,17 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 10. **Responsivitas Perangkat Mobile Layar Kecil pada Ops Shell**:
     - *Kondisi saat ini*: Tampilan `OpsShellView.vue` sangat nyaman pada layar laptop/desktop (1366x768 ke atas), tetapi padat jika dibuka lewat smartphone.
     - *Kebutuhan*: Tampilan *drawer responsive* khusus navigasi jika operator membuka dashboard via ponsel.
+11. **Panel Sanksi & Panel Juri pada Konsol Wasit Masih Berisi Teks Tetap**:
+    - *Kondisi saat ini*: Nilai awal skor, teknik, hukuman, log kejadian, dan daftar juri di `RefereeConsoleView.vue` sudah dinetralkan, tetapi template masih memuat teks tertanam (mis. "Teguran 1 (Aktif)", "LOCK 3/3 SAH", "LAN JURI OK"). Pada tablet juri (`JudgeScoringView.vue`), titik indikator konsensus (`redConsensusDots`/`blueConsensusDots`) kini kosong dan belum terhubung ke data server.
+    - *Kebutuhan*: Turunkan seluruh panel tersebut dari data server (`score_update`, `penalty`, daftar juri terhubung). Backend hanya menyimpan total poin potongan, belum rincian binaan/teguran/peringatan; scoreboard saat ini menampilkan satu chip "POTONGAN".
+12. **Login Tablet via QR / Tautan**:
+    - *Kebutuhan*: Tombol "Buka Tablet" pada `DevicePinManager.vue` menghasilkan tautan/QR yang langsung memasukkan perangkat (tanpa mengetik PIN); PIN tetap sebagai cadangan.
+13. **Label Arena/Kategori/Partai pada Scoreboard**:
+    - *Kondisi saat ini*: Judul turnamen (`KEJUARAAN NASIONAL PENCAK SILAT 2025`) tertanam di `ScoreboardView.vue`, sedangkan label gelanggang, kategori, dan nomor partai berisi teks generik karena `GET /live/scoreboard` belum mengembalikannya.
+    - *Kebutuhan*: Tambahkan nama turnamen, gelanggang, kategori, dan nomor partai pada snapshot backend lalu tampilkan.
+14. **Format Prettier Belum Dipaksa di CI**:
+    - *Kondisi saat ini*: Prettier terpasang (`npm run format:check`) tetapi kode lama belum diformat sehingga belum dijadikan syarat CI.
+    - *Kebutuhan*: Jalankan `npm run format` sekali dalam commit terpisah, lalu tambahkan `format:check` ke job `frontend`.
 
 ---
 
@@ -154,6 +166,13 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 ---
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
+
+- **2026-10-06**:
+  - Rute `/ops` kini wajib login dan guard router menegakkan `allowedRoles`; kode ganda dihapus (`lib/api`, `lib/competitionApi`, `lib/authApi`, wrapper `CompetitionsView`); `KioskLayout` dan `TabletLayout` ditambahkan.
+  - Seluruh tipe `any` dihapus (helper `http` bertipe, DTO mengikuti backend, peta `WsServerMessages`); ESLint, Prettier, Vitest, dan job CI `frontend` ditambahkan.
+  - Login tablet hanya dengan PIN (juri 6 digit, wasit 8 digit); pilihan arena, ID turnamen, dan sampel PIN palsu dihapus.
+  - Scoreboard menampilkan data live (skor, babak, timer, jeda, nama atlet) dan tidak lagi berisi data demo; tombol MULAI RONDE wasit diperbaiki (status awal `idle`).
+  - Verifikasi ke backend nyata (Postgres + simulasi e2e + Chromium) menemukan dan memperbaiki bug backend WebSocket (lihat `docs/task_update.md` butir 36-37).
 
 - **2026-10-05**:
   - Menyelesaikan integrasi persisten PIN gelanggang dari backend database (`authApi.listPins`), mengeliminasi mock PIN di `localStorage`.

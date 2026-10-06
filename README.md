@@ -11,7 +11,7 @@ Backend system untuk **Pencak Silat Kategori Tanding** dengan real-time scoring,
 | Backend API + WS | Go 1.27 (stdlib `net/http` + `gorilla/websocket`) |
 | Rules Engine | Go struct-based, dynamic rule set dari JSON/DB |
 | Database | PostgreSQL 16 (`jackc/pgx/v5` driver via stdlib) |
-| Auth & Security | PIN (bcrypt) + JWT (HS256) + Token Bucket Rate Limiting (`golang.org/x/time/rate`) |
+| Auth & Security | PIN (lookup HMAC-SHA256 + bcrypt) + JWT (HS256) + Token Bucket Rate Limiting (`golang.org/x/time/rate`) + kunci IP setelah PIN salah |
 | Validation | `go-playground/validator/v10` |
 | Caching & Metrics | In-Memory TTL Cache (`internal/cache`) + Prometheus (`internal/metrics`) |
 | Deployment | Single binary + systemd + Caddy reverse proxy |
@@ -26,7 +26,7 @@ internal/
   api/                       # HTTP handlers, router, middleware (JWT, RBAC, CORS, RateLimit)
     handler/                 # REST handlers (auth, competition, match, arena, bracket, official, contingent, report, live)
     swagger.go               # Swagger UI + OpenAPI spec
-  auth/                      # Random PIN generation (crypto/rand), bcrypt, JWT claims (role & seat)
+  auth/                      # PIN (crypto/rand, lookup HMAC, validasi per role), pembatas percobaan gagal, bcrypt, JWT claims (role & seat)
   bracket/                   # Single-elimination bracket generator & tree traversal
   cache/                     # In-memory TTL report cache with concurrent invalidation
   config/                    # Centralized environment & app settings (godotenv + env/v11)
@@ -43,7 +43,7 @@ internal/
 rulesets/
   ipsi_2024.json             # IPSI 2024 ruleset
   persilat_v7.json           # PERSILAT ruleset
-migrations/                  # SQL migrations (001 s/d 017) + Auto-migration engine
+migrations/                  # SQL migrations (001 s/d 018) + Auto-migration engine
 tests/                       # End-to-end integration test scenarios (tournament lifecycle & workflows)
 docker-compose.yml           # Local PostgreSQL
 docs/
@@ -105,7 +105,10 @@ Arena A Hub          Arena B Hub
 ```
 - Role-based broadcast: judge hanya terima ack sendiri, referee/scoreboard terima semua
 - Auth via query param: `wss://host/ws/arena/{id}?token=<JWT>`
-- Reconnection + full state snapshot recovery
+  - **Tanpa token** = penonton publik (scoreboard TV), role `scoreboard`, read-only; hanya bisa terhubung ke arena yang sudah punya pertandingan aktif (selain itu HTTP 404)
+  - **Token PIN** (juri/wasit) harus cocok dengan arena yang dituju (selain itu HTTP 403); role `wasit` dan `dewan` dipetakan ke `referee`
+  - **Token login email** (tanpa arena) hanya diterima untuk `admin`, `dewan`, `wasit`
+- Reconnection + full state snapshot recovery (`sync_request` → `sync_response`)
 
 ### 5. Match Orchestrator
 Koordinator pusat per match:
@@ -174,7 +177,7 @@ export ENV="development"  # atau "production"
 ```
 
 ### 3. Run Migrations (Otomatis)
-Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 017) akan otomatis diterapkan:
+Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 018) akan otomatis diterapkan:
 ```bash
 go run ./cmd/server
 ```
@@ -297,8 +300,8 @@ GET http://localhost:8080/docs/openapi.yaml
 ### 11. Live Scoreboard & WebSocket
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/live/scoreboard/{arena_id}` | Public | Live scoreboard feed publik (polling fallback) |
-| GET | `/ws/arena/{arena_id}?token=<JWT>` | Query Token | Real-time bi-directional channel gelanggang (Websocket) |
+| GET | `/api/v1/live/scoreboard/{arena_id}` | Public | Snapshot pertandingan aktif di arena (status, ronde, timer, total skor, nama atlet) atau `{"status":"no active match"}` |
+| GET | `/ws/arena/{arena_id}[?token=<JWT>]` | Token opsional | Real-time bi-directional channel gelanggang (Websocket); tanpa token = penonton read-only |
 
 ---
 
@@ -307,25 +310,22 @@ GET http://localhost:8080/docs/openapi.yaml
 ### Client → Server
 | Type | From | Payload |
 |------|------|---------|
-| `score` | Judge | `{technique, target, round}` |
-| `penalty_recommend` | Judge | `{type, level, target}` |
-| `match_start` | Referee | `{}` |
-| `match_pause` | Referee | `{reason}` |
-| `match_resume` | Referee | `{}` |
-| `penalty_apply` | Referee | `{type, level, target, points}` |
-| `override` | Admin | `{ref_event_id, new_points, reason}` |
+| `judge_input` | Judge | `{event_id, score_type, target, round}` (`event_id` = kunci idempotensi) |
+| `state_change` | Referee, Admin | `{action}` dengan `action` = `start` \| `pause` \| `resume` \| `finish` \| `cancel` |
+| `penalty` | Referee | `{target, level}` (`level` = poin potongan) |
+| `sync_request` | Semua | `{}` |
 
 ### Server → Client
 | Type | To | Payload |
 |------|----|---------|
-| `ack` | Sender | `{seq, status}` |
-| `state_update` | All | `{state, round, timer}` |
-| `score_confirmed` | All except judge | `{technique, points, judges[], target}` |
-| `score_unconfirmed` | Judge | `{technique, reason}` |
-| `timer_sync` | All | `{remaining_ms, running, round, server_ts}` |
-| `penalty_applied` | All | `{type, level, points, target, by}` |
-| `match_result` | All | `{winner, result_type, scores}` |
-| `error` | Sender | `{code, message, ref_seq}` |
+| `sync_response` | Pengirim `sync_request` | `{match_id, arena_id, state, round, timer_remaining_ms, timer_running, scores[], red_total, blue_total, server_time}` |
+| `state_change` | All | `{state, round, timer_remaining_ms, timer_running}` (saat dijeda `state` tetap `round_N`, `timer_running=false`) |
+| `score_update` | All | `{round, red_technical, blue_technical, red_penalties, blue_penalties}` |
+| `score_confirmed` | All | `{score_type, target, points, count, round}` |
+| `match_result` | All | `{winner, corner, result_type, scores}` |
+| `error` | Pengirim | `{code, message}` (mis. `FORBIDDEN`, `SCORING_NOT_ALLOWED`, `INVALID_STATE_TRANSITION`) |
+
+Timer berjalan di server; klien menyinkronkan lewat `state_change`/`sync_response` dan menghitung mundur secara lokal.
 
 ---
 
@@ -434,9 +434,11 @@ Daftar lengkap akun login official, kontingen, dan PIN wasit/juri didokumentasik
 ```bash
 go test -v -count=1 ./...
 ```
+
 Menjalankan seluruh **automated unit tests** (co-located di `internal/`) dan **integration test scenarios** (di `tests/`) dengan hasil 100% PASS:
 - **Unit Tests (`internal/`)**:
-  - `internal/auth`: Token issuance, verification, expiration, seat number, bcrypt PIN
+  - `internal/auth`: Token issuance, verification, expiration, seat number, bcrypt PIN, validasi/generator/lookup PIN, pembatas percobaan gagal (kunci IP)
+  - `internal/hub`: Pemetaan role JWT → role hub (wasit/dewan → referee)
   - `internal/bracket`: Single elimination tree generator, BYE handling, auto-advance
   - `internal/consensus`: Majority voting (2/3), sliding window (3s), duplicate suppression
   - `internal/statemachine`: Round lifecycle flow, invalid transitions, early finish
@@ -445,14 +447,25 @@ Menjalankan seluruh **automated unit tests** (co-located di `internal/`) dan **i
   - `internal/cache`: TTL cache hit/miss, concurrent invalidation
   - `internal/metrics`: Prometheus metric vectors & latency histogram
   - `internal/config`: Environment parser & defaults
-  - `internal/api`: Token bucket rate limiting middleware & struct validator
+  - `internal/api`: Token bucket rate limiting middleware, struct validator, WebSocket melalui `MetricsMiddleware`, akses WebSocket (penonton publik, token PIN, token email)
 - **Integration Tests (`tests/`)**:
+  - `tests/pin_login_test.go`: Login hanya dengan PIN (database nyata): keunikan global, kedaluwarsa, rotasi, panjang per role, kunci IP, `create-pin` 409/400
   - `tests/contingent_test.go`: End-to-end contingent portal, athlete registration & verification
   - `tests/match_service_test.go`: Full match lifecycle, timer, WebSocket broadcast & scoring
   - `tests/official_and_report_test.go`: Tournament report aggregation, medals table, export
   - `tests/ruleset_crud_test.go`: Dynamic database ruleset CRUD integration
   - `tests/admin_features_test.go`: Arena CRUD & Competition administrative operations
   - `tests/p1_features_test.go` & `tests/p2_features_test.go`: Phase 1 & 2 feature regression tests
+
+Tes login PIN (`tests/pin_login_test.go`) memakai database PostgreSQL nyata dan dilewati bila tidak tersedia
+(default `postgres://scoring_user@localhost:5432/digital_scoring`, atau set `TEST_DB_URL`). CI menyediakannya lewat service Postgres.
+
+Simulasi end-to-end (REST + WebSocket + konsensus juri, 20+ pemeriksaan; butuh backend berjalan dan data seed):
+```bash
+go run ./cmd/seed
+go run ./cmd/server &
+node apps/web/scripts/e2e-simulation.mjs   # keluar dengan kode 1 bila ada pemeriksaan gagal
+```
 
 ### Generate Migration
 ```bash

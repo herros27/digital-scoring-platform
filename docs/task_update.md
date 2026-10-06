@@ -35,7 +35,7 @@
     - Mounted `GET /api/v1/competitions/{comp_id}/matches/{id}/scores` in `internal/api/router.go`.
     - Added automated unit test in `tests/match_service_test.go`.
 12. **OpenAPI Spec & WebSocket Contract Documentation (P0)** –
-    - Updated `docs/openapi.yaml` with complete two-way WebSocket protocol schemas (`score_event`, `referee_command`, `penalty_event`, `state_change`, `score_update`, `score_confirmed`, `match_result`, `error`).
+    - Updated `docs/openapi.yaml` with complete two-way WebSocket protocol schemas (klien: `judge_input`, `state_change` + `action`, `penalty`, `sync_request`; server: `sync_response`, `state_change`, `score_update`, `score_confirmed`, `match_result`, `error`; dikoreksi mengikuti kode backend).
     - Documented Category, Athlete, Match Lifecycle, and Score endpoints.
 13. **Automatic Bracket Advancement (P1)** –
     - Added `AdvanceWinner()` in `BracketStore` (`internal/store/bracket.go`).
@@ -152,9 +152,24 @@
     - Frontend: Memperbaiki [`apps/web/src/views/admin/DevicePinManager.vue`](file:///d:/Freelance/DigitalScoring/apps/web/src/views/admin/DevicePinManager.vue) dengan menghapus fallback ID statis palsu, menambahkan hook `onMounted` dan sinkronisasi otomatis `refetchArenas()`, serta menyematkan `getValidArenaId()` guard sebelum proses generate PIN agar tidak pernah mengirimkan ID gelanggang basi (*stale*) ke server.
 
 
+36. **Perbaikan WebSocket, Akses Penonton Publik, dan Siaran Event** –
+    - `MetricsMiddleware` (`statusRecorder`) kini meneruskan `http.Hijacker`/`Flusher`; sebelumnya seluruh upgrade WebSocket gagal dengan "response does not implement http.Hijacker".
+    - `GET /ws/arena/{arena_id}` tanpa token diterima sebagai penonton publik (role `scoreboard`, read-only) hanya untuk arena yang sudah punya hub; selain itu 404. Token PIN harus cocok dengan arena; token login email (tanpa arena) hanya untuk `admin`, `dewan`, `wasit`.
+    - Role JWT `wasit`/`dewan` dipetakan ke `hub.RoleReferee` (`hub.RoleFromClaim`) sehingga wasit dapat start/pause/penalty.
+    - Orchestrator menyiarkan `score_confirmed`; `state_change` membawa `timer_running` (jeda tidak lagi tampak sebagai `round_N` yang berjalan).
+    - `GET /api/v1/live/scoreboard/{arena_id}` mengembalikan snapshot pertandingan aktif (status, ronde, timer, total skor, nama atlet) lewat `MatchService.GetLiveSnapshot`.
+    - Dokumentasi: `docs/openapi.yaml` dan README disamakan dengan protokol sebenarnya.
+37. **Login Juri/Wasit Hanya dengan PIN (Migrasi 018)** –
+    - `POST /api/v1/auth/judge-login` menerima `{ "pin" }` saja; turnamen, gelanggang, role, dan kursi ditentukan server dari PIN.
+    - Kolom `judge_pins.pin_lookup` (HMAC-SHA256 dari PIN dengan kunci turunan JWT secret, indeks unik) untuk pencarian O(1); bcrypt diverifikasi sekali setelah ketemu. Migrasi menghapus PIN lama (tahap development).
+    - PIN unik di seluruh sistem (`ErrPinTaken` -> HTTP 409); PIN acak dibuat ulang otomatis bila bentrok (`PinStore.CreateWithRandomPIN`). PIN juri 6 digit, PIN wasit 8 digit; PIN kustom divalidasi.
+    - `auth.AttemptLimiter`: 5 PIN salah beruntun dalam 15 menit mengunci IP 15 menit (HTTP 429 + `Retry-After`).
+    - Seeder: PIN wasit `11110001` (Gelanggang A) dan `22220001` (Gelanggang B).
+    - Tes database nyata di `tests/pin_login_test.go`; CI menyediakan service Postgres (`TEST_DB_URL`). Simulasi `apps/web/scripts/e2e-simulation.mjs` kini memverifikasi (keluar kode 1 bila gagal).
+
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.
-- **Test Suite**: **100% PASS** (Seluruh unit test dan skenario integrasi lolos tanpa error).
+- **Test Suite**: **100% PASS** (`go test -race ./...` termasuk tes database nyata untuk login PIN; simulasi e2e REST+WebSocket lolos).
 - **UAT / Requirement Readiness**: Memenuhi 100% spesifikasi fungsional backend sesuai `architecture-backend.md` dan `workLog/api-missing-requirements.md`.
 
 ## Next Steps (Production Deployment & Operations)

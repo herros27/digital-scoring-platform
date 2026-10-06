@@ -62,12 +62,13 @@ flowchart TD
 
 ## 2. Manajemen Autentikasi & Otorisasi (RBAC)
 
-Backend mengadopsi 2 metode login terpisah berdasarkan perangkat:
+Backend mengadopsi 2 metode login terpisah berdasarkan perangkat. Login tablet hanya memakai PIN: turnamen, gelanggang, role, dan kursi ditentukan server dari PIN (setiap PIN unik; juri 6 digit, wasit 8 digit; 5 PIN salah beruntun mengunci IP 15 menit).
 
 | Peran (Role) | Metode Login | Endpoint | Payload Request | Data JWT Claims |
 |---|---|---|---|---|
-| **Juri 1 - 5** | 6-Digit PIN | `POST /api/v1/auth/judge-login` | `{ competition_id, arena_id, pin }` | `role: "judge"`, `seat_number: 1..5`, `arena_id`, `competition_id` |
-| **Wasit Gelanggang** | Email / Sandi atau Wasit PIN | `POST /api/v1/auth/login` | `{ email, password }` | `role: "wasit"`, `user_id` |
+| **Juri 1 - 5** | 6-Digit PIN | `POST /api/v1/auth/judge-login` | `{ pin }` | `role: "judge"`, `seat_number: 1..5`, `arena_id`, `competition_id` |
+| **Wasit Gelanggang (Meja Wasit)** | 8-Digit PIN | `POST /api/v1/auth/judge-login` | `{ pin }` | `role: "wasit"`, `arena_id`, `competition_id` |
+| **Wasit (login email)** | Email / Sandi | `POST /api/v1/auth/login` | `{ email, password }` | `role: "wasit"`, `user_id` (tanpa arena; WebSocket diterima untuk arena mana pun) |
 | **Admin / Dewan / Delegasi** | Email & Password | `POST /api/v1/auth/login` | `{ email, password }` | `role: "admin"` / `"dewan"`, `user_id` |
 | **Scoreboard TV** | Anonim (Public Read) | Tidak perlu token | N/A | Public Spectator Mode |
 
@@ -127,8 +128,8 @@ export const useAuthStore = defineStore('auth', () => {
 *Target Layar: Tablet sentuh ergonomis landscape (`02_judge_tablet_pwa.png`)*
 
 1. **Alur Masuk (PIN Onboarding)**:
-   - Menampilkan modal input 6-digit PIN saat pertama kali dibuka.
-   - Memanggil `POST /api/v1/auth/judge-login`.
+   - Menampilkan modal input PIN (6 digit juri / 8 digit wasit) saat pertama kali dibuka.
+   - Memanggil `POST /api/v1/auth/judge-login` dengan `{ pin }` saja.
    - Mengambil `token` dan `seat_number` (Juri 1, 2, atau 3).
 2. **WebSocket Scoring Pipeline**:
    - Koneksi: `new WebSocket("/ws/arena/" + arena_id + "?token=" + token)`.

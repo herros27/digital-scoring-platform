@@ -50,7 +50,7 @@ Backend menyediakan 3 mekanisme autentikasi berbeda yang harus ditangani oleh mo
 | Flow / Aktor | Endpoint Login | Kredensial | Tipe Token & Payload | Masa Berlaku | Destinasi Antarmuka |
 |---|---|---|---|---|---|
 | **Official Auth** (Admin, Dewan, Operator, Wasit) | `POST /api/v1/auth/login` | Email & Password | Bearer JWT (claims: `sub`, `role: "admin" \| "dewan" \| "operator" \| "wasit"`) | 24 Jam | `/admin/*` & `/referee/*` |
-| **Judge Auth** (Juri Gelanggang) | `POST /api/v1/auth/judge-login` | `competition_id`, `arena_id`, `pin` (6 digit) | Scoped JWT (claims: `pin_id`, `comp_id`, `arena_id`, `role: "judge"`, `seat_number: 1..N`) | Sesuai TTL PIN (default 12 jam) | `/judge/*` (Tablet Scoring PWA) |
+| **Judge & Wasit PIN Auth** (Tablet Juri / Meja Wasit) | `POST /api/v1/auth/judge-login` | `pin` saja (juri 6 digit, wasit 8 digit; server menentukan turnamen, gelanggang, role, kursi) | Scoped JWT (claims: `pin_id`, `comp_id`, `arena_id`, `role: "judge"`, `seat_number: 1..N`) | Sesuai TTL PIN (default 12 jam) | `/judge/*` (Tablet Scoring PWA) |
 | **Contingent Auth** (Manajer Tim Kontingen) | `POST /api/v1/auth/contingent/login` | Email & Password | Bearer JWT (claims: `sub`, `role: "contingent"`) | 24 Jam | `/contingent/*` (Portal Pendaftaran) |
 | **Scoreboard & Publik** | *Tanpa Auth* | Publik | Tidak memerlukan token (akses live feed) | - | `/scoreboard/:arena_id` & `/live/*` |
 
@@ -146,9 +146,10 @@ Seluruh panggilan REST menggunakan wrapper pada `src/lib/api.ts`. Response forma
    - **Request**: `{ "email": "admin@silat.id", "password": "test_password_1" }`
    - **Response**: `{ "token": string, "user": { "id": uuid, "name": string, "email": string, "role": string } }`
 2. **`POST /api/v1/auth/judge-login`**
-   - **Tujuan**: Login Tablet Juri menggunakan PIN 6-digit.
-   - **Request**: `{ "competition_id": uuid, "arena_id": uuid, "pin": "123456" }`
-   - **Response**: `{ "token": string, "role": "judge", "seat_number": number, "arena_id": uuid, "competition_id": uuid }`
+   - **Tujuan**: Login tablet juri (PIN 6 digit) atau meja wasit (PIN 8 digit). Tidak perlu memilih gelanggang atau mengisi ID turnamen.
+   - **Request**: `{ "pin": "123456" }`
+   - **Response**: `{ "token": string, "role": "judge" | "wasit", "seat_number"?: number, "arena_id": uuid, "competition_id": uuid }`
+   - **Error**: `401 INVALID_PIN`, `429 TOO_MANY_ATTEMPTS` (+ `Retry-After`)
 3. **`POST /api/v1/auth/create-pin`** *(Protected: Admin / Dewan)*
    - **Tujuan**: Membuat PIN akses baru untuk juri/wasit gelanggang.
    - **Request**: `{ "competition_id": uuid, "arena_id": uuid, "role": "juri" | "wasit", "seat_number": 1..5, "pin"?: string, "ttl_hours"?: 12 }`
