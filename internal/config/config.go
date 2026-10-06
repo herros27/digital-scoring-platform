@@ -15,6 +15,8 @@ type Config struct {
 	JWTSecret   string `env:"JWT_SECRET" envDefault:"dev-secret-change-in-prod"`
 	AutoMigrate bool   `env:"AUTO_MIGRATE" envDefault:"true"`
 	SeedData    bool   `env:"SEED_DATA" envDefault:"false"`
+	// MetricsToken: bila diisi, /metrics wajib header Authorization: Bearer <token>; kosong = hanya loopback.
+	MetricsToken string `env:"METRICS_TOKEN" envDefault:""`
 }
 
 // Load loads configuration from optional .env files and environment variables into Config.

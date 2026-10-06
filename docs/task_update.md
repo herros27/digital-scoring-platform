@@ -269,6 +269,12 @@
     - `.gitignore`: `.env.*` kecuali `.env.example` (sebelumnya hanya `.env`, sehingga `.env.prod` berisi rahasia dapat ikut ter-commit). CI: membuat `.env.prod` dari contoh lalu `docker compose --env-file .env.prod config --quiet`.
     - Diperiksa dengan `docker compose config`: tanpa `.env.prod` berhenti dengan pesan jelas; dengan `.env.prod` (pengguna/database/port/JWT dari berkas itu, `DB_URL` internal dan `ENV=production` tetap). Menjalankan stack penuh belum diuji.
 
+55. **Perapian permukaan publik** –
+    - `/metrics` tidak lagi terbuka: tanpa `METRICS_TOKEN` hanya dilayani dari loopback (`RemoteAddr`, header `X-Forwarded-For` diabaikan), dengan token wajib `Authorization: Bearer <token>`; selain itu 404. Nginx tidak mem-proxy `/metrics`, jadi tidak terjangkau dari luar.
+    - `GET /api/v1/health` hanya mengembalikan `{"status":"ok"}`; bila database tidak merespons 503 `UNAVAILABLE` tanpa rincian (detail masuk log server).
+    - Halaman `/design-system` dihapus beserta `DesignSystemView`, `HomeView` (yatim) dan komponen UI yang tidak dipakai (`AppCard`, `AppDock`, `AppIconBadge`, `AppProgressBar`).
+    - Base URL `/` kini diarahkan ke `/scoreboard` (daftar pertandingan live); halaman itu memuat tautan Login Petugas, Login Juri/Wasit (PIN), dan Daftar Kontingen. Mengembalikan ke login cukup mengubah `redirect` rute `home` di `router/index.ts`.
+    - Tes: `TestMetricsAccess_LoopbackOnlyWithoutToken`, `TestHealthHandler_NoDetailsOnFailure`, tes router untuk `/`.
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

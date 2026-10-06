@@ -65,10 +65,33 @@ onBeforeUnmount(() => clearInterval(timer))
         </router-link>
       </li>
     </ul>
+
+    <nav class="sbl__staff font-mono" aria-label="Akses petugas">
+      <router-link to="/login">Login Petugas</router-link>
+      <router-link to="/judge/login">Login Juri / Wasit (PIN)</router-link>
+      <router-link to="/register">Daftar Kontingen</router-link>
+    </nav>
   </main>
 </template>
 
 <style scoped>
+.sbl__staff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid #1f2937;
+  font-size: 13px;
+}
+.sbl__staff a {
+  color: #94a3b8;
+  text-decoration: none;
+}
+.sbl__staff a:hover {
+  color: #e5e7eb;
+  text-decoration: underline;
+}
 .sbl {
   min-height: 100vh;
   padding: 32px 24px;
