@@ -1063,11 +1063,7 @@ function openBracketOps(c: Competition) {
           <AppButton variant="secondary" size="md" @click="detailModal.open = false">
             Tutup
           </AppButton>
-          <AppButton
-            variant="primary"
-            size="md"
-            @click="openBracketFromDetail"
-          >
+          <AppButton variant="primary" size="md" @click="openBracketFromDetail">
             Buka Bagan Pertandingan
           </AppButton>
         </footer>
