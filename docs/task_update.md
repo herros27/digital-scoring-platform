@@ -241,6 +241,11 @@
     - Scoreboard: judul kejuaraan, kelas "KELAS A PUTRI • TANDING", kontingen, "PARTAI #n", dan label ruleset tidak lagi tertanam.
     - Tes: `TestBroadcastSnapshot_ReachesAllClientsWithMatchContext`, `TestClassLabel`; browser `scoreboard.mjs` 11/11.
 
+49. **Perbaikan CI GitHub & Format Prettier Wajib** –
+    - Riwayat run GitHub Actions (dibaca lewat API) menunjukkan job `Test & Lint` (dengan layanan PostgreSQL) dan `Frontend Lint, Test & Build` sudah hijau, tetapi job `Docker Build Check` gagal di setiap push: `Unable to resolve action actions/setup-buildx-action, repository not found`. Diperbaiki menjadi `docker/setup-buildx-action@v3`.
+    - Seluruh `apps/web/src` diformat (`npm run format`, commit terpisah) dan `npm run format:check` ditambahkan ke job frontend. Satu handler `@click` berisi dua pernyataan di `CompetitionsView` dipindah ke fungsi karena format Prettier-nya tidak diterima kompiler Vue.
+    - Setelah format: lint, typecheck, 98 tes, build, dan seluruh skrip browser (wasit 50/50, hasil khusus, konsensus, ruleset, scoreboard, editor ruleset, juri) tetap lolos.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.
