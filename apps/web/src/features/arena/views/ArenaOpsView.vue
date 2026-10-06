@@ -15,6 +15,9 @@ import {
 } from '@/features/competitions/api/competitionQueries'
 import type { CompetitionFilterValues } from '@/features/competitions/types/competition.schema'
 import { createArenaSchema, type Arena } from '../types/arena.schema'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const props = withDefaults(
   defineProps<{
@@ -272,6 +275,7 @@ const filteredArenas = computed(() => {
         </AppButton>
 
         <AppButton
+          v-if="authStore.isAdminOrDewan"
           variant="secondary"
           size="sm"
           :loading="seedMutation.isPending.value"
@@ -295,7 +299,12 @@ const filteredArenas = computed(() => {
           Template Standar (Gelanggang A-D)
         </AppButton>
 
-        <AppButton variant="emerald" size="sm" @click="openCreateModal">
+        <AppButton
+          v-if="authStore.isAdminOrDewan"
+          variant="emerald"
+          size="sm"
+          @click="openCreateModal"
+        >
           <template #icon>
             <svg
               width="15"
@@ -528,6 +537,7 @@ const filteredArenas = computed(() => {
             </button>
 
             <button
+              v-if="authStore.isReferee || authStore.isAdminOrDewan"
               type="button"
               class="arena-link-btn arena-link--referee"
               title="Buka konsol wasit / dewan juri"
@@ -565,7 +575,7 @@ const filteredArenas = computed(() => {
             </svg>
           </button>
 
-          <div class="arena-manage-btns">
+          <div v-if="authStore.isAdminOrDewan" class="arena-manage-btns">
             <button
               type="button"
               class="arena-btn-icon"

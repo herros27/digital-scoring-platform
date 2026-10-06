@@ -13,10 +13,14 @@ import {
 } from '../api/matchQueries'
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
+import { useAuthStore } from '@/stores/auth'
 import type { MatchDTO } from '../api/matchService'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
+
+const canControlMatch = computed(() => ['admin', 'dewan', 'wasit'].includes(authStore.role || ''))
 
 const props = withDefaults(
   defineProps<{
@@ -612,7 +616,7 @@ const filteredMatches = computed(() => {
         <!-- Footer Operations -->
         <footer class="sch-card__footer font-mono">
           <!-- Control Buttons based on status -->
-          <div class="sch-footer__ops-btns">
+          <div v-if="canControlMatch" class="sch-footer__ops-btns">
             <!-- If idle / ready -->
             <template v-if="m.status === 'idle' || m.status === 'ready'">
               <button
@@ -702,6 +706,7 @@ const filteredMatches = computed(() => {
               Layar Scoreboard
             </button>
             <button
+              v-if="canControlMatch"
               type="button"
               class="sch-link-btn"
               title="Buka Konsol Wasit"

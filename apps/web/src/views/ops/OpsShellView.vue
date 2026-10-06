@@ -175,14 +175,37 @@ function isNavKey(value: unknown): value is NavKey {
   return typeof value === 'string' && (NAV_KEYS as readonly string[]).includes(value)
 }
 
-/** Tab Regulasi (ruleset) hanya untuk admin dan dewan. */
-const canManageRulesets = computed(() => ['admin', 'dewan'].includes(authStore.role || ''))
+const isAdminOrDewan = computed(() => ['admin', 'dewan'].includes(authStore.role || ''))
+const isContingent = computed(() => authStore.role === 'contingent')
+
+/** Validasi hak akses tab berdasarkan wewenang/role pengguna saat ini */
+function canAccessTab(tab: NavKey): boolean {
+  switch (tab) {
+    case 'kompetisi':
+    case 'kategori':
+    case 'verifikasi':
+    case 'pin':
+    case 'regulasi':
+      return isAdminOrDewan.value
+    case 'gelanggang':
+      return !isContingent.value
+    case 'atlet':
+    case 'jadwal':
+    case 'bagan':
+    case 'laporan':
+      return true
+    default:
+      return false
+  }
+}
 
 const resolveDefaultNav = (): NavKey => {
-  if (isNavKey(route.query.tab) && (route.query.tab !== 'regulasi' || canManageRulesets.value)) {
+  if (isNavKey(route.query.tab) && canAccessTab(route.query.tab)) {
     return route.query.tab
   }
-  if (route.path.includes('/admin')) return 'pin'
+  if (route.path.includes('/admin')) {
+    return canAccessTab('pin') ? 'pin' : 'jadwal'
+  }
   if (authStore.role === 'contingent') return 'atlet'
   return 'jadwal'
 }
@@ -190,6 +213,7 @@ const resolveDefaultNav = (): NavKey => {
 const activeNav = ref<NavKey>(resolveDefaultNav())
 
 function setNav(tab: typeof activeNav.value) {
+  if (!canAccessTab(tab)) return
   activeNav.value = tab
   router.replace({ query: { ...route.query, tab } })
 }
@@ -197,12 +221,17 @@ function setNav(tab: typeof activeNav.value) {
 watch(
   () => route.query.tab,
   (newTab) => {
-    if (
-      isNavKey(newTab) &&
-      newTab !== activeNav.value &&
-      (newTab !== 'regulasi' || canManageRulesets.value)
-    ) {
+    if (isNavKey(newTab) && newTab !== activeNav.value && canAccessTab(newTab)) {
       activeNav.value = newTab
+    }
+  },
+)
+
+watch(
+  () => authStore.role,
+  () => {
+    if (!canAccessTab(activeNav.value)) {
+      activeNav.value = resolveDefaultNav()
     }
   },
 )
@@ -702,115 +731,125 @@ function handleLoadToMat1() {
 
       <nav class="ops-nav font-mono">
         <!-- Section: Operasional Turnamen -->
-        <div class="ops-nav__section-title">OPERASIONAL TURNAMEN</div>
-        <button
-          class="ops-nav__item"
-          :class="{ 'ops-nav__item--active': activeNav === 'kompetisi' }"
-          @click="setNav('kompetisi')"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+        <template v-if="canAccessTab('kompetisi') || canAccessTab('gelanggang') || canAccessTab('kategori')">
+          <div class="ops-nav__section-title">OPERASIONAL TURNAMEN</div>
+          <button
+            v-if="canAccessTab('kompetisi')"
+            class="ops-nav__item"
+            :class="{ 'ops-nav__item--active': activeNav === 'kompetisi' }"
+            @click="setNav('kompetisi')"
           >
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-            <path d="M4 22h16" />
-            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-          </svg>
-          <span>Kompetisi</span>
-        </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+              <path d="M4 22h16" />
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+            </svg>
+            <span>Kompetisi</span>
+          </button>
 
-        <button
-          class="ops-nav__item"
-          :class="{ 'ops-nav__item--active': activeNav === 'gelanggang' }"
-          @click="setNav('gelanggang')"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+          <button
+            v-if="canAccessTab('gelanggang')"
+            class="ops-nav__item"
+            :class="{ 'ops-nav__item--active': activeNav === 'gelanggang' }"
+            @click="setNav('gelanggang')"
           >
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <circle cx="12" cy="12" r="4" />
-          </svg>
-          <span>Gelanggang</span>
-        </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+            <span>Gelanggang</span>
+          </button>
 
-        <button
-          class="ops-nav__item"
-          :class="{ 'ops-nav__item--active': activeNav === 'kategori' }"
-          @click="setNav('kategori')"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+          <button
+            v-if="canAccessTab('kategori')"
+            class="ops-nav__item"
+            :class="{ 'ops-nav__item--active': activeNav === 'kategori' }"
+            @click="setNav('kategori')"
           >
-            <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
-            <path d="M11 3 8 9l4 12 4-12-3-6" />
-            <path d="M2 9h20" />
-          </svg>
-          <span>Kategori Tanding</span>
-        </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+              <path d="M11 3 8 9l4 12 4-12-3-6" />
+              <path d="M2 9h20" />
+            </svg>
+            <span>Kategori Tanding</span>
+          </button>
+        </template>
 
         <!-- Section: Kontingen & Peserta -->
-        <div class="ops-nav__section-title">KONTINGEN & PESERTA</div>
-        <button
-          class="ops-nav__item"
-          :class="{ 'ops-nav__item--active': activeNav === 'atlet' }"
-          @click="setNav('atlet')"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+        <template v-if="canAccessTab('atlet') || canAccessTab('verifikasi')">
+          <div class="ops-nav__section-title">KONTINGEN & PESERTA</div>
+          <button
+            v-if="canAccessTab('atlet')"
+            class="ops-nav__item"
+            :class="{ 'ops-nav__item--active': activeNav === 'atlet' }"
+            @click="setNav('atlet')"
           >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          <span>Data Atlet</span>
-        </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span>Data Atlet</span>
+          </button>
 
-        <button
-          class="ops-nav__item"
-          :class="{ 'ops-nav__item--active': activeNav === 'verifikasi' }"
-          @click="setNav('verifikasi')"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+          <button
+            v-if="canAccessTab('verifikasi')"
+            class="ops-nav__item"
+            :class="{ 'ops-nav__item--active': activeNav === 'verifikasi' }"
+            @click="setNav('verifikasi')"
           >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <polyline points="16 11 18 13 22 9" />
-          </svg>
-          <span>Verifikasi Peserta</span>
-        </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <polyline points="16 11 18 13 22 9" />
+            </svg>
+            <span>Verifikasi Peserta</span>
+          </button>
+        </template>
 
         <!-- Section: Manajemen Laga -->
         <div class="ops-nav__section-title">MANAJEMEN LAGA</div>
         <button
+          v-if="canAccessTab('jadwal')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'jadwal' }"
           @click="setNav('jadwal')"
@@ -832,6 +871,7 @@ function handleLoadToMat1() {
         </button>
 
         <button
+          v-if="canAccessTab('bagan')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'bagan' }"
           @click="setNav('bagan')"
@@ -853,6 +893,7 @@ function handleLoadToMat1() {
         </button>
 
         <button
+          v-if="canAccessTab('pin')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'pin' }"
           @click="setNav('pin')"
@@ -872,7 +913,7 @@ function handleLoadToMat1() {
         </button>
 
         <button
-          v-if="canManageRulesets"
+          v-if="canAccessTab('regulasi')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'regulasi' }"
           @click="setNav('regulasi')"
@@ -894,6 +935,7 @@ function handleLoadToMat1() {
         </button>
 
         <button
+          v-if="canAccessTab('laporan')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
           @click="setNav('laporan')"
@@ -1075,11 +1117,11 @@ function handleLoadToMat1() {
         }"
       >
         <!-- TAB KOMPETISI -->
-        <CompetitionsView v-if="activeNav === 'kompetisi'" />
+        <CompetitionsView v-if="activeNav === 'kompetisi' && canAccessTab('kompetisi')" />
 
         <!-- TAB GELANGGANG -->
         <ArenaOpsView
-          v-else-if="activeNav === 'gelanggang'"
+          v-else-if="activeNav === 'gelanggang' && canAccessTab('gelanggang')"
           :competition-id="activeCompId"
           @select-arena="handleArenaSelect"
           @switch-competition="switchCompetition"
@@ -1087,7 +1129,7 @@ function handleLoadToMat1() {
 
         <!-- TAB KATEGORI TANDING -->
         <CategoryOpsView
-          v-else-if="activeNav === 'kategori'"
+          v-else-if="activeNav === 'kategori' && canAccessTab('kategori')"
           :competition-id="activeCompId"
           :competition-name="activeCompetition?.name"
           @select-category="handleCategorySelect"
@@ -1095,31 +1137,31 @@ function handleLoadToMat1() {
 
         <!-- TAB DATA ATLET & KONTINGEN -->
         <AthletesOpsView
-          v-else-if="activeNav === 'atlet'"
+          v-else-if="activeNav === 'atlet' && canAccessTab('atlet')"
           :competition-id="activeCompId"
-          @navigate-verification="activeNav = 'verifikasi'"
+          @navigate-verification="canAccessTab('verifikasi') ? (activeNav = 'verifikasi') : undefined"
         />
 
         <!-- TAB VERIFIKASI PESERTA -->
         <ParticipantVerificationView
-          v-else-if="activeNav === 'verifikasi'"
+          v-else-if="activeNav === 'verifikasi' && canAccessTab('verifikasi')"
           :competition-id="activeCompId"
         />
 
         <!-- TAB JADWAL TANDING -->
-        <ScheduleOpsView v-else-if="activeNav === 'jadwal'" :competition-id="activeCompId" />
+        <ScheduleOpsView v-else-if="activeNav === 'jadwal' && canAccessTab('jadwal')" :competition-id="activeCompId" />
 
         <!-- TAB PERANGKAT & PIN JURI -->
-        <DevicePinManager v-else-if="activeNav === 'pin'" :competition-id="activeCompId" />
+        <DevicePinManager v-else-if="activeNav === 'pin' && canAccessTab('pin')" :competition-id="activeCompId" />
 
         <!-- TAB REGULASI & RULESET -->
-        <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canManageRulesets" />
+        <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')" />
 
         <!-- TAB LAPORAN & EKSPOR -->
-        <ReportsOpsView v-else-if="activeNav === 'laporan'" :competition-id="activeCompId" />
+        <ReportsOpsView v-else-if="activeNav === 'laporan' && canAccessTab('laporan')" :competition-id="activeCompId" />
 
         <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
-        <template v-else>
+        <template v-else-if="activeNav === 'bagan' && canAccessTab('bagan')">
           <!-- HEADER BANNER & ACTION BUTTONS -->
           <section class="ops-banner-row">
             <div class="ops-banner-title-group">
@@ -1149,7 +1191,12 @@ function handleLoadToMat1() {
             </div>
 
             <div class="ops-banner-actions font-mono">
-              <AppButton variant="emerald" size="sm" @click="handleGenerateDraw">
+              <AppButton
+                v-if="isAdminOrDewan"
+                variant="emerald"
+                size="sm"
+                @click="handleGenerateDraw"
+              >
                 <template #icon>
                   <svg
                     width="16"
@@ -1167,7 +1214,11 @@ function handleLoadToMat1() {
                 Generate Bagan Acak
               </AppButton>
 
-              <button class="ops-action-btn-dark font-mono" @click="toggleLock">
+              <button
+                v-if="isAdminOrDewan"
+                class="ops-action-btn-dark font-mono"
+                @click="toggleLock"
+              >
                 <svg
                   width="15"
                   height="15"

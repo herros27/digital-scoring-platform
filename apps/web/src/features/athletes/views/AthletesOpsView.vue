@@ -8,6 +8,9 @@ import {
   useRegisterToCompetitionMutation,
 } from '../api/athleteQueries'
 import { createAthleteSchema } from '../types/athlete.schema'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const props = withDefaults(
   defineProps<{
@@ -261,7 +264,12 @@ function isMaleGender(gender: string): boolean {
           Segarkan
         </AppButton>
 
-        <AppButton variant="secondary" size="sm" @click="emit('navigateVerification')">
+        <AppButton
+          v-if="authStore.isAdminOrDewan"
+          variant="secondary"
+          size="sm"
+          @click="emit('navigateVerification')"
+        >
           <template #icon>
             <svg
               width="15"
@@ -547,6 +555,7 @@ function isMaleGender(gender: string): boolean {
             <span class="atl-status-text">TERDAFTAR RESMI</span>
           </div>
           <button
+            v-if="authStore.isAdminOrDewan"
             type="button"
             class="atl-verify-link font-mono"
             @click="emit('navigateVerification')"
@@ -1079,17 +1088,12 @@ function isMaleGender(gender: string): boolean {
 /* Card Grid */
 .atl-grid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
   gap: 16px;
 }
-@container (min-width: 640px) {
+@media (max-width: 640px) {
   .atl-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@container (min-width: 1024px) {
-  .atl-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
