@@ -98,11 +98,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # docker-compose.yml mewajibkan berkas .env (env_file); di CI dibuat dari contoh agar compose ikut tervalidasi
-      - name: Validate docker compose (requires .env)
+      # docker-compose.yml mewajibkan berkas .env.prod (env_file); di CI dibuat dari contoh agar compose ikut tervalidasi
+      - name: Validate docker compose (requires .env.prod)
         run: |
-          cp .env.example .env
-          docker compose config --quiet
+          cp .env.example .env.prod
+          docker compose --env-file .env.prod config --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
