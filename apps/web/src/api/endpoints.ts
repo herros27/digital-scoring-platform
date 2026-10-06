@@ -119,6 +119,7 @@ export const ENDPOINTS = {
 
   // Live Displays & Telemetry
   LIVE: {
+    ARENAS: '/api/v1/live/arenas',
     SCOREBOARD: (arenaId: string) => `/api/v1/live/scoreboard/${arenaId}`,
   },
 

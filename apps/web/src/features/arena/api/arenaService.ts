@@ -1,6 +1,6 @@
 import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
-import type { Arena, LiveScoreboardSnapshot } from '../types/arena.schema'
+import type { Arena, LiveArena, LiveScoreboardSnapshot } from '../types/arena.schema'
 
 export const arenaService = {
   /**
@@ -89,6 +89,14 @@ export const arenaService = {
     }
 
     return { created, skipped }
+  },
+
+  /**
+   * 8. GET /api/v1/live/arenas (Public) — gelanggang yang sedang berlangsung
+   */
+  async getLiveArenas(): Promise<LiveArena[]> {
+    const res = await http.get<LiveArena[]>(ENDPOINTS.LIVE.ARENAS)
+    return res.data || []
   },
 
   /**

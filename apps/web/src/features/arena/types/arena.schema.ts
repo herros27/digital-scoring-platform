@@ -22,12 +22,26 @@ export interface Arena {
   connected_judges?: number
 }
 
+/** Satu baris GET /live/arenas: gelanggang yang sedang punya pertandingan aktif. */
+export interface LiveArena {
+  arena_id: string
+  arena_name: string
+  match_id: string
+  state: string
+  round: number
+  red_athlete?: string
+  blue_athlete?: string
+  red_total: number
+  blue_total: number
+}
+
 /**
  * Respons GET /live/scoreboard/{arena_id}. Backend saat ini hanya mengembalikan
  * `{ status: 'no active match' }`; field lain terisi bila ada pertandingan aktif.
  */
 export interface LiveScoreboardSnapshot {
   status?: string
+  arena_name?: string
   round?: number
   red_athlete?: string
   blue_athlete?: string

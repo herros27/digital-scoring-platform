@@ -123,6 +123,7 @@ onMounted(async () => {
 
   try {
     const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
+    if (snapshot?.arena_name) arenaName.value = snapshot.arena_name.toUpperCase()
     if (snapshot && typeof snapshot === 'object' && snapshot.status !== 'no active match') {
       if (snapshot.round) currentRound.value = snapshot.round
       if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete

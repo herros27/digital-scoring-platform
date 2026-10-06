@@ -19,6 +19,7 @@ describe('router guard', () => {
 
   it('mengizinkan rute publik tanpa token', async () => {
     expect((await visit('/scoreboard/a1')).name).toBe('scoreboard')
+    expect((await visit('/scoreboard')).name).toBe('scoreboard-list')
   })
 
   it('/ops tanpa token diarahkan ke /login dengan redirect', async () => {

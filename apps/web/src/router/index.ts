@@ -13,7 +13,13 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false },
   },
   {
-    path: '/scoreboard/:arena_id?',
+    path: '/scoreboard',
+    name: 'scoreboard-list',
+    component: () => import('../views/scoreboard/ScoreboardListView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
+    path: '/scoreboard/:arena_id',
     name: 'scoreboard',
     component: () => import('../views/scoreboard/ScoreboardView.vue'),
     meta: { requiresAuth: false, layout: 'KioskLayout' },

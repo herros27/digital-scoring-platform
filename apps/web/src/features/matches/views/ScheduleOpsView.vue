@@ -154,7 +154,7 @@ async function handleFinishMatch(m: MatchDTO) {
 
 // External Links
 function openScoreboard(arenaId?: string) {
-  const url = arenaId ? `/scoreboard?arena=${arenaId}` : '/scoreboard'
+  const url = arenaId ? `/scoreboard/${arenaId}` : '/scoreboard'
   window.open(url, '_blank')
 }
 

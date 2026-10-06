@@ -42,6 +42,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	athleteService := service.NewAthleteService(athleteRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
 	matchService.SetRulesetResolver(rulesetService)
+	matchService.SetArenaStore(arenaRepo)
 	officialService := service.NewOfficialService(officialRepo)
 	contingentService := service.NewContingentService(contingentRepo)
 	reportService := service.NewReportService(compRepo, arenaRepo, categoryRepo, athleteRepo, matchRepo)
@@ -100,6 +101,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	mux.Handle("POST /api/v1/auth/contingent/register", authLimiter(http.HandlerFunc(contingentH.Register)))
 	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
 	mux.HandleFunc("POST /api/v1/auth/logout", authH.Logout)
+	mux.HandleFunc("GET /api/v1/live/arenas", liveH.Arenas)
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
 
 	// === Public cached tournament views (Otter in-memory cache) ===

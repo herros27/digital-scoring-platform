@@ -2090,6 +2090,40 @@ paths:
   # -------------------------------------------------------
   # LIVE SCOREBOARD (PUBLIC)
   # -------------------------------------------------------
+  /api/v1/live/arenas:
+    get:
+      summary: Daftar Gelanggang yang Sedang Berlangsung (Publik)
+      description: |
+        Semua gelanggang yang punya pertandingan aktif (state bukan `finished`/`cancelled`), dibaca dari
+        orchestrator di memori dan diurutkan menurut nama gelanggang. Dipakai halaman `/scoreboard`.
+      tags:
+        - Live Scoreboard
+      responses:
+        '200':
+          description: Daftar (kosong bila tidak ada pertandingan berlangsung)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        arena_id: { type: string, format: uuid }
+                        arena_name: { type: string }
+                        match_id: { type: string, format: uuid }
+                        state: { type: string, example: round_1 }
+                        round: { type: integer }
+                        red_athlete: { type: string }
+                        blue_athlete: { type: string }
+                        red_total: { type: integer }
+                        blue_total: { type: integer }
+
   /api/v1/live/scoreboard/{arena_id}:
     get:
       summary: Live Scoreboard Feed (Publik / Layar Penonton)
@@ -2118,6 +2152,9 @@ paths:
                   data:
                     type: object
                     properties:
+                      arena_name:
+                        type: string
+                        description: Nama gelanggang (ada juga saat `no active match`)
                       status:
                         type: string
                         description: Status mesin pertandingan (`ready`, `round_1`, `break_1`, ...) atau `no active match`

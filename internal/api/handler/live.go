@@ -13,6 +13,15 @@ type LiveHandler struct {
 	Matches    *service.MatchService
 }
 
+// GET /api/v1/live/arenas  — no auth, daftar gelanggang yang sedang punya pertandingan aktif.
+func (h *LiveHandler) Arenas(w http.ResponseWriter, r *http.Request) {
+	if h.Matches == nil {
+		Ok(w, []map[string]any{})
+		return
+	}
+	Ok(w, h.Matches.ListLiveArenas())
+}
+
 // GET /api/v1/live/scoreboard/{arena_id}  — no auth, untuk display publik
 // Mengembalikan keadaan pertandingan aktif di arena, atau {"status": "no active match"}.
 func (h *LiveHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
@@ -23,5 +32,9 @@ func (h *LiveHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	Ok(w, map[string]string{"status": "no active match"})
+	resp := map[string]string{"status": "no active match"}
+	if h.Matches != nil {
+		resp["arena_name"] = h.Matches.ArenaName(arenaID)
+	}
+	Ok(w, resp)
 }

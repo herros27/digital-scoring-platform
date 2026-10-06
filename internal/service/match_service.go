@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"sort"
 	"sync"
 
 	"github.com/herros27/digital-scoring/internal/consensus"
@@ -34,10 +35,25 @@ type MatchService struct {
 	matchStore      *store.MatchStore
 	bracketStore    orchestrator.BracketAdvancer
 	rulesetResolver RulesetResolver
+	arenaStore      *store.ArenaStore
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
 }
+
+// ArenaName mengembalikan nama gelanggang, atau "" bila tidak diketahui.
+func (s *MatchService) ArenaName(arenaID string) string {
+	if s.arenaStore == nil {
+		return ""
+	}
+	if a, err := s.arenaStore.GetByID(arenaID); err == nil {
+		return a.Name
+	}
+	return ""
+}
+
+// SetArenaStore memungkinkan daftar scoreboard publik menampilkan nama gelanggang.
+func (s *MatchService) SetArenaStore(a *store.ArenaStore) { s.arenaStore = a }
 
 func (s *MatchService) SetRulesetResolver(resolver RulesetResolver) {
 	s.rulesetResolver = resolver
@@ -347,6 +363,7 @@ func (s *MatchService) GetLiveSnapshot(arenaID string) (snapshot map[string]any,
 
 	snapshot = live.Snapshot()
 	snapshot["status"] = snapshot["state"]
+	snapshot["arena_name"] = s.ArenaName(arenaID)
 	if s.matchStore != nil {
 		if red, blue, err := s.matchStore.GetCornerNames(live.GetMatchID()); err == nil {
 			snapshot["red_athlete"] = red
@@ -354,4 +371,49 @@ func (s *MatchService) GetLiveSnapshot(arenaID string) (snapshot map[string]any,
 		}
 	}
 	return snapshot, true
+}
+
+// ListLiveArenas mengembalikan ringkasan semua gelanggang yang sedang punya pertandingan
+// aktif (belum selesai/dibatalkan), diurutkan menurut nama gelanggang.
+func (s *MatchService) ListLiveArenas() []map[string]any {
+	s.mu.RLock()
+	live := make([]*orchestrator.Orchestrator, 0, len(s.activeOrchestrators))
+	for _, orch := range s.activeOrchestrators {
+		if orch.IsActive() {
+			live = append(live, orch)
+		}
+	}
+	s.mu.RUnlock()
+
+	list := make([]map[string]any, 0, len(live))
+	for _, orch := range live {
+		snap := orch.Snapshot()
+		item := map[string]any{
+			"arena_id":   orch.GetArenaID(),
+			"arena_name": s.ArenaName(orch.GetArenaID()),
+			"match_id":   orch.GetMatchID(),
+			"state":      snap["state"],
+			"round":      snap["round"],
+			"red_total":  snap["red_total"],
+			"blue_total": snap["blue_total"],
+		}
+		if s.matchStore != nil {
+			if red, blue, err := s.matchStore.GetCornerNames(orch.GetMatchID()); err == nil {
+				item["red_athlete"] = red
+				item["blue_athlete"] = blue
+			}
+		}
+		list = append(list, item)
+	}
+	sort.Slice(list, func(i, j int) bool {
+		ni, _ := list[i]["arena_name"].(string)
+		nj, _ := list[j]["arena_name"].(string)
+		if ni != nj {
+			return ni < nj
+		}
+		ai, _ := list[i]["arena_id"].(string)
+		aj, _ := list[j]["arena_id"].(string)
+		return ai < aj
+	})
+	return list
 }

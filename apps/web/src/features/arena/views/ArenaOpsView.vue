@@ -168,7 +168,7 @@ async function handleSeedStandard() {
 
 // Open External Links
 function openScoreboard(arena: Arena) {
-  window.open(`/scoreboard?arena=${arena.id}`, '_blank')
+  window.open(`/scoreboard/${arena.id}`, '_blank')
 }
 
 function openRefereeConsole() {

@@ -300,6 +300,7 @@ GET http://localhost:8080/docs/openapi.yaml
 ### 11. Live Scoreboard & WebSocket
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/api/v1/live/arenas` | Public | Daftar gelanggang yang sedang punya pertandingan aktif (nama gelanggang, atlet, ronde, skor) |
 | GET | `/api/v1/live/scoreboard/{arena_id}` | Public | Snapshot pertandingan aktif di arena (status, ronde, timer, total skor, nama atlet) atau `{"status":"no active match"}` |
 | GET | `/ws/arena/{arena_id}[?token=<JWT>]` | Token opsional | Real-time bi-directional channel gelanggang (Websocket); tanpa token = penonton read-only |
 
