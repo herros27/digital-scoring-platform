@@ -509,7 +509,9 @@ WantedBy=multi-user.target
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
-Returns: DB status, active arenas, active matches, WS connections.
+Returns `{"status":"ok"}`, atau 503 bila database tidak merespons (tanpa rincian). Endpoint ini publik; metrik ada di `/metrics`.
+
+`/metrics` (Prometheus) hanya dapat diakses dari loopback; untuk scraper jarak jauh isi `METRICS_TOKEN` lalu kirim `Authorization: Bearer <token>`. Nginx pada image web tidak mem-proxy `/metrics`.
 
 ---
 

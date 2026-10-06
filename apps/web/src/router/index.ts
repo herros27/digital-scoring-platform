@@ -4,13 +4,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'home',
-    redirect: '/login',
-  },
-  {
-    path: '/design-system',
-    name: 'design-system',
-    component: () => import('../views/DesignSystemView.vue'),
-    meta: { requiresAuth: false },
+    redirect: '/scoreboard',
   },
   {
     path: '/scoreboard',

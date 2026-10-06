@@ -17,7 +17,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
+// NewRouter merakit seluruh rute. metricsToken (METRICS_TOKEN) kosong = /metrics hanya dari loopback.
+func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Handler {
 	// in-memory cache (Otter S3-FIFO)
 	appCache := cache.MustNew(10_000)
 
@@ -79,21 +80,11 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	mux.HandleFunc("GET /docs", SwaggerHandler())
 	mux.HandleFunc("GET /docs/openapi.yaml", OpenAPISpecHandler("docs/openapi.yaml"))
 
-	// === Prometheus Metrics (Public) ===
-	mux.Handle("GET /metrics", promhttp.Handler())
+	// === Prometheus Metrics (hanya loopback, atau dengan METRICS_TOKEN) ===
+	mux.Handle("GET /metrics", MetricsAccess(metricsToken)(promhttp.Handler()))
 
-	// === Health Check (Public) ===
-	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		dbStatus := "connected"
-		if err := db.Ping(); err != nil {
-			dbStatus = "error: " + err.Error()
-		}
-		handler.Ok(w, map[string]any{
-			"status":   "ok",
-			"database": dbStatus,
-			"version":  "1.0.0",
-		})
-	})
+	// === Health Check (publik, tanpa detail) ===
+	mux.HandleFunc("GET /api/v1/health", HealthHandler(db))
 
 	// Rate limiters:
 	// Auth endpoints: 10 req/min, burst 10 per IP (brute force mitigation for PIN & password)

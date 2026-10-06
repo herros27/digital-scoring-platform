@@ -58,7 +58,7 @@ func main() {
 
 	// 4. Hub Manager & Router
 	hubManager := hub.NewManager()
-	router := api.NewRouter(db, hubManager)
+	router := api.NewRouter(db, hubManager, cfg.MetricsToken)
 
 	// 5. Production HTTP Server Configuration
 	server := &http.Server{

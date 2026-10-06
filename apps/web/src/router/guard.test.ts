@@ -14,12 +14,16 @@ async function visit(path: string) {
 describe('router guard', () => {
   beforeEach(async () => {
     sessionStorage.clear()
-    await router.push('/design-system')
+    await router.push('/login')
   })
 
   it('mengizinkan rute publik tanpa token', async () => {
     expect((await visit('/scoreboard/a1')).name).toBe('scoreboard')
     expect((await visit('/scoreboard')).name).toBe('scoreboard-list')
+  })
+
+  it('base URL diarahkan ke daftar scoreboard live', async () => {
+    expect((await visit('/')).name).toBe('scoreboard-list')
   })
 
   it('/ops tanpa token diarahkan ke /login dengan redirect', async () => {
