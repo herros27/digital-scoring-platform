@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
@@ -120,8 +121,8 @@ async function handleSubmitCategory() {
     const created = await createMutation.mutateAsync(payload)
     isModalOpen.value = false
     showToast('Kategori Dibuat', `Kategori ${created.name} berhasil ditambahkan ke kompetisi.`, 'success')
-  } catch (err: any) {
-    const message = err.message || 'Gagal menambahkan kategori ke server.'
+  } catch (err) {
+    const message = getErrorMessage(err, 'Gagal menambahkan kategori ke server.')
     showToast('Terjadi Kesalahan', message, 'danger')
   }
 }
@@ -143,8 +144,8 @@ async function handleSeedPresets() {
         'info'
       )
     }
-  } catch (err: any) {
-    showToast('Gagal Sinkronisasi', err.message || 'Gagal memuat standar IPSI.', 'danger')
+  } catch (err) {
+    showToast('Gagal Sinkronisasi', getErrorMessage(err, 'Gagal memuat standar IPSI.'), 'danger')
   }
 }
 
@@ -426,7 +427,7 @@ function handleCategoryClick(cat: Category) {
         </svg>
       </div>
       <h3 class="cat-empty-title">Gagal Memuat Kategori</h3>
-      <p class="cat-empty-desc">{{ (error as any)?.message || 'Terjadi gangguan jaringan saat menghubungi server.' }}</p>
+      <p class="cat-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat menghubungi server.') }}</p>
       <AppButton variant="secondary" size="md" @click="() => refetch()">
         Coba Lagi
       </AppButton>

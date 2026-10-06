@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { isNotFoundError } from '@/api/error'
+import { getErrorMessage } from '@/api/error'
 import { ref, computed, watch, onMounted } from 'vue'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -65,7 +67,7 @@ async function loadAllArenasDeviceCounts() {
       try {
         const pins = await authService.listPins(compId, arena.id)
         const maxJudge = judgeFormat.value === '3' ? 3 : 5
-        const validPins = (pins || []).filter((p: any) => {
+        const validPins = (pins || []).filter((p) => {
           if (p.role === 'wasit') return true
           if (p.role === 'judge' || p.role === 'juri') {
             return Number(p.seat_number) <= maxJudge
@@ -163,7 +165,7 @@ async function fetchPinsForArena(arenaId: string) {
     // 1. Kursi Juri (1 s/d 3 atau 1 s/d 5)
     for (let s = 1; s <= maxJudge; s++) {
       const found = pinsFromBackend.find(
-        (p: any) => (p.role === 'judge' || p.role === 'juri') && Number(p.seat_number) === s
+        (p) => (p.role === 'judge' || p.role === 'juri') && Number(p.seat_number) === s
       )
       const pinStr = found?.pin ? formatPin(found.pin) : '--- ---'
       seats.push({
@@ -181,7 +183,7 @@ async function fetchPinsForArena(arenaId: string) {
     }
 
     // 2. Meja Pengawas & Wasit
-    const foundWasit = pinsFromBackend.find((p: any) => p.role === 'wasit')
+    const foundWasit = pinsFromBackend.find((p) => p.role === 'wasit')
     const wasitPinStr = foundWasit?.pin ? formatPin(foundWasit.pin) : '--- ---'
     seats.push({
       id: foundWasit?.id || `${arenaId}-wasit`,
@@ -198,7 +200,7 @@ async function fetchPinsForArena(arenaId: string) {
 
     arenaData.value[arenaId] = seats
     arenaDeviceCounts.value[arenaId] = seats.length
-  } catch (err: any) {
+  } catch (err) {
     console.error('Gagal mengambil PIN gelanggang dari backend:', err)
   } finally {
     isLoadingPins.value = false
@@ -287,11 +289,11 @@ async function generatePinForSeat(seat: DeviceSeat) {
     await loadAllArenasDeviceCounts()
     const formattedPin = res?.pin ? formatPin(res.pin) : seat.pin
     showToast('PIN Diperbarui', `PIN baru untuk ${seat.label}: ${formattedPin}`, 'success')
-  } catch (err: any) {
-    if (err?.status === 404 || err?.message?.includes('tidak ditemukan')) {
+  } catch (err) {
+    if (isNotFoundError(err)) {
       await refetchArenas()
     }
-    showToast('Gagal Reset PIN', err.message || 'Terjadi kesalahan sistem.', 'warning')
+    showToast('Gagal Reset PIN', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'warning')
   }
 }
 
@@ -332,11 +334,11 @@ async function handleBatchGenerate() {
       `Seluruh PIN ${maxJudge} Juri & Wasit di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang dan disimpan ke server.`,
       'success'
     )
-  } catch (err: any) {
-    if (err?.status === 404 || err?.message?.includes('tidak ditemukan')) {
+  } catch (err) {
+    if (isNotFoundError(err)) {
       await refetchArenas()
     }
-    showToast('Gagal Generate Semua PIN', err.message || 'Terjadi kesalahan.', 'warning')
+    showToast('Gagal Generate Semua PIN', getErrorMessage(err, 'Terjadi kesalahan.'), 'warning')
   }
 }
 
@@ -382,11 +384,11 @@ async function handleSaveCustomPin() {
     showToast('PIN Berhasil Dibuat', `PIN ${customRole.value.toUpperCase()} (${formatted}) tersimpan aman di server.`, 'success')
     showCustomPinModal.value = false
     customPinInput.value = ''
-  } catch (err: any) {
-    if (err?.status === 404 || err?.message?.includes('tidak ditemukan')) {
+  } catch (err) {
+    if (isNotFoundError(err)) {
       await refetchArenas()
     }
-    showToast('Gagal Simpan PIN Kustom', err.message || 'Terjadi kesalahan.', 'warning')
+    showToast('Gagal Simpan PIN Kustom', getErrorMessage(err, 'Terjadi kesalahan.'), 'warning')
   }
 }
 </script>

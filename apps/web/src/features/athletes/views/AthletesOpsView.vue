@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
@@ -108,8 +109,8 @@ async function handleSubmitAthlete() {
     isModalOpen.value = false
     showToast('Atlet Berhasil Didaftarkan', `${formState.value.name} telah didaftarkan ke kompetisi.`, 'success')
     refetch()
-  } catch (err: any) {
-    showToast('Gagal Mendaftarkan Atlet', err.message || 'Terjadi kesalahan sistem.', 'danger')
+  } catch (err) {
+    showToast('Gagal Mendaftarkan Atlet', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
   }
 }
 
@@ -397,7 +398,7 @@ function isMaleGender(gender: string): boolean {
         </svg>
       </div>
       <h3 class="atl-empty-title">Gagal Memuat Data Atlet</h3>
-      <p class="atl-empty-desc">{{ (error as any)?.message || 'Terjadi gangguan jaringan saat memuat data atlet.' }}</p>
+      <p class="atl-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat data atlet.') }}</p>
       <AppButton variant="secondary" size="md" @click="() => refetch()">
         Coba Lagi
       </AppButton>

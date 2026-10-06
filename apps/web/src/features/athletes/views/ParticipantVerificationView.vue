@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
@@ -58,8 +59,8 @@ async function handleSetStatus(participant: Participant, newStatus: 'verified' |
       `Peserta ${participant.name} ${actionLabel}.`,
       newStatus === 'verified' ? 'success' : 'danger'
     )
-  } catch (err: any) {
-    showToast('Gagal Memperbarui Status', err.message || 'Terjadi kesalahan sistem.', 'danger')
+  } catch (err) {
+    showToast('Gagal Memperbarui Status', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
   } finally {
     processingId.value = null
   }
@@ -358,7 +359,7 @@ function formatDate(iso: string): string {
         </svg>
       </div>
       <h3 class="verif-empty-title">Gagal Memuat Antrean Verifikasi</h3>
-      <p class="verif-empty-desc">{{ (error as any)?.message || 'Terjadi gangguan jaringan saat memuat antrean.' }}</p>
+      <p class="verif-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat antrean.') }}</p>
       <AppButton variant="secondary" size="md" @click="() => refetch()">
         Coba Lagi
       </AppButton>

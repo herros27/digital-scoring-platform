@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { competitionSchema } from '@/features/competitions/types/competition.schema'
+import type { Category } from '@/features/categories/types/category.schema'
+import type { Match } from '@/features/matches/types/match.schema'
 
 export const competitionSummarySchema = z.object({
   competition_id: z.string(),
@@ -19,11 +22,11 @@ export const medalStandingSchema = z.object({
 })
 
 export const competitionExportSchema = z.object({
-  competition: z.any(),
+  competition: competitionSchema,
   summary: competitionSummarySchema,
   medals: z.array(medalStandingSchema),
-  categories: z.array(z.any()),
-  matches: z.array(z.any()),
+  categories: z.array(z.custom<Category>()),
+  matches: z.array(z.custom<Match>()),
 })
 
 export type CompetitionSummary = z.infer<typeof competitionSummarySchema>

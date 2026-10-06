@@ -1,4 +1,4 @@
-import { apiClient } from '@/api/client'
+import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
 import type {
   Category,
@@ -14,7 +14,7 @@ export const categoryService = {
   async getCategories(competitionId: string): Promise<Category[]> {
     if (!competitionId) return []
     const url = ENDPOINTS.CATEGORIES.LIST(competitionId)
-    const res = await apiClient.get<any, { success: boolean; data: Category[] }>(url)
+    const res = await http.get<Category[]>(url)
     return res.data || []
   },
 
@@ -26,7 +26,7 @@ export const categoryService = {
     payload: CreateCategoryFormValues
   ): Promise<Category> {
     const url = ENDPOINTS.CATEGORIES.CREATE(competitionId)
-    const res = await apiClient.post<any, { success: boolean; data: Category }>(url, payload)
+    const res = await http.post<Category>(url, payload)
     return res.data
   },
 
@@ -35,7 +35,7 @@ export const categoryService = {
    */
   async getCategory(competitionId: string, id: string): Promise<Category> {
     const url = ENDPOINTS.CATEGORIES.DETAIL(competitionId, id)
-    const res = await apiClient.get<any, { success: boolean; data: Category }>(url)
+    const res = await http.get<Category>(url)
     return res.data
   },
 

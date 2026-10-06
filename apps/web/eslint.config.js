@@ -16,8 +16,7 @@ export default tseslint.config(
   {
     languageOptions: { globals: { ...globals.browser } },
     rules: {
-      // Kode lama masih memakai `any` pada payload API; tampilkan sebagai peringatan.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppBadge, AppInput } from '@/components/ui'
@@ -47,7 +48,7 @@ const totalCompetitions = computed(() => competitionsData.value?.pagination?.tot
 
 // Feedback toast
 const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(null)
-let toastTimer: any = null
+let toastTimer: ReturnType<typeof setTimeout> | null = null
 function showToast(title: string, message: string, type: 'success' | 'danger' | 'info' = 'success') {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { title, message, type }
@@ -175,8 +176,8 @@ async function handleFormSubmit() {
       const created = await createMutation.mutateAsync(result.data)
       showToast('Kejuaraan Dibuat', `Kejuaraan "${created.name}" berhasil dibuat sebagai Draft.`, 'success')
       isFormModalOpen.value = false
-    } catch (err: any) {
-      showToast('Gagal Menyimpan', err.message || 'Terjadi kesalahan sistem saat membuat kejuaraan', 'danger')
+    } catch (err) {
+      showToast('Gagal Menyimpan', getErrorMessage(err, 'Terjadi kesalahan sistem saat membuat kejuaraan'), 'danger')
     }
   } else if (formMode.value === 'edit' && activeEditId.value) {
     const result = updateCompetitionSchema.safeParse(formState.value)
@@ -195,8 +196,8 @@ async function handleFormSubmit() {
       })
       showToast('Perubahan Disimpan', `Data kejuaraan "${updated.name}" berhasil diperbarui.`, 'success')
       isFormModalOpen.value = false
-    } catch (err: any) {
-      showToast('Gagal Menyimpan', err.message || 'Terjadi kesalahan sistem saat memperbarui kejuaraan', 'danger')
+    } catch (err) {
+      showToast('Gagal Menyimpan', getErrorMessage(err, 'Terjadi kesalahan sistem saat memperbarui kejuaraan'), 'danger')
     }
   }
 }
@@ -275,8 +276,8 @@ async function executeConfirmAction() {
   try {
     await confirmModal.value.action()
     confirmModal.value.open = false
-  } catch (err: any) {
-    showToast('Operasi Gagal', err.message || 'Gagal mengubah status kompetisi', 'danger')
+  } catch (err) {
+    showToast('Operasi Gagal', getErrorMessage(err, 'Gagal mengubah status kompetisi'), 'danger')
   } finally {
     confirmLoading.value = false
   }
@@ -503,7 +504,7 @@ function openBracketOps(c: Competition) {
       <div v-else-if="queryError && competitions.length === 0" class="comp-empty">
         <div class="comp-empty__icon comp-empty__icon--error">✕</div>
         <h3 class="comp-empty__title">Gagal Menghubungkan Backend</h3>
-        <p class="comp-empty__desc">{{ (queryError as any)?.message || 'Terjadi gangguan jaringan' }}</p>
+        <p class="comp-empty__desc">{{ getErrorMessage(queryError, 'Terjadi gangguan jaringan') }}</p>
         <AppButton variant="secondary" size="md" @click="() => refetch()">Coba Lagi</AppButton>
       </div>
 

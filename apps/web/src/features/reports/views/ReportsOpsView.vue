@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -106,8 +107,8 @@ async function exportFullJson() {
     const jsonStr = JSON.stringify(data, null, 2)
     downloadFile(jsonStr, `Turnamen_Export_${compIdRef.value.slice(0, 8)}.json`, 'application/json')
     showToast('Ekspor Sukses', 'Arsip data turnamen lengkap berhasil diunduh (.JSON)', 'success')
-  } catch (err: any) {
-    showToast('Gagal Ekspor', err.message || 'Terjadi kesalahan saat mengunduh data turnamen.', 'warning')
+  } catch (err) {
+    showToast('Gagal Ekspor', getErrorMessage(err, 'Terjadi kesalahan saat mengunduh data turnamen.'), 'warning')
   } finally {
     isExportingJson.value = false
   }

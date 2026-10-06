@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AppButton } from '@/components/ui'
@@ -95,8 +96,8 @@ async function handleLoadToArena(m: MatchDTO) {
   try {
     await loadArenaMutation.mutateAsync({ matchId: m.id, arenaId: m.arena_id })
     showToast('Dimuat ke Gelanggang', `Partai berhasil dimuat ke ${arenaMap.value[m.arena_id] || 'Gelanggang'}.`, 'success')
-  } catch (err: any) {
-    showToast('Gagal Memuat', err.message || 'Gagal memuat partai.', 'danger')
+  } catch (err) {
+    showToast('Gagal Memuat', getErrorMessage(err, 'Gagal memuat partai.'), 'danger')
   } finally {
     actionLoadingId.value = null
   }
@@ -107,8 +108,8 @@ async function handleStartMatch(m: MatchDTO) {
   try {
     await startMatchMutation.mutateAsync(m.id)
     showToast('Pertandingan Dimulai', 'Timer dan konsol wasit telah diaktifkan.', 'success')
-  } catch (err: any) {
-    showToast('Gagal Memulai', err.message || 'Gagal memulai pertandingan.', 'danger')
+  } catch (err) {
+    showToast('Gagal Memulai', getErrorMessage(err, 'Gagal memulai pertandingan.'), 'danger')
   } finally {
     actionLoadingId.value = null
   }
@@ -119,8 +120,8 @@ async function handlePauseMatch(m: MatchDTO) {
   try {
     await pauseMatchMutation.mutateAsync(m.id)
     showToast('Pertandingan Dijeda', 'Pertandingan sementara dijeda (break/time out).', 'info')
-  } catch (err: any) {
-    showToast('Gagal Menjeda', err.message || 'Gagal menjeda.', 'danger')
+  } catch (err) {
+    showToast('Gagal Menjeda', getErrorMessage(err, 'Gagal menjeda.'), 'danger')
   } finally {
     actionLoadingId.value = null
   }
@@ -131,8 +132,8 @@ async function handleResumeMatch(m: MatchDTO) {
   try {
     await resumeMatchMutation.mutateAsync(m.id)
     showToast('Pertandingan Dilanjutkan', 'Timer pertandingan kembali berjalan.', 'success')
-  } catch (err: any) {
-    showToast('Gagal Melanjutkan', err.message || 'Gagal melanjutkan.', 'danger')
+  } catch (err) {
+    showToast('Gagal Melanjutkan', getErrorMessage(err, 'Gagal melanjutkan.'), 'danger')
   } finally {
     actionLoadingId.value = null
   }
@@ -144,8 +145,8 @@ async function handleFinishMatch(m: MatchDTO) {
   try {
     await finishMatchMutation.mutateAsync(m.id)
     showToast('Partai Selesai', 'Partai resmi dinyatakan selesai dan skor tercatat.', 'success')
-  } catch (err: any) {
-    showToast('Gagal Menyelesaikan', err.message || 'Gagal menyelesaikan partai.', 'danger')
+  } catch (err) {
+    showToast('Gagal Menyelesaikan', getErrorMessage(err, 'Gagal menyelesaikan partai.'), 'danger')
   } finally {
     actionLoadingId.value = null
   }
@@ -412,7 +413,7 @@ const filteredMatches = computed(() => {
         </svg>
       </div>
       <h3 class="sch-empty-title">Gagal Memuat Jadwal Pertandingan</h3>
-      <p class="sch-empty-desc">{{ (error as any)?.message || 'Terjadi gangguan jaringan saat memuat jadwal.' }}</p>
+      <p class="sch-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat jadwal.') }}</p>
       <AppButton variant="secondary" size="md" @click="() => refetch()">
         Coba Lagi
       </AppButton>

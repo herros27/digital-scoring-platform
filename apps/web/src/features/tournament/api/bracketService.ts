@@ -1,5 +1,6 @@
-import { apiClient } from '@/api/client'
+import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
+import type { Gender } from '@/features/athletes/types/athlete.schema'
 
 export interface ParticipantDTO {
   id: string
@@ -24,9 +25,23 @@ export interface BracketSlotDTO {
   winner_id?: string
 }
 
+/** Slot bagan sebagaimana dikembalikan GET /competitions/{comp_id}/brackets (domain.BracketSlot). */
+export interface BracketSlotRecord {
+  id: string
+  competition_id: string
+  weight_class: string
+  gender: string
+  round: number
+  slot_index: number
+  participant_id: string | null
+  is_bye: boolean
+  winner_id: string | null
+  next_slot_id: string | null
+}
+
 export interface GenerateBracketPayload {
   weight_class: string
-  gender: 'male' | 'female' | 'putra' | 'putri'
+  gender: Gender
   participant_ids?: string[]
 }
 
@@ -34,8 +49,8 @@ export const bracketService = {
   /**
    * GET /api/v1/competitions/{comp_id}/brackets?weight_class=...&gender=...
    */
-  async getBracketTree(compId: string, weightClass: string, gender: string): Promise<any> {
-    const res = await apiClient.get<any, { success: boolean; data: any }>(
+  async getBracketTree(compId: string, weightClass: string, gender: string): Promise<BracketSlotRecord[]> {
+    const res = await http.get<BracketSlotRecord[]>(
       `${ENDPOINTS.BRACKETS.TREE(compId)}?weight_class=${encodeURIComponent(weightClass)}&gender=${encodeURIComponent(gender)}`
     )
     return res.data
@@ -45,7 +60,7 @@ export const bracketService = {
    * POST /api/v1/competitions/{comp_id}/brackets/generate
    */
   async generateBracket(compId: string, payload: GenerateBracketPayload): Promise<BracketSlotDTO[]> {
-    const res = await apiClient.post<any, { success: boolean; data: BracketSlotDTO[] }>(
+    const res = await http.post<BracketSlotDTO[]>(
       ENDPOINTS.BRACKETS.GENERATE(compId),
       payload
     )
@@ -56,7 +71,7 @@ export const bracketService = {
    * GET /api/v1/competitions/{comp_id}/participants
    */
   async getParticipants(compId: string): Promise<ParticipantDTO[]> {
-    const res = await apiClient.get<any, { success: boolean; data: ParticipantDTO[] }>(
+    const res = await http.get<ParticipantDTO[]>(
       ENDPOINTS.PARTICIPANTS.LIST(compId)
     )
     return res.data || []

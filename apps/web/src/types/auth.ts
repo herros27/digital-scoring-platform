@@ -77,3 +77,6 @@ export interface CreatePinResponse {
   pin: string
   expires_at: string
 }
+
+/** Item dari GET /api/v1/auth/pins (bentuknya sama dengan hasil create-pin) */
+export type DevicePin = CreatePinResponse

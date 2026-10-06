@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AppButton, AppBadge } from '@/components/ui'
@@ -13,6 +14,7 @@ import ParticipantVerificationView from '@/features/athletes/views/ParticipantVe
 import ScheduleOpsView from '@/features/matches/views/ScheduleOpsView.vue'
 import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
 import { matchService } from '@/features/matches/api/matchService'
+import type { BracketSlotRecord } from '@/features/tournament/api/bracketService'
 import { useBracketTreeQuery, useGenerateBracketMutation } from '@/features/tournament/api/bracketQueries'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
@@ -75,11 +77,11 @@ const { data: rawMatches, refetch: refetchMatches } = useMatchesQuery(activeComp
 const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
 
 const categoryOptions = computed(() => {
-  const map = new Map<string, { id: string; name: string; weightClass: string; gender: string }>()
+  const map = new Map<string, { id: string; name: string; weightClass: string; gender: 'male' | 'female' }>()
 
   // 1. Ambil dari master categories database
   for (const c of rawCategories.value || []) {
-    const g = c.gender === 'female' || c.gender === 'putri' ? 'female' : 'male'
+    const g: 'male' | 'female' = c.gender === 'female' || c.gender === 'putri' ? 'female' : 'male'
     const wc = (c.weight_class || 'A').toUpperCase()
     const key = `${g}-${wc}`
     map.set(key, {
@@ -93,7 +95,7 @@ const categoryOptions = computed(() => {
   // 2. Tambahkan kelas yang memiliki peserta terdaftar/terverifikasi jika belum ada di master
   for (const p of rawParticipants.value || []) {
     if (!p.weight_class) continue
-    const g = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
+    const g: 'male' | 'female' = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
     const wc = p.weight_class.toUpperCase()
     const key = `${g}-${wc}`
     if (!map.has(key)) {
@@ -121,7 +123,7 @@ const parsedClass = computed(() => {
   }
   const catStr = selectedCategory.value || ''
   const isFemale = /putri/i.test(catStr)
-  const gender = isFemale ? 'female' : 'male'
+  const gender: 'male' | 'female' = isFemale ? 'female' : 'male'
   const match = catStr.match(/Kelas\s+([A-Za-z0-9_-]+)/i)
   const weightClass = match ? match[1].toUpperCase() : 'A'
   return { gender, weightClass }
@@ -139,16 +141,31 @@ const {
 const generateBracketMutation = useGenerateBracketMutation(activeCompId)
 
 // ponytail: default to 'jadwal' for ops overview, or contingent default to 'atlet'
-const resolveDefaultNav = () => {
-  if (route.query.tab) return route.query.tab as any
+const NAV_KEYS = [
+  'kompetisi',
+  'gelanggang',
+  'kategori',
+  'atlet',
+  'verifikasi',
+  'jadwal',
+  'bagan',
+  'pin',
+  'laporan',
+] as const
+type NavKey = (typeof NAV_KEYS)[number]
+
+function isNavKey(value: unknown): value is NavKey {
+  return typeof value === 'string' && (NAV_KEYS as readonly string[]).includes(value)
+}
+
+const resolveDefaultNav = (): NavKey => {
+  if (isNavKey(route.query.tab)) return route.query.tab
   if (route.path.includes('/admin')) return 'pin'
   if (authStore.role === 'contingent') return 'atlet'
   return 'jadwal'
 }
 
-const activeNav = ref<'kompetisi' | 'gelanggang' | 'kategori' | 'atlet' | 'verifikasi' | 'jadwal' | 'bagan' | 'pin' | 'laporan'>(
-  resolveDefaultNav()
-)
+const activeNav = ref<NavKey>(resolveDefaultNav())
 
 function setNav(tab: typeof activeNav.value) {
   activeNav.value = tab
@@ -158,8 +175,8 @@ function setNav(tab: typeof activeNav.value) {
 watch(
   () => route.query.tab,
   (newTab) => {
-    if (newTab && newTab !== activeNav.value) {
-      activeNav.value = newTab as any
+    if (isNavKey(newTab) && newTab !== activeNav.value) {
+      activeNav.value = newTab
     }
   }
 )
@@ -256,8 +273,8 @@ async function handleAdminLogin() {
     })
     showToast('Login Admin Berhasil', `Selamat datang, ${res.user?.name || 'Admin'}`, 'success')
     showAdminLoginModal.value = false
-  } catch (err: any) {
-    adminLoginError.value = err.message || 'Email atau kata sandi tidak valid'
+  } catch (err) {
+    adminLoginError.value = getErrorMessage(err, 'Email atau kata sandi tidak valid')
   } finally {
     adminLoginLoading.value = false
   }
@@ -359,18 +376,9 @@ const participantLookup = computed(() => {
 })
 
 // Build dynamic bracket cards per round from real backend bracket slots
-interface BracketSlotRecord {
-  id: string
-  round: number
-  slot_index: number
-  participant_id?: string
-  is_bye?: boolean
-  winner_id?: string
-  next_slot_id?: string
-}
 
 const slotsByRound = computed(() => {
-  const slots: BracketSlotRecord[] = (rawBracketSlots.value as any) || []
+  const slots: BracketSlotRecord[] = rawBracketSlots.value || []
   const grouped: Record<number, BracketSlotRecord[]> = {}
   for (const s of slots) {
     if (!grouped[s.round]) grouped[s.round] = []
@@ -533,15 +541,15 @@ function handleGenerateDraw() {
       try {
         await generateBracketMutation.mutateAsync({
           weight_class: currentWeightClass.value,
-          gender: currentGender.value as any,
+          gender: currentGender.value,
           participant_ids: [],
         })
         await refetchBracket()
         await refetchMatches()
         drawHash.value = `#IPSI-2025-CL-${currentWeightClass.value}-${Math.floor(1000 + Math.random() * 9000)}`
         showToast('Bagan Berhasil Di-Generate', `Data slot bagan tersinkronisasi dari backend. Hash: ${drawHash.value}`, 'success')
-      } catch (err: any) {
-        showToast('Gagal Generate Bagan', err.message || 'Pastikan minimal 2 atlet terverifikasi pada kelas ini.', 'warning')
+      } catch (err) {
+        showToast('Gagal Generate Bagan', getErrorMessage(err, 'Pastikan minimal 2 atlet terverifikasi pada kelas ini.'), 'warning')
       } finally {
         modal.value = null
       }

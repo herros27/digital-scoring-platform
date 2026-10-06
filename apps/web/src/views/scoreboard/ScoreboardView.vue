@@ -121,7 +121,7 @@ onMounted(async () => {
   onMessage('sync_response', (payload) => {
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
     }
   })
 
@@ -140,7 +140,7 @@ onMounted(async () => {
 
   onMessage('timer_sync', (payload) => {
     if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running)
+      timer.sync(payload.remaining_ms, payload.running ?? false)
     }
   })
 
@@ -152,8 +152,8 @@ onMounted(async () => {
   onMessage('score_update', (payload) => {
     const idx = roundScores.value.findIndex(r => r.round === payload.round)
     if (idx !== -1) {
-      roundScores.value[idx].red = payload.red_technical
-      roundScores.value[idx].blue = payload.blue_technical
+      if (payload.red_technical !== undefined) roundScores.value[idx].red = payload.red_technical
+      if (payload.blue_technical !== undefined) roundScores.value[idx].blue = payload.blue_technical
     }
   })
 

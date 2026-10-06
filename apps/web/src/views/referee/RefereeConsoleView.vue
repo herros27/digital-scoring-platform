@@ -287,7 +287,7 @@ onMounted(() => {
       else if (payload.state === 'finished') roundStatus.value = 'finished'
     }
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
     }
     if (payload.red_total !== undefined) redAthlete.value.score = payload.red_total
     if (payload.blue_total !== undefined) blueAthlete.value.score = payload.blue_total
@@ -308,7 +308,7 @@ onMounted(() => {
 
   onMessage('timer_sync', (payload) => {
     if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running)
+      timer.sync(payload.remaining_ms, payload.running ?? false)
     }
   })
 

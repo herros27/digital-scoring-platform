@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
@@ -122,8 +123,8 @@ async function handleSubmitArena() {
       showToast('Gelanggang Diperbarui', `Nama gelanggang diubah menjadi ${updated.name}.`, 'success')
     }
     isModalOpen.value = false
-  } catch (err: any) {
-    showToast('Terjadi Kesalahan', err.message || 'Gagal menyimpan data gelanggang.', 'danger')
+  } catch (err) {
+    showToast('Terjadi Kesalahan', getErrorMessage(err, 'Gagal menyimpan data gelanggang.'), 'danger')
   }
 }
 
@@ -136,8 +137,8 @@ async function handleDeleteArena(arena: Arena) {
   try {
     await deleteMutation.mutateAsync(arena.id)
     showToast('Gelanggang Dihapus', `${arena.name} telah dihapus dari sistem.`, 'info')
-  } catch (err: any) {
-    showToast('Gagal Menghapus', err.message || 'Gagal menghapus gelanggang.', 'danger')
+  } catch (err) {
+    showToast('Gagal Menghapus', getErrorMessage(err, 'Gagal menghapus gelanggang.'), 'danger')
   } finally {
     deletingId.value = null
   }
@@ -160,8 +161,8 @@ async function handleSeedStandard() {
         'info'
       )
     }
-  } catch (err: any) {
-    showToast('Gagal Menerapkan Template', err.message || 'Terjadi gangguan.', 'danger')
+  } catch (err) {
+    showToast('Gagal Menerapkan Template', getErrorMessage(err, 'Terjadi gangguan.'), 'danger')
   }
 }
 
@@ -363,7 +364,7 @@ const filteredArenas = computed(() => {
         </svg>
       </div>
       <h3 class="arena-empty-title">Gagal Memuat Gelanggang</h3>
-      <p class="arena-empty-desc">{{ (error as any)?.message || 'Terjadi gangguan jaringan saat memuat gelanggang.' }}</p>
+      <p class="arena-empty-desc">{{ getErrorMessage(error, 'Terjadi gangguan jaringan saat memuat gelanggang.') }}</p>
       <AppButton variant="secondary" size="md" @click="() => refetch()">
         Coba Lagi
       </AppButton>

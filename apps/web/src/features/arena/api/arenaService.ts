@@ -1,6 +1,6 @@
-import { apiClient } from '@/api/client'
+import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
-import type { Arena } from '../types/arena.schema'
+import type { Arena, LiveScoreboardSnapshot } from '../types/arena.schema'
 
 export const arenaService = {
   /**
@@ -8,7 +8,7 @@ export const arenaService = {
    */
   async getArenas(compId: string): Promise<Arena[]> {
     if (!compId) return []
-    const res = await apiClient.get<any, { success: boolean; data: Arena[] }>(
+    const res = await http.get<Arena[]>(
       ENDPOINTS.ARENAS.LIST(compId)
     )
     return res.data || []
@@ -18,7 +18,7 @@ export const arenaService = {
    * 2. POST /api/v1/competitions/{comp_id}/arenas
    */
   async createArena(compId: string, name: string): Promise<Arena> {
-    const res = await apiClient.post<any, { success: boolean; data: Arena }>(
+    const res = await http.post<Arena>(
       ENDPOINTS.ARENAS.CREATE(compId),
       { name }
     )
@@ -29,7 +29,7 @@ export const arenaService = {
    * 3. GET /api/v1/competitions/{comp_id}/arenas/{id}
    */
   async getArena(compId: string, id: string): Promise<Arena> {
-    const res = await apiClient.get<any, { success: boolean; data: Arena }>(
+    const res = await http.get<Arena>(
       ENDPOINTS.ARENAS.DETAIL(compId, id)
     )
     return res.data
@@ -39,7 +39,7 @@ export const arenaService = {
    * 4. PUT /api/v1/competitions/{comp_id}/arenas/{id}
    */
   async updateArena(compId: string, id: string, name: string): Promise<Arena> {
-    const res = await apiClient.put<any, { success: boolean; data: Arena }>(
+    const res = await http.put<Arena>(
       ENDPOINTS.ARENAS.UPDATE(compId, id),
       { name }
     )
@@ -50,7 +50,7 @@ export const arenaService = {
    * 5. DELETE /api/v1/competitions/{comp_id}/arenas/{id}
    */
   async deleteArena(compId: string, id: string): Promise<void> {
-    await apiClient.delete(ENDPOINTS.ARENAS.DELETE(compId, id))
+    await http.delete<unknown>(ENDPOINTS.ARENAS.DELETE(compId, id))
   },
 
   /**
@@ -94,8 +94,8 @@ export const arenaService = {
   /**
    * 7. GET /api/v1/live/scoreboard/{arena_id} (Public)
    */
-  async getLiveScoreboard(arenaId: string): Promise<any> {
-    const res = await apiClient.get<any, { success: boolean; data: any }>(
+  async getLiveScoreboard(arenaId: string): Promise<LiveScoreboardSnapshot> {
+    const res = await http.get<LiveScoreboardSnapshot>(
       ENDPOINTS.LIVE.SCOREBOARD(arenaId)
     )
     return res.data

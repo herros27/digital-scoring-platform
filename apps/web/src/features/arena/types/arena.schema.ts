@@ -21,3 +21,14 @@ export interface Arena {
   status?: 'live' | 'ready' | 'idle'
   connected_judges?: number
 }
+
+/**
+ * Respons GET /live/scoreboard/{arena_id}. Backend saat ini hanya mengembalikan
+ * `{ status: 'no active match' }`; field lain terisi bila ada pertandingan aktif.
+ */
+export interface LiveScoreboardSnapshot {
+  status?: string
+  round?: number
+  red_athlete?: string
+  blue_athlete?: string
+}

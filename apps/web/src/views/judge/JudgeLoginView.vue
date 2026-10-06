@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppInput } from '@/components/ui'
@@ -72,9 +73,9 @@ async function handleLogin() {
     } else {
       router.push({ path: '/judge', query: { arena_id: res.arena_id, seat: res.seat_number } })
     }
-  } catch (err: any) {
+  } catch (err) {
     haptics.heavy()
-    errorMessage.value = err.message || 'PIN tidak valid atau sudah kadaluarsa untuk gelanggang ini.'
+    errorMessage.value = getErrorMessage(err, 'PIN tidak valid atau sudah kadaluarsa untuk gelanggang ini.')
   } finally {
     isLoading.value = false
   }

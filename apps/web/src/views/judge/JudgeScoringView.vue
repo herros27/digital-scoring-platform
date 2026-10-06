@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
@@ -117,8 +118,8 @@ async function handlePinSubmit() {
       competitionId: res.competition_id,
     })
     showPinModal.value = false
-  } catch (err: any) {
-    pinError.value = err.message || 'PIN salah atau gagal terhubung ke backend server'
+  } catch (err) {
+    pinError.value = getErrorMessage(err, 'PIN salah atau gagal terhubung ke backend server')
   } finally {
     pinLoading.value = false
   }
@@ -214,7 +215,7 @@ onMounted(() => {
   onMessage('sync_response', (payload) => {
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running)
+      timer.sync(payload.timer_remaining_ms, payload.timer_running ?? false)
     }
   })
 
@@ -227,7 +228,7 @@ onMounted(() => {
 
   onMessage('timer_sync', (payload) => {
     if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running)
+      timer.sync(payload.remaining_ms, payload.running ?? false)
     }
   })
 })

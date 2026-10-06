@@ -1,4 +1,4 @@
-import { apiClient } from '@/api/client'
+import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
 import type {
   Athlete,
@@ -6,6 +6,8 @@ import type {
   Participant,
   CreateAthleteFormValues,
   RegisterParticipantPayload,
+  RegisterParticipantResult,
+  VerifyParticipantResult,
 } from '../types/athlete.schema'
 
 export const athleteService = {
@@ -19,7 +21,7 @@ export const athleteService = {
     if (params?.gender && params.gender !== 'all') query.append('gender', params.gender)
 
     const url = `${ENDPOINTS.ATHLETES.LIST}${query.toString() ? `?${query.toString()}` : ''}`
-    const res = await apiClient.get<any, { success: boolean; data: Athlete[] }>(url)
+    const res = await http.get<Athlete[]>(url)
     return res.data || []
   },
 
@@ -29,7 +31,7 @@ export const athleteService = {
   async getAthletesByCompetition(compId: string): Promise<Athlete[]> {
     if (!compId) return []
     const url = ENDPOINTS.ATHLETES.BY_COMPETITION(compId)
-    const res = await apiClient.get<any, { success: boolean; data: Athlete[] }>(url)
+    const res = await http.get<Athlete[]>(url)
     return res.data || []
   },
 
@@ -38,7 +40,7 @@ export const athleteService = {
    */
   async createAthlete(payload: CreateAthleteFormValues): Promise<Athlete> {
     const url = ENDPOINTS.ATHLETES.CREATE
-    const res = await apiClient.post<any, { success: boolean; data: Athlete }>(url, payload)
+    const res = await http.post<Athlete>(url, payload)
     return res.data
   },
 
@@ -49,9 +51,9 @@ export const athleteService = {
   async registerToCompetition(
     compId: string,
     payload: RegisterParticipantPayload
-  ): Promise<any> {
+  ): Promise<RegisterParticipantResult> {
     const url = ENDPOINTS.ATHLETES.REGISTER_TO_COMP(compId)
-    const res = await apiClient.post<any, { success: boolean; data: any }>(url, payload)
+    const res = await http.post<RegisterParticipantResult>(url, payload)
     return res.data
   },
 
@@ -64,7 +66,7 @@ export const athleteService = {
     if (status && status !== 'all') query.append('status', status)
 
     const url = `${ENDPOINTS.ATHLETES.PARTICIPANTS(compId)}${query.toString() ? `?${query.toString()}` : ''}`
-    const res = await apiClient.get<any, { success: boolean; data: Participant[] }>(url)
+    const res = await http.get<Participant[]>(url)
     return res.data || []
   },
 
@@ -75,9 +77,9 @@ export const athleteService = {
     compId: string,
     participantId: string,
     status: 'verified' | 'rejected'
-  ): Promise<any> {
+  ): Promise<VerifyParticipantResult> {
     const url = ENDPOINTS.ATHLETES.VERIFY_PARTICIPANT(compId, participantId)
-    const res = await apiClient.put<any, { success: boolean; data: any }>(url, { status })
+    const res = await http.put<VerifyParticipantResult>(url, { status })
     return res.data
   },
 
@@ -86,7 +88,7 @@ export const athleteService = {
    */
   async getContingents(): Promise<Contingent[]> {
     const url = ENDPOINTS.CONTINGENTS.LIST
-    const res = await apiClient.get<any, { success: boolean; data: Contingent[] }>(url)
+    const res = await http.get<Contingent[]>(url)
     return res.data || []
   },
 
@@ -95,7 +97,7 @@ export const athleteService = {
    */
   async getContingent(id: string): Promise<Contingent> {
     const url = ENDPOINTS.CONTINGENTS.DETAIL(id)
-    const res = await apiClient.get<any, { success: boolean; data: Contingent }>(url)
+    const res = await http.get<Contingent>(url)
     return res.data
   },
 }

@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios'
+import axios, { type AxiosInstance, type AxiosRequestConfig, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios'
 import { generateUUID } from '@/lib/uuid'
 import { AppApiError, type NormalizedApiError } from './error'
 
@@ -57,3 +57,31 @@ apiClient.interceptors.response.use(
     return Promise.reject(new AppApiError(normalized))
   }
 )
+
+export interface Pagination {
+  page: number
+  limit: number
+  total: number
+}
+
+/** Envelope standar backend: { success, data, pagination? } */
+export interface ApiEnvelope<T> {
+  success: boolean
+  data: T
+  pagination?: Pagination
+}
+
+/**
+ * Wrapper bertipe di atas `apiClient`. Response interceptor sudah mengembalikan body
+ * (bukan AxiosResponse), sehingga tipe kembaliannya adalah ApiEnvelope<T>.
+ */
+export const http = {
+  get: <T>(url: string, config?: AxiosRequestConfig) =>
+    apiClient.get<ApiEnvelope<T>, ApiEnvelope<T>>(url, config),
+  post: <T>(url: string, body?: unknown, config?: AxiosRequestConfig) =>
+    apiClient.post<ApiEnvelope<T>, ApiEnvelope<T>>(url, body, config),
+  put: <T>(url: string, body?: unknown, config?: AxiosRequestConfig) =>
+    apiClient.put<ApiEnvelope<T>, ApiEnvelope<T>>(url, body, config),
+  delete: <T>(url: string, config?: AxiosRequestConfig) =>
+    apiClient.delete<ApiEnvelope<T>, ApiEnvelope<T>>(url, config),
+}

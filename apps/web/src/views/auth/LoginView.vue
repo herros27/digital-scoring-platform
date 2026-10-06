@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { AppButton, AppInput } from "@/components/ui";
@@ -68,9 +69,9 @@ async function handleLogin() {
     });
 
     router.push("/ops?tab=atlet");
-  } catch (err: any) {
+  } catch (err) {
     errorMessage.value =
-      err.message || "Alamat email atau kata sandi tidak sesuai.";
+      getErrorMessage(err, "Alamat email atau kata sandi tidak sesuai.");
   } finally {
     isLoading.value = false;
   }

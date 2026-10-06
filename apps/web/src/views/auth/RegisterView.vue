@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getErrorMessage } from '@/api/error'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppInput } from '@/components/ui'
@@ -54,8 +55,8 @@ async function handleRegister() {
     setTimeout(() => {
       router.push('/login')
     }, 1600)
-  } catch (err: any) {
-    errorMessage.value = err.message || 'Pendaftaran gagal. Pastikan email belum pernah terdaftar.'
+  } catch (err) {
+    errorMessage.value = getErrorMessage(err, 'Pendaftaran gagal. Pastikan email belum pernah terdaftar.')
   } finally {
     isLoading.value = false
   }

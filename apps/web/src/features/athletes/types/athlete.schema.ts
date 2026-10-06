@@ -23,13 +23,15 @@ export type CreateAthleteFormValues = z.infer<typeof createAthleteSchema>
 export type RegisterParticipantPayload = z.infer<typeof registerParticipantSchema>
 export type VerifyParticipantPayload = z.infer<typeof verifyParticipantSchema>
 
+export type Gender = 'male' | 'female' | 'putra' | 'putri'
+
 export type ParticipantStatus = 'pending' | 'verified' | 'rejected' | 'registered'
 
 export interface Athlete {
   id: string
   contingent_id?: string
   name: string
-  gender: 'male' | 'female' | 'putra' | 'putri'
+  gender: Gender
   team: string
   created_at: string
 }
@@ -51,7 +53,22 @@ export interface Participant {
   name: string
   club?: string
   weight_class: string
-  gender: 'male' | 'female' | 'putra' | 'putri'
+  gender: Gender
   registration_status: ParticipantStatus
   created_at: string
+}
+
+/** Respons POST /competitions/{comp_id}/athletes */
+export interface RegisterParticipantResult {
+  competition_id: string
+  athlete_id: string
+  contingent_id: string
+  weight_class: string
+  status: string
+}
+
+/** Respons PUT /competitions/{comp_id}/participants/{id}/verify */
+export interface VerifyParticipantResult {
+  participant_id: string
+  status: string
 }

@@ -1,4 +1,4 @@
-import { apiClient } from '@/api/client'
+import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
 import type {
   LoginFormValues,
@@ -12,6 +12,7 @@ import type {
   ContingentLoginResponse,
   ContingentRegisterResponse,
   CreatePinResponse,
+  DevicePin,
 } from '@/types/auth'
 
 export const authService = {
@@ -19,7 +20,7 @@ export const authService = {
    * Official Login (Admin, Dewan, Wasit, Operator)
    */
   async officialLogin(payload: LoginFormValues): Promise<OfficialLoginResponse> {
-    const res = await apiClient.post<any, { success: boolean; data: OfficialLoginResponse }>(
+    const res = await http.post<OfficialLoginResponse>(
       ENDPOINTS.AUTH.OFFICIAL_LOGIN,
       payload
     )
@@ -30,7 +31,7 @@ export const authService = {
    * Judge PIN Login
    */
   async judgeLogin(payload: JudgeLoginFormValues): Promise<JudgeLoginResponse> {
-    const res = await apiClient.post<any, { success: boolean; data: JudgeLoginResponse }>(
+    const res = await http.post<JudgeLoginResponse>(
       ENDPOINTS.AUTH.JUDGE_LOGIN,
       payload
     )
@@ -41,7 +42,7 @@ export const authService = {
    * Contingent Manager Login
    */
   async contingentLogin(payload: LoginFormValues): Promise<ContingentLoginResponse> {
-    const res = await apiClient.post<any, { success: boolean; data: ContingentLoginResponse }>(
+    const res = await http.post<ContingentLoginResponse>(
       ENDPOINTS.AUTH.CONTINGENT_LOGIN,
       payload
     )
@@ -52,7 +53,7 @@ export const authService = {
    * Contingent Self-Registration
    */
   async contingentRegister(payload: ContingentRegisterFormValues): Promise<ContingentRegisterResponse> {
-    const res = await apiClient.post<any, { success: boolean; data: ContingentRegisterResponse }>(
+    const res = await http.post<ContingentRegisterResponse>(
       ENDPOINTS.AUTH.CONTINGENT_REGISTER,
       payload
     )
@@ -63,7 +64,7 @@ export const authService = {
    * Create Judge/Device PIN (Admin only)
    */
   async createPin(payload: CreatePinFormValues): Promise<CreatePinResponse> {
-    const res = await apiClient.post<any, { success: boolean; data: CreatePinResponse }>(
+    const res = await http.post<CreatePinResponse>(
       ENDPOINTS.AUTH.CREATE_PIN,
       payload
     )
@@ -73,9 +74,9 @@ export const authService = {
   /**
    * List Active Device PINs for an Arena (Admin only)
    */
-  async listPins(competitionId: string, arenaId: string): Promise<any[]> {
+  async listPins(competitionId: string, arenaId: string): Promise<DevicePin[]> {
     const url = `${ENDPOINTS.AUTH.PINS}?competition_id=${competitionId}&arena_id=${arenaId}`
-    const res = await apiClient.get<any, { success: boolean; data: any[] }>(url)
+    const res = await http.get<DevicePin[]>(url)
     return res.data || []
   },
 
@@ -84,7 +85,7 @@ export const authService = {
    */
   async logout(): Promise<void> {
     try {
-      await apiClient.post(ENDPOINTS.AUTH.LOGOUT)
+      await http.post<unknown>(ENDPOINTS.AUTH.LOGOUT)
     } catch {
       // Ignore network errors or expired session on logout
     }

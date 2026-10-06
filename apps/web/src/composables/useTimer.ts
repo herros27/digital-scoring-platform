@@ -3,7 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 export function useTimer() {
   const remainingMs = ref(0)
   const isRunning = ref(false)
-  let ticker: any = null
+  let ticker: ReturnType<typeof setInterval> | null = null
 
   function sync(ms: number, running: boolean) {
     remainingMs.value = Math.max(0, ms)
