@@ -265,6 +265,12 @@ func (s *MatchService) FinishMatch(matchID string) error {
 
 // FinishMatchWithWinner mengakhiri pertandingan; winner ("red"/"blue") = keputusan wasit, wajib bila skor seri.
 func (s *MatchService) FinishMatchWithWinner(matchID, winner string) error {
+	return s.FinishMatchWithDecision(matchID, winner, "")
+}
+
+// FinishMatchWithDecision seperti FinishMatchWithWinner dengan dasar keputusan (method): salah satu
+// metode manual seri pada ruleset (extra_round, lighter_weight, coin_toss); kosong = keputusan wasit.
+func (s *MatchService) FinishMatchWithDecision(matchID, winner, method string) error {
 	o, err := s.GetOrchestrator(matchID)
 	if err != nil {
 		return err
@@ -272,7 +278,7 @@ func (s *MatchService) FinishMatchWithWinner(matchID, winner string) error {
 	if winner == "" {
 		return o.Finish()
 	}
-	return o.FinishWithWinner(winner)
+	return o.FinishWithDecision(winner, method)
 }
 
 func (s *MatchService) CancelMatch(matchID string) error {

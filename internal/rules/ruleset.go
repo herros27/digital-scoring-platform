@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"time"
 )
 
@@ -22,6 +23,27 @@ type ScoringRule struct {
 	Penalties  []PenaltyRule   `json:"penalties,omitempty"`
 	Techniques []TechniqueRule `json:"techniques,omitempty"`
 	Consensus  *ConsensusRule  `json:"consensus,omitempty"`
+	Tiebreak   *TiebreakRule   `json:"tiebreak,omitempty"`
+}
+
+// Langkah seri otomatis (dihitung server dari data pertandingan) dan metode manual (diputuskan wasit).
+const (
+	StepFewestPenalties   = "fewest_penalties"   // total potongan sanksi paling sedikit menang
+	StepTechniquePriority = "technique_priority" // jumlah teknik terbanyak menurut urutan prioritas
+	MethodRefereeDecision = "referee_decision"
+	MethodExtraRound      = "extra_round"
+	MethodLighterWeight   = "lighter_weight"
+	MethodCoinToss        = "coin_toss"
+)
+
+// TiebreakRule aturan bila skor bersih seri setelah ronde terakhir.
+// `Steps` dijalankan berurutan sampai ada pemenang. `TechniquePriority` = kode teknik dari yang
+// paling bernilai; sudut dengan jumlah lebih banyak pada teknik paling awal yang berbeda menang.
+// Bila semua langkah otomatis seri, wasit memilih satu dari `ManualMethods` dan menentukan pemenang.
+type TiebreakRule struct {
+	Steps             []string `json:"steps,omitempty"`
+	TechniquePriority []string `json:"technique_priority,omitempty"`
+	ManualMethods     []string `json:"manual_methods,omitempty"`
 }
 
 // ActionDisqualify: sanksi ini langsung mendiskualifikasi sudut yang dikenai.
@@ -114,6 +136,29 @@ func (s ScoringRule) EffectiveConsensus() ConsensusRule {
 	return c
 }
 
+// EffectiveTiebreak aturan seri yang berlaku. Bawaan: sanksi paling sedikit, lalu teknik terbanyak
+// (urut dari nilai tertinggi), lalu keputusan manual wasit (babak tambahan, timbang ulang, undian koin).
+func (s ScoringRule) EffectiveTiebreak() TiebreakRule {
+	t := TiebreakRule{}
+	if s.Tiebreak != nil {
+		t = *s.Tiebreak
+	}
+	if len(t.Steps) == 0 {
+		t.Steps = []string{StepFewestPenalties, StepTechniquePriority}
+	}
+	if len(t.TechniquePriority) == 0 {
+		techs := append([]TechniqueRule(nil), s.EffectiveTechniques()...)
+		sort.SliceStable(techs, func(i, j int) bool { return techs[i].Points > techs[j].Points })
+		for _, tc := range techs {
+			t.TechniquePriority = append(t.TechniquePriority, tc.Type)
+		}
+	}
+	if len(t.ManualMethods) == 0 {
+		t.ManualMethods = []string{MethodExtraRound, MethodLighterWeight, MethodCoinToss}
+	}
+	return t
+}
+
 // Window durasi window konsensus.
 func (c ConsensusRule) Window() time.Duration { return time.Duration(c.WindowMs) * time.Millisecond }
 
@@ -185,6 +230,24 @@ func (s ScoringRule) Validate() error {
 		}
 		if t.Points <= 0 {
 			return fmt.Errorf("techniques: nilai %q harus lebih dari 0", t.Type)
+		}
+	}
+
+	if s.Tiebreak != nil {
+		for _, st := range s.Tiebreak.Steps {
+			if st != StepFewestPenalties && st != StepTechniquePriority {
+				return fmt.Errorf("tiebreak: langkah %q tidak dikenal (%s, %s)", st, StepFewestPenalties, StepTechniquePriority)
+			}
+		}
+		for _, tp := range s.Tiebreak.TechniquePriority {
+			if _, ok := s.Technique(tp); !ok {
+				return fmt.Errorf("tiebreak: technique_priority %q bukan teknik pada ruleset", tp)
+			}
+		}
+		for _, m := range s.Tiebreak.ManualMethods {
+			if m != MethodExtraRound && m != MethodLighterWeight && m != MethodCoinToss {
+				return fmt.Errorf("tiebreak: metode manual %q tidak dikenal (%s, %s, %s)", m, MethodExtraRound, MethodLighterWeight, MethodCoinToss)
+			}
 		}
 	}
 

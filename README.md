@@ -338,9 +338,12 @@ Timer berjalan di server berbasis **tenggat absolut** (`timer_ends_at_ms`), buka
 pada tiap penyegaran tampilan (jam server diselaraskan dari `server_time_ms`), dan server menyiarkan `timer_sync` tiap 5 detik. Dengan begitu
 wasit, juri, dan scoreboard menampilkan waktu yang sama walau tab diperlambat browser.
 
-**Skor seri:** pertandingan tidak pernah dimenangkan otomatis oleh sudut merah. Menyelesaikan pertandingan dengan skor seri ditolak
-(`TIE_NEEDS_DECISION` lewat REST) kecuali wasit menentukan pemenang (`winner`, hasil `referee_decision`); bila waktu ronde terakhir
-habis dengan skor seri, pertandingan menunggu keputusan wasit (`tie_pending`). Diskualifikasi (`disqualify`) memenangkan sudut lawan.
+**Skor seri:** pertandingan tidak pernah dimenangkan otomatis oleh sudut merah. Server menjalankan aturan seri ruleset (`tiebreak`):
+1. **Potongan sanksi paling sedikit** menang (`result_type` = `tiebreak_penalties`).
+2. **Teknik terbanyak** menurut urutan prioritas (bawaan dari nilai tertinggi: Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan; `tiebreak_technique`). Sudut dengan jumlah lebih banyak pada jenis teknik paling bernilai yang jumlahnya berbeda menang.
+3. Bila masih seri, pertandingan menunggu keputusan manual wasit (`tie_pending` pada waktu habis; `TIE_NEEDS_DECISION` lewat REST). Wasit menyertakan `winner` dan dasar keputusan `method`: `extra_round` (babak tambahan), `lighter_weight` (timbang ulang), `coin_toss` (undian koin), atau kosong = keputusan wasit (`tiebreak_extra_round`, `tiebreak_lighter_weight`, `tiebreak_coin_toss`, `referee_decision`).
+
+Langkah 1-2 dihitung server dari data pertandingan; babak tambahan, timbang ulang, dan undian koin dilakukan di luar sistem lalu hasilnya dicatat wasit. Kombinasi teknik 1+2 dan 1+1 belum ada sebagai jenis teknik terpisah (hanya Pukulan, Tendangan, Jatuhan, Tangkapan+Jatuhan). Diskualifikasi (`disqualify`) memenangkan sudut lawan.
 
 ---
 
@@ -380,6 +383,7 @@ Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikoso
 ```
 - **`techniques`**: tombol di tablet juri dan nilainya. `type` adalah `score_type` yang dikirim juri; jenis di luar daftar (selain `undo`) ditolak.
 - **`penalties`**: katalog sanksi konsol wasit. `points` = potongan nilai; `action: "disqualify"` membuat sanksi itu langsung mendiskualifikasi sudut yang dikenai. Bawaan: Binaan 1-2 (0), Teguran 1 (-1), Teguran 2 (-2), Peringatan 1 (-5), Peringatan 2 (-10), Peringatan 3 (diskualifikasi). **Cocokkan dengan peraturan event.**
+- **`tiebreak`**: `steps` (`fewest_penalties`, `technique_priority`), `technique_priority` (kode teknik dari yang paling bernilai), `manual_methods` (`extra_round`, `lighter_weight`, `coin_toss`). Kosong = bawaan di bagian "Skor seri".
 - **`consensus`**: `judges` (1-5, jumlah kursi yang ditampilkan), `majority` (juri yang harus sepakat), `window_ms` (500-10000).
 - Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3).
 - `POST/PUT /api/v1/rulesets` memvalidasi bagian ini (kode unik huruf kecil/angka/underscore, nilai teknik > 0, potongan >= 0, `majority` <= `judges`).

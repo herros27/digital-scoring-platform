@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
-import { getErrorMessage } from '@/api/error'
+import { AppApiError, getErrorMessage } from '@/api/error'
 import {
   useWebSocket,
   type WsMatchEvent,
@@ -7,6 +7,7 @@ import {
   type WsPenaltyEntry,
   type WsPenaltyKind,
   type WsTechniqueKind,
+  type WsTiebreak,
   type WsPresence,
   type WsRoundScore,
   type WsSyncResponse,
@@ -79,6 +80,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const penaltyCatalog = ref<WsPenaltyKind[]>([])
   const techniqueCatalog = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
   const judgeCount = ref(3)
+  const tiebreak = ref<WsTiebreak | null>(null)
   const medicActive = ref(false)
   const varActive = ref(false)
   const presence = ref<WsPresence | null>(null)
@@ -176,6 +178,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     if (s.penalty_catalog) penaltyCatalog.value = s.penalty_catalog
     if (s.techniques?.length) techniqueCatalog.value = s.techniques
     if (s.judge_count) judgeCount.value = s.judge_count
+    if (s.tiebreak) tiebreak.value = s.tiebreak
     if (s.medic_active !== undefined) medicActive.value = s.medic_active
     if (s.var_active !== undefined) varActive.value = s.var_active
     if (s.presence) presence.value = s.presence
@@ -378,13 +381,35 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
       if (id) await matchService.resumeMatch(opts.compId, id)
     }, 'Gagal melanjutkan pertandingan.')
   /** `winner` wajib saat skor seri (keputusan wasit). */
-  const finish = (winner?: WsTarget) =>
+  const finish = (winner?: WsTarget, method?: string) =>
     runControl(async () => {
       const id = requireMatch()
       if (!id) return
-      await matchService.finishMatch(opts.compId, id, winner)
+      await matchService.finishMatch(opts.compId, id, winner, method)
       await refreshQueue()
     }, 'Gagal menyelesaikan pertandingan.')
+  /**
+   * Selesaikan saat skor seri tanpa pemenang: server menjalankan aturan seri otomatis
+   * (sanksi paling sedikit, teknik terbanyak). Mengembalikan true bila masih seri dan wasit
+   * harus menentukan pemenang secara manual.
+   */
+  async function finishByTiebreak(): Promise<boolean> {
+    if (busy.value) return false
+    const id = requireMatch()
+    if (!id) return false
+    busy.value = true
+    try {
+      await matchService.finishMatch(opts.compId, id)
+      await refreshQueue()
+      return false
+    } catch (err) {
+      if (err instanceof AppApiError && err.code === 'TIE_NEEDS_DECISION') return true
+      notify('error', getErrorMessage(err, 'Gagal menyelesaikan pertandingan.'))
+      return false
+    } finally {
+      busy.value = false
+    }
+  }
   const cancelMatch = () =>
     runControl(async () => {
       const id = requireMatch()
@@ -476,6 +501,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     penaltyCatalog,
     techniqueCatalog,
     judgeCount,
+    tiebreak,
     medicActive,
     varActive,
     presence,
@@ -513,6 +539,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     pause,
     resume,
     finish,
+    finishByTiebreak,
     cancelMatch,
     rescheduleMatch,
     adjustTime,

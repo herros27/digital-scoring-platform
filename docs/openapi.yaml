@@ -1348,9 +1348,13 @@ paths:
     post:
       summary: Selesaikan Pertandingan & Hitung Pemenang (Admin / Dewan / Wasit)
       description: |
-        Pemenang dihitung dari skor bersih (poin teknik dikurangi sanksi). Bila skor **seri**, server menolak
-        dengan 400 `TIE_NEEDS_DECISION` kecuali body menyertakan `winner` (keputusan wasit; `result_type`
-        menjadi `referee_decision`).
+        Pemenang dihitung dari skor bersih (poin teknik dikurangi sanksi). Bila skor **seri**, server menjalankan
+        aturan seri ruleset (`tiebreak.steps`): potongan sanksi paling sedikit, lalu teknik terbanyak menurut
+        `technique_priority` (mis. Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan); `result_type` menjadi
+        `tiebreak_penalties` atau `tiebreak_technique`. Bila semua langkah otomatis masih seri, server menolak dengan
+        400 `TIE_NEEDS_DECISION` kecuali body menyertakan `winner` (keputusan manual; `method` menentukan dasar
+        keputusan dan `result_type`: `referee_decision` bila kosong, atau `tiebreak_extra_round`,
+        `tiebreak_lighter_weight`, `tiebreak_coin_toss`).
       tags:
         - Match Lifecycle
       security:
@@ -1378,7 +1382,11 @@ paths:
                 winner:
                   type: string
                   enum: [red, blue]
-                  description: Pemenang menurut keputusan wasit (wajib bila skor seri)
+                  description: Pemenang menurut keputusan wasit (wajib bila seri dan aturan seri otomatis tidak menemukan pemenang)
+                method:
+                  type: string
+                  enum: [referee_decision, extra_round, lighter_weight, coin_toss]
+                  description: Dasar keputusan manual. Selain `referee_decision`, harus ada pada `tiebreak.manual_methods` ruleset.
       responses:
         '200':
           description: Pertandingan selesai dan pemenang ditentukan (status finished)
@@ -1785,6 +1793,24 @@ paths:
                             type: string
                             enum: [disqualify]
                             description: "`disqualify` = sanksi ini langsung mendiskualifikasi sudut yang dikenai"
+                    tiebreak:
+                      type: object
+                      description: |
+                        Aturan seri. Kosong = sanksi paling sedikit, lalu teknik terbanyak (urut dari nilai tertinggi),
+                        lalu keputusan manual wasit.
+                      properties:
+                        steps:
+                          type: array
+                          items: { type: string, enum: [fewest_penalties, technique_priority] }
+                          description: Langkah otomatis, dijalankan berurutan sampai ada pemenang
+                        technique_priority:
+                          type: array
+                          items: { type: string }
+                          description: Kode teknik dari yang paling bernilai (default dari nilai poin teknik, besar ke kecil)
+                        manual_methods:
+                          type: array
+                          items: { type: string, enum: [extra_round, lighter_weight, coin_toss] }
+                          description: Dasar keputusan manual yang boleh dipilih wasit bila semua langkah otomatis seri
                     consensus:
                       type: object
                       description: Aturan kesepakatan juri. Kosong = 3 juri, mayoritas 2, window 3000 ms.
@@ -2296,9 +2322,11 @@ paths:
           }
           ```
           * `action`: `start`, `pause`, `resume`, `finish`, `cancel`
-          * `finish` pada skor seri ditolak (`INVALID_STATE_TRANSITION`) kecuali menyertakan `"winner": "red"|"blue"`
-            (keputusan wasit). Waktu habis di ronde terakhir dengan skor seri tidak mengakhiri pertandingan:
-            `state_change` membawa `tie_pending: true` sampai wasit memutuskan.
+          * `finish` pada skor seri menjalankan aturan seri otomatis ruleset (sanksi paling sedikit, lalu teknik
+            terbanyak). Bila masih seri, ditolak (`INVALID_STATE_TRANSITION`) kecuali menyertakan
+            `"winner": "red"|"blue"` (+ opsional `"method": "extra_round"|"lighter_weight"|"coin_toss"`).
+            Waktu habis di ronde terakhir dengan skor seri yang terselesaikan aturan otomatis langsung berakhir;
+            bila tidak, `state_change` membawa `tie_pending: true` sampai wasit memutuskan.
           * `disqualify` + `"target": "red"|"blue"` — sudut itu didiskualifikasi, lawan menang (`result_type`
             `disqualification`), pertandingan berakhir.
           * `adjust_time` + `"delta_ms"` (+/-) — koreksi sisa waktu ronde (dibatasi 1 detik s/d durasi ronde);
@@ -2417,7 +2445,7 @@ paths:
           `{"id", "match_id", "event_type", "payload", "judge_id", "created_at"}`.
           Jenis: `match_started`, `match_paused`, `match_resumed`, `match_finished`, `match_cancelled`, `round_started`,
           `round_ended`, `judge_input`, `score_confirmed`, `penalty_applied`, `penalty_revoked`, `disqualified`,
-          `referee_decision`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
+          `referee_decision`, `tiebreak_resolved`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
         * **Update Skor Resmi (`score_update`)**:
           ```json
           {

@@ -76,3 +76,41 @@ func TestValidate_Rejects(t *testing.T) {
 		}
 	}
 }
+
+func TestEffectiveTiebreak_DefaultsFollowTechniqueValue(t *testing.T) {
+	sc := ScoringRule{TechniquePoints: 1, KnockdownPoints: 2, FallPoints: 3}
+	tb := sc.EffectiveTiebreak()
+	if len(tb.Steps) != 2 || tb.Steps[0] != StepFewestPenalties || tb.Steps[1] != StepTechniquePriority {
+		t.Fatalf("langkah bawaan salah: %+v", tb.Steps)
+	}
+	want := []string{"fall", "knockdown", "technique"}
+	for i, w := range want {
+		if tb.TechniquePriority[i] != w {
+			t.Fatalf("prioritas teknik = %v, want %v", tb.TechniquePriority, want)
+		}
+	}
+	if len(tb.ManualMethods) != 3 {
+		t.Fatalf("metode manual bawaan: %v", tb.ManualMethods)
+	}
+}
+
+func TestValidate_Tiebreak(t *testing.T) {
+	base := ScoringRule{RoundDuration: 120, TotalRounds: 3, TechniquePoints: 1, KnockdownPoints: 2, FallPoints: 3}
+	bad := []TiebreakRule{
+		{Steps: []string{"undian"}},
+		{TechniquePriority: []string{"tidak_ada"}},
+		{ManualMethods: []string{"sulap"}},
+	}
+	for _, tb := range bad {
+		sc := base
+		sc.Tiebreak = &tb
+		if err := sc.Validate(); err == nil {
+			t.Errorf("%+v harus ditolak", tb)
+		}
+	}
+	ok := base
+	ok.Tiebreak = &TiebreakRule{Steps: []string{StepTechniquePriority}, TechniquePriority: []string{"fall"}, ManualMethods: []string{MethodCoinToss}}
+	if err := ok.Validate(); err != nil {
+		t.Errorf("konfigurasi valid ditolak: %v", err)
+	}
+}

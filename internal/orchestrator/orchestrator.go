@@ -61,6 +61,8 @@ type Orchestrator struct {
 	inputCount    map[int]int
 	forced        *forcedResult
 	result        map[string]any
+	// techCount jumlah poin sah per sudut dan jenis teknik (untuk aturan seri)
+	techCount map[string]map[string]int
 }
 
 func New(
@@ -87,6 +89,7 @@ func New(
 		seenEvents:   make(map[string]time.Time),
 		lastInput:    make(map[int]judgeAction),
 		inputCount:   make(map[int]int),
+		techCount:    make(map[string]map[string]int),
 	}
 	// Pasang callback: setiap message dari hub masuk ke sini
 	h.Attach(o, o.handleMessage, o.broadcastPresence)
@@ -135,7 +138,8 @@ func (o *Orchestrator) handleMessage(arenaID string, client *hub.Client, msg hub
 // payload untuk MsgStateChange: {"action": "start"} / "pause" / "resume"
 type controlPayload struct {
 	Action  string `json:"action"`
-	Winner  string `json:"winner,omitempty"`   // finish: pemenang keputusan wasit (wajib bila seri)
+	Winner  string `json:"winner,omitempty"`   // finish: pemenang keputusan wasit (wajib bila seri dan langkah otomatis masih seri)
+	Method  string `json:"method,omitempty"`   // finish: dasar keputusan (coin_toss, lighter_weight, extra_round; kosong = keputusan wasit)
 	Target  string `json:"target,omitempty"`   // disqualify: sudut yang didiskualifikasi
 	DeltaMS int64  `json:"delta_ms,omitempty"` // adjust_time: koreksi waktu (+/-)
 }
@@ -167,7 +171,7 @@ func (o *Orchestrator) handleControl(client *hub.Client, msg hub.Message) {
 			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
 		}
 	case "finish":
-		if err := o.doFinish(p.Winner); err != nil {
+		if err := o.doFinish(p.Winner, p.Method); err != nil {
 			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
 		}
 	case "cancel":
@@ -254,7 +258,10 @@ func (o *Orchestrator) doResume() error {
 
 // doFinish mengakhiri pertandingan. Bila skor seri, wasit wajib menentukan pemenang
 // (`winner` = "red"/"blue", keputusan wasit); tanpa itu pertandingan tidak diakhiri.
-func (o *Orchestrator) doFinish(winner string) error {
+// doFinish mengakhiri pertandingan. `winner` (keputusan wasit) menimpa hasil; `method` menjelaskan
+// dasar keputusan (kosong = keputusan wasit; selain itu salah satu metode manual ruleset).
+// Tanpa `winner` dan skor seri, aturan seri otomatis dijalankan; bila masih seri, ErrTieNeedsDecision.
+func (o *Orchestrator) doFinish(winner, method string) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -265,10 +272,26 @@ func (o *Orchestrator) doFinish(winner string) error {
 		if !validTarget(winner) {
 			return fmt.Errorf("pemenang harus red atau blue")
 		}
-		o.forced = &forcedResult{Corner: winner, ResultType: "referee_decision"}
-		o.appendEvent("referee_decision", map[string]any{"winner_corner": winner}, "")
+		if method != "" && method != rules.MethodRefereeDecision {
+			allowed := false
+			for _, m := range o.ruleset.Scoring.EffectiveTiebreak().ManualMethods {
+				if m == method {
+					allowed = true
+				}
+			}
+			if !allowed {
+				return fmt.Errorf("metode %q tidak tersedia pada ruleset ini", method)
+			}
+		}
+		resultType := manualResultType(method)
+		o.forced = &forcedResult{Corner: winner, ResultType: resultType}
+		o.appendEvent("referee_decision", map[string]any{"winner_corner": winner, "method": resultType}, "")
 	} else if o.sm.CurrentRoundNumber() > 0 && o.tiedLocked() {
-		return ErrTieNeedsDecision
+		res, ok := o.resolveTiebreakLocked()
+		if !ok {
+			return ErrTieNeedsDecision
+		}
+		o.forceTiebreakLocked(res)
 	}
 	o.finalize()
 	return nil
@@ -444,6 +467,9 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	} else {
 		o.scores[round].BlueTechnical += pts
 	}
+	if pts > 0 {
+		o.countTechnique(string(result.Target), string(result.ScoreType))
+	}
 
 	// persist ke DB
 	sc := &store.MatchScore{
@@ -559,9 +585,13 @@ func (o *Orchestrator) onRoundExpired() {
 	// Ronde 3 selesai → langsung finish, kecuali skor seri: pertandingan menunggu keputusan wasit
 	if cur == statemachine.StateRound3 {
 		if o.tiedLocked() {
-			o.appendEvent("tie_pending", map[string]any{"round": 3}, "")
-			o.broadcastState()
-			return
+			res, ok := o.resolveTiebreakLocked()
+			if !ok {
+				o.appendEvent("tie_pending", map[string]any{"round": 3}, "")
+				o.broadcastState()
+				return
+			}
+			o.forceTiebreakLocked(res)
 		}
 		o.sm.Transition(statemachine.EventFinish)
 		o.appendEvent("round_ended", map[string]any{"round": 3}, "")
@@ -675,14 +705,15 @@ func (o *Orchestrator) determineWinner() (winnerID string, resultType string) {
 		blueTotal += o.scores[i].BlueTechnical - o.scores[i].BluePenalties
 	}
 
-	// ponytail: tiebreaker belum diimplementasi, draw = red menang (placeholder)
+	// Seri tidak sampai di sini: finalize dipanggil setelah aturan seri atau keputusan wasit menetapkan
+	// o.forced. "draw" hanya cadangan bila seri tak terselesaikan.
 	switch {
 	case redTotal > blueTotal:
 		return "red", "point_win"
 	case blueTotal > redTotal:
 		return "blue", "point_win"
 	default:
-		return "red", "draw" // ponytail: tiebreaker rules belum ada
+		return "red", "draw"
 	}
 }
 
@@ -785,12 +816,17 @@ func (o *Orchestrator) Resume() error {
 }
 
 func (o *Orchestrator) Finish() error {
-	return o.doFinish("")
+	return o.doFinish("", "")
 }
 
 // FinishWithWinner mengakhiri pertandingan dengan pemenang yang ditentukan wasit (wajib bila seri).
 func (o *Orchestrator) FinishWithWinner(winner string) error {
-	return o.doFinish(winner)
+	return o.doFinish(winner, "")
+}
+
+// FinishWithDecision seperti FinishWithWinner dengan metode keputusan (mis. coin_toss, lighter_weight).
+func (o *Orchestrator) FinishWithDecision(winner, method string) error {
+	return o.doFinish(winner, method)
 }
 
 func (o *Orchestrator) Cancel() error {

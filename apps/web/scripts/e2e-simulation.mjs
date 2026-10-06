@@ -349,8 +349,32 @@ async function runSimulation() {
   send(ref, 'state_change', { action: 'resume' })
   await sleep(300)
 
-  // 11. Selesai. Skor akhir seri (merah 1-1 sanksi, biru 0) -> wasit wajib memutuskan pemenang
-  console.log('\n11. Finishing match (tie requires referee decision)...')
+  // 11. Aturan seri. Keadaan sekarang: merah teknik 1, sanksi -1 (bersih 0); biru 0.
+  //     Sanksi berbeda -> aturan seri otomatis memberi kemenangan ke sudut dengan sanksi lebih sedikit (biru).
+  //     Pada partai lain yang seri penuh (sanksi dan teknik sama) wasit harus memutuskan: diuji di bawah dengan
+  //     menyamakan sanksi dan teknik lebih dulu.
+  console.log('\n11. Finishing match (aturan seri otomatis, lalu seri penuh = keputusan manual)...')
+  send(ref, 'penalty', { target: 'blue', type: 'teguran_1' }) // biru -1, potongan sama dengan merah
+  await sleep(300)
+  for (const idx of [0, 1]) {
+    judgeSockets[idx].ws.send(JSON.stringify({
+      type: 'judge_input',
+      payload: { event_id: randomUUID(), idempotency_key: randomUUID(), score_type: 'technique', target: 'blue', round: 1 },
+    }))
+    await sleep(300)
+  }
+  await sleep(800)
+  const tiedSnap = await new Promise((resolve) => {
+    const before = ref.events.length
+    send(ref, 'sync_request', {})
+    const t = setInterval(() => {
+      const m = ref.events.slice(before).find((e) => e.type === 'sync_response')
+      if (m) { clearInterval(t); resolve(m.payload) }
+    }, 50)
+  })
+  check('Seri penuh: sanksi 1-1 dan teknik 1-1, aturan seri otomatis tidak menemukan pemenang',
+    tiedSnap.red_total === tiedSnap.blue_total && tiedSnap.tiebreak?.auto_result === null &&
+      tiedSnap.tiebreak?.manual_methods?.includes('coin_toss'), JSON.stringify(tiedSnap.tiebreak))
   const errorsBefore = errorsOf(ref).length
   send(ref, 'state_change', { action: 'finish' })
   await sleep(500)
@@ -365,9 +389,15 @@ async function runSimulation() {
   const restFinish = await fetch(`${BASE_HTTP}/api/v1/competitions/${comp.id}/matches/${targetMatch.id}/finish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders },
-    body: JSON.stringify({ winner: 'blue' }),
+    body: JSON.stringify({ winner: 'blue', method: 'ngawur' }),
   })
-  check('REST finish dengan keputusan wasit diterima', restFinish.status === 200, String(restFinish.status))
+  check('REST finish dengan metode tidak dikenal ditolak', restFinish.status === 400, String(restFinish.status))
+  const restCoin = await fetch(`${BASE_HTTP}/api/v1/competitions/${comp.id}/matches/${targetMatch.id}/finish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify({ winner: 'blue', method: 'coin_toss' }),
+  })
+  check('REST finish seri penuh dengan undian koin diterima', restCoin.status === 200, String(restCoin.status))
   await sleep(500)
 
   send(ref, 'penalty', { target: 'blue', type: 'binaan_1' })
@@ -375,7 +405,7 @@ async function runSimulation() {
   check('Sanksi setelah pertandingan selesai ditolak', errorsOf(ref).includes('PENALTY_NOT_ALLOWED'), errorsOf(ref).join())
 
   const matchResult = last(sb.events, 'match_result')
-  check('match_result: sudut biru menang lewat keputusan wasit', matchResult?.payload?.corner === 'blue' && matchResult?.payload?.result_type === 'referee_decision', JSON.stringify(matchResult?.payload))
+  check('match_result: sudut biru menang lewat undian koin', matchResult?.payload?.corner === 'blue' && matchResult?.payload?.result_type === 'tiebreak_coin_toss', JSON.stringify(matchResult?.payload))
   const after = await getJson(`/api/v1/live/scoreboard/${arena.id}`)
   check('REST /live/scoreboard kembali "no active match"', after.data.status === 'no active match', JSON.stringify(after.data))
 

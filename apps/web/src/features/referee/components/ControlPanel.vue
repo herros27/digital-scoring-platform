@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { MATCH_STATUS_LABEL } from '@/composables/matchStatus'
+import { resultLabel } from '@/composables/matchResult'
 import type { WsTarget } from '@/composables/useWebSocket'
 import type { RefereeConsole } from '../composables/useRefereeConsole'
 import { formatClock, TARGET_LABEL } from '../lib/matchLog'
@@ -130,7 +131,7 @@ function askCancel() {
           >PERTANDINGAN SELESAI — PEMENANG SUDUT {{ TARGET_LABEL[winnerTarget] }}</strong
         >
         <strong v-else>PERTANDINGAN BERAKHIR</strong>
-        <span v-if="c.result?.result_type">{{ c.result.result_type }}</span>
+        <span v-if="c.result?.result_type">{{ resultLabel(c.result.result_type) }}</span>
         <button class="ref-btn" @click="emit('goto', 'bagan-antrean')">
           Pilih Partai Berikutnya
         </button>

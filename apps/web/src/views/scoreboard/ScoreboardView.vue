@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
 import { playGong } from '@/composables/useGong'
+import { RESULT_LABEL } from '@/composables/matchResult'
 import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { arenaService } from '@/features/arena/api/arenaService'
 
@@ -81,11 +82,6 @@ function triggerScoreToast(side: 'red' | 'blue', text: string) {
 const medicActive = ref(false)
 const varActive = ref(false)
 
-const RESULT_LABEL: Record<string, string> = {
-  point_win: 'MENANG ANGKA (POINT WIN)',
-  disqualification: 'MENANG DISKUALIFIKASI',
-  draw: 'SERI (KEPUTUSAN WASIT)',
-}
 
 // Winner Announcement Modal
 const showWinnerModal = ref(false)

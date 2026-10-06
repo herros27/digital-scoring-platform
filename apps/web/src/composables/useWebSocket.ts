@@ -31,6 +31,15 @@ export interface WsTechniqueKind {
   points: number
 }
 
+/** Aturan seri dari ruleset beserta pratinjau hasil otomatis bila skor sedang seri. */
+export interface WsTiebreak {
+  steps: string[]
+  technique_priority: string[]
+  manual_methods: string[]
+  /** Pemenang dari langkah otomatis; null bila skor tidak seri atau wasit harus memutuskan */
+  auto_result: { winner_corner: WsTarget; result_type: string; step: string; detail: string } | null
+}
+
 /** Aturan konsensus juri dari ruleset. */
 export interface WsConsensusRule {
   judges: number
@@ -113,6 +122,7 @@ export interface WsSyncResponse {
   penalty_catalog?: WsPenaltyKind[]
   techniques?: WsTechniqueKind[]
   judge_count?: number
+  tiebreak?: WsTiebreak
   consensus?: WsConsensusRule
   medic_active?: boolean
   var_active?: boolean

@@ -56,8 +56,12 @@ func (o *Orchestrator) tiedLocked() bool {
 
 // tiePendingLocked true saat waktu ronde terakhir habis dengan skor seri dan menunggu keputusan wasit.
 func (o *Orchestrator) tiePendingLocked() bool {
-	return o.sm.Current() == statemachine.StateRound3 &&
-		o.timer != nil && o.timer.Remaining() <= 0 && !o.timer.IsRunning() && o.tiedLocked()
+	if o.sm.Current() != statemachine.StateRound3 ||
+		o.timer == nil || o.timer.Remaining() > 0 || o.timer.IsRunning() || !o.tiedLocked() {
+		return false
+	}
+	_, resolvable := o.resolveTiebreakLocked()
+	return !resolvable
 }
 
 func opposite(target string) string {
@@ -376,6 +380,7 @@ func (o *Orchestrator) extraSnapshotLocked() map[string]any {
 		"techniques":        o.ruleset.Scoring.EffectiveTechniques(),
 		"judge_count":       o.ruleset.Scoring.EffectiveConsensus().Judges,
 		"consensus":         o.ruleset.Scoring.EffectiveConsensus(),
+		"tiebreak":          o.tiebreakSnapshotLocked(),
 		"medic_active":      o.medicActive,
 		"var_active":        o.varActive,
 		"presence":          o.presenceLocked(),

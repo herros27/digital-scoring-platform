@@ -196,6 +196,13 @@
     - Tes: `internal/rules/ruleset_test.go`, `internal/orchestrator/ruleset_test.go`, `TestConsensusEngine_ConfigurableMajorityAndWindow`; e2e 51 pemeriksaan; browser wasit 50/50 dan juri (4 tombol, konsensus Tangkapan + Jatuhan = 4).
     - Belum: tiebreak resmi otomatis, tombol KO/TKO/WO/undur diri, editor ruleset di frontend (langkah 3-5).
 
+42. **Aturan Seri Resmi (Tiebreak Otomatis)** –
+    - Seri skor bersih kini diselesaikan server menurut `scoring.tiebreak` ruleset: (1) potongan sanksi paling sedikit, (2) jumlah teknik terbanyak menurut urutan prioritas (bawaan dari nilai tertinggi: Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan). Berlaku saat waktu ronde terakhir habis dan saat `finish` manual. Jumlah teknik dihitung dari konsensus juri (`techCount` di orkestrator).
+    - Bila semua langkah otomatis seri, wasit memutuskan manual: `finish` menerima `winner` + `method` (`extra_round`, `lighter_weight`, `coin_toss`; kosong = `referee_decision`). `result_type` baru: `tiebreak_penalties`, `tiebreak_technique`, `tiebreak_extra_round`, `tiebreak_lighter_weight`, `tiebreak_coin_toss`. Kejadian baru `tiebreak_resolved`; snapshot `sync_response` memuat `tiebreak` (aturan + `auto_result`).
+    - Konsol wasit: "Selesaikan" saat seri menerapkan aturan seri otomatis; bila masih seri, dialog berlanjut ke pilihan dasar keputusan + pemenang. Label hasil di konsol dan scoreboard (`composables/matchResult.ts`).
+    - Tes: `internal/orchestrator/tiebreak_test.go` (urutan sanksi/teknik, seri penuh, kedaluwarsa ronde 3, metode manual), `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e 53 pemeriksaan; browser wasit 50/50.
+    - Batasan: kombinasi 1+2 dan 1+1 pada urutan regulasi belum menjadi jenis teknik terpisah; babak tambahan/timbang/koin dilakukan di luar sistem lalu dicatat wasit.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

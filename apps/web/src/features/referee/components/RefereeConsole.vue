@@ -8,7 +8,7 @@ import JuryPanel from './JuryPanel.vue'
 import SanctionsPanel from './SanctionsPanel.vue'
 import LogPanel from './LogPanel.vue'
 import QueuePanel from './QueuePanel.vue'
-import { finishRequest, type default as ConfirmRequest } from './confirmRequest'
+import { finishRequest, isConfirmRequest, type default as ConfirmRequest } from './confirmRequest'
 import '../referee.css'
 
 const props = defineProps<{ arenaId: string; compId: string }>()
@@ -44,8 +44,10 @@ const ROLE_LABEL: Record<string, string> = {
 }
 const roleLabel = computed(() => ROLE_LABEL[authStore.role] ?? authStore.role.toUpperCase())
 
-const judgesOnline = computed(() => c.presence?.judges.filter((j) => j.connected).length ?? 0)
-const judgeSeats = computed(() => c.presence?.judges.length ?? 5)
+const judgesOnline = computed(
+  () => c.presence?.judges.filter((j) => j.connected && j.seat <= c.judgeCount).length ?? 0,
+)
+const judgeSeats = computed(() => c.judgeCount)
 const tvOnline = computed(() => c.presence?.scoreboards ?? 0)
 const arenaTitle = computed(() => (c.arenaName || 'GELANGGANG').toUpperCase())
 const latencyText = computed(() => (c.latencyMs === null ? '-' : `${c.latencyMs} ms`))
@@ -53,15 +55,25 @@ const latencyText = computed(() => (c.latencyMs === null ? '-' : `${c.latencyMs}
 // --- dialog konfirmasi ---
 const confirmRequest = ref<ConfirmRequest | null>(null)
 const confirmChoice = ref('')
+const confirmMethod = ref('')
 function askConfirm(request: ConfirmRequest) {
   confirmChoice.value = ''
+  confirmMethod.value = ''
   confirmRequest.value = request
 }
+const confirmReady = computed(() => {
+  const r = confirmRequest.value
+  return !!r && (!r.choices || !!confirmChoice.value) && (!r.methods || !!confirmMethod.value)
+})
 async function runConfirmed() {
   const request = confirmRequest.value
-  if (!request || (request.choices && !confirmChoice.value)) return
+  if (!request || !confirmReady.value) return
   confirmRequest.value = null
-  await request.action(request.choices ? confirmChoice.value : undefined)
+  const next = await request.action(
+    request.choices ? confirmChoice.value : undefined,
+    request.methods ? confirmMethod.value : undefined,
+  )
+  if (isConfirmRequest(next)) askConfirm(next)
 }
 
 function askLogout() {
@@ -248,6 +260,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
       <div class="ref-modal-box">
         <h3 class="ref-modal-title">{{ confirmRequest.title }}</h3>
         <p class="ref-modal-msg">{{ confirmRequest.message }}</p>
+        <div v-if="confirmRequest.methods" class="ref-choice-list font-mono">
+          <label v-for="m in confirmRequest.methods" :key="m.value" class="ref-choice">
+            <input v-model="confirmMethod" type="radio" name="confirm-method" :value="m.value" />
+            <span>{{ m.label }}</span>
+          </label>
+        </div>
         <div v-if="confirmRequest.choices" class="ref-choice-list font-mono">
           <label v-for="ch in confirmRequest.choices" :key="ch.value" class="ref-choice">
             <input v-model="confirmChoice" type="radio" name="confirm-choice" :value="ch.value" />
@@ -259,7 +277,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
           <button
             class="ref-modal-confirm"
             :class="{ 'ref-modal-confirm--danger': confirmRequest.danger }"
-            :disabled="!!confirmRequest.choices && !confirmChoice"
+            :disabled="!confirmReady"
             @click="runConfirmed"
           >
             {{ confirmRequest.confirmLabel }}

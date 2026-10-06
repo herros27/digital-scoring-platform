@@ -188,6 +188,8 @@ func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 	// Body opsional: {"winner":"red"|"blue"} = keputusan wasit (wajib bila skor seri)
 	var req struct {
 		Winner string `json:"winner" validate:"omitempty,oneof=red blue"`
+		// Method dasar keputusan seri: extra_round | lighter_weight | coin_toss (kosong = keputusan wasit)
+		Method string `json:"method" validate:"omitempty,oneof=referee_decision extra_round lighter_weight coin_toss"`
 	}
 	if r.ContentLength != 0 {
 		if err := Decode(r, &req); err != nil {
@@ -196,7 +198,7 @@ func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.Service.FinishMatchWithWinner(matchID, req.Winner); err != nil {
+	if err := h.Service.FinishMatchWithDecision(matchID, req.Winner, req.Method); err != nil {
 		code := "INVALID_STATE_TRANSITION"
 		if errors.Is(err, orchestrator.ErrTieNeedsDecision) {
 			code = "TIE_NEEDS_DECISION"

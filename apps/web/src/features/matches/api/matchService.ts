@@ -172,10 +172,15 @@ export const matchService = {
    * `winner` = keputusan wasit ('red' | 'blue'); wajib bila skor seri (server menjawab
    * 400 TIE_NEEDS_DECISION tanpa itu).
    */
-  async finishMatch(compId: string, matchId: string, winner?: 'red' | 'blue'): Promise<{ status: string }> {
+  async finishMatch(
+    compId: string,
+    matchId: string,
+    winner?: 'red' | 'blue',
+    method?: string
+  ): Promise<{ status: string }> {
     const res = await http.post<{ status: string }>(
       ENDPOINTS.MATCHES.FINISH(compId, matchId),
-      winner ? { winner } : undefined
+      winner ? { winner, ...(method ? { method } : {}) } : undefined
     )
     return res.data
   },

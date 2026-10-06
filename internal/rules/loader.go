@@ -26,6 +26,11 @@ func presetScoring() ScoringRule {
 		},
 		Penalties: DefaultPenalties(),
 		Consensus: &ConsensusRule{Judges: 3, Majority: 2, WindowMs: 3000},
+		Tiebreak: &TiebreakRule{
+			Steps:             []string{StepFewestPenalties, StepTechniquePriority},
+			TechniquePriority: []string{"catch_fall", "fall", "knockdown", "technique"},
+			ManualMethods:     []string{MethodExtraRound, MethodLighterWeight, MethodCoinToss},
+		},
 	}
 }
 
