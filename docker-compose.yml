@@ -7,14 +7,18 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8080}:8080"
+    # Berkas .env WAJIB ada (cp .env.example .env): compose berhenti bila tidak ditemukan. Seluruh isinya
+    # menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...). Nilai di `environment` di bawah
+    # menimpa .env karena harus berbeda di dalam container.
+    env_file:
+      - .env
     environment:
-      - PORT=8080
-      - ENV=production
-      # dirakit dari nilai yang sama dengan layanan postgres (lihat .env.example)
+      - PORT=8080            # nginx dan pemetaan port menuju 8080 di dalam container
+      - ENV=production       # jalur Docker = produksi; development memakai `go run` dengan .env
+      # .env berisi DB_URL untuk `go run` di host (localhost); di dalam container database bernama `postgres`
       - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
-      # WAJIB diisi di .env atau environment host (mis. openssl rand -base64 48). Compose berhenti dengan
-      # pesan jelas bila kosong; backend juga menolak nilai contoh dan nilai < 32 karakter (ENV=production).
-      - JWT_SECRET=${JWT_SECRET:?isi JWT_SECRET di berkas .env (cp .env.example .env lalu ganti dengan nilai acak, mis. openssl rand -base64 48)}
+      # pemeriksaan dini dengan pesan jelas; backend juga menolak nilai contoh dan nilai < 32 karakter
+      - JWT_SECRET=${JWT_SECRET:?isi JWT_SECRET di berkas .env (ganti dengan nilai acak, mis. openssl rand -base64 48)}
     depends_on:
       postgres:
         condition: service_healthy

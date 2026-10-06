@@ -260,6 +260,11 @@
     - `docker-compose.yml`: `JWT_SECRET` kini wajib (`${JWT_SECRET:?...}`), compose berhenti dengan pesan jelas sebelum container dijalankan; nilai contoh lama dihapus.
     - Tes: `TestValidate_ProductionRejectsWeakJWTSecret`; biner diuji langsung (production + kunci lemah → keluar kode 1 dengan pesan; development tidak terpengaruh).
 
+53. **`env_file: .env` Wajib pada Compose** –
+    - Layanan `app` memakai `env_file: .env` (berkas wajib ada; tanpa `.env` compose berhenti dengan "env file ... not found"). Seluruh isi `.env` menjadi environment backend, sehingga `AUTO_MIGRATE` dan `SEED_DATA` kini ikut diteruskan ke container (sebelumnya tidak). `environment:` menimpa tiga nilai yang harus berbeda di dalam container: `PORT=8080`, `ENV=production`, dan `DB_URL` ke layanan `postgres` (`DB_URL` di `.env` untuk `go run` di host). Layanan `postgres` dan `web` tidak diberi `env_file` agar `JWT_SECRET` tidak masuk container yang tidak membutuhkannya.
+    - CI (job Docker): membuat `.env` dari `.env.example` lalu `docker compose config --quiet`, sehingga berkas compose ikut tervalidasi.
+    - Diperiksa dengan `docker compose config`: tanpa `.env` berhenti dengan pesan jelas (galat JWT_SECRET atau "env file not found"), dengan `.env` environment backend benar (DB_URL internal, ENV production, PORT 8080, JWT_SECRET/AUTO_MIGRATE/SEED_DATA dari `.env`). Menjalankan stack penuh belum diuji (tidak ada daemon Docker).
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.
