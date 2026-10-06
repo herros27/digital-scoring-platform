@@ -51,6 +51,16 @@ type Orchestrator struct {
 	scores     [4]RoundScore
 	timer      *Timer
 	seenEvents map[string]time.Time
+
+	// state meja wasit (lihat referee_ops.go)
+	penalties     []penaltyEntry
+	nextPenaltyID int
+	medicActive   bool
+	varActive     bool
+	lastInput     map[int]judgeAction
+	inputCount    map[int]int
+	forced        *forcedResult
+	result        map[string]any
 }
 
 func New(
@@ -75,9 +85,12 @@ func New(
 		scoreStore:   scoreStore,
 		bracketStore: bracketStore,
 		seenEvents:   make(map[string]time.Time),
+		lastInput:    make(map[int]judgeAction),
+		inputCount:   make(map[int]int),
 	}
 	// Pasang callback: setiap message dari hub masuk ke sini
 	h.OnMessage = o.handleMessage
+	h.SetOnPresence(o.broadcastPresence)
 	return o
 }
 
@@ -104,6 +117,10 @@ func (o *Orchestrator) handleMessage(arenaID string, client *hub.Client, msg hub
 		o.handleControl(client, msg)
 	case hub.MsgPenalty:
 		o.handlePenalty(client, msg)
+	case hub.MsgPenaltyRevoke:
+		o.handlePenaltyRevoke(client, msg)
+	case hub.MsgArenaSignal:
+		o.handleArenaSignal(client, msg)
 	case hub.MsgSyncRequest:
 		o.handleSyncRequest(client)
 	default:
@@ -113,7 +130,10 @@ func (o *Orchestrator) handleMessage(arenaID string, client *hub.Client, msg hub
 
 // payload untuk MsgStateChange: {"action": "start"} / "pause" / "resume"
 type controlPayload struct {
-	Action string `json:"action"`
+	Action  string `json:"action"`
+	Winner  string `json:"winner,omitempty"`   // finish: pemenang keputusan wasit (wajib bila seri)
+	Target  string `json:"target,omitempty"`   // disqualify: sudut yang didiskualifikasi
+	DeltaMS int64  `json:"delta_ms,omitempty"` // adjust_time: koreksi waktu (+/-)
 }
 
 func (o *Orchestrator) handleControl(client *hub.Client, msg hub.Message) {
@@ -143,11 +163,23 @@ func (o *Orchestrator) handleControl(client *hub.Client, msg hub.Message) {
 			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
 		}
 	case "finish":
-		if err := o.doFinish(); err != nil {
+		if err := o.doFinish(p.Winner); err != nil {
 			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
 		}
 	case "cancel":
 		if err := o.doCancel(); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
+	case "disqualify":
+		if err := o.doDisqualify(p.Target); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
+	case "adjust_time":
+		if err := o.doAdjustTime(p.DeltaMS); err != nil {
+			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
+		}
+	case "reset_round":
+		if err := o.doResetRound(); err != nil {
 			o.sendError(client, "INVALID_STATE_TRANSITION", err.Error())
 		}
 	default:
@@ -216,12 +248,23 @@ func (o *Orchestrator) doResume() error {
 	return nil
 }
 
-func (o *Orchestrator) doFinish() error {
+// doFinish mengakhiri pertandingan. Bila skor seri, wasit wajib menentukan pemenang
+// (`winner` = "red"/"blue", keputusan wasit); tanpa itu pertandingan tidak diakhiri.
+func (o *Orchestrator) doFinish(winner string) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	if o.sm.IsFinished() {
 		return fmt.Errorf("match is already finished")
+	}
+	if winner != "" {
+		if !validTarget(winner) {
+			return fmt.Errorf("pemenang harus red atau blue")
+		}
+		o.forced = &forcedResult{Corner: winner, ResultType: "referee_decision"}
+		o.appendEvent("referee_decision", map[string]any{"winner_corner": winner}, "")
+	} else if o.sm.CurrentRoundNumber() > 0 && o.tiedLocked() {
+		return ErrTieNeedsDecision
 	}
 	o.finalize()
 	return nil
@@ -316,7 +359,9 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 		Timestamp:  time.Now(),
 	}
 
-	// log raw judge input ke DB (audit trail)
+	// log raw judge input ke DB (audit trail) dan catat aktivitas kursi untuk panel juri
+	o.mu.Lock()
+	o.recordJudgeInput(client.SeatNumber, string(input.ScoreType), string(input.Target), input.Round)
 	o.appendEvent("judge_input", map[string]any{
 		"judge_id":    input.JudgeID,
 		"seat_number": client.SeatNumber,
@@ -325,6 +370,8 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 		"target":      input.Target,
 		"round":       input.Round,
 	}, client.ID)
+	o.mu.Unlock()
+	o.broadcastPresence()
 
 	result := o.engine.Submit(input)
 	if result == nil || !result.Accepted {
@@ -356,12 +403,14 @@ func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyK
 	input.Round = o.sm.CurrentRoundNumber()
 	input.Timestamp = time.Now()
 
+	o.mu.Lock()
 	o.appendEvent("judge_input", map[string]any{
 		"judge_id":   input.JudgeID,
 		"score_type": input.ScoreType,
 		"target":     input.Target,
 		"round":      input.Round,
 	}, input.JudgeID)
+	o.mu.Unlock()
 
 	result := o.engine.Submit(input)
 	if result != nil && result.Accepted {
@@ -428,60 +477,6 @@ func (o *Orchestrator) pointsFor(st consensus.ScoreType) int {
 	}
 }
 
-// payload untuk MsgPenalty: {"target": "red", "level": 1}
-type penaltyPayload struct {
-	Target string `json:"target"`
-	Level  int    `json:"level"`
-}
-
-func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
-	if !consensus.CanIssuePenalty(consensus.JudgeRole(client.Role)) {
-		o.sendError(client, "FORBIDDEN", "only referee can issue penalty")
-		return
-	}
-
-	var p penaltyPayload
-	if err := decodePayload(msg.Payload, &p); err != nil {
-		o.sendError(client, "BAD_PAYLOAD", err.Error())
-		return
-	}
-
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
-	round := o.sm.CurrentRoundNumber()
-	if round == 0 {
-		return // match belum mulai
-	}
-
-	if p.Target == "red" {
-		o.scores[round].RedPenalties += p.Level
-	} else {
-		o.scores[round].BluePenalties += p.Level
-	}
-
-	sc := &store.MatchScore{
-		MatchID:          o.matchID,
-		Round:            round,
-		AthleteRedScore:  o.scores[round].RedTechnical,
-		AthleteBlueScore: o.scores[round].BlueTechnical,
-		RedPenalties:     o.scores[round].RedPenalties,
-		BluePenalties:    o.scores[round].BluePenalties,
-	}
-	if o.scoreStore != nil {
-		_ = o.scoreStore.Upsert(sc)
-	}
-
-	o.appendEvent("penalty_applied", map[string]any{
-		"target": p.Target,
-		"level":  p.Level,
-		"round":  round,
-		"by":     client.ID,
-	}, client.ID)
-
-	o.broadcastScoreUpdate(round)
-}
-
 func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
 	o.mu.Lock()
 	payload := o.snapshotLocked()
@@ -515,7 +510,7 @@ func (o *Orchestrator) snapshotLocked() map[string]any {
 		blueTotal += o.scores[i].BlueTechnical - o.scores[i].BluePenalties
 	}
 
-	return map[string]any{
+	snap := map[string]any{
 		"match_id":           o.matchID,
 		"arena_id":           o.arenaID,
 		"state":              string(o.sm.Current()),
@@ -527,6 +522,10 @@ func (o *Orchestrator) snapshotLocked() map[string]any {
 		"blue_total":         blueTotal,
 		"server_time":        time.Now().UTC().Format(time.RFC3339),
 	}
+	for k, v := range o.extraSnapshotLocked() {
+		snap[k] = v
+	}
+	return snap
 }
 
 func (o *Orchestrator) startRoundTimer() {
@@ -541,8 +540,13 @@ func (o *Orchestrator) onRoundExpired() {
 
 	cur := o.sm.Current()
 
-	// Ronde 3 selesai → langsung finish
+	// Ronde 3 selesai → langsung finish, kecuali skor seri: pertandingan menunggu keputusan wasit
 	if cur == statemachine.StateRound3 {
+		if o.tiedLocked() {
+			o.appendEvent("tie_pending", map[string]any{"round": 3}, "")
+			o.broadcastState()
+			return
+		}
 		o.sm.Transition(statemachine.EventFinish)
 		o.appendEvent("round_ended", map[string]any{"round": 3}, "")
 		o.finalize()
@@ -598,6 +602,9 @@ func (o *Orchestrator) finalize() {
 	}
 
 	winnerCorner, resultType := o.determineWinner()
+	if o.forced != nil {
+		winnerCorner, resultType = o.forced.Corner, o.forced.ResultType
+	}
 	winnerID := winnerCorner
 
 	if o.matchStore != nil {
@@ -628,6 +635,11 @@ func (o *Orchestrator) finalize() {
 		"result_type": resultType,
 	}, "")
 
+	o.result = map[string]any{
+		"winner":      winnerID,
+		"corner":      winnerCorner,
+		"result_type": resultType,
+	}
 	o.h.Broadcast(hub.Message{
 		Type: hub.MsgMatchResult,
 		Payload: map[string]any{
@@ -671,6 +683,7 @@ func (o *Orchestrator) broadcastState() {
 				return 0
 			}(),
 			"timer_running": o.timer != nil && o.timer.IsRunning(),
+			"tie_pending":   o.tiePendingLocked(),
 		},
 	})
 }
@@ -698,20 +711,44 @@ func (o *Orchestrator) sendError(client *hub.Client, code, message string) {
 	})
 }
 
+// appendEvent mencatat kejadian ke database dan menyiarkannya ke meja wasit/admin sebagai
+// `match_event` (log real-time). Pemanggil WAJIB memegang o.mu. Setiap kejadian diberi
+// `clock_ms` (sisa waktu timer saat itu) dan `round` bila belum ada.
 func (o *Orchestrator) appendEvent(eventType string, payload map[string]any, judgeID string) {
-	if o.eventStore == nil {
-		return
+	if payload == nil {
+		payload = map[string]any{}
 	}
+	if _, ok := payload["clock_ms"]; !ok {
+		payload["clock_ms"] = o.clockMS()
+	}
+	if _, ok := payload["round"]; !ok {
+		payload["round"] = o.sm.CurrentRoundNumber()
+	}
+
 	raw, _ := json.Marshal(payload)
 	ev := &store.MatchEvent{
 		MatchID:   o.matchID,
 		EventType: eventType,
 		Payload:   string(raw),
 		JudgeID:   judgeID,
+		CreatedAt: time.Now().UTC(),
 	}
-	if err := o.eventStore.Append(ev); err != nil {
-		log.Printf("[orch:%s] event append error: %v", o.matchID, err)
+	if o.eventStore != nil {
+		if err := o.eventStore.Append(ev); err != nil {
+			log.Printf("[orch:%s] event append error: %v", o.matchID, err)
+		}
 	}
+
+	msg := hub.Message{Type: hub.MsgMatchEvent, Payload: map[string]any{
+		"id":         ev.ID,
+		"match_id":   ev.MatchID,
+		"event_type": ev.EventType,
+		"payload":    payload,
+		"judge_id":   ev.JudgeID,
+		"created_at": ev.CreatedAt,
+	}}
+	o.h.SendToRole(hub.RoleReferee, msg)
+	o.h.SendToRole(hub.RoleAdmin, msg)
 }
 
 func (o *Orchestrator) GetMatchID() string {
@@ -742,7 +779,12 @@ func (o *Orchestrator) Resume() error {
 }
 
 func (o *Orchestrator) Finish() error {
-	return o.doFinish()
+	return o.doFinish("")
+}
+
+// FinishWithWinner mengakhiri pertandingan dengan pemenang yang ditentukan wasit (wajib bila seri).
+func (o *Orchestrator) FinishWithWinner(winner string) error {
+	return o.doFinish(winner)
 }
 
 func (o *Orchestrator) Cancel() error {

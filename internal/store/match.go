@@ -79,26 +79,10 @@ func (s *MatchStore) SetWinner(matchID, winnerID string) error {
 	return err
 }
 
-func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]Match, int, error) {
-	var total int
-	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND ($2 = '' OR status = $2)`
-	if err := s.DB.QueryRow(countQuery, competitionID, status).Scan(&total); err != nil {
-		return nil, 0, err
-	}
+const matchColumns = `id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at`
 
-	query := `
-		SELECT id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at 
-		FROM matches 
-		WHERE competition_id = $1 AND ($2 = '' OR status = $2)
-		ORDER BY created_at DESC 
-		LIMIT $3 OFFSET $4`
-	rows, err := s.DB.Query(query, competitionID, status, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	var list []Match
+func scanMatches(rows *sql.Rows) ([]Match, error) {
+	list := []Match{}
 	for rows.Next() {
 		var m Match
 		var arenaID, bracketSlotID, winnerID sql.NullString
@@ -107,7 +91,7 @@ func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit,
 			&m.AthleteRedID, &m.AthleteBlueID, &m.CurrentRound,
 			&m.Status, &winnerID, &m.CreatedAt, &m.StartedAt, &m.FinishedAt,
 		); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		if arenaID.Valid {
 			m.ArenaID = arenaID.String
@@ -120,10 +104,52 @@ func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit,
 		}
 		list = append(list, m)
 	}
-	if list == nil {
-		list = []Match{}
+	return list, rows.Err()
+}
+
+func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]Match, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND ($2 = '' OR status = $2)`
+	if err := s.DB.QueryRow(countQuery, competitionID, status).Scan(&total); err != nil {
+		return nil, 0, err
 	}
-	return list, total, rows.Err()
+
+	rows, err := s.DB.Query(`
+		SELECT `+matchColumns+`
+		FROM matches
+		WHERE competition_id = $1 AND ($2 = '' OR status = $2)
+		ORDER BY created_at DESC
+		LIMIT $3 OFFSET $4`, competitionID, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	list, err := scanMatches(rows)
+	return list, total, err
+}
+
+// ListByArenaPaged daftar partai pada satu gelanggang dalam urutan antrean (paling awal dibuat lebih dulu).
+func (s *MatchStore) ListByArenaPaged(competitionID, arenaID, status string, limit, offset int) ([]Match, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND arena_id = $2 AND ($3 = '' OR status = $3)`
+	if err := s.DB.QueryRow(countQuery, competitionID, arenaID, status).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := s.DB.Query(`
+		SELECT `+matchColumns+`
+		FROM matches
+		WHERE competition_id = $1 AND arena_id = $2 AND ($3 = '' OR status = $3)
+		ORDER BY created_at ASC, id ASC
+		LIMIT $4 OFFSET $5`, competitionID, arenaID, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	list, err := scanMatches(rows)
+	return list, total, err
 }
 
 func (s *MatchStore) ListByCompetition(competitionID string) ([]Match, error) {

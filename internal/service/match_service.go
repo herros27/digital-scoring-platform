@@ -97,6 +97,44 @@ func (s *MatchService) GetMatchesByCompetitionPaged(competitionID, status string
 	return []store.Match{}, 0, nil
 }
 
+// GetMatchesByArenaPaged daftar partai pada satu gelanggang (urutan antrean).
+func (s *MatchService) GetMatchesByArenaPaged(competitionID, arenaID, status string, page, limit int) ([]store.Match, int, error) {
+	if competitionID == "" || arenaID == "" {
+		return nil, 0, domain.ErrInvalidInput
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if s.matchStore != nil {
+		return s.matchStore.ListByArenaPaged(competitionID, arenaID, status, limit, (page-1)*limit)
+	}
+
+	// Tanpa store (mis. repositori tiruan): saring dari daftar kompetisi
+	all, _, err := s.GetMatchesByCompetitionPaged(competitionID, status, 1, 10000)
+	if err != nil {
+		return nil, 0, err
+	}
+	filtered := make([]store.Match, 0, len(all))
+	for _, m := range all {
+		if m.ArenaID == arenaID {
+			filtered = append(filtered, m)
+		}
+	}
+	total := len(filtered)
+	start := (page - 1) * limit
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return filtered[start:end], total, nil
+}
+
 func (s *MatchService) CreateMatch(m *store.Match) error {
 	if m.CompetitionID == "" {
 		return errors.New("competition id is required")
@@ -205,11 +243,19 @@ func (s *MatchService) ResumeMatch(matchID string) error {
 }
 
 func (s *MatchService) FinishMatch(matchID string) error {
+	return s.FinishMatchWithWinner(matchID, "")
+}
+
+// FinishMatchWithWinner mengakhiri pertandingan; winner ("red"/"blue") = keputusan wasit, wajib bila skor seri.
+func (s *MatchService) FinishMatchWithWinner(matchID, winner string) error {
 	o, err := s.GetOrchestrator(matchID)
 	if err != nil {
 		return err
 	}
-	return o.Finish()
+	if winner == "" {
+		return o.Finish()
+	}
+	return o.FinishWithWinner(winner)
 }
 
 func (s *MatchService) CancelMatch(matchID string) error {

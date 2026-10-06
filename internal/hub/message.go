@@ -15,6 +15,13 @@ const (
 	MsgError          MessageType = "error"
 	MsgSyncRequest    MessageType = "sync_request"
 	MsgSyncResponse   MessageType = "sync_response"
+
+	// Meja wasit: pembatalan sanksi, daftar sanksi, sinyal arena, kehadiran perangkat, log kejadian
+	MsgPenaltyRevoke MessageType = "penalty_revoke"
+	MsgPenaltyUpdate MessageType = "penalties"
+	MsgArenaSignal   MessageType = "arena_signal"
+	MsgPresence      MessageType = "presence"
+	MsgMatchEvent    MessageType = "match_event"
 )
 
 type Role string

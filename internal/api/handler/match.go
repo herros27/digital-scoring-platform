@@ -11,6 +11,7 @@ import (
 	"github.com/herros27/digital-scoring/internal/consensus"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/hub"
+	"github.com/herros27/digital-scoring/internal/orchestrator"
 	"github.com/herros27/digital-scoring/internal/service"
 	"github.com/herros27/digital-scoring/internal/store"
 )
@@ -27,7 +28,16 @@ func (h *MatchHandler) List(w http.ResponseWriter, r *http.Request) {
 	page, limit, _ := ParsePagination(r)
 	status := r.URL.Query().Get("status")
 
-	matches, total, err := h.Service.GetMatchesByCompetitionPaged(compID, status, page, limit)
+	var (
+		matches []store.Match
+		total   int
+		err     error
+	)
+	if arenaID := r.URL.Query().Get("arena_id"); arenaID != "" {
+		matches, total, err = h.Service.GetMatchesByArenaPaged(compID, arenaID, status, page, limit)
+	} else {
+		matches, total, err = h.Service.GetMatchesByCompetitionPaged(compID, status, page, limit)
+	}
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
@@ -174,8 +184,24 @@ func (h *MatchHandler) Resume(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	matchID := r.PathValue("id")
-	if err := h.Service.FinishMatch(matchID); err != nil {
-		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+
+	// Body opsional: {"winner":"red"|"blue"} = keputusan wasit (wajib bila skor seri)
+	var req struct {
+		Winner string `json:"winner" validate:"omitempty,oneof=red blue"`
+	}
+	if r.ContentLength != 0 {
+		if err := Decode(r, &req); err != nil {
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+			return
+		}
+	}
+
+	if err := h.Service.FinishMatchWithWinner(matchID, req.Winner); err != nil {
+		code := "INVALID_STATE_TRANSITION"
+		if errors.Is(err, orchestrator.ErrTieNeedsDecision) {
+			code = "TIE_NEEDS_DECISION"
+		}
+		Fail(w, http.StatusBadRequest, code, err.Error(), nil)
 		return
 	}
 	if h.Cache != nil {

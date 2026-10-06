@@ -88,6 +88,28 @@ func (t *Timer) Remaining() time.Duration {
 	return t.remaining
 }
 
+// Adjust menambah/mengurangi sisa waktu (delta boleh negatif) dan membatasinya ke [min, max].
+// Mengembalikan sisa waktu baru.
+func (t *Timer) Adjust(delta, min, max time.Duration) time.Duration {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.remaining += delta
+	if t.remaining > max {
+		t.remaining = max
+	}
+	if t.remaining < min {
+		t.remaining = min
+	}
+	return t.remaining
+}
+
+// Reset mengatur sisa waktu ke durasi tertentu tanpa mengubah status berjalan/jeda.
+func (t *Timer) Reset(d time.Duration) {
+	t.mu.Lock()
+	t.remaining = d
+	t.mu.Unlock()
+}
+
 func (t *Timer) IsRunning() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()

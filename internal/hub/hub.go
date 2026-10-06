@@ -27,6 +27,52 @@ type Hub struct {
 	unregister chan *Client
 	// callback ke orchestrator
 	OnMessage func(arenaID string, client *Client, msg Message)
+	// onPresence dipanggil (di luar kunci hub) setiap ada klien yang terhubung/terputus
+	onPresence func()
+}
+
+// Presence ringkasan perangkat yang sedang terhubung di arena.
+type Presence struct {
+	JudgeSeats  map[int]bool // nomor kursi juri yang online
+	Referees    int
+	Admins      int
+	Scoreboards int
+}
+
+// Presence menghitung perangkat yang terhubung saat ini.
+func (h *Hub) Presence() Presence {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	p := Presence{JudgeSeats: make(map[int]bool)}
+	for c := range h.clients {
+		switch {
+		case c.Role.IsJudge():
+			p.JudgeSeats[c.SeatNumber] = true
+		case c.Role == RoleReferee:
+			p.Referees++
+		case c.Role == RoleAdmin:
+			p.Admins++
+		case c.Role == RoleScoreboard:
+			p.Scoreboards++
+		}
+	}
+	return p
+}
+
+// SetOnPresence memasang callback perubahan kehadiran (aman dipanggil saat hub berjalan).
+func (h *Hub) SetOnPresence(fn func()) {
+	h.mu.Lock()
+	h.onPresence = fn
+	h.mu.Unlock()
+}
+
+func (h *Hub) notifyPresence() {
+	h.mu.RLock()
+	fn := h.onPresence
+	h.mu.RUnlock()
+	if fn != nil {
+		fn()
+	}
 }
 
 func NewHub(arenaID string) *Hub {
@@ -48,16 +94,22 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			log.Printf("[hub:%s] client connected: %s (%s)", h.ArenaID, client.ID, client.Role)
 			metrics.IncWSConnections(h.ArenaID, string(client.Role))
+			h.notifyPresence()
 
 		case client := <-h.unregister:
 			h.mu.Lock()
+			removed := false
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
+				removed = true
 				log.Printf("[hub:%s] client disconnected: %s", h.ArenaID, client.ID)
 				metrics.DecWSConnections(h.ArenaID, string(client.Role))
 			}
 			h.mu.Unlock()
+			if removed {
+				h.notifyPresence()
+			}
 
 		case inbound := <-h.inbound:
 			// judge tidak bisa lihat input judge lain
