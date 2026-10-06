@@ -12,7 +12,90 @@ export interface WsRoundScore {
   BluePenalties: number
 }
 
+export type WsTarget = 'red' | 'blue'
+
+/** Satu jenis sanksi resmi dari katalog server (poin = potongan). */
+export interface WsPenaltyKind {
+  type: string
+  label: string
+  points: number
+}
+
+/** Sanksi yang sudah dijatuhkan pada pertandingan berjalan. */
+export interface WsPenaltyEntry {
+  id: number
+  round: number
+  target: WsTarget
+  type: string
+  label: string
+  points: number
+  clock_ms: number
+}
+
+/** Input juri terakhir pada satu kursi. */
+export interface WsJudgeAction {
+  score_type: string
+  target: string
+  round: number
+  clock_ms: number
+  at: string
+}
+
+export interface WsJudgePresence {
+  seat: number
+  connected: boolean
+  inputs: number
+  last_input: WsJudgeAction | null
+}
+
+/** Perangkat yang sedang terhubung ke gelanggang. */
+export interface WsPresence {
+  judges: WsJudgePresence[]
+  referees: number
+  admins: number
+  scoreboards: number
+}
+
+/** Hasil akhir pertandingan (setelah selesai). */
+export interface WsMatchOutcome {
+  winner: string
+  corner: string
+  result_type: string
+}
+
+/** Kejadian pertandingan (baris `match_events`), juga disiarkan real-time ke meja wasit. */
+export interface WsMatchEvent {
+  id: string
+  match_id: string
+  event_type: string
+  payload: Record<string, unknown>
+  judge_id: string
+  created_at: string
+}
+
+export interface WsArenaSignal {
+  signal: 'gong' | 'medic' | 'var'
+  active: boolean
+}
+
+export interface WsPenaltyList {
+  penalties: WsPenaltyEntry[]
+}
+
 export interface WsSyncResponse {
+  match_id?: string
+  arena_id?: string
+  tie_pending?: boolean
+  ruleset_name?: string
+  round_duration_ms?: number
+  break_duration_ms?: number
+  total_rounds?: number
+  penalties?: WsPenaltyEntry[]
+  penalty_catalog?: WsPenaltyKind[]
+  medic_active?: boolean
+  var_active?: boolean
+  presence?: WsPresence
+  result?: WsMatchOutcome | null
   round?: number
   state?: WsMatchState
   timer_remaining_ms?: number
@@ -29,6 +112,8 @@ export interface WsStateChange {
   timer_remaining_ms?: number
   /** false saat wasit menjeda pertandingan; state tetap `round_N` */
   timer_running?: boolean
+  /** Waktu ronde terakhir habis dengan skor seri: menunggu keputusan wasit */
+  tie_pending?: boolean
 }
 
 export interface WsTimerSync {
@@ -70,6 +155,10 @@ export interface WsServerMessages {
   score_confirmed: WsScoreConfirmed
   score_update: WsScoreUpdate
   match_result: WsMatchResult
+  penalties: WsPenaltyList
+  arena_signal: WsArenaSignal
+  presence: WsPresence
+  match_event: WsMatchEvent
   error: WsErrorPayload
 }
 
@@ -144,10 +233,13 @@ export function useWebSocket(arenaId: string, token?: string) {
     reconnectTimeout = setTimeout(connect, delay)
   }
 
-  function sendMessage(type: string, payload: Record<string, unknown>) {
+  /** Mengirim pesan; mengembalikan false bila koneksi belum/tidak terbuka (pesan tidak terkirim). */
+  function sendMessage(type: string, payload: Record<string, unknown>): boolean {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({ type, payload }))
+      return true
     }
+    return false
   }
 
   function onMessage<K extends WsServerMessageType>(

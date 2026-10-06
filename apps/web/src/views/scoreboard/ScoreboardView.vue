@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
+import { playGong } from '@/composables/useGong'
 import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { arenaService } from '@/features/arena/api/arenaService'
 
@@ -76,6 +77,16 @@ function triggerScoreToast(side: 'red' | 'blue', text: string) {
   }, 1600)
 }
 
+// Sinyal arena dari wasit (banner selama aktif)
+const medicActive = ref(false)
+const varActive = ref(false)
+
+const RESULT_LABEL: Record<string, string> = {
+  point_win: 'MENANG ANGKA (POINT WIN)',
+  disqualification: 'MENANG DISKUALIFIKASI',
+  draw: 'SERI (KEPUTUSAN WASIT)',
+}
+
 // Winner Announcement Modal
 const showWinnerModal = ref(false)
 const winnerData = ref<{ side: 'red' | 'blue'; name: string; resultType: string } | null>(null)
@@ -117,6 +128,8 @@ onMounted(async () => {
 
   // Listen to WebSocket broadcasts
   onMessage('sync_response', (payload) => {
+    if (payload.medic_active !== undefined) medicActive.value = payload.medic_active
+    if (payload.var_active !== undefined) varActive.value = payload.var_active
     if (payload.round) currentRound.value = payload.round
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.timer_remaining_ms !== undefined) {
@@ -167,15 +180,28 @@ onMounted(async () => {
     winnerData.value = {
       side,
       name,
-      resultType: payload.result_type || 'MENANG ANGKA (POINT WIN)',
+      resultType: RESULT_LABEL[payload.result_type ?? ''] ?? (payload.result_type || RESULT_LABEL.point_win),
     }
     showWinnerModal.value = true
+    medicActive.value = false
+    varActive.value = false
+  })
+
+  // Sinyal dari meja wasit: gong berbunyi sesaat; dokter/VAR menampilkan banner selama aktif
+  onMessage('arena_signal', (payload) => {
+    if (payload.signal === 'gong') playGong()
+    else if (payload.signal === 'medic') medicActive.value = payload.active
+    else if (payload.signal === 'var') varActive.value = payload.active
   })
 })
 </script>
 
 <template>
   <div class="sb-screen">
+    <div v-if="medicActive || varActive" class="sb-signal-banner font-mono">
+      <span v-if="medicActive">⚕ PERTANDINGAN DIHENTIKAN SEMENTARA — DOKTER PERTANDINGAN</span>
+      <span v-if="varActive">▶ TINJAUAN VIDEO (VAR) SEDANG BERJALAN</span>
+    </div>
     <!-- TOP BROADCAST NAVBAR -->
     <header class="sb-topbar">
       <div class="sb-brand">
@@ -488,6 +514,29 @@ onMounted(async () => {
 /* ==========================================================================
    STADIUM BROADCAST SCOREBOARD (Figma Node 1:2 / 01_arena_scoreboard.png)
    ========================================================================== */
+
+.sb-signal-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 10px 16px;
+  background: rgba(217, 119, 6, 0.92);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  animation: sb-signal-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sb-signal-pulse {
+  50% {
+    background: rgba(180, 83, 9, 0.92);
+  }
+}
 
 .sb-screen {
   width: 100vw;

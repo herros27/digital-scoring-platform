@@ -20,3 +20,13 @@ export function matchStatusFromState(
   if (state === 'finished' || state === 'cancelled') return 'finished'
   return undefined
 }
+
+/** Label tampilan (Indonesia) untuk status pertandingan. */
+export const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
+  idle: 'MENUNGGU',
+  ready: 'SIAP',
+  running: 'BERJALAN',
+  paused: 'DIJEDA',
+  break: 'ISTIRAHAT',
+  finished: 'SELESAI',
+}

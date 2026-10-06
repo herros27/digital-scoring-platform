@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchStatusFromState } from './matchStatus'
+import { MATCH_STATUS_LABEL, matchStatusFromState } from './matchStatus'
 
 describe('matchStatusFromState', () => {
   it('memetakan state server ke status tampilan', () => {
@@ -20,5 +20,12 @@ describe('matchStatusFromState', () => {
     expect(matchStatusFromState(undefined)).toBeUndefined()
     expect(matchStatusFromState('')).toBeUndefined()
     expect(matchStatusFromState('aneh')).toBeUndefined()
+  })
+})
+
+describe('MATCH_STATUS_LABEL', () => {
+  it('punya label untuk setiap status', () => {
+    const statuses = ['idle', 'ready', 'running', 'paused', 'break', 'finished'] as const
+    for (const s of statuses) expect(MATCH_STATUS_LABEL[s]).toMatch(/^[A-Z]+$/)
   })
 })

@@ -241,6 +241,80 @@ async function runSimulation() {
   const update = last(sb.events, 'score_update')
   check('score_update: merah=1, biru=0', update?.payload?.red_technical === 1 && update?.payload?.blue_technical === 0, JSON.stringify(update?.payload))
 
+  // 9b. Fitur meja wasit: sanksi, pembatalan, sinyal arena, kehadiran, log
+  console.log('\n9b. Referee console features (penalties, signals, presence, events)...')
+  const send = (client, type, payload) => client.ws.send(JSON.stringify({ type, payload }))
+  const lastMsg = (client, type) => last(client.events, type)
+  const errorsOf = (client) => client.events.filter((e) => e.type === 'error').map((e) => e.payload?.code)
+
+  send(ref, 'penalty', { target: 'red', type: 'teguran_1' })
+  send(ref, 'penalty', { target: 'red', type: 'peringatan_1' })
+  await sleep(400)
+  const pens = lastMsg(sb, 'penalties')?.payload?.penalties ?? []
+  check('Sanksi disiarkan ke scoreboard (2 sanksi merah)', pens.filter((x) => x.target === 'red').length === 2, JSON.stringify(pens))
+  check('Poin sanksi ditentukan server (teguran 1 = -1, peringatan 1 = -5)', pens.map((x) => x.points).join() === '1,5', pens.map((x) => x.points).join())
+  const afterPen = lastMsg(sb, 'score_update')?.payload
+  check('Skor merah dipotong sanksi (teknik 1, potongan 6)', afterPen?.red_technical === 1 && afterPen?.red_penalties === 6, JSON.stringify(afterPen))
+
+  send(ref, 'penalty', { target: 'red', type: 'teguran_1' })
+  send(judgeSockets[0], 'penalty', { target: 'blue', type: 'teguran_1' })
+  send(ref, 'penalty', { target: 'red', type: 'ngawur' })
+  await sleep(400)
+  check('Sanksi ganda ditolak (PENALTY_ALREADY_APPLIED)', errorsOf(ref).includes('PENALTY_ALREADY_APPLIED'), errorsOf(ref).join())
+  check('Juri tidak boleh menjatuhkan sanksi (FORBIDDEN)', errorsOf(judgeSockets[0]).includes('FORBIDDEN'))
+  check('Jenis sanksi tidak dikenal ditolak (BAD_PAYLOAD)', errorsOf(ref).includes('BAD_PAYLOAD'))
+
+  send(ref, 'penalty_revoke', { target: 'red' })
+  await sleep(400)
+  const revoked = lastMsg(sb, 'penalties')?.payload?.penalties ?? []
+  check('Batalkan sanksi terakhir (peringatan_1 hilang, teguran_1 tetap)', revoked.length === 1 && revoked[0].type === 'teguran_1', JSON.stringify(revoked))
+  check('Poin potongan dikembalikan (potongan 1)', lastMsg(sb, 'score_update')?.payload?.red_penalties === 1)
+
+  send(ref, 'arena_signal', { signal: 'gong' })
+  send(ref, 'arena_signal', { signal: 'medic', active: true })
+  send(ref, 'arena_signal', { signal: 'var', active: true })
+  await sleep(400)
+  const signals = sb.events.filter((e) => e.type === 'arena_signal').map((e) => `${e.payload.signal}:${e.payload.active}`)
+  check('Scoreboard menerima sinyal gong, dokter, dan VAR', ['gong:true', 'medic:true', 'var:true'].every((x) => signals.includes(x)), signals.join())
+  const snapNow = await getJson(`/api/v1/live/scoreboard/${arena.id}`)
+  check('Status dokter/VAR tampil di snapshot REST', snapNow.data.medic_active === true && snapNow.data.var_active === true)
+  send(ref, 'arena_signal', { signal: 'medic', active: false })
+  send(ref, 'arena_signal', { signal: 'var', active: false })
+  send(judgeSockets[0], 'arena_signal', { signal: 'gong' })
+  await sleep(300)
+  check('Juri tidak boleh membunyikan gong (FORBIDDEN)', errorsOf(judgeSockets[0]).filter((c) => c === 'FORBIDDEN').length >= 2)
+
+  const presence = lastMsg(ref, 'presence')?.payload
+  const online = (presence?.judges ?? []).filter((j) => j.connected).map((j) => j.seat)
+  check('Kehadiran: juri kursi 1-3 online', [1, 2, 3].every((n) => online.includes(n)) && online.length === 3, online.join())
+  check('Kehadiran: 1 layar TV dan 1 wasit', presence?.scoreboards === 1 && presence?.referees === 1, JSON.stringify({ tv: presence?.scoreboards, ref: presence?.referees }))
+  const j1 = (presence?.judges ?? []).find((j) => j.seat === 1)
+  check('Aktivitas juri 1 tercatat (input terakhir + jumlah)', j1?.inputs >= 1 && j1?.last_input?.target === 'red', JSON.stringify(j1))
+
+  const eventsRes = await getJson(`/api/v1/competitions/${comp.id}/matches/${targetMatch.id}/events`, authHeaders)
+  const types = eventsRes.data.map((e) => e.event_type)
+  check('Log REST memuat match_started, score_confirmed, penalty_applied, penalty_revoked, arena_signal',
+    ['match_started', 'score_confirmed', 'penalty_applied', 'penalty_revoked', 'arena_signal'].every((t) => types.includes(t)), types.join())
+  const liveEv = ref.events.filter((e) => e.type === 'match_event').map((e) => e.payload.event_type)
+  check('Log real-time (match_event) sampai ke meja wasit', liveEv.includes('penalty_applied') && liveEv.includes('arena_signal'))
+  check('Penonton publik tidak menerima log internal', !sb.events.some((e) => e.type === 'match_event'))
+  check('Setiap kejadian membawa clock_ms dan round', ref.events.filter((e) => e.type === 'match_event').every((e) => typeof e.payload.payload.clock_ms === 'number' && typeof e.payload.payload.round === 'number'))
+
+  const sync = await new Promise((resolve) => {
+    const before = ref.events.length
+    send(ref, 'sync_request', {})
+    const t = setInterval(() => {
+      const m = ref.events.slice(before).find((e) => e.type === 'sync_response')
+      if (m) { clearInterval(t); resolve(m.payload) }
+    }, 50)
+  })
+  check('sync_response memuat katalog sanksi, sanksi aktif, dan info ruleset',
+    sync.penalty_catalog?.length === 6 && sync.penalties?.length === 1 && sync.round_duration_ms === 120000 && sync.total_rounds === 3,
+    JSON.stringify({ cat: sync.penalty_catalog?.length, pen: sync.penalties?.length, dur: sync.round_duration_ms }))
+
+  const queueRes = await getJson(`/api/v1/competitions/${comp.id}/matches?arena_id=${arena.id}&limit=100`, authHeaders)
+  check('Antrean per gelanggang: semua partai berada di arena ini', queueRes.data.length >= 1 && queueRes.data.every((m) => m.arena_id === arena.id), String(queueRes.data.length))
+
   // 10. Pause & resume
   console.log('\n10. Referee tests PAUSE and RESUME...')
   ref.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'pause' } }))
@@ -250,13 +324,51 @@ async function runSimulation() {
   await sleep(400)
   check('Resume: timer_running=true', last(sb.events, 'state_change')?.payload?.timer_running === true)
 
-  // 11. Selesai
-  console.log('\n11. Finishing match...')
-  ref.ws.send(JSON.stringify({ type: 'state_change', payload: { action: 'finish' } }))
-  await sleep(600)
+  // Koreksi waktu & reset babak
+  const remBefore = last(sb.events, 'state_change').payload.timer_remaining_ms
+  send(ref, 'state_change', { action: 'adjust_time', delta_ms: -10000 })
+  await sleep(400)
+  const remAfter = last(sb.events, 'state_change').payload.timer_remaining_ms
+  check('Koreksi waktu -10 detik disiarkan ke scoreboard', Math.abs(remBefore - 10000 - remAfter) <= 2000, `${remBefore} -> ${remAfter}`)
+  send(ref, 'state_change', { action: 'reset_round' })
+  await sleep(300)
+  check('Reset babak saat berjalan ditolak', errorsOf(ref).includes('INVALID_STATE_TRANSITION'), errorsOf(ref).join())
+  send(ref, 'state_change', { action: 'pause' })
+  await sleep(300)
+  send(ref, 'state_change', { action: 'reset_round' })
+  await sleep(400)
+  const remReset = last(sb.events, 'state_change').payload
+  check('Reset babak saat dijeda mengembalikan waktu penuh (02:00)', remReset.timer_remaining_ms === 120000 && remReset.timer_running === false, JSON.stringify(remReset))
+  send(ref, 'state_change', { action: 'resume' })
+  await sleep(300)
+
+  // 11. Selesai. Skor akhir seri (merah 1-1 sanksi, biru 0) -> wasit wajib memutuskan pemenang
+  console.log('\n11. Finishing match (tie requires referee decision)...')
+  const errorsBefore = errorsOf(ref).length
+  send(ref, 'state_change', { action: 'finish' })
+  await sleep(500)
+  check('Selesai saat skor seri tanpa keputusan ditolak', errorsOf(ref).length > errorsBefore && !last(sb.events, 'match_result'), errorsOf(ref).join())
+  const restTie = await fetch(`${BASE_HTTP}/api/v1/competitions/${comp.id}/matches/${targetMatch.id}/finish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+  })
+  const restTieBody = await restTie.json()
+  check('REST finish saat seri -> 400 TIE_NEEDS_DECISION', restTie.status === 400 && restTieBody.error?.code === 'TIE_NEEDS_DECISION', JSON.stringify(restTieBody))
+
+  const restFinish = await fetch(`${BASE_HTTP}/api/v1/competitions/${comp.id}/matches/${targetMatch.id}/finish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify({ winner: 'blue' }),
+  })
+  check('REST finish dengan keputusan wasit diterima', restFinish.status === 200, String(restFinish.status))
+  await sleep(500)
+
+  send(ref, 'penalty', { target: 'blue', type: 'binaan_1' })
+  await sleep(300)
+  check('Sanksi setelah pertandingan selesai ditolak', errorsOf(ref).includes('PENALTY_NOT_ALLOWED'), errorsOf(ref).join())
 
   const matchResult = last(sb.events, 'match_result')
-  check('match_result: sudut merah menang angka', matchResult?.payload?.corner === 'red' && matchResult?.payload?.result_type === 'point_win', JSON.stringify(matchResult?.payload))
+  check('match_result: sudut biru menang lewat keputusan wasit', matchResult?.payload?.corner === 'blue' && matchResult?.payload?.result_type === 'referee_decision', JSON.stringify(matchResult?.payload))
   const after = await getJson(`/api/v1/live/scoreboard/${arena.id}`)
   check('REST /live/scoreboard kembali "no active match"', after.data.status === 'no active match', JSON.stringify(after.data))
 

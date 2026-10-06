@@ -50,6 +50,16 @@ export interface SubmitScoreResult {
   result?: unknown
 }
 
+/** Satu baris `match_events` (payload berupa string JSON). */
+export interface MatchEventDTO {
+  id: string
+  match_id: string
+  event_type: string
+  payload: string
+  judge_id: string
+  created_at: string
+}
+
 export const matchService = {
   /**
    * GET /api/v1/competitions/{comp_id}/matches
@@ -59,6 +69,25 @@ export const matchService = {
     const res = await http.get<MatchDTO[]>(
       `${ENDPOINTS.MATCHES.LIST(compId)}${qs}`
     )
+    return res.data || []
+  },
+
+  /**
+   * GET /api/v1/competitions/{comp_id}/matches?arena_id=...
+   * Antrean partai satu gelanggang, urut dari yang paling awal.
+   */
+  async getArenaQueue(compId: string, arenaId: string): Promise<MatchDTO[]> {
+    const res = await http.get<MatchDTO[]>(
+      `${ENDPOINTS.MATCHES.LIST(compId)}?arena_id=${encodeURIComponent(arenaId)}&limit=100`
+    )
+    return res.data || []
+  },
+
+  /**
+   * GET /api/v1/competitions/{comp_id}/matches/{id}/events
+   */
+  async getEvents(compId: string, matchId: string): Promise<MatchEventDTO[]> {
+    const res = await http.get<MatchEventDTO[]>(ENDPOINTS.MATCHES.EVENTS(compId, matchId))
     return res.data || []
   },
 
@@ -139,9 +168,14 @@ export const matchService = {
   /**
    * POST /api/v1/competitions/{comp_id}/matches/{id}/finish
    */
-  async finishMatch(compId: string, matchId: string): Promise<{ status: string }> {
+  /**
+   * `winner` = keputusan wasit ('red' | 'blue'); wajib bila skor seri (server menjawab
+   * 400 TIE_NEEDS_DECISION tanpa itu).
+   */
+  async finishMatch(compId: string, matchId: string, winner?: 'red' | 'blue'): Promise<{ status: string }> {
     const res = await http.post<{ status: string }>(
-      ENDPOINTS.MATCHES.FINISH(compId, matchId)
+      ENDPOINTS.MATCHES.FINISH(compId, matchId),
+      winner ? { winner } : undefined
     )
     return res.data
   },
