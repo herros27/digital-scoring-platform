@@ -146,8 +146,8 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
     - *Kondisi saat ini*: Tampilan `OpsShellView.vue` sangat nyaman pada layar laptop/desktop (1366x768 ke atas), tetapi padat jika dibuka lewat smartphone.
     - *Kebutuhan*: Tampilan *drawer responsive* khusus navigasi jika operator membuka dashboard via ponsel.
 11. **Tablet Juri Masih Memuat Elemen Tetap** *(Walk Over, KO, Menang Teknik, dan Undur Diri sudah ada di konsol wasit; tiebreak resmi sudah otomatis)*:
-    - *Kondisi saat ini*: Konsol wasit sudah sepenuhnya dari data server. Pada tablet juri (`JudgeScoringView.vue`), titik indikator konsensus (`redConsensusDots`/`blueConsensusDots`) kosong dan belum terhubung ke data server. Poin potongan sanksi (teguran -1, peringatan -5/-10) masih mengikuti nilai tampilan lama dan berada di katalog `penaltyCatalog` pada `internal/orchestrator/referee_ops.go`; perlu dicek terhadap regulasi IPSI/PERSILAT yang dipakai.
-    - *Kebutuhan*: Hubungkan indikator konsensus tablet juri ke data server; verifikasi nilai poin sanksi (idealnya dari ruleset); poin sanksi dan teknik kini dari ruleset (lihat `docs/task_update.md` butir 41-43).
+    - *Kondisi saat ini*: Konsol wasit sudah sepenuhnya dari data server. Lampu konsensus di tablet juri kini terhubung (`consensus_progress`, lihat `docs/task_update.md` butir 46). Poin sanksi dan teknik kini dari ruleset (butir 41-43).
+    - *Kebutuhan*: Cocokkan nilai sanksi dan teknik preset dengan peraturan pertandingan yang dipakai event.
 12. **Login Tablet via QR / Tautan**:
     - *Kebutuhan*: Tombol "Buka Tablet" pada `DevicePinManager.vue` menghasilkan tautan/QR yang langsung memasukkan perangkat (tanpa mengetik PIN); PIN tetap sebagai cadangan.
 13. **Label Arena/Kategori/Partai pada Scoreboard**:

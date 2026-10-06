@@ -225,6 +225,11 @@
     - Tes: `internal/orchestrator/runtime_test.go` (simpan→pulihkan identik, lanjut+konsensus+selesai, catatan jeda/koreksi waktu, istirahat, idle, data rusak/selesai, batal/DQ menghapus, tie_pending); `restart.mjs` (kill -9 terhadap server nyata, 19 pemeriksaan) dan `restartui.mjs` (konsol wasit tersambung ulang sendiri, 6 pemeriksaan).
     - Batasan: input juri yang belum mencapai konsensus tidak dipulihkan; catatan sisa waktu berselang 5 detik.
 
+46. **Lampu Konsensus di Tablet Juri** –
+    - Server mengirim `consensus_progress` `{target, score_type, round, count, needed, window_ms}` hanya ke tablet juri setiap ada tekanan yang belum mencapai kesepakatan (anonim: jumlah saja, tanpa identitas kursi). Wasit dan scoreboard tidak menerimanya. `ConsensusResult` kini membawa `Count` juga saat belum diterima; engine menyediakan `Majority()` dan `Window()`.
+    - Tablet: jumlah lampu = jumlah juri ruleset; menyala sebanyak juri yang sepakat dengan teks "PUKULAN 1/2 • MENUNGGU JURI LAIN", padam sendiri setelah window; saat `score_confirmed` menyala penuh dengan "PUKULAN +1 TERKONFIRMASI" beberapa saat. Direset saat istirahat/selesai. Logika di `composables/consensusFeedback.ts`.
+    - Tes: `internal/orchestrator/progress_test.go`, `consensusFeedback.test.ts`; browser `konsensus.mjs` 15/15 (juri 1 lewat UI, juri 2 lewat WebSocket).
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

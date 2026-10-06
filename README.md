@@ -331,6 +331,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | `match_event` | Referee, Admin | log kejadian real-time (sama dengan `GET .../matches/{id}/events`, payload selalu memuat `clock_ms` dan `round`) |
 | `score_update` | All | `{round, red_technical, blue_technical, red_penalties, blue_penalties}` |
 | `score_confirmed` | All | `{score_type, target, points, count, round}` |
+| `consensus_progress` | Hanya tablet juri | `{target, score_type, round, count, needed, window_ms}`: berapa juri (anonim, tanpa identitas kursi) yang sudah menekan teknik dan sudut yang sama dalam window; dikirim saat belum mencapai kesepakatan. Dipakai lampu konsensus di tablet juri |
 | `match_result` | All | `{winner, corner, result_type, scores}` |
 | `error` | Pengirim | `{code, message}` (mis. `FORBIDDEN`, `SCORING_NOT_ALLOWED`, `INVALID_STATE_TRANSITION`) |
 

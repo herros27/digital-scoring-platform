@@ -20,6 +20,12 @@ type ConsensusResult struct {
 	Count     int // berapa juri yang setuju
 }
 
+// Majority jumlah juri yang harus sepakat.
+func (e *Engine) Majority() int { return e.majority }
+
+// Window lama jendela kesepakatan.
+func (e *Engine) Window() time.Duration { return e.window }
+
 type Engine struct {
 	mu       sync.Mutex
 	buffer   []JudgeInput
@@ -100,7 +106,14 @@ func (e *Engine) evaluate(latest JudgeInput) *ConsensusResult {
 		}
 	}
 
-	return &ConsensusResult{Accepted: false}
+	// belum cukup: laporkan kemajuan (jumlah juri yang sudah sepakat dalam window)
+	return &ConsensusResult{
+		Accepted:  false,
+		ScoreType: latest.ScoreType,
+		Target:    latest.Target,
+		Round:     latest.Round,
+		Count:     count,
+	}
 }
 
 func (e *Engine) cleanup() {

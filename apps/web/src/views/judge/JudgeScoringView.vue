@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
 import { DEFAULT_TECHNIQUES } from '@/composables/techniques'
+import { useConsensusFeedback } from '@/composables/consensusFeedback'
 import type { WsTechniqueKind } from '@/composables/useWebSocket'
 import { MATCH_STATUS_LABEL, matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { useHaptics } from '@/composables/useHaptics'
@@ -62,9 +63,11 @@ const latencyMs = ref(12)
 const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
 const blueAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
 
-// Consensus Indicators (5 dots per side)
-const redConsensusDots = ref([false, false, false, false, false])
-const blueConsensusDots = ref([false, false, false, false, false])
+// Umpan balik konsensus: lampu per sudut = jumlah juri yang sudah sepakat (anonim), jumlah lampu = juri ruleset
+const feedback = useConsensusFeedback(() => techniques.value)
+feedback.attach()
+const redConsensusDots = feedback.dots('red')
+const blueConsensusDots = feedback.dots('blue')
 
 // Touch Logs
 interface TouchLog {
@@ -223,6 +226,7 @@ onMounted(() => {
 
   onMessage('sync_response', (payload) => {
     if (payload.techniques?.length) techniques.value = payload.techniques
+    feedback.configure(payload.judge_count, payload.consensus?.majority)
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
@@ -230,8 +234,12 @@ onMounted(() => {
     }
   })
 
+  onMessage('consensus_progress', (payload) => feedback.onProgress(payload))
+  onMessage('score_confirmed', (payload) => feedback.onConfirmed(payload))
+
   onMessage('state_change', (payload) => {
     matchStatus.value = matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
+    if (matchStatus.value === 'break' || matchStatus.value === 'finished') feedback.reset()
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
       timer.sync(payload.timer_remaining_ms, payload.timer_running ?? true, payload.timer_ends_at_ms)
@@ -374,9 +382,19 @@ onMounted(() => {
                 v-for="(on, idx) in redConsensusDots"
                 :key="idx"
                 class="judge-dot-light"
-                :class="{ 'judge-dot-light--red': on }"
+                :class="{
+                  'judge-dot-light--red': on,
+                  'judge-dot-light--confirmed': on && feedback.sides.red.confirmed,
+                }"
               />
             </div>
+            <span
+              v-if="feedback.sides.red.text"
+              class="judge-consensus-text"
+              :class="{ 'judge-consensus-text--ok': feedback.sides.red.confirmed }"
+              data-test="consensus-text-red"
+              >{{ feedback.sides.red.text }}</span
+            >
           </div>
         </div>
 
@@ -464,9 +482,19 @@ onMounted(() => {
                 v-for="(on, idx) in blueConsensusDots"
                 :key="idx"
                 class="judge-dot-light"
-                :class="{ 'judge-dot-light--blue': on }"
+                :class="{
+                  'judge-dot-light--blue': on,
+                  'judge-dot-light--confirmed': on && feedback.sides.blue.confirmed,
+                }"
               />
             </div>
+            <span
+              v-if="feedback.sides.blue.text"
+              class="judge-consensus-text"
+              :class="{ 'judge-consensus-text--ok': feedback.sides.blue.confirmed }"
+              data-test="consensus-text-blue"
+              >{{ feedback.sides.blue.text }}</span
+            >
           </div>
         </div>
 
@@ -948,14 +976,32 @@ onMounted(() => {
 }
 
 .judge-dot-light {
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.15);
 }
 .judge-dot-light--red {
   background-color: #ef4444;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+.judge-dot-light--confirmed {
+  animation: judge-dot-pop 0.35s ease-out;
+}
+@keyframes judge-dot-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.7); }
+  100% { transform: scale(1); }
+}
+.judge-consensus-indicator .judge-consensus-text {
+  font-size: 0.625rem;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+  max-width: 190px;
+  text-align: right;
+}
+.judge-consensus-indicator .judge-consensus-text--ok {
+  color: #34d399;
 }
 .judge-dot-light--blue {
   background-color: #3b82f6;

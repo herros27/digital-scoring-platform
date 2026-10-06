@@ -421,6 +421,7 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	result := o.engine.Submit(input)
 	if result == nil || !result.Accepted {
 		// belum majority, tidak apa-apa — tunggu juri lain
+		o.notifyConsensusProgress(result)
 		return
 	}
 
@@ -463,9 +464,30 @@ func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyK
 	result := o.engine.Submit(input)
 	if result != nil && result.Accepted {
 		o.applyScore(result)
+	} else {
+		o.notifyConsensusProgress(result)
 	}
 
 	return result, false, nil
+}
+
+// notifyConsensusProgress memberi tahu tablet juri berapa juri yang sudah menekan teknik dan sudut
+// yang sama dalam window (anonim: tanpa identitas kursi, agar juri tidak saling terpengaruh).
+func (o *Orchestrator) notifyConsensusProgress(res *consensus.ConsensusResult) {
+	if res == nil || res.Accepted || res.Count == 0 {
+		return
+	}
+	o.h.SendToRole(hub.RoleJudge, hub.Message{
+		Type: hub.MsgConsensusProgress,
+		Payload: map[string]any{
+			"target":     res.Target,
+			"score_type": res.ScoreType,
+			"round":      res.Round,
+			"count":      res.Count,
+			"needed":     o.engine.Majority(),
+			"window_ms":  o.engine.Window().Milliseconds(),
+		},
+	})
 }
 
 func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {

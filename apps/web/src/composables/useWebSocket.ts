@@ -177,6 +177,16 @@ export interface WsScoreConfirmed {
   round?: number
 }
 
+/** Kemajuan kesepakatan juri (anonim): berapa juri yang sudah menekan teknik dan sudut yang sama. */
+export interface WsConsensusProgress {
+  target: string
+  score_type: string
+  round?: number
+  count: number
+  needed: number
+  window_ms: number
+}
+
 export interface WsScoreUpdate {
   round?: number
   red_technical?: number
@@ -201,6 +211,7 @@ export interface WsServerMessages {
   state_change: WsStateChange
   timer_sync: WsTimerSync
   score_confirmed: WsScoreConfirmed
+  consensus_progress: WsConsensusProgress
   score_update: WsScoreUpdate
   match_result: WsMatchResult
   penalties: WsPenaltyList
