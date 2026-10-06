@@ -191,6 +191,17 @@ export const matchService = {
   },
 
   /**
+   * POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule
+   * Partai yang dibatalkan kembali ke antrean dan diulang dari 0-0.
+   */
+  async rescheduleMatch(compId: string, matchId: string): Promise<{ status: string }> {
+    const res = await http.post<{ status: string }>(
+      ENDPOINTS.MATCHES.RESCHEDULE(compId, matchId)
+    )
+    return res.data
+  },
+
+  /**
    * GET /api/v1/competitions/{comp_id}/matches/{id}/scores
    */
   async getMatchScores(compId: string, matchId: string): Promise<MatchScoresDTO> {

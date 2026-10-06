@@ -95,6 +95,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const competitors = computed(() => competitorMap(participants.value))
   const hasMatch = computed(() => !!matchId.value)
   const isFinished = computed(() => status.value === 'finished')
+  const isCancelled = computed(() => matchState.value === 'cancelled')
   const activeMatchId = computed(() => (matchId.value && !isFinished.value ? matchId.value : null))
   const redCompetitor = computed<Competitor | null>(() =>
     matchDto.value ? (competitors.value.get(matchDto.value.athlete_red_id) ?? null) : null,
@@ -377,6 +378,27 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
       await refreshQueue()
     }, 'Gagal membatalkan pertandingan.')
 
+  /** Kembalikan partai batal ke antrean (diulang dari 0-0); konsol dikosongkan bila partai itu sedang tampil. */
+  const rescheduleMatch = (id: string) =>
+    runControl(async () => {
+      await matchService.rescheduleMatch(opts.compId, id)
+      if (matchId.value === id) {
+        matchId.value = null
+        matchState.value = ''
+        status.value = 'idle'
+        round.value = 1
+        roundScores.value = emptyRounds()
+        penalties.value = []
+        result.value = null
+        tiePending.value = false
+        lastConfirmed.value = null
+        events.value = []
+        matchDto.value = null
+      }
+      notify('success', 'Partai dikembalikan ke antrean dan dapat dimuat ulang dari 0-0.')
+      await refreshQueue()
+    }, 'Gagal menjadwalkan ulang partai.')
+
   function adjustTime(deltaSeconds: number) {
     sendWs('state_change', { action: 'adjust_time', delta_ms: deltaSeconds * 1000 })
   }
@@ -460,6 +482,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     // aturan tombol
     hasMatch,
     isFinished,
+    isCancelled,
     canStart,
     canPause,
     canResume,
@@ -474,6 +497,7 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     resume,
     finish,
     cancelMatch,
+    rescheduleMatch,
     adjustTime,
     resetRound,
     disqualify,

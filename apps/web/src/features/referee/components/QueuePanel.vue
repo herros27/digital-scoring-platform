@@ -88,6 +88,15 @@ const lastRound = computed(() => Math.max(1, ...rounds.value.map((r) => r.round)
             >
               Muat ke Gelanggang
             </button>
+            <button
+              v-else-if="row.state === 'cancelled'"
+              class="ref-btn"
+              :disabled="c.busy"
+              title="Kembalikan partai ke antrean dan ulang dari 0-0"
+              @click="c.rescheduleMatch(row.match.id)"
+            >
+              Jadwalkan Ulang
+            </button>
           </div>
         </div>
       </div>

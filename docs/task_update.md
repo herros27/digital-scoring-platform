@@ -183,6 +183,11 @@
     - Pengukuran 3 layar nyata (wasit, juri dengan `setInterval` dilambatkan 1 detik, scoreboard; 30 detik): kode lama 74/74 sampel berbeda, selisih terbesar 28 detik; kode baru 2/74 berbeda (hanya di pergantian detik), selisih terbesar 1 detik.
     - Tes: `internal/orchestrator/timer_test.go`, `timer_sync_test.go`; `serverClock.test.ts`, `useTimer.test.ts`.
 
+40. **Jadwalkan Ulang Partai yang Dibatalkan** –
+    - `POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule` (admin/dewan/wasit): partai `cancelled` kembali `idle`, skor per ronde dihapus, diulang dari 0-0. Partai yang bukan `cancelled` atau masih aktif di gelanggang ditolak (400).
+    - Log kejadian lama tetap di tabel `match_events` untuk audit; kejadian `match_rescheduled` menjadi batas, dan `GET .../events` hanya mengembalikan kejadian sejak batas itu.
+    - Frontend: tombol "Jadwalkan Ulang" pada baris BATAL di antrean wasit dan banner "PARTAI DIBATALKAN" di Kontrol Tanding.
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

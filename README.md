@@ -260,6 +260,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/resume` | Admin, Dewan, Wasit | Lanjutkan ronde yang terjeda |
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/finish` | Admin, Dewan, Wasit | Selesaikan match & otomatis majukan pemenang di bagan |
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/cancel` | Admin, Dewan, Wasit | Batalkan pertandingan |
+| POST | `/api/v1/competitions/{comp_id}/matches/{id}/reschedule` | Admin, Dewan, Wasit | Jadwalkan ulang partai yang dibatalkan (kembali `idle`, skor dihapus, diulang dari 0-0) |
 | GET | `/api/v1/competitions/{comp_id}/matches/{id}/scores` | JWT | Rincian skor akumulatif & breakdown per-seat juri |
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/scores` | JWT (Judge) | Submit skor HTTP fallback (didukung `Idempotency-Key` header) |
 | GET | `/api/v1/competitions/{comp_id}/matches/{id}/events` | JWT | Riwayat lengkap event log / audit trail pertandingan |

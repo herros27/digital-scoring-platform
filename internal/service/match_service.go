@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -416,4 +417,35 @@ func (s *MatchService) ListLiveArenas() []map[string]any {
 		return ai < aj
 	})
 	return list
+}
+
+// RescheduleMatch mengulang partai yang dibatalkan dari 0-0. Hanya partai berstatus cancelled
+// yang dapat dijadwalkan ulang; skor lama dihapus dan log lama disembunyikan (tetap tersimpan).
+func (s *MatchService) RescheduleMatch(matchID string) error {
+	if matchID == "" || s.matchStore == nil {
+		return domain.ErrInvalidInput
+	}
+	s.mu.RLock()
+	existing, ok := s.activeOrchestrators[matchID]
+	s.mu.RUnlock()
+	if ok && existing.IsActive() {
+		return fmt.Errorf("%w: partai masih aktif di gelanggang", domain.ErrInvalidStateTransition)
+	}
+	if m, err := s.matchStore.GetByID(matchID); err != nil || m == nil {
+		return domain.ErrMatchNotFound
+	}
+	changed, err := s.matchStore.Reschedule(matchID)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return fmt.Errorf("%w: hanya partai yang dibatalkan yang dapat dijadwalkan ulang", domain.ErrInvalidStateTransition)
+	}
+	s.mu.Lock()
+	delete(s.activeOrchestrators, matchID)
+	s.mu.Unlock()
+	if s.eventStore != nil {
+		_ = s.eventStore.Append(&store.MatchEvent{MatchID: matchID, EventType: "match_rescheduled", Payload: "{}"})
+	}
+	return nil
 }

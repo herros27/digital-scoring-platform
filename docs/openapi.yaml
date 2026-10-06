@@ -1389,6 +1389,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/competitions/{comp_id}/matches/{id}/reschedule:
+    post:
+      summary: Jadwalkan Ulang Partai yang Dibatalkan (Admin / Dewan / Wasit)
+      description: |
+        Mengembalikan partai berstatus `cancelled` ke `idle` dan menghapus skor per ronde, sehingga partai bisa
+        dimuat ke gelanggang lagi dan diulang dari 0-0. Log kejadian percobaan lama tetap tersimpan untuk audit
+        tetapi tidak lagi ditampilkan oleh `GET .../events` (disaring sejak kejadian `match_rescheduled` terakhir).
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Partai kembali `idle`
+        '400':
+          description: Partai tidak berstatus cancelled, atau masih aktif di gelanggang (`INVALID_STATE_TRANSITION`)
+        '404':
+          description: Partai tidak ditemukan
+
   /api/v1/competitions/{comp_id}/matches/{id}/cancel:
     post:
       summary: Batalkan Pertandingan (Admin / Dewan / Wasit)

@@ -224,6 +224,24 @@ func (h *MatchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	Ok(w, map[string]string{"status": "cancelled"})
 }
 
+// POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule
+func (h *MatchHandler) Reschedule(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	matchID := r.PathValue("id")
+	if err := h.Service.RescheduleMatch(matchID); err != nil {
+		status, code := http.StatusBadRequest, "INVALID_STATE_TRANSITION"
+		if errors.Is(err, domain.ErrMatchNotFound) {
+			status, code = http.StatusNotFound, "NOT_FOUND"
+		}
+		Fail(w, status, code, err.Error(), nil)
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]string{"status": "idle"})
+}
+
 // GET /api/v1/competitions/{comp_id}/matches/{id}/scores
 func (h *MatchHandler) GetScores(w http.ResponseWriter, r *http.Request) {
 	matchID := r.PathValue("id")

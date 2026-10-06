@@ -170,3 +170,28 @@ func (s *MatchStore) GetCornerNames(matchID string) (red, blue string, err error
 		WHERE m.id = $1`, matchID).Scan(&r, &b)
 	return r.String, b.String, err
 }
+
+// Reschedule mengembalikan partai berstatus cancelled ke idle dan menghapus skor per ronde,
+// sehingga partai dapat dimuat ke gelanggang dan dimulai lagi dari 0-0. Mengembalikan false
+// bila partai tidak berstatus cancelled (tidak ada yang diubah).
+func (s *MatchStore) Reschedule(id string) (bool, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`UPDATE matches
+		SET status = 'idle', current_round = 1, winner_id = NULL, started_at = NULL, finished_at = NULL
+		WHERE id = $1 AND status = 'cancelled'`, id)
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, nil
+	}
+	if _, err := tx.Exec(`DELETE FROM match_scores WHERE match_id = $1`, id); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}

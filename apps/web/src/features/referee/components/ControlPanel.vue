@@ -109,8 +109,20 @@ function askCancel() {
         <button class="ref-btn ref-btn--primary" @click="askFinish">Tetapkan Pemenang</button>
       </section>
 
+      <section v-if="c.isCancelled" class="ref-result-banner ref-result-banner--muted font-mono">
+        <strong>PARTAI DIBATALKAN</strong>
+        <span>Tanpa pemenang. Jadwalkan ulang untuk mengulang partai dari 0-0.</span>
+        <button
+          class="ref-btn ref-btn--primary"
+          :disabled="c.busy || !c.matchId"
+          @click="c.matchId && c.rescheduleMatch(c.matchId)"
+        >
+          Jadwalkan Ulang
+        </button>
+      </section>
+
       <section
-        v-if="c.isFinished"
+        v-else-if="c.isFinished"
         class="ref-result-banner font-mono"
         :class="winnerTarget ? `ref-result-banner--${winnerTarget}` : 'ref-result-banner--muted'"
       >
