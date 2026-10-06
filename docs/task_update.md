@@ -275,6 +275,10 @@
     - Halaman `/design-system` dihapus beserta `DesignSystemView`, `HomeView` (yatim) dan komponen UI yang tidak dipakai (`AppCard`, `AppDock`, `AppIconBadge`, `AppProgressBar`).
     - Base URL `/` kini diarahkan ke `/scoreboard` (daftar pertandingan live); halaman itu memuat tautan Login Petugas, Login Juri/Wasit (PIN), dan Daftar Kontingen. Mengembalikan ke login cukup mengubah `redirect` rute `home` di `router/index.ts`.
     - Tes: `TestMetricsAccess_LoopbackOnlyWithoutToken`, `TestHealthHandler_NoDetailsOnFailure`, tes router untuk `/`.
+56. **Halaman `/scoreboard` lebih informatif** –
+    - Endpoint publik baru `GET /api/v1/live/schedule`: kejuaraan `active`, gelanggangnya, dan sampai 3 partai `idle` berikutnya per gelanggang (nomor partai sama dengan scoreboard; partai yang sudah dimuat ke gelanggang tidak diulang).
+    - Halaman menampilkan nama kejuaraan, lokasi, dan tanggal di bagian atas, bagian "Sedang Berlangsung", "Jadwal Berikutnya" per gelanggang, dan kartu Akses Petugas. Logo memakai tanda merek aplikasi karena kejuaraan belum punya data logo.
+    - Diperiksa di browser terhadap backend nyata; kegagalan jadwal tidak menyembunyikan daftar live.
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

@@ -35,6 +35,27 @@ export interface LiveArena {
   blue_total: number
 }
 
+/** Satu partai menunggu pada GET /live/schedule. */
+export interface UpcomingMatch {
+  match_id: string
+  match_number: number
+  red_athlete: string
+  blue_athlete: string
+  red_team: string
+  blue_team: string
+  class_label: string
+}
+
+/** Kejuaraan aktif beserta gelanggang dan partai berikutnya (GET /live/schedule). */
+export interface LiveSchedule {
+  competition_id: string
+  name: string
+  location: string
+  start_date: string
+  end_date: string
+  arenas: { arena_id: string; arena_name: string; upcoming: UpcomingMatch[] }[]
+}
+
 /**
  * Respons GET /live/scoreboard/{arena_id}. Backend saat ini hanya mengembalikan
  * `{ status: 'no active match' }`; field lain terisi bila ada pertandingan aktif.

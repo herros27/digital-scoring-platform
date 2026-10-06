@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/herros27/digital-scoring/internal/service"
@@ -37,4 +38,19 @@ func (h *LiveHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		resp["arena_name"], resp["competition_name"] = h.Matches.ArenaContext(arenaID)
 	}
 	Ok(w, resp)
+}
+
+// GET /api/v1/live/schedule — no auth, kejuaraan aktif beserta gelanggang dan partai berikutnya.
+func (h *LiveHandler) Schedule(w http.ResponseWriter, r *http.Request) {
+	if h.Matches == nil {
+		Ok(w, []map[string]any{})
+		return
+	}
+	list, err := h.Matches.ListSchedule()
+	if err != nil {
+		log.Printf("jadwal publik: %v", err)
+		Fail(w, http.StatusInternalServerError, "INTERNAL", "gagal memuat jadwal", nil)
+		return
+	}
+	Ok(w, list)
 }

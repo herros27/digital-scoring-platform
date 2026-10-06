@@ -558,3 +558,60 @@ func (s *MatchService) RescheduleMatch(matchID string) error {
 	}
 	return nil
 }
+
+// UpcomingPerArena jumlah partai menunggu yang ditampilkan per gelanggang pada jadwal publik.
+const UpcomingPerArena = 3
+
+// ListSchedule menyusun jadwal publik: kejuaraan aktif, gelanggangnya, dan beberapa partai
+// berikutnya per gelanggang. Partai yang sudah dimuat ke gelanggang (tampil di daftar live)
+// tidak diulang di jadwal.
+func (s *MatchService) ListSchedule() ([]map[string]any, error) {
+	if s.matchStore == nil {
+		return []map[string]any{}, nil
+	}
+	rows, err := s.matchStore.ListUpcoming()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	loaded := make(map[string]bool, len(s.activeOrchestrators))
+	for id, orch := range s.activeOrchestrators {
+		if orch.IsActive() {
+			loaded[id] = true
+		}
+	}
+	s.mu.RUnlock()
+
+	result := []map[string]any{}
+	var comp, arena map[string]any
+	var compID, arenaID string
+	for _, r := range rows {
+		if comp == nil || r.CompetitionID != compID {
+			compID, arenaID = r.CompetitionID, ""
+			comp = map[string]any{
+				"competition_id": r.CompetitionID, "name": r.CompetitionName, "location": r.Location,
+				"start_date": r.StartDate, "end_date": r.EndDate, "arenas": []map[string]any{},
+			}
+			result = append(result, comp)
+		}
+		if arena == nil || r.ArenaID != arenaID {
+			arenaID = r.ArenaID
+			arena = map[string]any{"arena_id": r.ArenaID, "arena_name": r.ArenaName, "upcoming": []map[string]any{}}
+			comp["arenas"] = append(comp["arenas"].([]map[string]any), arena)
+		}
+		if r.MatchID == "" || loaded[r.MatchID] {
+			continue
+		}
+		up := arena["upcoming"].([]map[string]any)
+		if len(up) >= UpcomingPerArena {
+			continue
+		}
+		arena["upcoming"] = append(up, map[string]any{
+			"match_id": r.MatchID, "match_number": r.Number,
+			"red_athlete": r.RedName, "blue_athlete": r.BlueName,
+			"red_team": r.RedTeam, "blue_team": r.BlueTeam,
+			"class_label": classLabel(r.WeightClass, r.Gender),
+		})
+	}
+	return result, nil
+}

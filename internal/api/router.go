@@ -100,6 +100,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
 	mux.HandleFunc("POST /api/v1/auth/logout", authH.Logout)
 	mux.HandleFunc("GET /api/v1/live/arenas", liveH.Arenas)
+	mux.HandleFunc("GET /api/v1/live/schedule", liveH.Schedule)
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
 
 	// === Public cached tournament views (Otter in-memory cache) ===

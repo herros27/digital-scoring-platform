@@ -2279,6 +2279,58 @@ paths:
                         red_total: { type: integer }
                         blue_total: { type: integer }
 
+  /api/v1/live/schedule:
+    get:
+      summary: Jadwal Partai Berikutnya per Gelanggang (Publik)
+      description: |
+        Kejuaraan berstatus `active` beserta gelanggangnya dan sampai 3 partai berstatus `idle` berikutnya
+        per gelanggang (urut nomor partai). Partai yang sudah dimuat ke gelanggang tidak diulang di sini
+        (muncul di `/live/arenas`). Dipakai halaman `/scoreboard`.
+      tags:
+        - Live Scoreboard
+      responses:
+        '200':
+          description: Daftar kejuaraan aktif (kosong bila tidak ada)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        competition_id: { type: string, format: uuid }
+                        name: { type: string }
+                        location: { type: string }
+                        start_date: { type: string, example: '2026-10-10' }
+                        end_date: { type: string, example: '2026-10-15' }
+                        arenas:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              arena_id: { type: string, format: uuid }
+                              arena_name: { type: string }
+                              upcoming:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    match_id: { type: string, format: uuid }
+                                    match_number: { type: integer }
+                                    class_label: { type: string, example: Kelas A Putra }
+                                    red_athlete: { type: string }
+                                    blue_athlete: { type: string }
+                                    red_team: { type: string }
+                                    blue_team: { type: string }
+        '500':
+          description: Gagal memuat jadwal
+
   /api/v1/live/scoreboard/{arena_id}:
     get:
       summary: Live Scoreboard Feed (Publik / Layar Penonton)
