@@ -56,7 +56,7 @@ describe('payloadFromDraft', () => {
     d.techniques[2].points = 4 // jatuhan 4
     const p = payloadFromDraft(d)
     expect(p.scoring.fall_points).toBe(4)
-    expect(p.scoring.techniques).toHaveLength(4)
+    expect(p.scoring.techniques).toHaveLength(6)
     expect(p.scoring.penalties?.at(-1)).toEqual({
       type: 'peringatan_3',
       label: 'Peringatan 3',
@@ -88,17 +88,27 @@ describe('payloadFromDraft', () => {
 
 describe('priority', () => {
   it('urut menurut nilai tertinggi', () => {
+    // urutan regulasi: 1+3, 3, 1+2, 2, 1+1, 1
     expect(priorityByValue(newDraft().techniques)).toEqual([
       'catch_fall',
       'fall',
+      'combo_1_2',
       'knockdown',
+      'combo_1_1',
       'technique',
     ])
   })
   it('membuang kode yang dihapus dan menambah kode baru di akhir', () => {
     const d = newDraft()
     d.tiebreak.priority = ['fall', 'hilang', 'technique']
-    expect(normalizedPriority(d)).toEqual(['fall', 'technique', 'knockdown', 'catch_fall'])
+    expect(normalizedPriority(d)).toEqual([
+      'fall',
+      'technique',
+      'knockdown',
+      'catch_fall',
+      'combo_1_2',
+      'combo_1_1',
+    ])
   })
 })
 

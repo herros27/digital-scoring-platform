@@ -73,6 +73,8 @@ export const defaultTechniques = (): RulesetTechnique[] => [
   { type: 'knockdown', label: 'Tendangan', points: 2 },
   { type: 'fall', label: 'Jatuhan', points: 3 },
   { type: 'catch_fall', label: 'Tangkapan + Jatuhan', points: 4 },
+  { type: 'combo_1_2', label: 'Kombinasi Pukulan + Tendangan', points: 3 },
+  { type: 'combo_1_1', label: 'Kombinasi 2 Pukulan', points: 2 },
 ]
 
 export const defaultPenalties = (): DraftPenalty[] => [

@@ -18,6 +18,8 @@ export const SCORE_TYPE_LABEL: Record<string, string> = {
   knockdown: 'Tendangan',
   fall: 'Jatuhan',
   catch_fall: 'Tangkapan + Jatuhan',
+  combo_1_2: 'Kombinasi Pukulan + Tendangan',
+  combo_1_1: 'Kombinasi 2 Pukulan',
 }
 
 export const TARGET_LABEL: Record<string, string> = { red: 'MERAH', blue: 'BIRU' }

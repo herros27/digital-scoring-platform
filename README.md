@@ -341,10 +341,10 @@ wasit, juri, dan scoreboard menampilkan waktu yang sama walau tab diperlambat br
 
 **Skor seri:** pertandingan tidak pernah dimenangkan otomatis oleh sudut merah. Server menjalankan aturan seri ruleset (`tiebreak`):
 1. **Potongan sanksi paling sedikit** menang (`result_type` = `tiebreak_penalties`).
-2. **Teknik terbanyak** menurut urutan prioritas (bawaan dari nilai tertinggi: Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan; `tiebreak_technique`). Sudut dengan jumlah lebih banyak pada jenis teknik paling bernilai yang jumlahnya berbeda menang.
+2. **Teknik terbanyak** menurut urutan prioritas (preset: 1+3 Tangkapan+Jatuhan, 3 Jatuhan, 1+2 Kombinasi Pukulan+Tendangan, 2 Tendangan, 1+1 Kombinasi 2 Pukulan, 1 Pukulan; ruleset tanpa urutan eksplisit memakai nilai tertinggi lebih dulu; `tiebreak_technique`). Sudut dengan jumlah lebih banyak pada jenis teknik paling bernilai yang jumlahnya berbeda menang.
 3. Bila masih seri, pertandingan menunggu keputusan manual wasit (`tie_pending` pada waktu habis; `TIE_NEEDS_DECISION` lewat REST). Wasit menyertakan `winner` dan dasar keputusan `method`: `extra_round` (babak tambahan), `lighter_weight` (timbang ulang), `coin_toss` (undian koin), atau kosong = keputusan wasit (`tiebreak_extra_round`, `tiebreak_lighter_weight`, `tiebreak_coin_toss`, `referee_decision`).
 
-Langkah 1-2 dihitung server dari data pertandingan; babak tambahan, timbang ulang, dan undian koin dilakukan di luar sistem lalu hasilnya dicatat wasit. Kombinasi teknik 1+2 dan 1+1 belum ada sebagai jenis teknik terpisah (hanya Pukulan, Tendangan, Jatuhan, Tangkapan+Jatuhan). Diskualifikasi (`disqualify`) memenangkan sudut lawan.
+Langkah 1-2 dihitung server dari data pertandingan; babak tambahan, timbang ulang, dan undian koin dilakukan di luar sistem lalu hasilnya dicatat wasit. Kombinasi serangan 1+2 (`combo_1_2`, 3 poin) dan 1+1 (`combo_1_1`, 2 poin) tersedia sebagai teknik terpisah pada preset sehingga urutan prioritas seri sesuai regulasi; hapus dari ruleset bila event tidak memakainya. Diskualifikasi (`disqualify`) memenangkan sudut lawan.
 
 ---
 
@@ -390,7 +390,7 @@ Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikoso
 - **`outcomes`**: hasil khusus yang boleh dinyatakan wasit. Tiap item `{type, label, phase}` dengan `type` ∈ `ko`, `tko`, `walkover`, `withdrawal` dan `phase` ∈ `before_start`, `in_match`, `any`. Bawaan: KO dan TKO setelah pertandingan dimulai, WO sebelum dimulai, Undur Diri kapan saja. Dinyatakan lewat WebSocket `declare_outcome` atau `POST .../matches/{id}/outcome` dengan `winner` (sudut yang menang); `result_type` hasil = jenis hasil.
 - **`tiebreak`**: `steps` (`fewest_penalties`, `technique_priority`), `technique_priority` (kode teknik dari yang paling bernilai), `manual_methods` (`extra_round`, `lighter_weight`, `coin_toss`). Kosong = bawaan di bagian "Skor seri".
 - **`consensus`**: `judges` (1-5, jumlah kursi yang ditampilkan), `majority` (juri yang harus sepakat), `window_ms` (500-10000).
-- Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3).
+- Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3), serta "Kombinasi Pukulan + Tendangan" (1+2 = 3) dan "Kombinasi 2 Pukulan" (1+1 = 2) (migrasi 021 melengkapi preset yang sudah ada). Tablet juri menyusun tombol dua kolom bila teknik lebih dari 4.
 - `POST/PUT /api/v1/rulesets` memvalidasi bagian ini (kode unik huruf kecil/angka/underscore, nilai teknik > 0, potongan >= 0, `majority` <= `judges`).
 
 ---

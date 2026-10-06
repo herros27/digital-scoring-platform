@@ -30,6 +30,16 @@
         "type": "catch_fall",
         "label": "Tangkapan + Jatuhan",
         "points": 4
+      },
+      {
+        "type": "combo_1_2",
+        "label": "Kombinasi Pukulan + Tendangan",
+        "points": 3
+      },
+      {
+        "type": "combo_1_1",
+        "label": "Kombinasi 2 Pukulan",
+        "points": 2
       }
     ],
     "penalties": [
@@ -74,6 +84,25 @@
       "judges": 3,
       "majority": 2,
       "window_ms": 3000
+    },
+    "tiebreak": {
+      "steps": [
+        "fewest_penalties",
+        "technique_priority"
+      ],
+      "technique_priority": [
+        "catch_fall",
+        "fall",
+        "combo_1_2",
+        "knockdown",
+        "combo_1_1",
+        "technique"
+      ],
+      "manual_methods": [
+        "extra_round",
+        "lighter_weight",
+        "coin_toss"
+      ]
     }
   }
 }

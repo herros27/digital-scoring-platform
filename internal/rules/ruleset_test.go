@@ -145,3 +145,44 @@ func TestOutcomes_DefaultsAndValidation(t *testing.T) {
 		t.Errorf("valid ditolak: %v", err)
 	}
 }
+
+func TestPresets_TiebreakOrderFollowsRegulation(t *testing.T) {
+	want := []string{"catch_fall", "fall", "combo_1_2", "knockdown", "combo_1_1", "technique"}
+	for _, name := range []string{"ipsi", "persilat"} {
+		rs, err := LoadRuleset(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rs.Scoring.Validate(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		got := rs.Scoring.EffectiveTiebreak().TechniquePriority
+		if len(got) != len(want) {
+			t.Fatalf("%s: prioritas = %v, want %v", name, got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("%s: prioritas = %v, want %v", name, got, want)
+			}
+		}
+		if c, _ := rs.Scoring.Technique("combo_1_2"); c.Points != 3 {
+			t.Errorf("%s: 1+2 harus 3 poin", name)
+		}
+		if c, _ := rs.Scoring.Technique("combo_1_1"); c.Points != 2 {
+			t.Errorf("%s: 1+1 harus 2 poin", name)
+		}
+	}
+}
+
+func TestEffectiveTiebreak_DerivedOrderMatchesRegulationWithoutExplicitPriority(t *testing.T) {
+	// ruleset tersimpan tanpa tiebreak (preset basis data hasil migrasi): turunan dari nilai + urutan daftar
+	sc := PresetScoring()
+	sc.Tiebreak = nil
+	want := []string{"catch_fall", "fall", "combo_1_2", "knockdown", "combo_1_1", "technique"}
+	got := sc.EffectiveTiebreak().TechniquePriority
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("prioritas turunan = %v, want %v", got, want)
+		}
+	}
+}

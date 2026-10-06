@@ -230,6 +230,11 @@
     - Tablet: jumlah lampu = jumlah juri ruleset; menyala sebanyak juri yang sepakat dengan teks "PUKULAN 1/2 • MENUNGGU JURI LAIN", padam sendiri setelah window; saat `score_confirmed` menyala penuh dengan "PUKULAN +1 TERKONFIRMASI" beberapa saat. Direset saat istirahat/selesai. Logika di `composables/consensusFeedback.ts`.
     - Tes: `internal/orchestrator/progress_test.go`, `consensusFeedback.test.ts`; browser `konsensus.mjs` 15/15 (juri 1 lewat UI, juri 2 lewat WebSocket).
 
+47. **Teknik Kombinasi 1+2 dan 1+1** –
+    - Preset `IPSI 2024` dan `PERSILAT International` memuat `combo_1_2` (Kombinasi Pukulan + Tendangan, 3 poin) dan `combo_1_1` (Kombinasi 2 Pukulan, 2 poin) selain Tangkapan+Jatuhan; migrasi `021` melengkapi preset yang sudah ada di database. Urutan prioritas seri preset kini persis 1+3, 3, 1+2, 2, 1+1, 1 (juga bila diturunkan otomatis dari nilai + urutan daftar).
+    - Tablet juri menyusun tombol dua kolom bila teknik lebih dari 4 (semua tetap terlihat di 1280x800). Label teknik di log dan editor ruleset ikut.
+    - Tes: `TestPresets_TiebreakOrderFollowsRegulation`, `TestTiebreak_CombinationsRankBetweenFallAndKnockdown`; browser `ruleset.mjs` (6 tombol, +1,+2,+3,+4,+3,+2).
+
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.

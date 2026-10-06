@@ -56,7 +56,11 @@ const TECHNIQUE_HINT: Record<string, string> = {
   knockdown: 'SERANGAN KAKI SAH',
   fall: 'TEKNIK BANTINGAN / SAPUAN',
   catch_fall: 'TANGKAPAN LALU JATUHKAN',
+  combo_1_2: 'PUKULAN LALU TENDANGAN',
+  combo_1_1: 'DUA PUKULAN BERUNTUN',
 }
+// Lebih dari 4 teknik: tombol disusun dua kolom agar semuanya tetap terlihat tanpa menggulir
+const denseButtons = computed(() => techniques.value.length > 4)
 const techniqueHint = (type: string) => TECHNIQUE_HINT[type] ?? 'TEKNIK SAH'
 const latencyMs = ref(12)
 
@@ -399,7 +403,7 @@ onMounted(() => {
         </div>
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Red -->
-        <div class="judge-buttons-list">
+        <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
           <button
             v-for="tech in techniques"
             :key="tech.type"
@@ -499,7 +503,7 @@ onMounted(() => {
         </div>
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Blue -->
-        <div class="judge-buttons-list">
+        <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
           <button
             v-for="tech in techniques"
             :key="tech.type"
@@ -1014,6 +1018,26 @@ onMounted(() => {
   flex-direction: column;
   gap: 12px;
   flex: 1;
+}
+.judge-buttons-list--dense {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 10px;
+}
+.judge-buttons-list--dense .judge-btn {
+  min-height: 70px;
+  padding: 10px 14px;
+}
+.judge-buttons-list--dense .judge-btn__title {
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+.judge-buttons-list--dense .judge-btn__pts {
+  font-size: 1.6rem;
+}
+.judge-buttons-list--dense .judge-btn__icon-box {
+  display: none;
 }
 
 .judge-btn {

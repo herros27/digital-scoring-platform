@@ -23,13 +23,15 @@ func presetScoring() ScoringRule {
 			{Type: "knockdown", Label: "Tendangan", Points: 2},
 			{Type: "fall", Label: "Jatuhan", Points: 3},
 			{Type: "catch_fall", Label: "Tangkapan + Jatuhan", Points: 4},
+			{Type: "combo_1_2", Label: "Kombinasi Pukulan + Tendangan", Points: 3},
+			{Type: "combo_1_1", Label: "Kombinasi 2 Pukulan", Points: 2},
 		},
 		Penalties: DefaultPenalties(),
 		Outcomes:  DefaultOutcomes(),
 		Consensus: &ConsensusRule{Judges: 3, Majority: 2, WindowMs: 3000},
 		Tiebreak: &TiebreakRule{
 			Steps:             []string{StepFewestPenalties, StepTechniquePriority},
-			TechniquePriority: []string{"catch_fall", "fall", "knockdown", "technique"},
+			TechniquePriority: []string{"catch_fall", "fall", "combo_1_2", "knockdown", "combo_1_1", "technique"},
 			ManualMethods:     []string{MethodExtraRound, MethodLighterWeight, MethodCoinToss},
 		},
 	}

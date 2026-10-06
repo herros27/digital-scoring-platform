@@ -160,3 +160,59 @@ func TestTiebreak_CountsOnlyConfirmedScores(t *testing.T) {
 		t.Error("undo tidak boleh dihitung sebagai teknik")
 	}
 }
+
+func TestTiebreak_CombinationsRankBetweenFallAndKnockdown(t *testing.T) {
+	preset, err := rules.LoadRuleset("ipsi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// merah: 1 kombinasi 1+2; biru: 5 tendangan. 1+2 lebih tinggi dari 2 -> merah menang
+	r := newRigWith(t, preset)
+	r.start(t)
+	setTiedScores(r, 0, 0)
+	r.o.mu.Lock()
+	r.o.countTechnique("red", "combo_1_2")
+	for i := 0; i < 5; i++ {
+		r.o.countTechnique("blue", "knockdown")
+	}
+	r.o.mu.Unlock()
+	if err := r.o.Finish(); err != nil {
+		t.Fatal(err)
+	}
+	if res := resultOf(r); res["corner"] != "red" || res["result_type"] != "tiebreak_technique" {
+		t.Fatalf("hasil = %+v, want red (1+2 di atas tendangan)", res)
+	}
+
+	// merah: 1 jatuhan murni; biru: 3 kombinasi 1+2. Jatuhan (3) di atas 1+2
+	r2 := newRigWith(t, preset)
+	r2.start(t)
+	setTiedScores(r2, 0, 0)
+	r2.o.mu.Lock()
+	r2.o.countTechnique("red", "fall")
+	for i := 0; i < 3; i++ {
+		r2.o.countTechnique("blue", "combo_1_2")
+	}
+	r2.o.mu.Unlock()
+	if err := r2.o.Finish(); err != nil {
+		t.Fatal(err)
+	}
+	if res := resultOf(r2); res["corner"] != "red" {
+		t.Fatalf("hasil = %+v, want red (jatuhan di atas 1+2)", res)
+	}
+
+	// merah: 2 pukulan; biru: 1 kombinasi 1+1. 1+1 di atas pukulan -> biru
+	r3 := newRigWith(t, preset)
+	r3.start(t)
+	setTiedScores(r3, 0, 0)
+	r3.o.mu.Lock()
+	r3.o.countTechnique("red", "technique")
+	r3.o.countTechnique("red", "technique")
+	r3.o.countTechnique("blue", "combo_1_1")
+	r3.o.mu.Unlock()
+	if err := r3.o.Finish(); err != nil {
+		t.Fatal(err)
+	}
+	if res := resultOf(r3); res["corner"] != "blue" {
+		t.Fatalf("hasil = %+v, want blue (1+1 di atas pukulan)", res)
+	}
+}
