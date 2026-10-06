@@ -255,6 +255,10 @@
     - `.env.example` ditambahkan (sebelumnya tidak ada dan `.gitignore` ikut mengabaikannya; kini `!.env.example`) memuat semua variabel backend, PostgreSQL, dan port host. `docker-compose.yml` memakai `${VAR:-bawaan}` untuk `POSTGRES_USER`, `POSTGRES_DB`, `JWT_SECRET`, `WEB_PORT`, `APP_PORT`, `POSTGRES_PORT`; `DB_URL` backend dirakit dari nilai yang sama dengan layanan postgres dan healthcheck memakai variabel di dalam container, sehingga tidak ada nama pengguna/database yang tertulis dua kali.
     - `ci.yml`: nama database/pengguna (service postgres, healthcheck, `TEST_DB_URL`) memakai Repository Variables `POSTGRES_DB`/`POSTGRES_USER` dengan nilai bawaan yang sama. CI tidak dapat membaca `.env` lokal; versi alat tetap ditetapkan di tempatnya.
     - Tes: `TestEnvExample_ListsEveryConfigVariable`; `docker compose config` diperiksa dengan nilai bawaan, nilai timpaan, dan `--env-file .env.example`.
+52. **Pengaman JWT_SECRET pada Mode Production** –
+    - Sebelumnya backend diam-diam memakai kunci bawaan yang terlihat di repo bila `JWT_SECRET` kosong, bahkan pada `ENV=production`, sehingga token (termasuk token admin) dapat dipalsukan. `Config.Validate()` (dipanggil di `cmd/server/main.go`) kini menolak start pada `ENV=production` bila `JWT_SECRET` kosong, sama dengan nilai contoh di repo (`dev-secret-change-in-prod`, nilai contoh compose lama), atau kurang dari 32 karakter; mode lain tidak terpengaruh.
+    - `docker-compose.yml`: `JWT_SECRET` kini wajib (`${JWT_SECRET:?...}`), compose berhenti dengan pesan jelas sebelum container dijalankan; nilai contoh lama dihapus.
+    - Tes: `TestValidate_ProductionRejectsWeakJWTSecret`; biner diuji langsung (production + kunci lemah → keluar kode 1 dengan pesan; development tidak terpengaruh).
 
 
 ## Status Backend Development & UAT Readiness

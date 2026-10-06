@@ -12,8 +12,9 @@ services:
       - ENV=production
       # dirakit dari nilai yang sama dengan layanan postgres (lihat .env.example)
       - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
-      # ganti lewat berkas .env atau environment host (JWT_SECRET=... docker compose up)
-      - JWT_SECRET=${JWT_SECRET:-change-this-in-production-secret-key-123}
+      # WAJIB diisi di .env atau environment host (mis. openssl rand -base64 48). Compose berhenti dengan
+      # pesan jelas bila kosong; backend juga menolak nilai contoh dan nilai < 32 karakter (ENV=production).
+      - JWT_SECRET=${JWT_SECRET:?isi JWT_SECRET di berkas .env (cp .env.example .env lalu ganti dengan nilai acak, mis. openssl rand -base64 48)}
     depends_on:
       postgres:
         condition: service_healthy

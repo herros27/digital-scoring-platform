@@ -23,6 +23,11 @@ func main() {
 
 	// 2. Inisialisasi Logger & Auth JWT Secret
 	logger.Init(cfg.IsProduction())
+	if err := cfg.Validate(); err != nil {
+		logger.Log.Error("konfigurasi tidak aman, server tidak dijalankan", "error", err,
+			"petunjuk", "buat nilai acak: openssl rand -base64 48, lalu isi JWT_SECRET di .env")
+		os.Exit(1)
+	}
 	auth.SetJWTSecret(cfg.JWTSecret)
 
 	// 3. Hubungkan Database & Jalankan Migrasi Otomatis

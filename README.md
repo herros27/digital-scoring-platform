@@ -422,7 +422,7 @@ DB_URL="postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable" 
 
 Catatan:
 - nginx menimpa header `X-Forwarded-For` dengan alamat sambungan asli, sehingga pembatas percobaan PIN (15 menit setelah 5 salah) tidak bisa dihindari dengan header palsu. Jangan mempublikasikan port 8080 backend langsung ke jaringan venue bila ingin mengandalkan ini; hapus pemetaan `8080:8080` pada `docker-compose.yml` untuk produksi.
-- `JWT_SECRET` bawaan di compose hanya contoh; set lewat environment atau berkas `.env`. Database memakai `trust` tanpa kata sandi, cocok untuk jaringan venue tertutup saja.
+- `JWT_SECRET` **wajib** diisi di `.env` atau environment: `docker compose up` berhenti dengan pesan jelas bila kosong, dan backend (`ENV=production`, yang diatur compose) menolak start bila nilainya kosong, masih nilai contoh dari repo, atau kurang dari 32 karakter. Buat nilai acak dengan `openssl rand -base64 48`. Database memakai `trust` tanpa kata sandi, cocok untuk jaringan venue tertutup saja.
 - CI membangun kedua image dan memeriksa sintaks konfigurasi nginx (`nginx -t`).
 
 ---

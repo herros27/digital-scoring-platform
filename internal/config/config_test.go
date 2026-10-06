@@ -96,3 +96,30 @@ func TestEnvExample_ListsEveryConfigVariable(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate_ProductionRejectsWeakJWTSecret(t *testing.T) {
+	long := "mock-jwt-secret-key-for-test-32chars-ok!"
+	cases := []struct {
+		name   string
+		env    string
+		secret string
+		ok     bool
+	}{
+		{"development apa pun lolos", "development", "dev-secret-change-in-prod", true},
+		{"development kosong lolos", "development", "", true},
+		{"production kosong ditolak", "production", "", false},
+		{"production nilai contoh kode ditolak", "production", "dev-secret-change-in-prod", false},
+		{"production nilai contoh compose ditolak", "production", "change-this-in-production-secret-key-123", false},
+		{"production terlalu pendek ditolak", "production", "short-secret", false},
+		{"production 31 karakter ditolak", "production", "0123456789012345678901234567890", false},
+		{"production 32 karakter lolos", "production", "01234567890123456789012345678901", true},
+		{"production acak panjang lolos", "production", long, true},
+	}
+	for _, c := range cases {
+		cfg := &Config{Env: c.env, JWTSecret: c.secret}
+		err := cfg.Validate()
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err = %v, want ok=%v", c.name, err, c.ok)
+		}
+	}
+}
