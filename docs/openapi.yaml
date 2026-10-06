@@ -1087,7 +1087,10 @@ paths:
   # -------------------------------------------------------
   /api/v1/competitions/{comp_id}/matches:
     get:
-      summary: Daftar Pertandingan pada Kompetisi (Mendukung Pagination & Filter Status)
+      summary: Daftar Pertandingan pada Kompetisi (Mendukung Pagination, Filter Status & Gelanggang)
+      description: |
+        Tanpa `arena_id`: terbaru lebih dulu. Dengan `arena_id`: antrean partai gelanggang itu, urut dari
+        yang paling awal dibuat (dipakai konsol wasit untuk menampilkan antrean).
       tags:
         - Match
       security:
@@ -1099,6 +1102,13 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: arena_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Hanya partai pada gelanggang ini (urutan antrean)
         - name: page
           in: query
           required: false
@@ -1337,6 +1347,10 @@ paths:
   /api/v1/competitions/{comp_id}/matches/{id}/finish:
     post:
       summary: Selesaikan Pertandingan & Hitung Pemenang (Admin / Dewan / Wasit)
+      description: |
+        Pemenang dihitung dari skor bersih (poin teknik dikurangi sanksi). Bila skor **seri**, server menolak
+        dengan 400 `TIE_NEEDS_DECISION` kecuali body menyertakan `winner` (keputusan wasit; `result_type`
+        menjadi `referee_decision`).
       tags:
         - Match Lifecycle
       security:
@@ -1354,9 +1368,26 @@ paths:
           schema:
             type: string
             format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                winner:
+                  type: string
+                  enum: [red, blue]
+                  description: Pemenang menurut keputusan wasit (wajib bila skor seri)
       responses:
         '200':
           description: Pertandingan selesai dan pemenang ditentukan (status finished)
+        '400':
+          description: Status tidak valid, atau skor seri tanpa `winner` (`TIE_NEEDS_DECISION`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/competitions/{comp_id}/matches/{id}/cancel:
     post:
@@ -2160,17 +2191,43 @@ paths:
           }
           ```
           * `action`: `start`, `pause`, `resume`, `finish`, `cancel`
+          * `finish` pada skor seri ditolak (`INVALID_STATE_TRANSITION`) kecuali menyertakan `"winner": "red"|"blue"`
+            (keputusan wasit). Waktu habis di ronde terakhir dengan skor seri tidak mengakhiri pertandingan:
+            `state_change` membawa `tie_pending: true` sampai wasit memutuskan.
+          * `disqualify` + `"target": "red"|"blue"` — sudut itu didiskualifikasi, lawan menang (`result_type`
+            `disqualification`), pertandingan berakhir.
+          * `adjust_time` + `"delta_ms"` (+/-) — koreksi sisa waktu ronde (dibatasi 1 detik s/d durasi ronde);
+            hanya saat berada di dalam ronde.
+          * `reset_round` — kembalikan sisa waktu ronde ke durasi penuh; hanya saat dijeda.
 
-        * **Pemberian Peringatan / Hukuman (`penalty`)** — hanya `referee`:
+        * **Sanksi (`penalty`)** — hanya `referee`/`admin`, hanya saat pertandingan berlangsung. Poin potongan
+          ditentukan server dari katalog (`penalty_catalog` pada `sync_response`), klien hanya mengirim jenisnya.
+          Setiap jenis hanya boleh dijatuhkan sekali per sudut (`PENALTY_ALREADY_APPLIED`):
           ```json
           {
             "type": "penalty",
             "payload": {
               "target": "blue",
-              "level": 1
+              "type": "teguran_1"
             }
           }
           ```
+          Jenis bawaan: `binaan_1` (0), `binaan_2` (0), `teguran_1` (-1), `teguran_2` (-1), `peringatan_1` (-5),
+          `peringatan_2` (-10).
+
+        * **Batalkan Sanksi Terakhir (`penalty_revoke`)** — mengembalikan poin sanksi terakhir pada sudut itu:
+          ```json
+          { "type": "penalty_revoke", "payload": { "target": "blue" } }
+          ```
+
+        * **Sinyal Arena (`arena_signal`)** — hanya `referee`/`admin`:
+          ```json
+          { "type": "arena_signal", "payload": { "signal": "gong" } }
+          { "type": "arena_signal", "payload": { "signal": "medic", "active": true } }
+          { "type": "arena_signal", "payload": { "signal": "var", "active": false } }
+          ```
+          `gong` sesaat (disiarkan ke semua klien); `medic` dan `var` memiliki status aktif/nonaktif yang tersimpan
+          di server dan tampil sebagai banner pada layar scoreboard.
 
         * **Sinkronisasi Reconnect (`sync_request`)**:
           ```json
@@ -2197,10 +2254,27 @@ paths:
               ],
               "red_total": 4,
               "blue_total": 5,
-              "server_time": "2026-10-04T06:30:00Z"
+              "server_time": "2026-10-04T06:30:00Z",
+              "ruleset_name": "IPSI 2024",
+              "round_duration_ms": 120000,
+              "break_duration_ms": 60000,
+              "total_rounds": 3,
+              "penalties": [
+                {"id": 1, "round": 1, "target": "red", "type": "teguran_1", "label": "Teguran 1", "points": 1, "clock_ms": 98000}
+              ],
+              "penalty_catalog": [{"type": "teguran_1", "label": "Teguran 1", "points": 1}],
+              "medic_active": false,
+              "var_active": false,
+              "tie_pending": false,
+              "result": null,
+              "presence": {
+                "judges": [{"seat": 1, "connected": true, "inputs": 3, "last_input": {"score_type": "technique", "target": "red", "round": 1, "clock_ms": 98000, "at": "2026-10-04T06:29:55Z"}}],
+                "referees": 1, "admins": 0, "scoreboards": 1
+              }
             }
           }
           ```
+          Bidang meja wasit (`ruleset_name` dst.) juga ada pada `GET /api/v1/live/scoreboard/{arena_id}`.
         * **Status & Timer Pertandingan (`state_change`)**: dikirim setiap start/pause/resume/finish/cancel
           dan pergantian ronde. Saat dijeda, `state` tetap `round_N` dan `timer_running` bernilai `false`.
           ```json
@@ -2210,10 +2284,22 @@ paths:
               "state": "round_1",
               "round": 1,
               "timer_remaining_ms": 118000,
-              "timer_running": true
+              "timer_running": true,
+              "tie_pending": false
             }
           }
           ```
+        * **Daftar Sanksi (`penalties`)**: disiarkan ke semua klien setiap sanksi dijatuhkan/dibatalkan —
+          `{"penalties": [{"id", "round", "target", "type", "label", "points", "clock_ms"}]}`.
+        * **Sinyal Arena (`arena_signal`)**: `{"signal": "gong"|"medic"|"var", "active": true}`.
+        * **Kehadiran Perangkat (`presence`)** — hanya ke meja wasit/admin, saat perangkat terhubung/terputus atau
+          juri mengirim input: `{"judges": [{"seat", "connected", "inputs", "last_input"}], "referees", "admins", "scoreboards"}`.
+        * **Log Kejadian (`match_event`)** — hanya ke meja wasit/admin; sama dengan baris `GET .../matches/{id}/events`
+          (`payload` sudah berupa objek, selalu memuat `clock_ms` dan `round`):
+          `{"id", "match_id", "event_type", "payload", "judge_id", "created_at"}`.
+          Jenis: `match_started`, `match_paused`, `match_resumed`, `match_finished`, `match_cancelled`, `round_started`,
+          `round_ended`, `judge_input`, `score_confirmed`, `penalty_applied`, `penalty_revoked`, `disqualified`,
+          `referee_decision`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
         * **Update Skor Resmi (`score_update`)**:
           ```json
           {

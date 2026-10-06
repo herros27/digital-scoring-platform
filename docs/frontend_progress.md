@@ -32,7 +32,7 @@ Dokumen ini melacak secara menyeluruh perkembangan antarmuka (*frontend web & PW
 | 9 | **Jadwal & Running Order** | `ScheduleOpsView.vue` | Selesai | REST (Partai & Arena Load) | 88% |
 | 10 | **Perangkat & PIN Juri** | `DevicePinManager.vue` | Selesai | REST (Multi-device Sync) | 95% |
 | 11 | **Tablet Skoring Juri** | `JudgeScoringView.vue` | Selesai | WS Real-time + Haptics | 92% |
-| 12 | **Meja Wasit & Pengawas** | `RefereeConsoleView.vue` | Selesai | WS Real-time + Timer | 90% |
+| 12 | **Meja Wasit & Pengawas** | `RefereeConsoleView.vue` + `features/referee/*` | Selesai (5 menu, tanpa data dummy) | REST + WS Real-time | 95% |
 | 13 | **Layar TV Scoreboard Publik** | `ScoreboardView.vue` | Selesai | WS Real-time (Bebas PIN) | 92% |
 | 14 | **Laporan & Ekspor Data** | `ReportsOpsView.vue` | Selesai | REST (CSV & Klasemen) | 85% |
 
@@ -86,11 +86,14 @@ Dokumen ini melacak secara menyeluruh perkembangan antarmuka (*frontend web & PW
   - Haptic feedback (getaran tablet saat tombol ditekan).
   - Deduplikasi double-tap menggunakan client-side `idempotency_key` (UUID).
   - Indikator kesepakatan konsensus juri per sudut.
-- [x] **Meja Pengawas & Wasit (`RefereeConsoleView.vue`)**:
-  - Kontrol waktu tanding resmi: Mulai, Jeda, Lanjut, Selesai, dan Penyesuaian waktu (+/- detik).
-  - Pencatatan sanksi & pelanggaran (Binaan 1–2, Teguran 1–2, Peringatan 1–2).
-  - Keputusan khusus: Diskualifikasi (DQ), Walk Over (WO), Menang Teknik, dan Selisih Poin.
-  - Pemicu sinyal Gong arena, panggilan tim medis, dan sinyal VAR.
+- [x] **Meja Pengawas & Wasit (`features/referee/`, halaman `RefereeConsoleView.vue`)** — seluruhnya terhubung ke backend, tanpa data dummy. Lima menu sidebar masing-masing menampilkan isinya sendiri:
+  - **Kontrol Tanding**: nama atlet/kontingen/kelas dari server, skor sah, ringkasan sanksi, teknik sah, kronometer resmi; Mulai/Jeda/Lanjutkan/Selesaikan (REST) dengan tombol yang aktif/nonaktif mengikuti mesin status server; koreksi waktu (-10/+10 detik) dan reset babak; gong, dokter, dan VAR sebagai sinyal nyata (banner + bunyi gong di scoreboard); Batalkan Partai; pintasan keyboard (Spasi, P, L, G, Esc).
+  - **Verifikasi Juri 1-5**: kursi juri online/offline nyata, jumlah input dan input terakhir tiap juri, kesiapan konsensus (minimal 3 juri), jumlah wasit/admin/layar TV terhubung.
+  - **Sanksi & Disiplin**: sanksi dari katalog server (Binaan 1–2, Teguran 1–2, Peringatan 1–2; poin ditentukan server), batalkan sanksi terakhir, Diskualifikasi (lawan menang), riwayat sanksi.
+  - **Log Poin & Teknik**: skor per babak, teknik sah per sudut (Pukulan/Tendangan/Jatuhan), log real-time dengan filter (poin, sanksi, kontrol, sinyal, input juri); log dipulihkan dari REST setelah reload.
+  - **Bagan & Antrean**: antrean partai per gelanggang dengan tombol "Muat ke Gelanggang", status partai, dan bagan per kelas (read-only).
+  - Keputusan wasit saat skor seri (dialog memilih pemenang; waktu habis saat seri menunggu keputusan). Walk Over dan Menang Teknik belum ada.
+  - Latensi dan status koneksi diukur nyata (sync_request/sync_response); halaman memilih kejuaraan/gelanggang bila akun belum terikat.
 - [x] **Layar TV Scoreboard Publik (`ScoreboardView.vue`)**:
   - Layout kiosk 16:9 full-screen beresolusi tinggi (bebas login PIN).
   - Tampilan skor besar, babak (ronde), waktu sisa, potongan hukuman, dan notifikasi animasi poin melayang. Skor, babak, dan timer diambil dari `sync_response`/`state_change`/`score_update` (TV yang baru menyala langsung memulihkan skor); data demo sudah dihapus. Jeda terlihat lewat `timer_running`.
@@ -108,9 +111,9 @@ Dokumen ini melacak secara menyeluruh perkembangan antarmuka (*frontend web & PW
 Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan pada antarmuka frontend:
 
 ### 🔴 Prioritas Tinggi (P0 - Kritis untuk Kelancaran Pertandingan Venue)
-1. **Audio Synthesizer / Suara Gong Riil pada Meja Wasit & Scoreboard**:
-   - *Kondisi saat ini*: Menekan tombol Gong di konsol wasit hanya memicu animasi visual (*flash UI*), belum mengeluarkan suara audio file (.mp3 / Web Audio API) ke sound system venue.
-   - *Kebutuhan*: Integrasi audio bell/gong sintetis dengan pengaturan volume dan buzzer otomatis saat waktu ronde menyentuh 00:00.
+1. **Audio: Pengaturan Volume & Buzzer Otomatis**:
+   - *Kondisi saat ini*: Gong sintetis (Web Audio) sudah berbunyi di scoreboard dan konsol wasit saat wasit menekan tombol Gong. Browser memblokir suara sebelum ada interaksi pada halaman, jadi layar TV perlu diklik/disentuh sekali setelah dibuka.
+   - *Kebutuhan*: Pengaturan volume, tombol "aktifkan suara" pada layar TV, dan buzzer otomatis saat waktu ronde menyentuh 00:00.
 2. **Offline Resilience / Buffer Mode pada Tablet Juri**:
    - *Kondisi saat ini*: Jika koneksi Wi-Fi venue terputus sesaat, skor yang ditekan juri saat offline berisiko tidak terkirim.
    - *Kebutuhan*: Antrian lokal sementara (*offline queue*) di IndexedDB / Local Cache yang otomatis disinkronkan ulang saat koneksi WebSocket tersambung kembali.
@@ -142,9 +145,9 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 10. **Responsivitas Perangkat Mobile Layar Kecil pada Ops Shell**:
     - *Kondisi saat ini*: Tampilan `OpsShellView.vue` sangat nyaman pada layar laptop/desktop (1366x768 ke atas), tetapi padat jika dibuka lewat smartphone.
     - *Kebutuhan*: Tampilan *drawer responsive* khusus navigasi jika operator membuka dashboard via ponsel.
-11. **Panel Sanksi & Panel Juri pada Konsol Wasit Masih Berisi Teks Tetap**:
-    - *Kondisi saat ini*: Nilai awal skor, teknik, hukuman, log kejadian, dan daftar juri di `RefereeConsoleView.vue` sudah dinetralkan, tetapi template masih memuat teks tertanam (mis. "Teguran 1 (Aktif)", "LOCK 3/3 SAH", "LAN JURI OK"). Pada tablet juri (`JudgeScoringView.vue`), titik indikator konsensus (`redConsensusDots`/`blueConsensusDots`) kini kosong dan belum terhubung ke data server.
-    - *Kebutuhan*: Turunkan seluruh panel tersebut dari data server (`score_update`, `penalty`, daftar juri terhubung). Backend hanya menyimpan total poin potongan, belum rincian binaan/teguran/peringatan; scoreboard saat ini menampilkan satu chip "POTONGAN".
+11. **Tablet Juri Masih Memuat Elemen Tetap & Konsol Wasit Belum Punya WO / Menang Teknik**:
+    - *Kondisi saat ini*: Konsol wasit sudah sepenuhnya dari data server. Pada tablet juri (`JudgeScoringView.vue`), titik indikator konsensus (`redConsensusDots`/`blueConsensusDots`) kosong dan belum terhubung ke data server. Poin potongan sanksi (teguran -1, peringatan -5/-10) masih mengikuti nilai tampilan lama dan berada di katalog `penaltyCatalog` pada `internal/orchestrator/referee_ops.go`; perlu dicek terhadap regulasi IPSI/PERSILAT yang dipakai.
+    - *Kebutuhan*: Hubungkan indikator konsensus tablet juri ke data server; verifikasi nilai poin sanksi (idealnya dari ruleset); tambah keputusan Walk Over dan Menang Teknik; seri pada partai yang dimajukan lewat bagan butuh aturan tiebreak resmi (saat ini keputusan wasit).
 12. **Login Tablet via QR / Tautan**:
     - *Kebutuhan*: Tombol "Buka Tablet" pada `DevicePinManager.vue` menghasilkan tautan/QR yang langsung memasukkan perangkat (tanpa mengetik PIN); PIN tetap sebagai cadangan.
 13. **Label Arena/Kategori/Partai pada Scoreboard**:
@@ -158,7 +161,7 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 5. Rencana Tindak Lanjut & Checklist Pengerjaan
 
-- [ ] **Langkah 1**: Menambahkan Web Audio gong & buzzer sound effect pada `RefereeConsoleView.vue` dan `ScoreboardView.vue`.
+- [ ] **Langkah 1**: Pengaturan volume, tombol aktifkan suara pada layar TV, dan buzzer otomatis di 00:00 (gong sintetis manual sudah ada).
 - [ ] **Langkah 2**: Mengembangkan fungsionalitas drag & drop reorder partai pada `ScheduleOpsView.vue`.
 - [ ] **Langkah 3**: Menambahkan dialog swap/reseed atlet pada bagan pertandingan sebelum penguncian bagan resmi.
 - [ ] **Langkah 4**: Mengimplementasikan template impor data atlet dari spreadsheet CSV.
@@ -167,6 +170,11 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
+- **2026-10-06 (konsol wasit)**:
+  - `RefereeConsoleView` ditulis ulang menjadi cangkang + 5 panel menu (`features/referee/`) dengan composable `useRefereeConsole` yang menjadi satu-satunya pintu ke server; seluruh data dummy dihapus; menu "Bagan & Antrean" tidak lagi membuka `/design-system`.
+  - Backend ditambah untuk mendukungnya (lihat `docs/task_update.md` butir 38): sanksi bertipe + pembatalan, diskualifikasi, koreksi waktu, sinyal arena, kehadiran perangkat, log real-time, antrean per gelanggang, dan keputusan wasit saat skor seri.
+  - Scoreboard menampilkan banner dokter/VAR dan membunyikan gong; hasil diskualifikasi/keputusan wasit berlabel.
+  - Diverifikasi di Chromium terhadap backend + Postgres nyata (50 pemeriksaan UI) dan simulasi e2e (49 pemeriksaan); 55 tes Vitest.
 - **2026-10-06**:
   - Rute `/ops` kini wajib login dan guard router menegakkan `allowedRoles`; kode ganda dihapus (`lib/api`, `lib/competitionApi`, `lib/authApi`, wrapper `CompetitionsView`); `KioskLayout` dan `TabletLayout` ditambahkan.
   - Seluruh tipe `any` dihapus (helper `http` bertipe, DTO mengikuti backend, peta `WsServerMessages`); ESLint, Prettier, Vitest, dan job CI `frontend` ditambahkan.

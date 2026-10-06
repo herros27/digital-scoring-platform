@@ -311,21 +311,31 @@ GET http://localhost:8080/docs/openapi.yaml
 | Type | From | Payload |
 |------|------|---------|
 | `judge_input` | Judge | `{event_id, score_type, target, round}` (`event_id` = kunci idempotensi) |
-| `state_change` | Referee, Admin | `{action}` dengan `action` = `start` \| `pause` \| `resume` \| `finish` \| `cancel` |
-| `penalty` | Referee | `{target, level}` (`level` = poin potongan) |
+| `state_change` | Referee, Admin | `{action}` dengan `action` = `start` \| `pause` \| `resume` \| `finish` (+`winner` bila seri) \| `cancel` \| `disqualify` (+`target`) \| `adjust_time` (+`delta_ms`) \| `reset_round` |
+| `penalty` | Referee, Admin | `{target, type}`; poin potongan ditentukan server dari katalog (`binaan_1/2`, `teguran_1/2`, `peringatan_1/2`) |
+| `penalty_revoke` | Referee, Admin | `{target}` membatalkan sanksi terakhir sudut itu |
+| `arena_signal` | Referee, Admin | `{signal: "gong"}` atau `{signal: "medic"\|"var", active}` |
 | `sync_request` | Semua | `{}` |
 
 ### Server → Client
 | Type | To | Payload |
 |------|----|---------|
-| `sync_response` | Pengirim `sync_request` | `{match_id, arena_id, state, round, timer_remaining_ms, timer_running, scores[], red_total, blue_total, server_time}` |
-| `state_change` | All | `{state, round, timer_remaining_ms, timer_running}` (saat dijeda `state` tetap `round_N`, `timer_running=false`) |
+| `sync_response` | Pengirim `sync_request` | `{match_id, arena_id, state, round, timer_remaining_ms, timer_running, scores[], red_total, blue_total, server_time, ruleset_name, round_duration_ms, break_duration_ms, total_rounds, penalties[], penalty_catalog[], medic_active, var_active, tie_pending, presence, result}` |
+| `state_change` | All | `{state, round, timer_remaining_ms, timer_running, tie_pending}` (saat dijeda `state` tetap `round_N`, `timer_running=false`; `tie_pending=true` bila waktu ronde terakhir habis dengan skor seri) |
+| `penalties` | All | `{penalties: [{id, round, target, type, label, points, clock_ms}]}` |
+| `arena_signal` | All | `{signal, active}` |
+| `presence` | Referee, Admin | `{judges: [{seat, connected, inputs, last_input}], referees, admins, scoreboards}` |
+| `match_event` | Referee, Admin | log kejadian real-time (sama dengan `GET .../matches/{id}/events`, payload selalu memuat `clock_ms` dan `round`) |
 | `score_update` | All | `{round, red_technical, blue_technical, red_penalties, blue_penalties}` |
 | `score_confirmed` | All | `{score_type, target, points, count, round}` |
 | `match_result` | All | `{winner, corner, result_type, scores}` |
 | `error` | Pengirim | `{code, message}` (mis. `FORBIDDEN`, `SCORING_NOT_ALLOWED`, `INVALID_STATE_TRANSITION`) |
 
 Timer berjalan di server; klien menyinkronkan lewat `state_change`/`sync_response` dan menghitung mundur secara lokal.
+
+**Skor seri:** pertandingan tidak pernah dimenangkan otomatis oleh sudut merah. Menyelesaikan pertandingan dengan skor seri ditolak
+(`TIE_NEEDS_DECISION` lewat REST) kecuali wasit menentukan pemenang (`winner`, hasil `referee_decision`); bila waktu ronde terakhir
+habis dengan skor seri, pertandingan menunggu keputusan wasit (`tie_pending`). Diskualifikasi (`disqualify`) memenangkan sudut lawan.
 
 ---
 

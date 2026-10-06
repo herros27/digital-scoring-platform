@@ -167,6 +167,16 @@
     - Seeder: PIN wasit `11110001` (Gelanggang A) dan `22220001` (Gelanggang B).
     - Tes database nyata di `tests/pin_login_test.go`; CI menyediakan service Postgres (`TEST_DB_URL`). Simulasi `apps/web/scripts/e2e-simulation.mjs` kini memverifikasi (keluar kode 1 bila gagal).
 
+38. **Dukungan Meja Wasit: Sanksi Bertipe, Diskualifikasi, Koreksi Waktu, Sinyal Arena, Kehadiran & Log Real-time** –
+    - Sanksi: katalog resmi di server (`binaan_1/2`, `teguran_1/2`, `peringatan_1/2`); klien hanya mengirim `type`, poin ditentukan server. Satu jenis hanya sekali per sudut; sanksi sebelum pertandingan dimulai/sesudah selesai ditolak. `penalty_revoke` membatalkan sanksi terakhir sudut dan mengembalikan poin. Daftar sanksi disiarkan (`penalties`) dan ada pada snapshot.
+    - Aksi kontrol baru pada `state_change`: `disqualify` (lawan menang, `result_type: disqualification`), `adjust_time` (+/- ms, dibatasi 1 detik..durasi ronde), `reset_round` (hanya saat dijeda). `Timer.Adjust/Reset`.
+    - Skor seri tidak lagi dimenangkan otomatis oleh sudut merah (placeholder lama): selesai manual saat seri ditolak (`TIE_NEEDS_DECISION`) kecuali wasit menyertakan `winner` (`referee_decision`); waktu ronde 3 habis dengan skor seri -> `tie_pending` sampai wasit memutuskan. `POST .../matches/{id}/finish` menerima body `{"winner"}` opsional.
+    - `arena_signal` (`gong`, `medic`, `var`) disiarkan ke semua klien; status medic/VAR tersimpan di server dan tampil sebagai banner di scoreboard; gong berbunyi (Web Audio).
+    - Kehadiran perangkat: `hub.Presence()` + callback perubahan; orchestrator melacak input juri terakhir per kursi dan menyiarkan `presence` ke meja wasit/admin.
+    - `appendEvent` kini menambah `clock_ms` + `round` ke setiap kejadian dan menyiarkannya sebagai `match_event` ke meja wasit/admin (log real-time); penonton publik dan juri tidak menerimanya.
+    - `GET /competitions/{comp_id}/matches?arena_id=` mengembalikan antrean partai satu gelanggang (urutan antrean); snapshot menambah info ruleset (nama, durasi ronde/istirahat, total ronde).
+    - Tes: `internal/orchestrator/referee_ops_test.go` (sanksi, pembatalan, DQ, koreksi waktu, sinyal, kehadiran, log, seri; telah diuji dengan mutasi) dan perluasan `apps/web/scripts/e2e-simulation.mjs` (49 pemeriksaan terhadap backend nyata).
+
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.
 - **Test Suite**: **100% PASS** (`go test -race ./...` termasuk tes database nyata untuk login PIN; simulasi e2e REST+WebSocket lolos).
