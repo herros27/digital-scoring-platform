@@ -7,18 +7,20 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8080}:8080"
-    # Berkas .env WAJIB ada (cp .env.example .env): compose berhenti bila tidak ditemukan. Seluruh isinya
-    # menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...). Nilai di `environment` di bawah
-    # menimpa .env karena harus berbeda di dalam container.
+    # Berkas .env.prod WAJIB ada (cp .env.example .env.prod, lalu isi JWT_SECRET dll.): compose berhenti bila
+    # tidak ditemukan. Seluruh isinya menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...).
+    # Jalankan selalu dengan:  docker compose --env-file .env.prod up -d --build
+    # agar ${VAR} di berkas ini (port, POSTGRES_*) juga dibaca dari .env.prod, bukan dari .env (development).
+    # Nilai di `environment` di bawah menimpa .env.prod karena harus berbeda di dalam container.
     env_file:
-      - .env
+      - .env.prod
     environment:
       - PORT=8080            # nginx dan pemetaan port menuju 8080 di dalam container
       - ENV=production       # jalur Docker = produksi; development memakai `go run` dengan .env
-      # .env berisi DB_URL untuk `go run` di host (localhost); di dalam container database bernama `postgres`
+      # .env.prod berisi DB_URL untuk `go run` di host (localhost); di dalam container database bernama `postgres`
       - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
-      # pemeriksaan dini dengan pesan jelas; backend juga menolak nilai contoh dan nilai < 32 karakter
-      - JWT_SECRET=${JWT_SECRET:?isi JWT_SECRET di berkas .env (ganti dengan nilai acak, mis. openssl rand -base64 48)}
+      # JWT_SECRET sengaja tidak ditulis di sini: nilainya datang dari .env.prod (env_file). Backend menolak
+      # start bila kosong, masih nilai contoh, atau < 32 karakter (ENV=production).
     depends_on:
       postgres:
         condition: service_healthy

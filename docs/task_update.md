@@ -264,6 +264,10 @@
     - Layanan `app` memakai `env_file: .env` (berkas wajib ada; tanpa `.env` compose berhenti dengan "env file ... not found"). Seluruh isi `.env` menjadi environment backend, sehingga `AUTO_MIGRATE` dan `SEED_DATA` kini ikut diteruskan ke container (sebelumnya tidak). `environment:` menimpa tiga nilai yang harus berbeda di dalam container: `PORT=8080`, `ENV=production`, dan `DB_URL` ke layanan `postgres` (`DB_URL` di `.env` untuk `go run` di host). Layanan `postgres` dan `web` tidak diberi `env_file` agar `JWT_SECRET` tidak masuk container yang tidak membutuhkannya.
     - CI (job Docker): membuat `.env` dari `.env.example` lalu `docker compose config --quiet`, sehingga berkas compose ikut tervalidasi.
     - Diperiksa dengan `docker compose config`: tanpa `.env` berhenti dengan pesan jelas (galat JWT_SECRET atau "env file not found"), dengan `.env` environment backend benar (DB_URL internal, ENV production, PORT 8080, JWT_SECRET/AUTO_MIGRATE/SEED_DATA dari `.env`). Menjalankan stack penuh belum diuji (tidak ada daemon Docker).
+54. **Berkas `.env.prod` untuk Docker (`.env` untuk Development)** –
+    - `env_file` layanan `app` kini `.env.prod` (wajib ada); `JWT_SECRET` tidak lagi ditulis di `environment` (sebelumnya nilai hasil interpolasi `.env` akan menimpa `.env.prod`) sehingga datang dari `.env.prod` dan dijaga pengaman backend. Dijalankan dengan `docker compose --env-file .env.prod up -d --build` agar `${VAR}` (port, `POSTGRES_*`) juga dari `.env.prod`.
+    - `.gitignore`: `.env.*` kecuali `.env.example` (sebelumnya hanya `.env`, sehingga `.env.prod` berisi rahasia dapat ikut ter-commit). CI: membuat `.env.prod` dari contoh lalu `docker compose --env-file .env.prod config --quiet`.
+    - Diperiksa dengan `docker compose config`: tanpa `.env.prod` berhenti dengan pesan jelas; dengan `.env.prod` (pengguna/database/port/JWT dari berkas itu, `DB_URL` internal dan `ENV=production` tetap). Menjalankan stack penuh belum diuji.
 
 
 ## Status Backend Development & UAT Readiness

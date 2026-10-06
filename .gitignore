@@ -6,6 +6,7 @@ internal/docs
 
 # Environment
 .env
+.env.*
 !.env.example
 bin
 
