@@ -36,67 +36,120 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <template>
   <main class="sbl">
-    <header class="sbl__head">
-      <h1>SCOREBOARD LIVE</h1>
-      <p class="font-mono">
-        Pilih gelanggang untuk membuka papan skor. Daftar diperbarui otomatis.
+    <div class="sbl__inner">
+      <header class="sbl__head">
+        <h1>SCOREBOARD LIVE</h1>
+        <p class="font-mono">
+          Pilih gelanggang untuk membuka papan skor. Daftar diperbarui otomatis.
+        </p>
+      </header>
+
+      <p v-if="failed" class="sbl__msg sbl__msg--error font-mono">
+        Tidak dapat terhubung ke server. Mencoba lagi…
       </p>
-    </header>
+      <p v-else-if="loaded && !arenas.length" class="sbl__msg font-mono">
+        Belum ada pertandingan yang sedang berlangsung.
+      </p>
 
-    <p v-if="failed" class="sbl__msg sbl__msg--error font-mono">
-      Tidak dapat terhubung ke server. Mencoba lagi…
-    </p>
-    <p v-else-if="loaded && !arenas.length" class="sbl__msg font-mono">
-      Belum ada pertandingan yang sedang berlangsung.
-    </p>
+      <ul v-if="arenas.length" class="sbl__grid">
+        <li v-for="a in arenas" :key="a.arena_id">
+          <router-link :to="`/scoreboard/${a.arena_id}`" class="sbl-card">
+            <div class="sbl-card__top font-mono">
+              <strong>{{ a.arena_name || 'GELANGGANG' }}</strong>
+              <span class="sbl-card__status"> BABAK {{ a.round }} · {{ statusLabel(a) }} </span>
+            </div>
+            <div class="sbl-card__fight">
+              <span class="sbl-card__red">{{ a.red_athlete || 'Sudut Merah' }}</span>
+              <span class="sbl-card__score font-mono">{{ a.red_total }} : {{ a.blue_total }}</span>
+              <span class="sbl-card__blue">{{ a.blue_athlete || 'Sudut Biru' }}</span>
+            </div>
+          </router-link>
+        </li>
+      </ul>
 
-    <ul v-if="arenas.length" class="sbl__grid">
-      <li v-for="a in arenas" :key="a.arena_id">
-        <router-link :to="`/scoreboard/${a.arena_id}`" class="sbl-card">
-          <div class="sbl-card__top font-mono">
-            <strong>{{ a.arena_name || 'GELANGGANG' }}</strong>
-            <span class="sbl-card__status"> BABAK {{ a.round }} · {{ statusLabel(a) }} </span>
-          </div>
-          <div class="sbl-card__fight">
-            <span class="sbl-card__red">{{ a.red_athlete || 'Sudut Merah' }}</span>
-            <span class="sbl-card__score font-mono">{{ a.red_total }} : {{ a.blue_total }}</span>
-            <span class="sbl-card__blue">{{ a.blue_athlete || 'Sudut Biru' }}</span>
-          </div>
-        </router-link>
-      </li>
-    </ul>
-
-    <nav class="sbl__staff font-mono" aria-label="Akses petugas">
-      <router-link to="/login">Login Petugas</router-link>
-      <router-link to="/judge/login">Login Juri / Wasit (PIN)</router-link>
-      <router-link to="/register">Daftar Kontingen</router-link>
-    </nav>
+      <section class="sbl__staff" aria-labelledby="sbl-staff-title">
+        <h2 id="sbl-staff-title" class="font-mono">AKSES PETUGAS</h2>
+        <div class="sbl__staff-grid">
+          <router-link to="/login" class="sbl-action">
+            <strong>Login Petugas</strong>
+            <span>Admin, dewan, operator, dan kontingen</span>
+            <em aria-hidden="true">Masuk →</em>
+          </router-link>
+          <router-link to="/judge/login" class="sbl-action">
+            <strong>Login Juri / Wasit</strong>
+            <span>Masuk dengan PIN dari panitia</span>
+            <em aria-hidden="true">Masuk →</em>
+          </router-link>
+          <router-link to="/register" class="sbl-action">
+            <strong>Daftar Kontingen</strong>
+            <span>Buat akun untuk mendaftarkan atlet</span>
+            <em aria-hidden="true">Daftar →</em>
+          </router-link>
+        </div>
+      </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
 .sbl__staff {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 40px;
-  padding-top: 16px;
+  margin-top: 48px;
+  padding-top: 24px;
   border-top: 1px solid #1f2937;
+}
+.sbl__staff h2 {
+  margin: 0 0 14px;
   font-size: 13px;
-}
-.sbl__staff a {
+  letter-spacing: 0.12em;
   color: #94a3b8;
-  text-decoration: none;
 }
-.sbl__staff a:hover {
+.sbl__staff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.sbl-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #0b1220;
   color: #e5e7eb;
-  text-decoration: underline;
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.sbl-action strong {
+  font-size: 16px;
+}
+.sbl-action span {
+  font-size: 13px;
+  color: #94a3b8;
+}
+.sbl-action em {
+  margin-top: 6px;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+  color: #60a5fa;
+}
+.sbl-action:hover,
+.sbl-action:focus-visible {
+  border-color: #3b82f6;
+  background: #0f1a30;
 }
 .sbl {
   min-height: 100vh;
   padding: 32px 24px;
   background: #05070d;
   color: #e5e7eb;
+}
+.sbl__inner {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 .sbl__head h1 {
   margin: 0;
