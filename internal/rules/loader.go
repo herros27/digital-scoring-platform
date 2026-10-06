@@ -13,7 +13,7 @@ var defaults = map[string]Ruleset{
 		Scoring: ScoringRule{
 			TechniquePoints:  1,
 			KnockdownPoints:  2,
-			FallPoints:       2,
+			FallPoints:       3,
 			MaxPenalties:     5,
 			PenaltyThreshold: 3,
 			RoundDuration:    120,
@@ -27,7 +27,7 @@ var defaults = map[string]Ruleset{
 		Scoring: ScoringRule{
 			TechniquePoints:  1,
 			KnockdownPoints:  2,
-			FallPoints:       2,
+			FallPoints:       3,
 			MaxPenalties:     5,
 			PenaltyThreshold: 3,
 			RoundDuration:    120,

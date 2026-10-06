@@ -13,7 +13,7 @@ func TestRules_LoaderAndScoring(t *testing.T) {
 	if rsIPSI.Name != "IPSI" {
 		t.Errorf("expected name IPSI, got %s", rsIPSI.Name)
 	}
-	if rsIPSI.Scoring.TechniquePoints != 1 || rsIPSI.Scoring.KnockdownPoints != 2 || rsIPSI.Scoring.FallPoints != 2 {
+	if rsIPSI.Scoring.TechniquePoints != 1 || rsIPSI.Scoring.KnockdownPoints != 2 || rsIPSI.Scoring.FallPoints != 3 {
 		t.Errorf("unexpected scoring points configuration: %+v", rsIPSI.Scoring)
 	}
 
