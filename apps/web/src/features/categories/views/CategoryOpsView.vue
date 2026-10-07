@@ -854,7 +854,7 @@ function handleCategoryClick(cat: Category) {
       aria-labelledby="seed-title"
       @click.self="isSeedOpen = false"
     >
-      <div class="cat-modal">
+      <div class="cat-modal cat-modal--compact">
         <header class="cat-modal__header">
           <div>
             <div class="cat-modal__tag font-mono">TEMPLATE KATEGORI</div>
@@ -867,7 +867,7 @@ function handleCategoryClick(cat: Category) {
           </button>
         </header>
 
-        <div class="cat-modal__body">
+        <div class="cat-modal__body cat-modal__body--compact">
           <div class="cat-seed-standards font-mono" role="tablist" aria-label="Standar regulasi">
             <button
               v-for="std in ['ipsi', 'persilat_2026'] as PresetStandard[]"
@@ -885,17 +885,19 @@ function handleCategoryClick(cat: Category) {
 
           <div class="cat-form-group">
             <span class="cat-form-label font-mono">GOLONGAN UMUR YANG DIPERTANDINGKAN</span>
-            <label v-for="band in seedBands" :key="band.code" class="cat-seed-check">
-              <input
-                type="checkbox"
-                :checked="seedGroups.includes(band.code)"
-                @change="toggleSeedGroup(band.code)"
-              />
-              <span>
-                <strong>{{ band.label }}</strong>
-                <span class="cat-sub font-mono"> · {{ band.hint }}</span>
-              </span>
-            </label>
+            <div class="cat-seed-grid">
+              <label v-for="band in seedBands" :key="band.code" class="cat-seed-check">
+                <input
+                  type="checkbox"
+                  :checked="seedGroups.includes(band.code)"
+                  @change="toggleSeedGroup(band.code)"
+                />
+                <span>
+                  <strong>{{ band.label }}</strong>
+                  <span class="cat-sub font-mono">{{ band.hint }}</span>
+                </span>
+              </label>
+            </div>
             <span class="cat-form-help"
               >Contoh: event pelajar cukup centang Usia Dini 1 s.d. Remaja. Kelas yang sudah ada
               dilewati otomatis. Golongan tanpa tabel bobot resmi dibuat sebagai "Kelas Bebas" dan
@@ -2082,5 +2084,58 @@ function handleCategoryClick(cat: Category) {
   gap: 0.6rem;
   padding: 0.35rem 0;
   cursor: pointer;
+}
+.cat-modal--compact {
+  max-width: 480px;
+  font-size: 0.8125rem;
+}
+.cat-modal--compact .cat-modal__header {
+  padding: 12px 18px;
+}
+.cat-modal--compact .cat-modal__title {
+  font-size: 1rem;
+}
+.cat-modal__body--compact {
+  padding: 14px 18px;
+  gap: 12px;
+}
+.cat-seed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 14px;
+}
+@media (max-width: 520px) {
+  .cat-seed-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cat-modal--compact .cat-seed-check {
+  padding: 4px 0;
+  gap: 8px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+.cat-modal--compact .cat-seed-check .cat-sub {
+  display: block;
+  font-size: 0.68rem;
+  opacity: 0.65;
+}
+.cat-modal--compact .cat-age-tab {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.7rem;
+}
+.cat-modal--compact .cat-form-label {
+  font-size: 0.65rem;
+}
+.cat-modal--compact .cat-form-help {
+  font-size: 0.68rem;
+}
+.cat-modal--compact .cat-modal__footer {
+  gap: 8px;
+  align-items: center;
+}
+.cat-modal--compact .cat-modal__footer > .cat-sub {
+  margin-right: auto;
+  font-size: 0.72rem;
 }
 </style>
