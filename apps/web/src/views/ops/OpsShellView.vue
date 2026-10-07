@@ -1256,6 +1256,7 @@ function handleLoadToMat1() {
           @navigate-verification="
             canAccessTab('verifikasi') ? (activeNav = 'verifikasi') : undefined
           "
+          @navigate-categories="canAccessTab('kategori') ? (activeNav = 'kategori') : undefined"
         />
 
         <!-- TAB VERIFIKASI PESERTA -->

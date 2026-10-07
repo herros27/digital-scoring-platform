@@ -31,6 +31,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'navigateVerification'): void
+  (e: 'navigateCategories'): void
 }>()
 
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
@@ -1628,5 +1629,16 @@ function isMaleGender(gender: string): boolean {
   margin-top: 0.3rem;
   font-size: 0.7rem;
   opacity: 0.7;
+}
+.atl-link-btn {
+  display: block;
+  margin-top: 0.35rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-emerald-500, #10b981);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>
