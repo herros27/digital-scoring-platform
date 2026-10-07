@@ -485,7 +485,7 @@ function handleCategoryClick(cat: Category) {
 
       <div class="cat-metric-card cat-metric-card--male">
         <div class="cat-metric-corner-tag font-mono">SUDUT MERAH</div>
-        <span class="cat-metric-label">DEWASA PUTRA</span>
+        <span class="cat-metric-label">PUTRA</span>
         <div class="cat-metric-value-row">
           <span class="cat-metric-val cat-val-male tabular-nums">{{ stats.male }}</span>
           <span class="cat-metric-badge cat-badge-male font-mono">KELAS A - J</span>
@@ -495,7 +495,7 @@ function handleCategoryClick(cat: Category) {
 
       <div class="cat-metric-card cat-metric-card--female">
         <div class="cat-metric-corner-tag font-mono">SUDUT BIRU</div>
-        <span class="cat-metric-label">DEWASA PUTRI</span>
+        <span class="cat-metric-label">PUTRI</span>
         <div class="cat-metric-value-row">
           <span class="cat-metric-val cat-val-female tabular-nums">{{ stats.female }}</span>
           <span class="cat-metric-badge cat-badge-female font-mono">KELAS A - F</span>

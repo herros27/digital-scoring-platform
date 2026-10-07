@@ -158,11 +158,12 @@ export function isEligible(
   refDate: string | Date,
 ): boolean {
   if (normalizeGender(athlete.gender) !== normalizeGender(category.gender)) return false
-  if (!category.age_group) return true
   if (!athlete.birth_date) return false
+  // Kategori lama tanpa age_group diperlakukan Dewasa (sama dengan default database),
+  // sehingga atlet anak tidak pernah ditawari kelas Dewasa.
   return (
     ageGroupForBirthDate(athlete.birth_date, refDate, category.preset_standard ?? 'ipsi') ===
-    category.age_group
+    (category.age_group ?? 'dewasa')
   )
 }
 

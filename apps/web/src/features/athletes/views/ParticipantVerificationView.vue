@@ -467,8 +467,8 @@ function formatDate(iso: string): string {
             aria-label="Filter Gender"
           >
             <option value="all">Semua Gender</option>
-            <option value="male">Dewasa Putra</option>
-            <option value="female">Dewasa Putri</option>
+            <option value="male">Putra</option>
+            <option value="female">Putri</option>
           </select>
         </div>
 

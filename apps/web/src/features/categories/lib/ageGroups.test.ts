@@ -61,6 +61,15 @@ describe('isEligible', () => {
   it('cocok gender + umur', () => {
     expect(isEligible({ gender: 'male', birth_date: '2010-03-01' }, cat, '2026-06-15')).toBe(true)
   })
+  it('kategori lama tanpa age_group dianggap Dewasa, anak tidak lolos', () => {
+    const legacy = { gender: 'putra' }
+    expect(isEligible({ gender: 'male', birth_date: '2024-07-01' }, legacy, '2026-10-07')).toBe(
+      false,
+    )
+    expect(isEligible({ gender: 'male', birth_date: '2000-01-01' }, legacy, '2026-10-07')).toBe(
+      true,
+    )
+  })
   it('menolak umur/gender/tanpa tanggal lahir', () => {
     expect(isEligible({ gender: 'male', birth_date: '2000-01-01' }, cat, '2026-06-15')).toBe(false)
     expect(isEligible({ gender: 'female', birth_date: '2010-03-01' }, cat, '2026-06-15')).toBe(

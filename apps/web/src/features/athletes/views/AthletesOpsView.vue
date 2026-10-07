@@ -702,7 +702,7 @@ function isMaleGender(gender: string): boolean {
                 <input v-model="formState.gender" type="radio" value="male" class="sr-only" />
                 <span class="atl-radio-indicator atl-radio-indicator--male" />
                 <div class="atl-radio-text">
-                  <strong>DEWASA PUTRA</strong>
+                  <strong>PUTRA</strong>
                   <span class="atl-sub font-mono">Sudut Merah</span>
                 </div>
               </label>
@@ -717,7 +717,7 @@ function isMaleGender(gender: string): boolean {
                 <input v-model="formState.gender" type="radio" value="female" class="sr-only" />
                 <span class="atl-radio-indicator atl-radio-indicator--female" />
                 <div class="atl-radio-text">
-                  <strong>DEWASA PUTRI</strong>
+                  <strong>PUTRI</strong>
                   <span class="atl-sub font-mono">Sudut Biru</span>
                 </div>
               </label>
