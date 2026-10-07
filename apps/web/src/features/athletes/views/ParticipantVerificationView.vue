@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/api/error'
-import { ref, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { AppButton } from '@/components/ui'
 import { useParticipantsQuery, useVerifyParticipantMutation } from '../api/athleteQueries'
 import type { Participant } from '../types/athlete.schema'
+import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import type { Category } from '@/features/categories/types/category.schema'
+import {
+  DOC_CHECKLIST,
+  ageGroupLabel,
+  checkWeight,
+  missingDocs,
+  requiredDocs,
+  type WeightVerdict,
+} from '@/features/categories/lib/ageGroups'
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +38,84 @@ const {
 const verifyMutation = useVerifyParticipantMutation(activeCompId)
 
 const participants = computed(() => rawParticipants.value || [])
+
+const { data: rawCategories } = useCategoriesQuery(activeCompId)
+const categoryById = computed(() => {
+  const map = new Map<string, Category>()
+  for (const c of rawCategories.value || []) map.set(c.id, c)
+  return map
+})
+const sortedCategories = computed(() =>
+  [...(rawCategories.value || [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+)
+
+// ---- Meja timbang & checklist berkas (state lokal per peserta) ----
+interface DeskState {
+  weight: string
+  docs: Record<string, boolean>
+}
+const desk = reactive<Record<string, DeskState>>({})
+
+// Isi awal dari data server; tidak menimpa input yang sedang diketik.
+watch(
+  participants,
+  (list) => {
+    for (const p of list) {
+      if (!desk[p.id]) {
+        desk[p.id] = {
+          weight: p.actual_weight != null ? String(p.actual_weight) : '',
+          docs: { ...(p.docs_verified || {}) },
+        }
+      }
+    }
+  },
+  { immediate: true },
+)
+
+function deskOf(p: Participant): DeskState {
+  return desk[p.id] ?? (desk[p.id] = { weight: '', docs: {} })
+}
+
+function parsedWeight(p: Participant): number | null {
+  const raw = deskOf(p).weight.trim().replace(',', '.')
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function weightVerdict(p: Participant): WeightVerdict | null {
+  const w = parsedWeight(p)
+  const cat = p.category_id ? categoryById.value.get(p.category_id) : undefined
+  if (w === null || !cat) return null
+  return checkWeight(w, cat.min_weight, cat.max_weight)
+}
+
+function categoryHasWeightBounds(p: Participant): boolean {
+  const cat = p.category_id ? categoryById.value.get(p.category_id) : undefined
+  return !!cat && (cat.min_weight != null || cat.max_weight != null)
+}
+
+function weightRangeLabel(p: Participant): string {
+  const cat = p.category_id ? categoryById.value.get(p.category_id) : undefined
+  if (!cat || !categoryHasWeightBounds(p)) return 'Tanpa batas bobot'
+  const min = cat.min_weight ?? null
+  const max = cat.max_weight ?? null
+  if (min === null) return `≤ ${max} kg`
+  if (max === null) return `> ${min} kg`
+  return `${min}–${max} kg`
+}
+
+/** Alasan tombol "Loloskan" ditahan di UI (server tetap memvalidasi ulang). */
+function approveBlocker(p: Participant): string | null {
+  const missing = missingDocs(p.age_group, deskOf(p).docs)
+  if (missing.length > 0) return `Berkas belum lengkap (${missing.length})`
+  if (categoryHasWeightBounds(p) && parsedWeight(p) === null) return 'Isi hasil timbang badan'
+  return null
+}
+
+function needsDesk(p: Participant): boolean {
+  return p.registration_status !== 'verified' && p.registration_status !== 'rejected'
+}
 
 // UI Filters
 const activeGenderTab = ref<'all' | 'male' | 'female'>('all')
@@ -58,16 +146,29 @@ const processingId = ref<string | null>(null)
 async function handleSetStatus(participant: Participant, newStatus: 'verified' | 'rejected') {
   processingId.value = participant.id
   try {
-    await verifyMutation.mutateAsync({
+    const state = deskOf(participant)
+    const weight = parsedWeight(participant)
+    const result = await verifyMutation.mutateAsync({
       participantId: participant.id,
       status: newStatus,
+      ...(weight !== null ? { actual_weight: weight } : {}),
+      docs_verified: { ...state.docs },
     })
-    const actionLabel = newStatus === 'verified' ? 'dinyatakan Lolos Verifikasi' : 'ditolak'
-    showToast(
-      newStatus === 'verified' ? 'Verifikasi Berhasil' : 'Peserta Ditolak',
-      `Peserta ${participant.name} ${actionLabel}.`,
-      newStatus === 'verified' ? 'success' : 'danger',
-    )
+    if (result.status === 'overweight' || result.status === 'underweight') {
+      // Server menerapkan aturan 0 kg toleransi: peserta tidak lolos timbang.
+      showToast(
+        result.status === 'overweight' ? 'OVERWEIGHT — Tidak Lolos' : 'UNDERWEIGHT — Tidak Lolos',
+        `${participant.name}: ${result.reason || 'bobot di luar batas kelas'}.`,
+        'danger',
+      )
+    } else {
+      const actionLabel = newStatus === 'verified' ? 'dinyatakan Lolos Verifikasi' : 'ditolak'
+      showToast(
+        newStatus === 'verified' ? 'Verifikasi Berhasil' : 'Peserta Ditolak',
+        `Peserta ${participant.name} ${actionLabel}.`,
+        newStatus === 'verified' ? 'success' : 'danger',
+      )
+    }
   } catch (err) {
     showToast(
       'Gagal Memperbarui Status',
@@ -87,11 +188,15 @@ const stats = computed(() => {
     (p) => p.registration_status === 'pending' || p.registration_status === 'registered',
   ).length
   const rejected = all.filter((p) => p.registration_status === 'rejected').length
+  const weighFail = all.filter(
+    (p) => p.registration_status === 'overweight' || p.registration_status === 'underweight',
+  ).length
   return {
     total: all.length,
     verified,
     pending,
     rejected,
+    weighFail,
   }
 })
 
@@ -108,6 +213,10 @@ const filteredParticipants = computed(() => {
     )
   } else if (activeStatusFilter.value === 'rejected') {
     list = list.filter((p) => p.registration_status === 'rejected')
+  } else if (activeStatusFilter.value === 'weighfail') {
+    list = list.filter(
+      (p) => p.registration_status === 'overweight' || p.registration_status === 'underweight',
+    )
   }
 
   // Gender Filter
@@ -119,7 +228,7 @@ const filteredParticipants = computed(() => {
 
   // Class Filter
   if (selectedClassFilter.value !== 'all') {
-    list = list.filter((p) => p.weight_class === selectedClassFilter.value)
+    list = list.filter((p) => p.category_id === selectedClassFilter.value)
   }
 
   // Search Query
@@ -129,6 +238,7 @@ const filteredParticipants = computed(() => {
       (p) =>
         (p.name && p.name.toLowerCase().includes(q)) ||
         (p.club && p.club.toLowerCase().includes(q)) ||
+        (p.category_name && p.category_name.toLowerCase().includes(q)) ||
         p.weight_class.toLowerCase().includes(q),
     )
   }
@@ -322,6 +432,16 @@ function formatDate(iso: string): string {
           <span class="verif-tab-dot verif-dot-rejected" />
           Ditolak ({{ stats.rejected }})
         </button>
+
+        <button
+          class="verif-tab-btn"
+          :class="{ 'verif-tab-btn--active-rejected': activeStatusFilter === 'weighfail' }"
+          role="tab"
+          :aria-selected="activeStatusFilter === 'weighfail'"
+          @click="activeStatusFilter = 'weighfail'"
+        >
+          Gagal Timbang ({{ stats.weighFail }})
+        </button>
       </div>
 
       <div class="verif-toolbar__search-group">
@@ -330,20 +450,10 @@ function formatDate(iso: string): string {
           <select
             v-model="selectedClassFilter"
             class="verif-select font-mono"
-            aria-label="Filter Kelas"
+            aria-label="Filter Kategori"
           >
-            <option value="all">Semua Kelas</option>
-            <option value="A">Kelas A</option>
-            <option value="B">Kelas B</option>
-            <option value="C">Kelas C</option>
-            <option value="D">Kelas D</option>
-            <option value="E">Kelas E</option>
-            <option value="F">Kelas F</option>
-            <option value="G">Kelas G</option>
-            <option value="H">Kelas H</option>
-            <option value="I">Kelas I</option>
-            <option value="J">Kelas J</option>
-            <option value="OPEN">Kelas Bebas</option>
+            <option value="all">Semua Kategori</option>
+            <option v-for="c in sortedCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
 
@@ -505,7 +615,11 @@ function formatDate(iso: string): string {
                   ? 'LOLOS VERIFIKASI'
                   : part.registration_status === 'rejected'
                     ? 'DITOLAK'
-                    : 'MENUNGGU VERIFIKASI'
+                    : part.registration_status === 'overweight'
+                      ? 'OVERWEIGHT'
+                      : part.registration_status === 'underweight'
+                        ? 'UNDERWEIGHT'
+                        : 'MENUNGGU VERIFIKASI'
               }}
             </span>
           </div>
@@ -513,7 +627,7 @@ function formatDate(iso: string): string {
           <!-- Class Code Badge -->
           <div class="verif-class-tag font-mono">
             <span>KELAS</span>
-            <strong>{{ part.weight_class }}</strong>
+            <strong>{{ part.weight_class || '—' }}</strong>
           </div>
         </header>
 
@@ -526,7 +640,8 @@ function formatDate(iso: string): string {
                 isMaleGender(part.gender) ? 'verif-gender-chip--male' : 'verif-gender-chip--female'
               "
             >
-              {{ isMaleGender(part.gender) ? 'DEWASA PUTRA (MERAH)' : 'DEWASA PUTRI (BIRU)' }}
+              {{ part.age_group ? ageGroupLabel(part.age_group).toUpperCase() : 'DEWASA' }}
+              {{ isMaleGender(part.gender) ? 'PUTRA (MERAH)' : 'PUTRI (BIRU)' }}
             </span>
           </div>
 
@@ -543,6 +658,55 @@ function formatDate(iso: string): string {
               <span class="verif-spec-sub tabular-nums">{{ formatDate(part.created_at) }}</span>
             </div>
           </div>
+
+          <!-- Meja Timbang & Screening Berkas -->
+          <section v-if="needsDesk(part)" class="verif-desk font-mono">
+            <div v-if="part.category_name" class="verif-desk__cat">
+              {{ part.category_name }}
+            </div>
+            <div class="verif-desk__row">
+              <label class="verif-desk__label" :for="`weigh-${part.id}`">
+                HASIL TIMBANG (KG)
+                <span class="verif-desk__range">Batas: {{ weightRangeLabel(part) }}</span>
+              </label>
+              <input
+                :id="`weigh-${part.id}`"
+                v-model="deskOf(part).weight"
+                type="text"
+                inputmode="decimal"
+                class="verif-desk__input tabular-nums"
+                placeholder="0.0"
+                autocomplete="off"
+              />
+              <span
+                v-if="weightVerdict(part) === 'ok'"
+                class="verif-weight-badge verif-weight-badge--ok"
+                >🟢 SAH</span
+              >
+              <span
+                v-else-if="weightVerdict(part) === 'overweight'"
+                class="verif-weight-badge verif-weight-badge--bad"
+                >🔴 OVERWEIGHT</span
+              >
+              <span
+                v-else-if="weightVerdict(part) === 'underweight'"
+                class="verif-weight-badge verif-weight-badge--bad"
+                >🔴 UNDERWEIGHT</span
+              >
+            </div>
+            <p class="verif-desk__note">Tanpa toleransi: selisih 0,1 kg pun diskualifikasi.</p>
+
+            <fieldset v-if="requiredDocs(part.age_group).length > 0" class="verif-desk__docs">
+              <legend>Berkas atlet di bawah umur</legend>
+              <label v-for="d in DOC_CHECKLIST" :key="d.key" class="verif-desk__check">
+                <input v-model="deskOf(part).docs[d.key]" type="checkbox" />
+                <span>{{ d.label }}</span>
+              </label>
+            </fieldset>
+            <p v-if="approveBlocker(part)" class="verif-desk__blocker">
+              ⚠ {{ approveBlocker(part) }}
+            </p>
+          </section>
         </div>
 
         <!-- Card Footer: Verification Actions -->
@@ -644,7 +808,8 @@ function formatDate(iso: string): string {
             <button
               type="button"
               class="verif-action-btn verif-btn-approve"
-              :disabled="processingId === part.id"
+              :disabled="processingId === part.id || !!approveBlocker(part)"
+              :title="approveBlocker(part) || undefined"
               @click="handleSetStatus(part, 'verified')"
             >
               <svg
@@ -657,7 +822,11 @@ function formatDate(iso: string): string {
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Loloskan
+              {{
+                weightVerdict(part) === 'overweight' || weightVerdict(part) === 'underweight'
+                  ? 'Catat Hasil Timbang'
+                  : 'Loloskan'
+              }}
             </button>
           </template>
         </footer>
@@ -1386,5 +1555,91 @@ function formatDate(iso: string): string {
   color: var(--color-neutral-400, #94a3b8);
   line-height: 1.5;
   margin-bottom: 20px;
+}
+.verif-desk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px dashed var(--border-card, #334155);
+  font-size: 0.75rem;
+}
+.verif-desk__cat {
+  opacity: 0.75;
+  font-size: 0.7rem;
+}
+.verif-desk__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.verif-desk__label {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 140px;
+  gap: 2px;
+  font-weight: 600;
+}
+.verif-desk__range {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.verif-desk__input {
+  width: 88px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card, #334155);
+  background: transparent;
+  color: inherit;
+  text-align: right;
+}
+.verif-weight-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.verif-weight-badge--ok {
+  background: rgba(16, 185, 129, 0.16);
+  color: var(--color-emerald-500, #10b981);
+}
+.verif-weight-badge--bad {
+  background: rgba(220, 38, 38, 0.16);
+  color: var(--color-primary-600, #dc2626);
+}
+.verif-desk__note {
+  margin: 0;
+  opacity: 0.6;
+}
+.verif-desk__docs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-card, #334155);
+  border-radius: 6px;
+}
+.verif-desk__docs legend {
+  padding: 0 6px;
+  opacity: 0.75;
+}
+.verif-desk__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.verif-desk__blocker {
+  margin: 0;
+  color: var(--color-amber-500, #f59e0b);
+}
+.verif-status-badge--overweight,
+.verif-status-badge--underweight {
+  background: rgba(220, 38, 38, 0.16);
+  color: var(--color-primary-600, #dc2626);
 }
 </style>
