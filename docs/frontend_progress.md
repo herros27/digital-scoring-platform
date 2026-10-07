@@ -168,6 +168,10 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
+- **2026-10-07 (kategori & registrasi IPSI)**: mengeksekusi `docs/rencana_kategori_dan_registrasi_ipsi.md`.
+  - Backend: migrasi `022` (golongan umur, rentang bobot, mode bagan pada `categories`; `birth_date`/`nik` pada `athletes`; `category_id`, `actual_weight`, `docs_verified` pada `participants`; `category_id` pada `bracket_slots`). Pendaftaran memvalidasi gender + golongan umur (usia pada `start_date` kejuaraan) sebelum atlet dibuat; verifikasi menerapkan timbang tanpa toleransi (status `overweight`/`underweight`) dan wajib berkas untuk golongan di bawah Dewasa; bagan terisolasi per `category_id` dengan mode `pemasalan_4` (mini-bracket maks. 4 peserta).
+  - Frontend: preset kelas resmi PB IPSI (default) dan PERSILAT 2026 dengan tombol "Terapkan Standar" + pilihan golongan umur, filter tab golongan umur, form atlet dengan tanggal lahir/NIK dan dropdown kategori yang hanya menampilkan kelas sah, meja verifikasi dengan input timbang + badge SAH/OVERWEIGHT + checklist berkas, dan selektor bagan terkelompok per golongan umur.
+  - Catatan: golongan tanpa tabel bobot resmi pada rencana (Pra Usia Dini, Master A/B, dan seluruh golongan PERSILAT 2026) dibuat sebagai "Kelas Bebas" tanpa batas bobot; panitia dapat menyesuaikannya.
 - **2026-10-06 (regulasi)**: editor ruleset (tab Regulasi & Ruleset), pemilihan ruleset di formulir kejuaraan, hasil khusus KO/TKO/WO/Undur Diri, aturan seri otomatis, dan tombol Jadwalkan Ulang partai batal di konsol wasit (lihat `docs/task_update.md` butir 40-44).
 - **2026-10-06 (konsol wasit)**:
   - Waktu pertandingan kini selaras di wasit, juri, dan scoreboard: timer server berbasis tenggat absolut, klien menghitung dari jam server (bukan penghitung 100 ms), plus siaran `timer_sync` tiap 5 detik. Pada pengukuran 3 layar nyata selisih terbesar turun dari 28 detik menjadi 1 detik (hanya di pergantian detik).

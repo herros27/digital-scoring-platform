@@ -659,6 +659,33 @@ paths:
                 ruleset_id:
                   type: string
                   format: uuid
+                age_group:
+                  type: string
+                  default: dewasa
+                  description: |
+                    Golongan umur. Standar `ipsi`: pra_usia_dini, usia_dini_1, usia_dini_2, pra_remaja,
+                    remaja, dewasa, master_a, master_b. Standar `persilat_2026`: singa, macan, pre_teen,
+                    pra_remaja, remaja, dewasa.
+                  example: "usia_dini_2"
+                preset_standard:
+                  type: string
+                  enum: [ipsi, persilat_2026]
+                  default: ipsi
+                min_weight:
+                  type: number
+                  nullable: true
+                  description: Batas bobot bawah (kg, inklusif). Kosong = tanpa batas.
+                  example: 26
+                max_weight:
+                  type: number
+                  nullable: true
+                  description: Batas bobot atas (kg, inklusif). Kosong = tanpa batas.
+                  example: 28
+                bracket_mode:
+                  type: string
+                  enum: [single_elimination, pemasalan_4]
+                  default: single_elimination
+                  description: "`pemasalan_4` = mini-bracket maks. 4 peserta (Pra Usia Dini / Usia Dini 1)."
       responses:
         '201':
           description: Kategori tanding berhasil dibuat
@@ -846,16 +873,32 @@ paths:
                 team:
                   type: string
                   example: "Jawa Barat"
+                birth_date:
+                  type: string
+                  format: date
+                  description: Tanggal lahir (YYYY-MM-DD). Wajib untuk atlet baru yang didaftarkan ke `category_id`.
+                  example: "2016-05-01"
+                nik:
+                  type: string
+                  maxLength: 50
+                  description: NIK pada KK / KIA / Akta Kelahiran.
+                category_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Kategori resmi. Server memvalidasi gender dan golongan umur atlet (usia dihitung pada
+                    `start_date` kompetisi) terhadap kategori; jika tidak sah, 400 dan atlet baru tidak dibuat.
                 weight_class:
                   type: string
                   example: "A"
+                  description: Wajib bila `category_id` tidak diisi (jalur legacy).
       responses:
         '201':
           description: Atlet berhasil didaftarkan ke kompetisi
 
   /api/v1/competitions/{comp_id}/participants:
     get:
-      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected)
+      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected/overweight/underweight)
       tags:
         - Athlete
       security:
@@ -880,7 +923,15 @@ paths:
   /api/v1/competitions/{comp_id}/participants/{id}/verify:
     put:
       summary: Verifikasi Pendaftaran Atlet oleh Admin / Dewan (Timbang Badan & Berkas)
-      description: Mengubah status pendaftaran peserta menjadi 'verified' atau 'rejected'.
+      description: |
+        Mengubah status pendaftaran peserta menjadi 'verified' atau 'rejected'.
+
+        Aturan resmi PB IPSI untuk peserta yang terhubung ke kategori:
+        - **Tanpa toleransi bobot (0 kg)**: jika `actual_weight` di luar rentang kategori, status akhir
+          menjadi `overweight` / `underweight` walau diminta `verified` (lihat `reason`).
+        - Kategori ber-batas bobot mewajibkan `actual_weight` (atau nilai tersimpan sebelumnya) untuk `verified`.
+        - Atlet di bawah golongan Dewasa wajib melengkapi checklist berkas `docs_verified`
+          (`identity`, `parental`, `health`); jika tidak, 400.
       tags:
         - Athlete
       security:
@@ -910,9 +961,21 @@ paths:
                   type: string
                   enum: [verified, rejected]
                   example: "verified"
+                actual_weight:
+                  type: number
+                  description: Hasil timbang aktual (kg), > 0 dan <= 300.
+                  example: 27.5
+                docs_verified:
+                  type: object
+                  additionalProperties:
+                    type: boolean
+                  description: "Checklist berkas: identity (Akta/KIA/KK), parental (izin orang tua), health (surat sehat)."
+                  example: { identity: true, parental: true, health: true }
       responses:
         '200':
-          description: Status verifikasi berhasil diperbarui
+          description: |
+            Status verifikasi berhasil diperbarui. Field `status` berisi status akhir
+            (verified / rejected / overweight / underweight) dan `reason` berisi alasan bila gagal timbang.
 
   /api/v1/contingents:
     get:
@@ -1687,8 +1750,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [weight_class, gender, participant_ids]
+              description: |
+                Isi `category_id` untuk bagan terisolasi per kategori (weight_class, gender, dan mode bagan
+                diambil dari kategori; peserta otomatis = peserta terverifikasi kategori tsb bila
+                `participant_ids` kosong). Tanpa `category_id`, gunakan `weight_class` + `gender` (legacy).
               properties:
+                category_id:
+                  type: string
+                  format: uuid
                 weight_class:
                   type: string
                   example: "A"
@@ -1719,15 +1788,22 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: category_id
+          in: query
+          required: false
+          description: Bagan terisolasi per kategori. Jika diisi, `weight_class` & `gender` tidak diperlukan.
+          schema:
+            type: string
+            format: uuid
         - name: weight_class
           in: query
-          required: true
+          required: false
           schema:
             type: string
             example: "A"
         - name: gender
           in: query
-          required: true
+          required: false
           schema:
             type: string
             example: "male"

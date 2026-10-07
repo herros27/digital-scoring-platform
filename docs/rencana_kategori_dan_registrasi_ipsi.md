@@ -1,3 +1,5 @@
+> **Status: dieksekusi (2026-10-07)** — lihat `docs/frontend_progress.md` (changelog) dan migrasi `022_categories_age_weight_registration.sql`.
+
 # 📋 Rencana Desain & Arsitektur: Kategori & Pendaftaran Resmi PB IPSI Terbaru (dengan Fleksibilitas PERSILAT 2026)
 
 Rencana ini disusun dengan fokus utama pada **Regulasi Resmi Pertandingan PB IPSI Terbaru (Pengurus Besar Ikatan Pencak Silat Indonesia / Hasil Munas & Pokja Penyempurnaan Regulasi)** untuk mengakomodasi kejuaraan tingkat **Kabupaten, Daerah (Kejurkab/Kejurda/Popda), maupun Kejuaraan Terbuka (Open Tournament)** di Indonesia, serta tetap menyediakan kompatibilitas penuh dengan regulasi internasional **PERSILAT 2026**.
