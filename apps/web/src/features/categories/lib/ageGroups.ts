@@ -70,6 +70,8 @@ export const AGE_BANDS: Record<PresetStandard, AgeBand[]> = {
     { code: 'pra_remaja', label: 'Pra-Remaja', hint: '12–13 th', minAge: 12, maxAge: 13 },
     { code: 'remaja', label: 'Remaja', hint: '14–16 th', minAge: 14, maxAge: 16 },
     { code: 'dewasa', label: 'Dewasa', hint: '17–45 th', minAge: 17, maxAge: 45 },
+    { code: 'master_a', label: 'Master A', hint: '46–60 th', minAge: 46, maxAge: 60 },
+    { code: 'master_b', label: 'Master B', hint: '≥ 61 th', minAge: 61, maxAge: null },
   ],
 }
 
@@ -186,23 +188,56 @@ export function checkWeight(
   return 'ok'
 }
 
-export type DocKey = 'identity' | 'parental' | 'health'
+export type DocKey = 'identity' | 'health' | 'pregnancy' | 'parental'
 
-export const DOC_CHECKLIST: { key: DocKey; label: string }[] = [
-  { key: 'identity', label: 'Akta Kelahiran / KIA / Kartu Keluarga terverifikasi' },
-  { key: 'parental', label: 'Surat Izin Orang Tua / Wali valid' },
-  { key: 'health', label: 'Surat Keterangan Sehat Dokter ada' },
-]
+/** Label berkas per standar (IPSI: Pasal 2 butir 2 & 5; PERSILAT: Pasal 1 butir 5 & Pasal 2 butir 1). */
+export function docLabel(key: DocKey, standard: PresetStandard = 'ipsi'): string {
+  switch (key) {
+    case 'identity':
+      return standard === 'persilat_2026'
+        ? 'Kartu identitas / paspor asli berfoto (tanggal lahir jelas)'
+        : 'Bukti umur: Akte Kelahiran / Ijazah / Paspor (asli atau fotokopi legalisir)'
+    case 'health':
+      return standard === 'persilat_2026'
+        ? 'Surat keterangan sehat dari institusi kesehatan'
+        : 'Surat keterangan sehat (dokter RS / RS Tipe D / Puskesmas, maks. 1 minggu sebelum)'
+    case 'pregnancy':
+      return 'Surat pernyataan tidak hamil'
+    case 'parental':
+      return 'Surat izin orang tua / wali (opsional, kebijakan panitia)'
+  }
+}
 
-/** Berkas wajib: seluruh golongan di bawah Dewasa. Dewasa & Master tidak diwajibkan. */
-export function requiredDocs(ageGroup: string | undefined): DocKey[] {
-  if (!ageGroup || ['dewasa', 'master_a', 'master_b'].includes(ageGroup)) return []
-  return DOC_CHECKLIST.map((d) => d.key)
+/**
+ * Berkas WAJIB: bukti umur + surat sehat untuk semua atlet, ditambah pernyataan tidak hamil
+ * bagi putri Remaja & Dewasa. Surat izin orang tua tidak disyaratkan regulasi (opsional).
+ */
+export function requiredDocs(ageGroup: string | undefined, gender?: string): DocKey[] {
+  const docs: DocKey[] = ['identity', 'health']
+  if (normalizeGender(gender) === 'female' && (ageGroup === 'remaja' || ageGroup === 'dewasa')) {
+    docs.push('pregnancy')
+  }
+  return docs
+}
+
+/** Daftar berkas yang ditampilkan di meja verifikasi (wajib + opsional). */
+export function docChecklist(
+  ageGroup: string | undefined,
+  gender: string | undefined,
+  standard: PresetStandard = 'ipsi',
+): { key: DocKey; label: string; required: boolean }[] {
+  const req = requiredDocs(ageGroup, gender)
+  return [...req, 'parental' as DocKey].map((key) => ({
+    key,
+    label: docLabel(key, standard),
+    required: req.includes(key),
+  }))
 }
 
 export function missingDocs(
   ageGroup: string | undefined,
+  gender: string | undefined,
   docs: Partial<Record<string, boolean>> | undefined,
 ): DocKey[] {
-  return requiredDocs(ageGroup).filter((k) => !docs?.[k])
+  return requiredDocs(ageGroup, gender).filter((k) => !docs?.[k])
 }

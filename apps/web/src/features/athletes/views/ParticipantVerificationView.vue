@@ -7,11 +7,10 @@ import type { Participant } from '../types/athlete.schema'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import type { Category } from '@/features/categories/types/category.schema'
 import {
-  DOC_CHECKLIST,
+  docChecklist,
   ageGroupLabel,
   checkWeight,
   missingDocs,
-  requiredDocs,
   type WeightVerdict,
 } from '@/features/categories/lib/ageGroups'
 
@@ -108,9 +107,16 @@ function weightRangeLabel(p: Participant): string {
 }
 
 /** Alasan tombol "Loloskan" ditahan di UI (server tetap memvalidasi ulang). */
+function checklistOf(p: Participant) {
+  // Peserta lama tanpa kategori tidak diperiksa berkasnya (server juga melewatkan).
+  if (!p.category_id) return []
+  const standard = categoryById.value.get(p.category_id)?.preset_standard ?? 'ipsi'
+  return docChecklist(p.age_group, p.gender, standard)
+}
+
 function approveBlocker(p: Participant): string | null {
-  const missing = missingDocs(p.age_group, deskOf(p).docs)
-  if (missing.length > 0) return `Berkas belum lengkap (${missing.length})`
+  const missing = p.category_id ? missingDocs(p.age_group, p.gender, deskOf(p).docs) : []
+  if (missing.length > 0) return `Berkas wajib belum lengkap (${missing.length})`
   if (categoryHasWeightBounds(p) && parsedWeight(p) === null) return 'Isi hasil timbang badan'
   return null
 }
@@ -698,11 +704,13 @@ function formatDate(iso: string): string {
             </div>
             <p class="verif-desk__note">Tanpa toleransi: selisih 0,1 kg pun diskualifikasi.</p>
 
-            <fieldset v-if="requiredDocs(part.age_group).length > 0" class="verif-desk__docs">
-              <legend>Berkas atlet di bawah umur</legend>
-              <label v-for="d in DOC_CHECKLIST" :key="d.key" class="verif-desk__check">
+            <fieldset v-if="checklistOf(part).length > 0" class="verif-desk__docs">
+              <legend>Berkas verifikasi</legend>
+              <label v-for="d in checklistOf(part)" :key="d.key" class="verif-desk__check">
                 <input v-model="deskOf(part).docs[d.key]" type="checkbox" />
-                <span>{{ d.label }}</span>
+                <span
+                  >{{ d.label }}<strong v-if="d.required" class="verif-desk__req"> *</strong></span
+                >
               </label>
             </fieldset>
             <p v-if="approveBlocker(part)" class="verif-desk__blocker">
@@ -1628,6 +1636,9 @@ function formatDate(iso: string): string {
 .verif-desk__docs legend {
   padding: 0 6px;
   opacity: 0.75;
+}
+.verif-desk__req {
+  color: var(--color-primary-600, #dc2626);
 }
 .verif-desk__check {
   display: flex;

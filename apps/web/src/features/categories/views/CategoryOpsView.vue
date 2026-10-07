@@ -11,6 +11,8 @@ import {
 import {
   BRACKET_MODE_LABELS,
   createCategorySchema,
+  groupNote,
+  isJurusOnly,
   presetsFor,
   type BracketMode,
   type Category,
@@ -970,7 +972,8 @@ function handleCategoryClick(cat: Category) {
                     </span>
                   </label>
                   <span class="cat-seed-count font-mono">
-                    <template v-if="groupState(band.code).selectable === 0"
+                    <template v-if="isJurusOnly(seedStandard, band.code)">Hanya Jurus</template>
+                    <template v-else-if="groupState(band.code).selectable === 0"
                       >Sudah diterapkan</template
                     >
                     <template v-else
@@ -993,6 +996,9 @@ function handleCategoryClick(cat: Category) {
                   </button>
                 </div>
 
+                <p v-if="groupNote(seedStandard, band.code)" class="cat-seed-note font-mono">
+                  {{ groupNote(seedStandard, band.code) }}
+                </p>
                 <div v-if="seedExpanded.has(band.code)" class="cat-seed-classes">
                   <div v-for="sex in ['male', 'female']" :key="sex" class="cat-seed-col">
                     <span class="cat-seed-col-title font-mono">{{
@@ -2322,5 +2328,11 @@ function handleCategoryClick(cat: Category) {
 .cat-modal--compact .cat-modal__footer > .cat-sub {
   margin-right: auto;
   font-size: 0.72rem;
+}
+.cat-seed-note {
+  margin: 0;
+  padding: 0 12px 8px 34px;
+  font-size: 0.66rem;
+  opacity: 0.65;
 }
 </style>

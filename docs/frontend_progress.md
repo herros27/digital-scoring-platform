@@ -168,6 +168,13 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
+- **2026-10-07 (koreksi sesuai regulasi resmi)**: preset dan berkas disesuaikan dengan *Peraturan Pertandingan PB IPSI 2025* dan *IPSF-PERSILAT Competition Rules Feb 2026*.
+  - Tabel kelas bobot Usia Dini 2, Pra-Remaja, Remaja, dan Dewasa terverifikasi identik di kedua regulasi.
+  - Pra Usia Dini: hanya Jurus, tidak ada preset Tanding. Usia Dini 1: satu "Kelas Bebas" per gender tanpa batas bobot/timbang (pasangan selisih usia 1 th, tinggi 3 cm, berat 1 kg). Master A & B memakai tabel 24 kelas Dewasa.
+  - Preset PERSILAT 2026: Pre-Teen/Pre-Junior/Junior/Senior memakai tabel resmi; Singa, Macan, Master A (46–60), Master B (≥61) tanpa kelas bobot (pasangan selisih berat sesuai regulasi).
+  - Berkas wajib: bukti umur + surat sehat untuk semua atlet, plus pernyataan tidak hamil untuk putri Remaja/Dewasa. Surat izin orang tua tidak disyaratkan regulasi, jadi opsional.
+  - Umur dihitung tepat pada tanggal mulai kejuaraan. Bagan pemasalan 4 tidak ada di regulasi; tetap tersedia sebagai pilihan manual.
+  - Belum didukung: timbang ulang di semifinal (PERSILAT; IPSI menimbang satu kali).
 - **2026-10-07 (kategori & registrasi IPSI)**: mengeksekusi `docs/rencana_kategori_dan_registrasi_ipsi.md`.
   - Backend: migrasi `022` (golongan umur, rentang bobot, mode bagan pada `categories`; `birth_date`/`nik` pada `athletes`; `category_id`, `actual_weight`, `docs_verified` pada `participants`; `category_id` pada `bracket_slots`). Pendaftaran memvalidasi gender + golongan umur (usia pada `start_date` kejuaraan) sebelum atlet dibuat; verifikasi menerapkan timbang tanpa toleransi (status `overweight`/`underweight`) dan wajib berkas untuk golongan di bawah Dewasa; bagan terisolasi per `category_id` dengan mode `pemasalan_4` (mini-bracket maks. 4 peserta).
   - Frontend: preset kelas resmi PB IPSI (default) dan PERSILAT 2026 dengan tombol "Terapkan Standar" + pilihan golongan umur, filter tab golongan umur, form atlet dengan tanggal lahir/NIK dan dropdown kategori yang hanya menampilkan kelas sah, meja verifikasi dengan input timbang + badge SAH/OVERWEIGHT + checklist berkas, dan selektor bagan terkelompok per golongan umur.

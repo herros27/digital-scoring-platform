@@ -4,6 +4,8 @@ import {
   ageGroupForBirthDate,
   ageOn,
   checkWeight,
+  docChecklist,
+  docLabel,
   isEligible,
   missingDocs,
   requiredDocs,
@@ -49,7 +51,7 @@ describe('ageGroupForAge', () => {
     expect(ageGroupForAge(10, 'persilat_2026')).toBe('pre_teen')
     expect(ageGroupForAge(16, 'persilat_2026')).toBe('remaja')
     expect(ageGroupForAge(45, 'persilat_2026')).toBe('dewasa')
-    expect(ageGroupForAge(46, 'persilat_2026')).toBeNull()
+    expect(ageGroupForAge(46, 'persilat_2026')).toBe('master_a')
   })
   it('dari tanggal lahir', () => {
     expect(ageGroupForBirthDate('2016-05-01', '2026-06-15')).toBe('usia_dini_2')
@@ -95,10 +97,31 @@ describe('checkWeight (tanpa toleransi)', () => {
 })
 
 describe('berkas verifikasi', () => {
-  it('dewasa tidak wajib, di bawah umur wajib 3 berkas', () => {
-    expect(requiredDocs('dewasa')).toEqual([])
-    expect(requiredDocs('usia_dini_1')).toHaveLength(3)
-    expect(missingDocs('remaja', { identity: true })).toEqual(['parental', 'health'])
-    expect(missingDocs('remaja', { identity: true, parental: true, health: true })).toEqual([])
+  it('semua atlet wajib bukti umur + surat sehat; izin orang tua tidak wajib', () => {
+    expect(requiredDocs('dewasa', 'male')).toEqual(['identity', 'health'])
+    expect(requiredDocs('usia_dini_1', 'putri')).toEqual(['identity', 'health'])
+    expect(missingDocs('usia_dini_1', 'male', { identity: true, health: true })).toEqual([])
+  })
+  it('pernyataan tidak hamil hanya putri Remaja & Dewasa', () => {
+    expect(requiredDocs('remaja', 'female')).toContain('pregnancy')
+    expect(requiredDocs('dewasa', 'putri')).toContain('pregnancy')
+    expect(requiredDocs('pra_remaja', 'female')).not.toContain('pregnancy')
+    expect(requiredDocs('remaja', 'male')).not.toContain('pregnancy')
+  })
+  it('checklist menampilkan izin orang tua sebagai opsional', () => {
+    const list = docChecklist('remaja', 'female', 'ipsi')
+    expect(list.map((d) => d.key)).toEqual(['identity', 'health', 'pregnancy', 'parental'])
+    expect(list.find((d) => d.key === 'parental')?.required).toBe(false)
+    expect(docLabel('identity', 'ipsi')).toContain('Akte Kelahiran')
+    expect(docLabel('identity', 'persilat_2026')).toContain('paspor')
+  })
+})
+
+describe('PERSILAT 2026 Master', () => {
+  it('Master A 46–60, Master B ≥ 61', () => {
+    expect(ageGroupForAge(45, 'persilat_2026')).toBe('dewasa')
+    expect(ageGroupForAge(46, 'persilat_2026')).toBe('master_a')
+    expect(ageGroupForAge(60, 'persilat_2026')).toBe('master_a')
+    expect(ageGroupForAge(61, 'persilat_2026')).toBe('master_b')
   })
 })

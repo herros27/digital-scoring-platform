@@ -94,15 +94,16 @@ func TestVerify_WeightNoTolerance(t *testing.T) {
 	if _, err := svc.RegisterParticipantToCategory("c1", "adult", "", "cat-dew", "pending", refDate); err != nil {
 		t.Fatal(err)
 	}
-	res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(50.1)})
+	docs := map[string]bool{domain.DocIdentity: true, domain.DocHealth: true}
+	res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(50.1), Docs: docs})
 	if err != nil || res.Status != domain.ParticipantOverweight {
 		t.Fatalf("want overweight, got %v %v", res, err)
 	}
-	res, _ = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(44.9)})
+	res, _ = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(44.9), Docs: docs})
 	if res.Status != domain.ParticipantUnderweight {
 		t.Fatalf("want underweight, got %s", res.Status)
 	}
-	res, err = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(50)})
+	res, err = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(50), Docs: docs})
 	if err != nil || res.Status != "verified" || ar.parts["p1"].RegistrationStatus != "verified" {
 		t.Fatalf("exact limit must pass: %v %v", res, err)
 	}
@@ -120,7 +121,7 @@ func TestVerify_WeightRequiredAndDocs(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "berkas") {
 		t.Fatalf("minor without docs must be blocked, got %v", err)
 	}
-	docs := map[string]bool{domain.DocIdentity: true, domain.DocParental: true, domain.DocHealth: true}
+	docs := map[string]bool{domain.DocIdentity: true, domain.DocHealth: true}
 	if _, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", Docs: docs}); err == nil {
 		t.Fatal("weight must be required for weight-bound category")
 	}

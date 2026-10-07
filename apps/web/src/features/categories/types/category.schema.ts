@@ -81,6 +81,8 @@ export interface StandardClassPreset {
   ageGroup: AgeGroupCode
   standard: PresetStandard
   bracketMode: BracketMode
+  /** Catatan pasangan/aturan khusus golongan (mis. golongan tanpa kelas bobot). */
+  note?: string
 }
 
 // ---------- Tabel kelas bobot resmi PB IPSI ----------
@@ -132,56 +134,83 @@ const open = (code: string, lo: number, hi: number | null): WeightClassDef => ({
 
 type Sex = 'male' | 'female'
 
-/** Tabel resmi per golongan umur → kelas bobot per gender. Golongan tanpa tabel resmi tidak ada di sini. */
-const WEIGHT_TABLES: Partial<Record<AgeGroupCode, Record<Sex, WeightClassDef[]>>> = (() => {
-  // Usia Dini 1 & 2 (SD): A 26–28 … S (>62–64), Open >64–68 — sama untuk putra/putri.
-  const sd = [...stepClasses(26, 2, 19), open('OPEN', 64, 68)]
-  // Pra-Remaja (SMP): A 30–33 … P (>75–78), Open >78–84.
-  const smp = [...stepClasses(30, 3, 16), open('OPEN', 78, 84)]
-  return {
-    usia_dini_1: { male: sd, female: sd },
-    usia_dini_2: { male: sd, female: sd },
-    pra_remaja: { male: smp, female: smp },
-    remaja: {
-      male: [
-        under(39),
-        ...stepClasses(39, 4, 12),
-        open('OPEN1', 87, 100),
-        open('OPEN2', 100, null),
-      ],
-      female: [
-        under(39),
-        ...stepClasses(39, 4, 10),
-        open('OPEN1', 79, 92),
-        open('OPEN2', 92, null),
-      ],
-    },
-    dewasa: {
-      male: [
-        under(45),
-        ...stepClasses(45, 5, 10),
-        open('OPEN1', 95, 110),
-        open('OPEN2', 110, null),
-      ],
-      female: [
-        under(45),
-        ...stepClasses(45, 5, 8),
-        open('OPEN1', 85, 100),
-        open('OPEN2', 100, null),
-      ],
-    },
-  }
-})()
+// Tabel kelas bobot resmi — identik pada regulasi PB IPSI 2025 (Pasal 3–7) dan
+// IPSF-PERSILAT Feb 2026 (Pasal 2 butir 3).
+const SD_TABLE: WeightClassDef[] = [...stepClasses(26, 2, 19), open('OPEN', 64, 68)] // A–S + Open
+const SMP_TABLE: WeightClassDef[] = [...stepClasses(30, 3, 16), open('OPEN', 78, 84)] // A–P + Open
+const REMAJA_TABLE: Record<Sex, WeightClassDef[]> = {
+  male: [under(39), ...stepClasses(39, 4, 12), open('OPEN1', 87, 100), open('OPEN2', 100, null)],
+  female: [under(39), ...stepClasses(39, 4, 10), open('OPEN1', 79, 92), open('OPEN2', 92, null)],
+}
+const DEWASA_TABLE: Record<Sex, WeightClassDef[]> = {
+  male: [under(45), ...stepClasses(45, 5, 10), open('OPEN1', 95, 110), open('OPEN2', 110, null)],
+  female: [under(45), ...stepClasses(45, 5, 8), open('OPEN1', 85, 100), open('OPEN2', 100, null)],
+}
+const both = (t: WeightClassDef[]): Record<Sex, WeightClassDef[]> => ({ male: t, female: t })
 
-/** Pra Usia Dini & Usia Dini 1 umumnya memakai bagan pemasalan (mini bagan 4). */
-const PEMASALAN_GROUPS: AgeGroupCode[] = ['pra_usia_dini', 'usia_dini_1']
+/** Golongan yang memakai tabel kelas bobot resmi, per standar. */
+const WEIGHT_TABLES: Record<
+  PresetStandard,
+  Partial<Record<AgeGroupCode, Record<Sex, WeightClassDef[]>>>
+> = {
+  ipsi: {
+    usia_dini_2: both(SD_TABLE),
+    pra_remaja: both(SMP_TABLE),
+    remaja: REMAJA_TABLE,
+    dewasa: DEWASA_TABLE,
+    // Master A & B memakai tabel yang sama dengan Dewasa (13 putra + 11 putri).
+    master_a: DEWASA_TABLE,
+    master_b: DEWASA_TABLE,
+  },
+  persilat_2026: {
+    pre_teen: both(SD_TABLE),
+    pra_remaja: both(SMP_TABLE),
+    remaja: REMAJA_TABLE,
+    dewasa: DEWASA_TABLE,
+  },
+}
+
+/**
+ * Golongan tanpa kelas bobot: atlet dipasangkan menurut pedoman selisih. Dibuat satu
+ * "Kelas Bebas" per gender tanpa batas bobot (tanpa kewajiban timbang).
+ */
+const MATCHING_GUIDELINES: Record<PresetStandard, Partial<Record<AgeGroupCode, string>>> = {
+  ipsi: {
+    usia_dini_1:
+      'Tanpa kelas bobot & tanpa timbang. Pasangan: selisih usia 1 th, tinggi 3 cm, berat 1 kg.',
+  },
+  persilat_2026: {
+    singa: 'Tanpa kelas bobot. Pasangan: selisih usia 1 th, tinggi 3 cm, berat 2 kg.',
+    macan: 'Tanpa kelas bobot. Pasangan: selisih usia 1 th, tinggi 3 cm, berat 2 kg.',
+    master_a: 'Tanpa kelas bobot. Pasangan: selisih berat 5 kg.',
+    master_b: 'Tanpa kelas bobot. Pasangan: selisih berat 5 kg.',
+  },
+}
+
+/** Golongan yang tidak mempertandingkan kategori Tanding (hanya Jurus) menurut regulasi. */
+const NO_TANDING: Record<PresetStandard, AgeGroupCode[]> = {
+  ipsi: ['pra_usia_dini'],
+  persilat_2026: [],
+}
 
 const SEX_LABEL: Record<Sex, string> = { male: 'Putra', female: 'Putri' }
 
+/** Catatan golongan untuk UI (pedoman pasangan / hanya Jurus), atau undefined. */
+export function groupNote(standard: PresetStandard, code: AgeGroupCode): string | undefined {
+  if (NO_TANDING[standard].includes(code)) {
+    return 'Hanya kategori Jurus (Jurus Tunggal Bebas) — tidak ada kelas Tanding.'
+  }
+  return MATCHING_GUIDELINES[standard][code]
+}
+
+/** True bila golongan tidak punya kategori Tanding sama sekali. */
+export function isJurusOnly(standard: PresetStandard, code: AgeGroupCode): boolean {
+  return NO_TANDING[standard].includes(code)
+}
+
 /**
- * Bangun preset kategori untuk satu standar. Golongan tanpa tabel bobot resmi
- * (Pra Usia Dini, Master, serta golongan PERSILAT) mendapat satu kategori "Kelas Bebas"
- * per gender tanpa batas bobot, yang dapat diubah panitia.
+ * Bangun preset kategori Tanding untuk satu standar sesuai regulasi resmi. Golongan tanpa kelas
+ * bobot mendapat satu "Kelas Bebas" per gender; golongan Jurus-saja tidak mendapat preset.
  */
 export function buildPresets(
   standard: PresetStandard,
@@ -190,11 +219,9 @@ export function buildPresets(
   const out: StandardClassPreset[] = []
   for (const band of AGE_BANDS[standard]) {
     if (ageGroups && !ageGroups.includes(band.code)) continue
-    const bracketMode: BracketMode =
-      standard === 'ipsi' && PEMASALAN_GROUPS.includes(band.code)
-        ? 'pemasalan_4'
-        : 'single_elimination'
-    const table = standard === 'ipsi' ? WEIGHT_TABLES[band.code] : undefined
+    if (NO_TANDING[standard].includes(band.code)) continue
+    const table = WEIGHT_TABLES[standard][band.code]
+    const note = MATCHING_GUIDELINES[standard][band.code]
     for (const sex of ['male', 'female'] as Sex[]) {
       const classes: WeightClassDef[] = table?.[sex] ?? [
         { code: 'BEBAS', label: 'Kelas Bebas', min: null, max: null },
@@ -208,7 +235,9 @@ export function buildPresets(
           gender: sex,
           ageGroup: band.code,
           standard,
-          bracketMode,
+          // Regulasi memakai sistem gugur; mode pemasalan 4 hanya pilihan manual panitia.
+          bracketMode: 'single_elimination',
+          note,
           categoryName: `Tanding ${ageGroupLabel(band.code, standard)} ${SEX_LABEL[sex]} - ${c.label}`,
         })
       }

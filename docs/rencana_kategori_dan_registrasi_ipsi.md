@@ -1,3 +1,5 @@
+> **Koreksi (2026-10-07) setelah membaca *Peraturan Pertandingan PB IPSI 2025* dan *IPSF-PERSILAT Feb 2026*:** (1) Pra Usia Dini hanya Jurus, tidak ada Tanding; (2) Usia Dini 1 tanpa timbang/kelas bobot, pasangan selisih usia 1 th/tinggi 3 cm/berat 1 kg; (3) Master A & B memakai tabel Dewasa; (4) bukti umur = Akte Kelahiran/Ijazah/Paspor (bukan KK/KIA); (5) surat izin orang tua tidak disyaratkan regulasi; (6) wajib surat sehat semua atlet dan pernyataan tidak hamil putri Remaja/Dewasa; (7) bagan pemasalan 4 tidak ada di regulasi (sistem gugur). Bagian di bawah yang bertentangan sudah digantikan oleh poin ini.
+>
 > **Status: dieksekusi (2026-10-07)** — lihat `docs/frontend_progress.md` (changelog) dan migrasi `022_categories_age_weight_registration.sql`.
 
 # 📋 Rencana Desain & Arsitektur: Kategori & Pendaftaran Resmi PB IPSI Terbaru (dengan Fleksibilitas PERSILAT 2026)

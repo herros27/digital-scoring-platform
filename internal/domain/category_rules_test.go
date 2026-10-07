@@ -32,7 +32,7 @@ func TestAgeGroupForAge_IPSI(t *testing.T) {
 }
 
 func TestAgeGroupForAge_Persilat(t *testing.T) {
-	cases := map[int]string{2: "", 3: AgeSinga, 6: AgeSinga, 7: AgeMacan, 10: AgePreTeen, 12: AgePraRemaja, 14: AgeRemaja, 17: AgeDewasa, 45: AgeDewasa, 46: ""}
+	cases := map[int]string{2: "", 3: AgeSinga, 6: AgeSinga, 7: AgeMacan, 10: AgePreTeen, 12: AgePraRemaja, 14: AgeRemaja, 17: AgeDewasa, 45: AgeDewasa, 46: AgeMasterA, 60: AgeMasterA, 61: AgeMasterB}
 	for age, want := range cases {
 		if got := AgeGroupForAge(age, PresetPersilat26); got != want {
 			t.Errorf("PERSILAT age %d = %q want %q", age, got, want)
@@ -63,15 +63,24 @@ func TestCheckWeight_NoTolerance(t *testing.T) {
 }
 
 func TestMissingDocs(t *testing.T) {
-	if len(MissingDocs(AgeDewasa, nil)) != 0 {
-		t.Error("adults need no protection docs")
+	// Semua atlet wajib bukti umur + surat sehat (IPSI & PERSILAT), termasuk dewasa.
+	if got := MissingDocs(AgeDewasa, "male", nil); len(got) != 2 {
+		t.Errorf("adult male needs identity+health, missing=%v", got)
 	}
-	if got := MissingDocs(AgeUsiaDini1, map[string]bool{DocIdentity: true}); len(got) != 2 {
-		t.Errorf("want 2 missing, got %v", got)
+	// Surat izin orang tua tidak disyaratkan regulasi.
+	ok := map[string]bool{DocIdentity: true, DocHealth: true}
+	if len(MissingDocs(AgeUsiaDini1, "male", ok)) != 0 {
+		t.Error("parental letter must not be required")
 	}
-	all := map[string]bool{DocIdentity: true, DocParental: true, DocHealth: true}
-	if len(MissingDocs(AgeRemaja, all)) != 0 {
-		t.Error("complete docs should pass")
+	// Pernyataan tidak hamil: hanya putri Remaja & Dewasa.
+	if got := MissingDocs(AgeRemaja, "putri", ok); len(got) != 1 || got[0] != DocPregnancy {
+		t.Errorf("female remaja must declare not pregnant, missing=%v", got)
+	}
+	if len(MissingDocs(AgeDewasa, "female", ok)) != 1 {
+		t.Error("female dewasa must declare not pregnant")
+	}
+	if len(MissingDocs(AgePraRemaja, "female", ok)) != 0 || len(MissingDocs(AgeRemaja, "male", ok)) != 0 {
+		t.Error("pregnancy declaration only for female remaja/dewasa")
 	}
 }
 

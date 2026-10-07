@@ -39,9 +39,16 @@ const (
 
 // Kunci checklist berkas verifikasi (participants.docs_verified).
 const (
-	DocIdentity = "identity" // Akta Kelahiran / KIA / Kartu Keluarga
-	DocParental = "parental" // Surat izin orang tua / wali bermaterai
-	DocHealth   = "health"   // Surat keterangan sehat dokter
+	// DocIdentity bukti umur & identitas. IPSI: Akte Kelahiran / Ijazah / Paspor (asli atau legalisir).
+	// PERSILAT: kartu identitas / paspor asli berfoto.
+	DocIdentity = "identity"
+	// DocHealth surat keterangan sehat (IPSI: dokter RS / RS Tipe D / Puskesmas, maks. 1 minggu sebelum).
+	DocHealth = "health"
+	// DocPregnancy surat pernyataan tidak hamil (putri Remaja & Dewasa / Junior & Senior).
+	DocPregnancy = "pregnancy"
+	// DocParental surat izin orang tua / wali. TIDAK disyaratkan regulasi IPSI maupun PERSILAT;
+	// opsional sesuai kebijakan panitia, tidak pernah memblokir verifikasi.
+	DocParental = "parental"
 )
 
 // AgeBand adalah rentang usia (tahun penuh, inklusif) satu golongan umur.
@@ -70,6 +77,8 @@ var persilat26Bands = []AgeBand{
 	{AgePraRemaja, 12, 13},
 	{AgeRemaja, 14, 16},
 	{AgeDewasa, 17, 45},
+	{AgeMasterA, 46, 60},
+	{AgeMasterB, 61, 0},
 }
 
 // AgeBands mengembalikan daftar golongan umur untuk sebuah standar (default IPSI).
@@ -169,22 +178,21 @@ func (c *Category) CheckWeight(actual float64) string {
 	return WeightOK
 }
 
-// RequiredDocs berkas yang wajib terverifikasi sebelum atlet golongan tersebut boleh ditimbang.
-// Atlet dewasa/master tidak diwajibkan berkas perlindungan anak.
-func RequiredDocs(ageGroup string) []string {
-	switch ageGroup {
-	case AgeDewasa, AgeMasterA, AgeMasterB:
-		return nil
-	case "":
-		return nil
+// RequiredDocs berkas yang wajib terverifikasi sebelum atlet boleh ditimbang/bertanding.
+// Regulasi IPSI (Pasal 2 butir 2 & 5) dan PERSILAT sama: bukti umur + surat sehat untuk semua
+// atlet, ditambah surat pernyataan tidak hamil bagi putri Remaja & Dewasa.
+func RequiredDocs(ageGroup, gender string) []string {
+	docs := []string{DocIdentity, DocHealth}
+	if NormalizeGender(gender) == "female" && (ageGroup == AgeRemaja || ageGroup == AgeDewasa) {
+		docs = append(docs, DocPregnancy)
 	}
-	return []string{DocIdentity, DocParental, DocHealth}
+	return docs
 }
 
 // MissingDocs mengembalikan berkas wajib yang belum dicentang.
-func MissingDocs(ageGroup string, docs map[string]bool) []string {
+func MissingDocs(ageGroup, gender string, docs map[string]bool) []string {
 	var missing []string
-	for _, d := range RequiredDocs(ageGroup) {
+	for _, d := range RequiredDocs(ageGroup, gender) {
 		if !docs[d] {
 			missing = append(missing, d)
 		}

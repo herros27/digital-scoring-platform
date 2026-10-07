@@ -664,8 +664,8 @@ paths:
                   default: dewasa
                   description: |
                     Golongan umur. Standar `ipsi`: pra_usia_dini, usia_dini_1, usia_dini_2, pra_remaja,
-                    remaja, dewasa, master_a, master_b. Standar `persilat_2026`: singa, macan, pre_teen,
-                    pra_remaja, remaja, dewasa.
+                    remaja, dewasa, master_a (36-45), master_b (46+). Standar `persilat_2026`: singa, macan,
+                    pre_teen, pra_remaja, remaja, dewasa (17-45), master_a (46-60), master_b (61+).
                   example: "usia_dini_2"
                 preset_standard:
                   type: string
@@ -685,7 +685,7 @@ paths:
                   type: string
                   enum: [single_elimination, pemasalan_4]
                   default: single_elimination
-                  description: "`pemasalan_4` = mini-bracket maks. 4 peserta (Pra Usia Dini / Usia Dini 1)."
+                  description: "`pemasalan_4` = mini-bracket maks. 4 peserta; pilihan manual panitia (tidak ada di regulasi, yang memakai sistem gugur)."
       responses:
         '201':
           description: Kategori tanding berhasil dibuat
@@ -950,8 +950,10 @@ paths:
         - **Tanpa toleransi bobot (0 kg)**: jika `actual_weight` di luar rentang kategori, status akhir
           menjadi `overweight` / `underweight` walau diminta `verified` (lihat `reason`).
         - Kategori ber-batas bobot mewajibkan `actual_weight` (atau nilai tersimpan sebelumnya) untuk `verified`.
-        - Atlet di bawah golongan Dewasa wajib melengkapi checklist berkas `docs_verified`
-          (`identity`, `parental`, `health`); jika tidak, 400.
+        - Berkas wajib (`docs_verified`) sesuai regulasi PB IPSI 2025 / IPSF-PERSILAT 2026: `identity`
+          (bukti umur) dan `health` (surat sehat) untuk semua atlet, ditambah `pregnancy` (pernyataan
+          tidak hamil) bagi putri Remaja & Dewasa; jika belum lengkap, 400. `parental` (izin orang tua)
+          opsional dan tidak memblokir verifikasi.
       tags:
         - Athlete
       security:
@@ -989,8 +991,8 @@ paths:
                   type: object
                   additionalProperties:
                     type: boolean
-                  description: "Checklist berkas: identity (Akta/KIA/KK), parental (izin orang tua), health (surat sehat)."
-                  example: { identity: true, parental: true, health: true }
+                  description: "Checklist berkas: identity (bukti umur), health (surat sehat), pregnancy (tidak hamil, putri Remaja/Dewasa), parental (opsional)."
+                  example: { identity: true, health: true }
       responses:
         '200':
           description: |

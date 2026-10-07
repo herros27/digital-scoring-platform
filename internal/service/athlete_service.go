@@ -261,7 +261,7 @@ func (s *AthleteService) VerifyParticipantDetailed(participantID string, in Veri
 		if err != nil {
 			return nil, err
 		}
-		if missing := domain.MissingDocs(cat.AgeGroup, docs); len(missing) > 0 {
+		if missing := domain.MissingDocs(cat.AgeGroup, part.Gender, docs); len(missing) > 0 {
 			return nil, errors.New("berkas belum lengkap: " + strings.Join(missing, ", "))
 		}
 		if cat.HasWeightBounds() {
