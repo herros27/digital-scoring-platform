@@ -15,6 +15,7 @@ import {
   type BracketMode,
   type Category,
   type CreateCategoryFormValues,
+  type StandardClassPreset,
 } from '../types/category.schema'
 import {
   AGE_BANDS,
@@ -252,31 +253,87 @@ async function handleSubmitCategory() {
 // Batch Seed Preset (PB IPSI / PERSILAT 2026) — admin memilih golongan umur yang dipertandingkan.
 const isSeedOpen = ref(false)
 const seedStandard = ref<PresetStandard>('ipsi')
-const seedGroups = ref<AgeGroupCode[]>([])
+// Pilihan dilacak per kelas (nama kategori unik). Kelas yang sudah ada di kejuaraan
+// ditandai "sudah diterapkan" dan tidak bisa dipilih lagi.
+const seedSelected = ref<Set<string>>(new Set())
+const seedExpanded = ref<Set<AgeGroupCode>>(new Set())
 
 const seedBands = computed(() => AGE_BANDS[seedStandard.value])
-const seedPreview = computed(() => presetsFor(seedStandard.value, seedGroups.value))
+const seedAllPresets = computed(() => presetsFor(seedStandard.value))
+const existingNames = computed(
+  () => new Set(categories.value.map((c) => c.name.toLowerCase().trim())),
+)
+const isApplied = (p: StandardClassPreset) =>
+  existingNames.value.has(p.categoryName.toLowerCase().trim())
+
+function presetsOfGroup(code: AgeGroupCode) {
+  return seedAllPresets.value.filter((p) => p.ageGroup === code)
+}
+
+interface GroupState {
+  total: number
+  applied: number
+  selectable: number
+  selected: number
+}
+function groupState(code: AgeGroupCode): GroupState {
+  const list = presetsOfGroup(code)
+  const applied = list.filter(isApplied).length
+  const selected = list.filter(
+    (p) => !isApplied(p) && seedSelected.value.has(p.categoryName),
+  ).length
+  return { total: list.length, applied, selectable: list.length - applied, selected }
+}
+
+const seedPreview = computed(() =>
+  seedAllPresets.value.filter((p) => !isApplied(p) && seedSelected.value.has(p.categoryName)),
+)
+
+// Default: semua kelas yang belum diterapkan tercentang.
+function resetSeedSelection() {
+  seedSelected.value = new Set(
+    seedAllPresets.value.filter((p) => !isApplied(p)).map((p) => p.categoryName),
+  )
+  seedExpanded.value = new Set()
+}
 
 function openSeedDialog(standard: PresetStandard = 'ipsi') {
   seedStandard.value = standard
-  seedGroups.value = AGE_BANDS[standard].map((b) => b.code)
+  resetSeedSelection()
   isSeedOpen.value = true
 }
 
 function setSeedStandard(standard: PresetStandard) {
   seedStandard.value = standard
-  seedGroups.value = AGE_BANDS[standard].map((b) => b.code)
+  resetSeedSelection()
 }
 
 function toggleSeedGroup(code: AgeGroupCode) {
-  seedGroups.value = seedGroups.value.includes(code)
-    ? seedGroups.value.filter((c) => c !== code)
-    : [...seedGroups.value, code]
+  const st = groupState(code)
+  const next = new Set(seedSelected.value)
+  const free = presetsOfGroup(code).filter((p) => !isApplied(p))
+  if (st.selected === st.selectable) free.forEach((p) => next.delete(p.categoryName))
+  else free.forEach((p) => next.add(p.categoryName))
+  seedSelected.value = next
+}
+
+function toggleSeedClass(name: string) {
+  const next = new Set(seedSelected.value)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
+  seedSelected.value = next
+}
+
+function toggleSeedExpand(code: AgeGroupCode) {
+  const next = new Set(seedExpanded.value)
+  if (next.has(code)) next.delete(code)
+  else next.add(code)
+  seedExpanded.value = next
 }
 
 async function handleSeedPresets() {
   if (seedPreview.value.length === 0) {
-    showToast('Pilih Golongan', 'Pilih minimal satu golongan umur yang dipertandingkan.', 'info')
+    showToast('Pilih Kelas', 'Pilih minimal satu kelas yang dipertandingkan.', 'info')
     return
   }
   const label = PRESET_LABELS[seedStandard.value]
@@ -884,24 +941,85 @@ function handleCategoryClick(cat: Category) {
           </div>
 
           <div class="cat-form-group">
-            <span class="cat-form-label font-mono">GOLONGAN UMUR YANG DIPERTANDINGKAN</span>
-            <div class="cat-seed-grid">
-              <label v-for="band in seedBands" :key="band.code" class="cat-seed-check">
-                <input
-                  type="checkbox"
-                  :checked="seedGroups.includes(band.code)"
-                  @change="toggleSeedGroup(band.code)"
-                />
-                <span>
-                  <strong>{{ band.label }}</strong>
-                  <span class="cat-sub font-mono">{{ band.hint }}</span>
-                </span>
-              </label>
-            </div>
+            <span class="cat-form-label font-mono">GOLONGAN UMUR & KELAS YANG DIPERTANDINGKAN</span>
+            <ul class="cat-seed-list">
+              <li
+                v-for="band in seedBands"
+                :key="band.code"
+                class="cat-seed-item"
+                :class="{ 'cat-seed-item--done': groupState(band.code).selectable === 0 }"
+              >
+                <div class="cat-seed-row">
+                  <label class="cat-seed-check">
+                    <input
+                      type="checkbox"
+                      :checked="
+                        groupState(band.code).selectable > 0 &&
+                        groupState(band.code).selected === groupState(band.code).selectable
+                      "
+                      :indeterminate="
+                        groupState(band.code).selected > 0 &&
+                        groupState(band.code).selected < groupState(band.code).selectable
+                      "
+                      :disabled="groupState(band.code).selectable === 0"
+                      @change="toggleSeedGroup(band.code)"
+                    />
+                    <span>
+                      <strong>{{ band.label }}</strong>
+                      <span class="cat-sub font-mono">{{ band.hint }}</span>
+                    </span>
+                  </label>
+                  <span class="cat-seed-count font-mono">
+                    <template v-if="groupState(band.code).selectable === 0"
+                      >Sudah diterapkan</template
+                    >
+                    <template v-else
+                      >{{ groupState(band.code).selected }}/{{
+                        groupState(band.code).selectable
+                      }}
+                      kelas<template v-if="groupState(band.code).applied > 0">
+                        · {{ groupState(band.code).applied }} sudah ada</template
+                      ></template
+                    >
+                  </span>
+                  <button
+                    type="button"
+                    class="cat-seed-toggle"
+                    :aria-expanded="seedExpanded.has(band.code)"
+                    :aria-label="`Tampilkan kelas ${band.label}`"
+                    @click="toggleSeedExpand(band.code)"
+                  >
+                    {{ seedExpanded.has(band.code) ? '▲' : '▼' }}
+                  </button>
+                </div>
+
+                <div v-if="seedExpanded.has(band.code)" class="cat-seed-classes">
+                  <div v-for="sex in ['male', 'female']" :key="sex" class="cat-seed-col">
+                    <span class="cat-seed-col-title font-mono">{{
+                      sex === 'male' ? 'PUTRA' : 'PUTRI'
+                    }}</span>
+                    <label
+                      v-for="p in presetsOfGroup(band.code).filter((x) => x.gender === sex)"
+                      :key="p.categoryName"
+                      class="cat-seed-class"
+                      :class="{ 'cat-seed-class--done': isApplied(p) }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="isApplied(p) || seedSelected.has(p.categoryName)"
+                        :disabled="isApplied(p)"
+                        @change="toggleSeedClass(p.categoryName)"
+                      />
+                      <span>{{ p.label }}</span>
+                    </label>
+                  </div>
+                </div>
+              </li>
+            </ul>
             <span class="cat-form-help"
-              >Contoh: event pelajar cukup centang Usia Dini 1 s.d. Remaja. Kelas yang sudah ada
-              dilewati otomatis. Golongan tanpa tabel bobot resmi dibuat sebagai "Kelas Bebas" dan
-              dapat disesuaikan.</span
+              >Klik panah untuk memilih kelas satu per satu; default semua kelas tercentang. Kelas
+              yang sudah ada di kejuaraan ditandai abu-abu dan dilewati. Golongan tanpa tabel bobot
+              resmi dibuat sebagai "Kelas Bebas" dan dapat disesuaikan.</span
             >
           </div>
 
@@ -2099,15 +2217,82 @@ function handleCategoryClick(cat: Category) {
   padding: 14px 18px;
   gap: 12px;
 }
-.cat-seed-grid {
+.cat-seed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-card, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cat-seed-item + .cat-seed-item {
+  border-top: 1px solid var(--border-card, #334155);
+}
+.cat-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+}
+.cat-seed-row .cat-seed-check {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cat-seed-count {
+  font-size: 0.68rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.cat-seed-toggle {
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 0.7rem;
+  padding: 4px 6px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.cat-seed-item--done {
+  opacity: 0.5;
+}
+.cat-seed-classes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 14px;
+  gap: 6px 14px;
+  padding: 6px 12px 10px 34px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.02);
 }
 @media (max-width: 520px) {
-  .cat-seed-grid {
+  .cat-seed-classes {
     grid-template-columns: 1fr;
   }
+}
+.cat-seed-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cat-seed-col-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 2px;
+}
+.cat-seed-class {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.cat-seed-class--done {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .cat-modal--compact .cat-seed-check {
   padding: 4px 0;
