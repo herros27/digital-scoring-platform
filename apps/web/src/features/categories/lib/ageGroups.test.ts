@@ -24,10 +24,21 @@ describe('ageOn', () => {
 describe('ageGroupForAge', () => {
   it('IPSI: batas atas inklusif', () => {
     const cases: Array<[number, string]> = [
-      [5, 'pra_usia_dini'], [6, 'usia_dini_1'], [8, 'usia_dini_1'], [9, 'usia_dini_2'],
-      [11, 'usia_dini_2'], [12, 'pra_remaja'], [14, 'pra_remaja'], [15, 'remaja'],
-      [17, 'remaja'], [18, 'dewasa'], [35, 'dewasa'], [36, 'master_a'], [45, 'master_a'],
-      [46, 'master_b'], [80, 'master_b'],
+      [5, 'pra_usia_dini'],
+      [6, 'usia_dini_1'],
+      [8, 'usia_dini_1'],
+      [9, 'usia_dini_2'],
+      [11, 'usia_dini_2'],
+      [12, 'pra_remaja'],
+      [14, 'pra_remaja'],
+      [15, 'remaja'],
+      [17, 'remaja'],
+      [18, 'dewasa'],
+      [35, 'dewasa'],
+      [36, 'master_a'],
+      [45, 'master_a'],
+      [46, 'master_b'],
+      [80, 'master_b'],
     ]
     for (const [age, want] of cases) expect(ageGroupForAge(age, 'ipsi')).toBe(want)
   })
@@ -52,7 +63,9 @@ describe('isEligible', () => {
   })
   it('menolak umur/gender/tanpa tanggal lahir', () => {
     expect(isEligible({ gender: 'male', birth_date: '2000-01-01' }, cat, '2026-06-15')).toBe(false)
-    expect(isEligible({ gender: 'female', birth_date: '2010-03-01' }, cat, '2026-06-15')).toBe(false)
+    expect(isEligible({ gender: 'female', birth_date: '2010-03-01' }, cat, '2026-06-15')).toBe(
+      false,
+    )
     expect(isEligible({ gender: 'male' }, cat, '2026-06-15')).toBe(false)
   })
 })

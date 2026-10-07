@@ -57,7 +57,15 @@ const categories = computed(() => rawCategories.value || [])
 // UI Filter & Search State
 const activeGenderTab = ref<'all' | 'male' | 'female'>('all')
 // Filter golongan umur: "master" menggabungkan Master A & B.
-type AgeTab = 'all' | 'pra_usia_dini' | 'usia_dini_1' | 'usia_dini_2' | 'pra_remaja' | 'remaja' | 'dewasa' | 'master'
+type AgeTab =
+  | 'all'
+  | 'pra_usia_dini'
+  | 'usia_dini_1'
+  | 'usia_dini_2'
+  | 'pra_remaja'
+  | 'remaja'
+  | 'dewasa'
+  | 'master'
 const activeAgeTab = ref<AgeTab>('all')
 const AGE_TABS: { key: AgeTab; label: string }[] = [
   { key: 'all', label: 'Semua' },
@@ -262,7 +270,11 @@ async function handleSeedPresets() {
       )
     }
   } catch (err) {
-    showToast('Gagal Sinkronisasi', getErrorMessage(err, `Gagal memuat standar ${label}.`), 'danger')
+    showToast(
+      'Gagal Sinkronisasi',
+      getErrorMessage(err, `Gagal memuat standar ${label}.`),
+      'danger',
+    )
   }
 }
 
@@ -732,9 +744,8 @@ function handleCategoryClick(cat: Category) {
             <div class="cat-spec-divider" />
             <div class="cat-spec-item">
               <span class="cat-spec-label">GOLONGAN</span>
-              <span class="cat-spec-value">{{
-                ageGroupLabel(cat.age_group ?? 'dewasa', cat.preset_standard).toUpperCase()
-              }}
+              <span class="cat-spec-value"
+                >{{ ageGroupLabel(cat.age_group ?? 'dewasa', cat.preset_standard).toUpperCase() }}
                 {{ isMaleGender(cat.gender) ? 'PUTRA' : 'PUTRI' }}</span
               >
             </div>
@@ -795,7 +806,7 @@ function handleCategoryClick(cat: Category) {
         <div class="cat-modal__body">
           <div class="cat-seed-standards font-mono" role="tablist" aria-label="Standar regulasi">
             <button
-              v-for="std in (['ipsi', 'persilat_2026'] as PresetStandard[])"
+              v-for="std in ['ipsi', 'persilat_2026'] as PresetStandard[]"
               :key="std"
               type="button"
               class="cat-age-tab"

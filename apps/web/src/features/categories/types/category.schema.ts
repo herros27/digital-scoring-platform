@@ -36,7 +36,9 @@ export const createCategorySchema = z
   })
   .refine(
     (v) =>
-      v.min_weight == null || v.max_weight == null || (v.min_weight as number) <= (v.max_weight as number),
+      v.min_weight == null ||
+      v.max_weight == null ||
+      (v.min_weight as number) <= (v.max_weight as number),
     { message: 'Bobot minimal tidak boleh melebihi bobot maksimal', path: ['max_weight'] },
   )
 
@@ -104,7 +106,10 @@ function stepClasses(start: number, step: number, count: number): WeightClassDef
     const hi = lo + step
     return {
       code: LETTERS[i],
-      label: i === 0 ? `Kelas ${LETTERS[i]} (${kg(lo)}–${kg(hi)} Kg)` : `Kelas ${LETTERS[i]} (>${kg(lo)}–${kg(hi)} Kg)`,
+      label:
+        i === 0
+          ? `Kelas ${LETTERS[i]} (${kg(lo)}–${kg(hi)} Kg)`
+          : `Kelas ${LETTERS[i]} (>${kg(lo)}–${kg(hi)} Kg)`,
       min: lo,
       max: hi,
     }
@@ -138,12 +143,32 @@ const WEIGHT_TABLES: Partial<Record<AgeGroupCode, Record<Sex, WeightClassDef[]>>
     usia_dini_2: { male: sd, female: sd },
     pra_remaja: { male: smp, female: smp },
     remaja: {
-      male: [under(39), ...stepClasses(39, 4, 12), open('OPEN1', 87, 100), open('OPEN2', 100, null)],
-      female: [under(39), ...stepClasses(39, 4, 10), open('OPEN1', 79, 92), open('OPEN2', 92, null)],
+      male: [
+        under(39),
+        ...stepClasses(39, 4, 12),
+        open('OPEN1', 87, 100),
+        open('OPEN2', 100, null),
+      ],
+      female: [
+        under(39),
+        ...stepClasses(39, 4, 10),
+        open('OPEN1', 79, 92),
+        open('OPEN2', 92, null),
+      ],
     },
     dewasa: {
-      male: [under(45), ...stepClasses(45, 5, 10), open('OPEN1', 95, 110), open('OPEN2', 110, null)],
-      female: [under(45), ...stepClasses(45, 5, 8), open('OPEN1', 85, 100), open('OPEN2', 100, null)],
+      male: [
+        under(45),
+        ...stepClasses(45, 5, 10),
+        open('OPEN1', 95, 110),
+        open('OPEN2', 110, null),
+      ],
+      female: [
+        under(45),
+        ...stepClasses(45, 5, 8),
+        open('OPEN1', 85, 100),
+        open('OPEN2', 100, null),
+      ],
     },
   }
 })()
@@ -166,7 +191,9 @@ export function buildPresets(
   for (const band of AGE_BANDS[standard]) {
     if (ageGroups && !ageGroups.includes(band.code)) continue
     const bracketMode: BracketMode =
-      standard === 'ipsi' && PEMASALAN_GROUPS.includes(band.code) ? 'pemasalan_4' : 'single_elimination'
+      standard === 'ipsi' && PEMASALAN_GROUPS.includes(band.code)
+        ? 'pemasalan_4'
+        : 'single_elimination'
     const table = standard === 'ipsi' ? WEIGHT_TABLES[band.code] : undefined
     for (const sex of ['male', 'female'] as Sex[]) {
       const classes: WeightClassDef[] = table?.[sex] ?? [
@@ -193,7 +220,10 @@ export function buildPresets(
 export const IPSI_STANDARD_PRESETS: StandardClassPreset[] = buildPresets('ipsi')
 export const PERSILAT_2026_PRESETS: StandardClassPreset[] = buildPresets('persilat_2026')
 
-export function presetsFor(standard: PresetStandard, ageGroups?: AgeGroupCode[]): StandardClassPreset[] {
+export function presetsFor(
+  standard: PresetStandard,
+  ageGroups?: AgeGroupCode[],
+): StandardClassPreset[] {
   return buildPresets(standard, ageGroups)
 }
 

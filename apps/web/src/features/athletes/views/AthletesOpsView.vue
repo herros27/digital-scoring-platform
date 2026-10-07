@@ -817,8 +817,8 @@ function isMaleGender(gender: string): boolean {
               v-else-if="formState.birth_date && eligibleCategories.length === 0"
               class="atl-form-help"
             >
-              Belum ada kategori untuk golongan umur / jenis kelamin ini. Buat atau terapkan
-              standar kategori terlebih dahulu di menu Kategori.
+              Belum ada kategori untuk golongan umur / jenis kelamin ini. Buat atau terapkan standar
+              kategori terlebih dahulu di menu Kategori.
             </span>
           </div>
 

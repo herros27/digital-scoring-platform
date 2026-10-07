@@ -46,7 +46,9 @@ const categoryById = computed(() => {
   return map
 })
 const sortedCategories = computed(() =>
-  [...(rawCategories.value || [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+  [...(rawCategories.value || [])].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  ),
 )
 
 // ---- Meja timbang & checklist berkas (state lokal per peserta) ----

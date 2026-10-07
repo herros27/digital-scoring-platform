@@ -30,12 +30,36 @@ export interface AgeBand {
 
 export const AGE_BANDS: Record<PresetStandard, AgeBand[]> = {
   ipsi: [
-    { code: 'pra_usia_dini', label: 'Pra Usia Dini', hint: '≤ 5 th · TK / Festival', minAge: 0, maxAge: 5 },
-    { code: 'usia_dini_1', label: 'Usia Dini 1', hint: '6–8 th · SD kelas awal', minAge: 6, maxAge: 8 },
-    { code: 'usia_dini_2', label: 'Usia Dini 2', hint: '9–11 th · SD kelas 3–6', minAge: 9, maxAge: 11 },
+    {
+      code: 'pra_usia_dini',
+      label: 'Pra Usia Dini',
+      hint: '≤ 5 th · TK / Festival',
+      minAge: 0,
+      maxAge: 5,
+    },
+    {
+      code: 'usia_dini_1',
+      label: 'Usia Dini 1',
+      hint: '6–8 th · SD kelas awal',
+      minAge: 6,
+      maxAge: 8,
+    },
+    {
+      code: 'usia_dini_2',
+      label: 'Usia Dini 2',
+      hint: '9–11 th · SD kelas 3–6',
+      minAge: 9,
+      maxAge: 11,
+    },
     { code: 'pra_remaja', label: 'Pra-Remaja', hint: '12–14 th · SMP', minAge: 12, maxAge: 14 },
     { code: 'remaja', label: 'Remaja', hint: '15–17 th · SMA', minAge: 15, maxAge: 17 },
-    { code: 'dewasa', label: 'Dewasa', hint: '18–35 th · Umum & Mahasiswa', minAge: 18, maxAge: 35 },
+    {
+      code: 'dewasa',
+      label: 'Dewasa',
+      hint: '18–35 th · Umum & Mahasiswa',
+      minAge: 18,
+      maxAge: 35,
+    },
     { code: 'master_a', label: 'Master A', hint: '36–45 th', minAge: 36, maxAge: 45 },
     { code: 'master_b', label: 'Master B', hint: '> 45 th', minAge: 46, maxAge: null },
   ],
@@ -64,7 +88,10 @@ export function ageGroupLabel(code: string | undefined, standard: PresetStandard
 }
 
 /** Usia tahun penuh pada tanggal acuan (keduanya YYYY-MM-DD / Date). null jika tanggal lahir tidak valid. */
-export function ageOn(birthDate: string | Date, refDate: string | Date = new Date()): number | null {
+export function ageOn(
+  birthDate: string | Date,
+  refDate: string | Date = new Date(),
+): number | null {
   const birth = parseDate(birthDate)
   const ref = parseDate(refDate)
   if (!birth || !ref) return null
@@ -91,9 +118,14 @@ function parseDate(v: string | Date): Date | null {
 }
 
 /** Golongan umur dari usia; null bila di luar semua band standar. */
-export function ageGroupForAge(age: number, standard: PresetStandard = 'ipsi'): AgeGroupCode | null {
+export function ageGroupForAge(
+  age: number,
+  standard: PresetStandard = 'ipsi',
+): AgeGroupCode | null {
   if (age < 0) return null
-  const band = AGE_BANDS[standard].find((b) => age >= b.minAge && (b.maxAge === null || age <= b.maxAge))
+  const band = AGE_BANDS[standard].find(
+    (b) => age >= b.minAge && (b.maxAge === null || age <= b.maxAge),
+  )
   return band?.code ?? null
 }
 
@@ -167,6 +199,9 @@ export function requiredDocs(ageGroup: string | undefined): DocKey[] {
   return DOC_CHECKLIST.map((d) => d.key)
 }
 
-export function missingDocs(ageGroup: string | undefined, docs: Partial<Record<string, boolean>> | undefined): DocKey[] {
+export function missingDocs(
+  ageGroup: string | undefined,
+  docs: Partial<Record<string, boolean>> | undefined,
+): DocKey[] {
   return requiredDocs(ageGroup).filter((k) => !docs?.[k])
 }

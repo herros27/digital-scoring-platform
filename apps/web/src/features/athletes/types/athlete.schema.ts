@@ -37,12 +37,7 @@ export type VerifyParticipantPayload = z.infer<typeof verifyParticipantSchema>
 export type Gender = 'male' | 'female' | 'putra' | 'putri'
 
 export type ParticipantStatus =
-  | 'pending'
-  | 'verified'
-  | 'rejected'
-  | 'registered'
-  | 'overweight'
-  | 'underweight'
+  'pending' | 'verified' | 'rejected' | 'registered' | 'overweight' | 'underweight'
 
 export interface Athlete {
   id: string

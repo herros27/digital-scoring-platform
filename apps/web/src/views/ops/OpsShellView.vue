@@ -18,10 +18,12 @@ import { matchService } from '@/features/matches/api/matchService'
 import type { BracketSlotRecord } from '@/features/tournament/api/bracketService'
 import {
   useBracketTreeQuery,
+  useCategoryBracketTreeQuery,
   useGenerateBracketMutation,
 } from '@/features/tournament/api/bracketQueries'
 import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import { AGE_BANDS, ageGroupLabel } from '@/features/categories/lib/ageGroups'
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useMatchesQuery } from '@/features/matches/api/matchQueries'
@@ -89,71 +91,118 @@ const { data: rawMatches, refetch: refetchMatches } = useMatchesQuery(activeComp
 // Selected category & weight class
 const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
 
-const categoryOptions = computed(() => {
-  const map = new Map<
-    string,
-    { id: string; name: string; weightClass: string; gender: 'male' | 'female' }
-  >()
+interface CategoryOption {
+  /** id kategori resmi; kosong untuk kelas turunan dari peserta lama tanpa kategori */
+  categoryId: string
+  id: string
+  name: string
+  weightClass: string
+  gender: 'male' | 'female'
+  /** Label bagan terkelompok: "[Usia Dini 2 Putra] - Kelas A" */
+  label: string
+  /** Kunci grup <optgroup> */
+  groupLabel: string
+  ageOrder: number
+}
 
-  // 1. Ambil dari master categories database
+const categoryOptions = computed<CategoryOption[]>(() => {
+  const list: CategoryOption[] = []
+  const coveredLegacy = new Set<string>()
+
+  // 1. Setiap kategori resmi punya bagan sendiri (terisolasi per category_id)
   for (const c of rawCategories.value || []) {
     const g: 'male' | 'female' = c.gender === 'female' || c.gender === 'putri' ? 'female' : 'male'
     const wc = (c.weight_class || 'A').toUpperCase()
-    const key = `${g}-${wc}`
-    map.set(key, {
+    const age = ageGroupLabel(c.age_group ?? 'dewasa', c.preset_standard)
+    const groupLabel = `${age} ${g === 'female' ? 'Putri' : 'Putra'}`
+    const order = AGE_BANDS.ipsi.findIndex((x) => x.code === (c.age_group ?? 'dewasa'))
+    list.push({
+      categoryId: c.id,
       id: c.id,
       name: c.name,
       weightClass: wc,
       gender: g,
+      label: `[${groupLabel}] - Kelas ${wc}`,
+      groupLabel,
+      ageOrder: order === -1 ? 99 : order,
     })
+    if (!c.age_group || c.age_group === 'dewasa') coveredLegacy.add(`${g}-${wc}`)
   }
 
-  // 2. Tambahkan kelas yang memiliki peserta terdaftar/terverifikasi jika belum ada di master
+  // 2. Peserta lama tanpa category_id: tetap bisa dibuatkan bagan per kelas bobot + gender
+  const legacySeen = new Set<string>()
   for (const p of rawParticipants.value || []) {
-    if (!p.weight_class) continue
+    if (!p.weight_class || p.category_id) continue
     const g: 'male' | 'female' = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
     const wc = p.weight_class.toUpperCase()
     const key = `${g}-${wc}`
-    if (!map.has(key)) {
-      const genderLabel = g === 'female' ? 'Putri' : 'Putra'
-      map.set(key, {
-        id: `derived-${key}`,
-        name: `Tanding Dewasa ${genderLabel} - Kelas ${wc}`,
-        weightClass: wc,
-        gender: g,
-      })
-    }
+    if (legacySeen.has(key) || coveredLegacy.has(key)) continue
+    legacySeen.add(key)
+    const genderLabel = g === 'female' ? 'Putri' : 'Putra'
+    list.push({
+      categoryId: '',
+      id: `derived-${key}`,
+      name: `Tanding Dewasa ${genderLabel} - Kelas ${wc}`,
+      weightClass: wc,
+      gender: g,
+      label: `[Dewasa ${genderLabel}] - Kelas ${wc}`,
+      groupLabel: `Dewasa ${genderLabel}`,
+      ageOrder: AGE_BANDS.ipsi.findIndex((x) => x.code === 'dewasa'),
+    })
   }
 
-  // Urutkan: Putra dulu, lalu Putri, kemudian abjad kelas A, B, C...
-  return Array.from(map.values()).sort((a, b) => {
+  // Urutkan: golongan umur, Putra dulu lalu Putri, kemudian kelas A, B, C...
+  return list.sort((a, b) => {
+    if (a.ageOrder !== b.ageOrder) return a.ageOrder - b.ageOrder
     if (a.gender !== b.gender) return a.gender === 'male' ? -1 : 1
     return a.weightClass.localeCompare(b.weightClass, undefined, { numeric: true })
   })
 })
 
+// Opsi dikelompokkan per golongan umur + gender untuk <optgroup>
+const categoryOptionGroups = computed(() => {
+  const groups: { label: string; options: CategoryOption[] }[] = []
+  for (const o of categoryOptions.value) {
+    const last = groups[groups.length - 1]
+    if (last && last.label === o.groupLabel) last.options.push(o)
+    else groups.push({ label: o.groupLabel, options: [o] })
+  }
+  return groups
+})
+
 const parsedClass = computed(() => {
   const selected = categoryOptions.value.find((c) => c.name === selectedCategory.value)
   if (selected) {
-    return { gender: selected.gender, weightClass: selected.weightClass }
+    return {
+      gender: selected.gender,
+      weightClass: selected.weightClass,
+      categoryId: selected.categoryId,
+    }
   }
   const catStr = selectedCategory.value || ''
   const isFemale = /putri/i.test(catStr)
   const gender: 'male' | 'female' = isFemale ? 'female' : 'male'
   const match = catStr.match(/Kelas\s+([A-Za-z0-9_-]+)/i)
   const weightClass = match ? match[1].toUpperCase() : 'A'
-  return { gender, weightClass }
+  return { gender, weightClass, categoryId: '' }
 })
 
 const currentWeightClass = computed(() => parsedClass.value.weightClass)
 const currentGender = computed(() => parsedClass.value.gender)
+const currentCategoryId = computed(() => parsedClass.value.categoryId)
 
-// Real Bracket Tree Query
-const { data: rawBracketSlots, refetch: refetchBracket } = useBracketTreeQuery(
+// Real Bracket Tree Query — bagan terisolasi per kategori; fallback per kelas bobot untuk data lama
+const legacyBracket = useBracketTreeQuery(
   activeCompId,
-  currentWeightClass,
+  computed(() => (currentCategoryId.value ? '' : currentWeightClass.value)),
   currentGender,
 )
+const categoryBracket = useCategoryBracketTreeQuery(activeCompId, currentCategoryId)
+const rawBracketSlots = computed(() =>
+  currentCategoryId.value ? categoryBracket.data.value : legacyBracket.data.value,
+)
+const refetchBracket = () =>
+  currentCategoryId.value ? categoryBracket.refetch() : legacyBracket.refetch()
 
 const generateBracketMutation = useGenerateBracketMutation(activeCompId)
 
@@ -631,16 +680,20 @@ function handleGenerateDraw() {
   modal.value = {
     show: true,
     title: 'Acak Ulang Bagan Pertandingan?',
-    message: `Generate susunan bagan turnamen untuk Kelas ${currentWeightClass.value} (${currentGender.value === 'male' ? 'Putra' : 'Putri'}) dari data peserta terverifikasi?`,
+    message: `Generate susunan bagan turnamen untuk ${selectedCategory.value} dari data peserta terverifikasi?`,
     confirmText: 'Ya, Generate Bagan',
     confirmVariant: 'emerald',
     action: async () => {
       try {
-        await generateBracketMutation.mutateAsync({
-          weight_class: currentWeightClass.value,
-          gender: currentGender.value,
-          participant_ids: [],
-        })
+        await generateBracketMutation.mutateAsync(
+          currentCategoryId.value
+            ? { category_id: currentCategoryId.value, participant_ids: [] }
+            : {
+                weight_class: currentWeightClass.value,
+                gender: currentGender.value,
+                participant_ids: [],
+              },
+        )
         await refetchBracket()
         await refetchMatches()
         drawHash.value = `#IPSI-2025-CL-${currentWeightClass.value}-${Math.floor(1000 + Math.random() * 9000)}`
@@ -730,11 +783,7 @@ function handleLoadToMat1() {
 <template>
   <div class="ops-layout">
     <!-- LEFT SIDEBAR -->
-    <div
-      v-if="isMobileSidebarOpen"
-      class="ops-sidebar-backdrop"
-      @click="closeMobileSidebar"
-    />
+    <div v-if="isMobileSidebarOpen" class="ops-sidebar-backdrop" @click="closeMobileSidebar" />
     <aside class="ops-sidebar" :class="{ 'ops-sidebar--open': isMobileSidebarOpen }">
       <div class="ops-sidebar__header">
         <div class="ops-brand">
@@ -772,7 +821,9 @@ function handleLoadToMat1() {
 
       <nav class="ops-nav font-mono">
         <!-- Section: Operasional Turnamen -->
-        <template v-if="canAccessTab('kompetisi') || canAccessTab('gelanggang') || canAccessTab('kategori')">
+        <template
+          v-if="canAccessTab('kompetisi') || canAccessTab('gelanggang') || canAccessTab('kategori')"
+        >
           <div class="ops-nav__section-title">OPERASIONAL TURNAMEN</div>
           <button
             v-if="canAccessTab('kompetisi')"
@@ -1202,7 +1253,9 @@ function handleLoadToMat1() {
         <AthletesOpsView
           v-else-if="activeNav === 'atlet' && canAccessTab('atlet')"
           :competition-id="activeCompId"
-          @navigate-verification="canAccessTab('verifikasi') ? (activeNav = 'verifikasi') : undefined"
+          @navigate-verification="
+            canAccessTab('verifikasi') ? (activeNav = 'verifikasi') : undefined
+          "
         />
 
         <!-- TAB VERIFIKASI PESERTA -->
@@ -1212,16 +1265,25 @@ function handleLoadToMat1() {
         />
 
         <!-- TAB JADWAL TANDING -->
-        <ScheduleOpsView v-else-if="activeNav === 'jadwal' && canAccessTab('jadwal')" :competition-id="activeCompId" />
+        <ScheduleOpsView
+          v-else-if="activeNav === 'jadwal' && canAccessTab('jadwal')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB PERANGKAT & PIN JURI -->
-        <DevicePinManager v-else-if="activeNav === 'pin' && canAccessTab('pin')" :competition-id="activeCompId" />
+        <DevicePinManager
+          v-else-if="activeNav === 'pin' && canAccessTab('pin')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB REGULASI & RULESET -->
         <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')" />
 
         <!-- TAB LAPORAN & EKSPOR -->
-        <ReportsOpsView v-else-if="activeNav === 'laporan' && canAccessTab('laporan')" :competition-id="activeCompId" />
+        <ReportsOpsView
+          v-else-if="activeNav === 'laporan' && canAccessTab('laporan')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
         <template v-else-if="activeNav === 'bagan' && canAccessTab('bagan')">
@@ -1323,9 +1385,11 @@ function handleLoadToMat1() {
               <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
               <div class="filter-select-wrapper">
                 <select v-model="selectedCategory" class="filter-select font-mono">
-                  <option v-for="c in categoryOptions" :key="c.id" :value="c.name">
-                    {{ c.name }}
-                  </option>
+                  <optgroup v-for="g in categoryOptionGroups" :key="g.label" :label="g.label">
+                    <option v-for="c in g.options" :key="c.id" :value="c.name">
+                      {{ c.label }}
+                    </option>
+                  </optgroup>
                 </select>
               </div>
             </div>

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildPresets, createCategorySchema, IPSI_STANDARD_PRESETS, presetToPayload } from './category.schema'
+import {
+  buildPresets,
+  createCategorySchema,
+  IPSI_STANDARD_PRESETS,
+  presetToPayload,
+} from './category.schema'
 
 const find = (age: string, sex: string, code: string) =>
   IPSI_STANDARD_PRESETS.find((p) => p.ageGroup === age && p.gender === sex && p.code === code)
@@ -36,7 +41,9 @@ describe('preset kelas bobot resmi PB IPSI', () => {
   it('bagan pemasalan untuk Pra Usia Dini & Usia Dini 1 saja', () => {
     expect(find('usia_dini_1', 'male', 'A')?.bracketMode).toBe('pemasalan_4')
     expect(find('usia_dini_2', 'male', 'A')?.bracketMode).toBe('single_elimination')
-    expect(IPSI_STANDARD_PRESETS.find((p) => p.ageGroup === 'pra_usia_dini')?.bracketMode).toBe('pemasalan_4')
+    expect(IPSI_STANDARD_PRESETS.find((p) => p.ageGroup === 'pra_usia_dini')?.bracketMode).toBe(
+      'pemasalan_4',
+    )
   })
   it('golongan tanpa tabel resmi mendapat Kelas Bebas tanpa batas bobot', () => {
     const master = IPSI_STANDARD_PRESETS.filter((p) => p.ageGroup === 'master_a')
