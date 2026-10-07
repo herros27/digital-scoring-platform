@@ -1130,7 +1130,7 @@ async function handleSaveCustomPin() {
 /* PIN Cards Grid */
 .pin-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 18px;
 }
 
@@ -1512,6 +1512,105 @@ async function handleSaveCustomPin() {
 }
 .pin-toast--info {
   border-color: #38bdf8;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================================== */
+@media (max-width: 900px) {
+  .pin-mgr-banner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+    gap: 14px;
+  }
+  .pin-mgr-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pin-mgr-actions button,
+  .pin-mgr-actions :deep(button) {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .scoreboard-public-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .scoreboard-open-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .pin-mgr-title-group {
+    gap: 12px;
+  }
+  .pin-mgr-icon-badge {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+  }
+  .pin-mgr-title {
+    font-size: 1.125rem;
+  }
+  .pin-mgr-sub {
+    font-size: 0.6875rem;
+  }
+  .arena-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .arena-tabs-list {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .arena-tab-btn {
+    flex-shrink: 0;
+    padding: 7px 12px;
+    font-size: 0.75rem;
+  }
+  .arena-format-toggle {
+    align-self: flex-start;
+  }
+  .pin-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .pin-device-card {
+    padding: 14px;
+  }
+  .pin-code-num {
+    font-size: 1.45rem;
+  }
+  .pin-card-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pin-modal {
+    padding: 18px 16px;
+    width: 95%;
+  }
+  .pin-print-modal {
+    padding: 16px;
+    width: 95%;
+  }
+  .print-modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .printable-slips-container {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media print {

@@ -97,6 +97,8 @@ const inputClasses = computed(() => [
   border: 1px solid var(--color-neutral-700);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
+  min-height: 42px;
+  box-sizing: border-box;
   transition: all var(--transition-fast);
   color: var(--text-main);
   position: relative;
@@ -134,6 +136,12 @@ const inputClasses = computed(() => [
   font-family: var(--font-mono);
   font-size: 0.875rem;
   letter-spacing: -0.01em;
+}
+
+@media (max-width: 640px) {
+  .app-input__field {
+    font-size: 1rem; /* 16px prevents iOS Safari auto-zoom */
+  }
 }
 
 .app-input__field::placeholder {

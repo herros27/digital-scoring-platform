@@ -32,8 +32,26 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 ]
 const activeTab = ref<TabKey>('kontrol-tanding')
 const isTab = (v: string): v is TabKey => TABS.some((t) => t.key === v)
+const isSidebarOpen = ref(typeof window !== 'undefined' ? window.innerWidth > 1024 : true)
+function toggleSidebar() {
+  isSidebarOpen.value = !isSidebarOpen.value
+}
+function closeSidebar() {
+  isSidebarOpen.value = false
+}
+function selectTab(key: TabKey) {
+  activeTab.value = key
+  if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+    isSidebarOpen.value = false
+  }
+}
 function goto(tab: string) {
-  if (isTab(tab)) activeTab.value = tab
+  if (isTab(tab)) {
+    activeTab.value = tab
+    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+      isSidebarOpen.value = false
+    }
+  }
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -97,6 +115,10 @@ function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') confirmRequest.value = null
     return
   }
+  if (e.key === 'Escape' && isSidebarOpen.value && typeof window !== 'undefined' && window.innerWidth <= 1024) {
+    isSidebarOpen.value = false
+    return
+  }
   if (e.code === 'Space') {
     e.preventDefault()
     if (c.canStart) void c.start()
@@ -118,25 +140,42 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
 <template>
   <div class="ref-app">
-    <aside class="ref-sidebar">
+    <aside class="ref-sidebar" :class="{ 'ref-sidebar--open': isSidebarOpen }">
       <div class="ref-sidebar__brand">
-        <div class="ref-logo-badge">
+        <div class="ref-sidebar__brand-left">
+          <div class="ref-logo-badge">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#DC2626"
+              stroke-width="2.5"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </div>
+          <div>
+            <span class="ref-brand-sub font-mono">PERSILAT ARENA</span>
+            <h2 class="ref-brand-title">MEJA PENGAWAS</h2>
+          </div>
+        </div>
+        <button class="ref-sidebar-close-btn" title="Tutup Menu" @click="closeSidebar">
           <svg
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#DC2626"
-            stroke-width="2.5"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-        </div>
-        <div>
-          <span class="ref-brand-sub font-mono">PERSILAT ARENA</span>
-          <h2 class="ref-brand-title">MEJA PENGAWAS</h2>
-        </div>
+        </button>
       </div>
 
       <div class="ref-arena-status">
@@ -158,7 +197,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
           :key="t.key"
           class="ref-nav__item"
           :class="{ 'ref-nav__item--active': activeTab === t.key }"
-          @click="activeTab = t.key"
+          @click="selectTab(t.key)"
         >
           <span>{{ t.label }}</span>
         </button>
@@ -179,16 +218,48 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
       </div>
     </aside>
 
+    <!-- Backdrop for mobile/tablet drawer -->
+    <transition name="ref-fade">
+      <div
+        v-if="isSidebarOpen"
+        class="ref-sidebar-backdrop"
+        @click="closeSidebar"
+      />
+    </transition>
+
     <div class="ref-main-content">
       <header class="ref-topbar">
         <div class="ref-topbar__left">
-          <span class="ref-top-series font-mono">PERSILAT DIGITAL ARENA &bull; MEJA PENGAWAS</span>
-          <div class="ref-top-headline">
-            <h1 class="ref-top-title">{{ arenaTitle }} - MEJA PERTANDINGAN</h1>
-            <span class="ref-status-badge font-mono">
-              <span class="ref-pulse-dot" />
-              {{ c.isConnected ? 'SISTEM KONTROL AKTIF' : 'KONTROL TERPUTUS' }}
-            </span>
+          <button
+            class="ref-hamburger-btn"
+            :aria-expanded="isSidebarOpen"
+            title="Buka/Tutup Menu Panel Wasit"
+            @click="toggleSidebar"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <div class="ref-topbar__titles">
+            <span class="ref-top-series font-mono">PERSILAT DIGITAL ARENA &bull; MEJA PENGAWAS</span>
+            <div class="ref-top-headline">
+              <h1 class="ref-top-title">{{ arenaTitle }} - MEJA PERTANDINGAN</h1>
+              <span class="ref-status-badge font-mono">
+                <span class="ref-pulse-dot" />
+                {{ c.isConnected ? 'SISTEM KONTROL AKTIF' : 'KONTROL TERPUTUS' }}
+              </span>
+            </div>
           </div>
         </div>
         <div class="ref-topbar__right font-mono">

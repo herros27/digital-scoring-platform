@@ -1327,13 +1327,15 @@ function openBracketOps(c: Competition) {
   background-color: var(--color-amber-400);
 }
 .comp-toolbar__search {
-  min-width: 280px;
+  flex: 1 1 240px;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Grid & Cards */
 .comp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 20px;
 }
 .comp-card {
@@ -1784,5 +1786,118 @@ function openBracketOps(c: Competition) {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================================== */
+@media (max-width: 900px) {
+  .comp-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px 18px;
+    gap: 14px;
+  }
+  .comp-header__actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .comp-header__actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .comp-metrics {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .comp-header__icon-box {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .comp-header__title {
+    font-size: 1.2rem;
+  }
+  .comp-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .metric-card {
+    padding: 12px 14px;
+  }
+  .metric-card__value {
+    font-size: 1.5rem;
+  }
+  .comp-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .comp-toolbar__tabs {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+  .comp-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .comp-card {
+    padding: 16px;
+  }
+  .primary-actions {
+    width: 100%;
+  }
+  .primary-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .lifecycle-actions {
+    width: 100%;
+  }
+  .lc-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 6px 10px;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .comp-modal {
+    width: 95%;
+  }
+  .comp-modal__header {
+    padding: 16px 18px;
+  }
+  .comp-modal__form,
+  .comp-modal__body {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+  .comp-modal__footer {
+    padding: 14px 18px;
+    flex-wrap: wrap;
+  }
+  .comp-modal__footer > * {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 400px) {
+  .comp-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

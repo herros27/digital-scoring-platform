@@ -20,6 +20,7 @@ import {
   useBracketTreeQuery,
   useGenerateBracketMutation,
 } from '@/features/tournament/api/bracketQueries'
+import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
@@ -211,11 +212,21 @@ const resolveDefaultNav = (): NavKey => {
 }
 
 const activeNav = ref<NavKey>(resolveDefaultNav())
+const isMobileSidebarOpen = ref(false)
+
+function toggleMobileSidebar() {
+  isMobileSidebarOpen.value = !isMobileSidebarOpen.value
+}
+
+function closeMobileSidebar() {
+  isMobileSidebarOpen.value = false
+}
 
 function setNav(tab: typeof activeNav.value) {
   if (!canAccessTab(tab)) return
   activeNav.value = tab
   router.replace({ query: { ...route.query, tab } })
+  closeMobileSidebar()
 }
 
 watch(
@@ -584,8 +595,15 @@ const bracketRounds = computed<BracketRoundDisplay[]>(() => {
   return list
 })
 
-// Current queued match for bottom dock
+// Current selected or queued match for bottom dock
+const selectedBracketMatch = ref<MatchCard | null>(null)
+
+function handleSelectBracketMatch(match: MatchCard) {
+  selectedBracketMatch.value = match
+}
+
 const queuedMatch = computed(() => {
+  if (selectedBracketMatch.value) return selectedBracketMatch.value
   for (const round of bracketRounds.value) {
     const readyMatch = round.matches.find(
       (m) =>
@@ -712,7 +730,12 @@ function handleLoadToMat1() {
 <template>
   <div class="ops-layout">
     <!-- LEFT SIDEBAR -->
-    <aside class="ops-sidebar">
+    <div
+      v-if="isMobileSidebarOpen"
+      class="ops-sidebar-backdrop"
+      @click="closeMobileSidebar"
+    />
+    <aside class="ops-sidebar" :class="{ 'ops-sidebar--open': isMobileSidebarOpen }">
       <div class="ops-sidebar__header">
         <div class="ops-brand">
           <div class="ops-brand__logo font-mono">PS</div>
@@ -720,6 +743,24 @@ function handleLoadToMat1() {
             <div class="ops-brand__title font-mono">SILAT CORE</div>
             <div class="ops-brand__sub font-mono">TOURNAMENT OPS V2.4</div>
           </div>
+          <button
+            type="button"
+            class="ops-sidebar-close"
+            aria-label="Tutup Navigasi"
+            @click="closeMobileSidebar"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         <div class="ops-telemetry font-mono">
@@ -994,6 +1035,28 @@ function handleLoadToMat1() {
     <main class="ops-main">
       <!-- TOP STATUS BAR -->
       <header class="ops-topbar">
+        <button
+          type="button"
+          class="ops-hamburger-btn"
+          aria-label="Buka Navigasi Operasional"
+          @click="toggleMobileSidebar"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
         <div class="ops-topbar__titles">
           <div class="ops-topbar__sub font-mono">{{ currentNavMeta.sub }}</div>
           <h1 class="ops-topbar__heading">{{ currentNavMeta.title }}</h1>
@@ -1368,66 +1431,15 @@ function handleLoadToMat1() {
             </div>
           </section>
 
-          <!-- TOURNAMENT BRACKET TREE COLUMNS (DYNAMIC BERDASARKAN HASIL UNDIAN KELAS) -->
-          <section v-if="bracketRounds.length > 0" class="bracket-tree-container">
-            <div v-for="round in bracketRounds" :key="round.roundNumber" class="bracket-column">
-              <div class="bracket-column__header font-mono">
-                <div class="col-title">
-                  <span class="col-dot" :class="round.badgeVariant" />
-                  <span>{{ round.title }}</span>
-                </div>
-                <AppBadge :variant="round.badgeVariant" size="sm">
-                  {{ round.matches.length }} PARTAI
-                </AppBadge>
-              </div>
-
-              <div
-                class="bracket-matches-list"
-                :class="`bracket-matches-list--round-${round.roundNumber}`"
-              >
-                <div
-                  v-for="m in round.matches"
-                  :key="m.id"
-                  class="bracket-match-card"
-                  :class="{ 'bracket-match-card--live': m.isLive }"
-                >
-                  <div class="match-card__header font-mono">
-                    <span class="match-partai">
-                      <span v-if="m.isLive" class="live-dot-pulse" />
-                      PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}
-                    </span>
-                    <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">
-                      {{ m.statusBadge }}
-                    </span>
-                  </div>
-
-                  <div
-                    class="match-card__athlete match-card__athlete--red"
-                    :class="{ 'athlete--winner': m.red.isWinner }"
-                  >
-                    <div class="athlete-name-group">
-                      <span class="corner-dot red" />
-                      <span class="athlete-name">{{ m.red.name }}</span>
-                      <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
-                    </div>
-                    <span class="athlete-score font-mono">{{ m.red.score }}</span>
-                  </div>
-
-                  <div
-                    class="match-card__athlete match-card__athlete--blue"
-                    :class="{ 'athlete--winner': m.blue.isWinner }"
-                  >
-                    <div class="athlete-name-group">
-                      <span class="corner-dot blue" />
-                      <span class="athlete-name">{{ m.blue.name }}</span>
-                      <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
-                    </div>
-                    <span class="athlete-score font-mono">{{ m.blue.score }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <!-- TOURNAMENT BRACKET TREE (PENCAK SILAT EDITION VUE-TOURNAMENT-BRACKET) -->
+          <TournamentTreeBracket
+            v-if="bracketRounds.length > 0"
+            :rounds="bracketRounds"
+            :selected-match-id="selectedBracketMatch?.id || queuedMatch?.id"
+            :category-name="selectedCategory"
+            @select-match="handleSelectBracketMatch"
+            @generate-draw="handleGenerateDraw"
+          />
 
           <!-- EMPTY STATE JIKA BAGAN KATEGORI BELUM DI-GENERATE -->
           <div v-else class="bracket-empty-state font-mono">
@@ -1668,12 +1680,14 @@ function handleLoadToMat1() {
 /* Main Container Layout */
 .ops-layout {
   display: flex;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   background-color: #080d1a;
   color: #e2e8f0;
   overflow: hidden;
   font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
@@ -1869,6 +1883,53 @@ function handleLoadToMat1() {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ops-hamburger-btn {
+  display: none;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 38px;
+  touch-action: manipulation;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.ops-hamburger-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.ops-sidebar-close {
+  display: none;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  touch-action: manipulation;
+}
+.ops-sidebar-close:hover {
+  color: #ffffff;
+}
+
+.ops-sidebar-backdrop {
+  display: none;
 }
 
 /* Top Status Bar */
@@ -2012,7 +2073,7 @@ function handleLoadToMat1() {
 
 /* ==========================================================================
    SCROLLABLE CONTENT AREA
-   ========================================================================== */
+   ========================================================================= */
 .ops-content-scroll {
   flex: 1;
   overflow-y: auto;
@@ -2021,6 +2082,9 @@ function handleLoadToMat1() {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ops-content-scroll--pin {
@@ -2307,276 +2371,6 @@ function handleLoadToMat1() {
   max-width: 440px;
 }
 
-.bracket-column__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.col-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #cbd5e1;
-}
-
-.col-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.col-dot.neutral {
-  background-color: #64748b;
-}
-.col-dot.blue {
-  background-color: #38bdf8;
-  box-shadow: 0 0 6px #38bdf8;
-}
-.col-dot.red {
-  background-color: #ef4444;
-  box-shadow: 0 0 6px #ef4444;
-}
-
-.bracket-matches-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.bracket-matches-list--qf {
-  gap: 32px;
-  justify-content: space-around;
-  padding-top: 10px;
-}
-
-.bracket-matches-list--sf {
-  gap: 60px;
-  justify-content: space-around;
-  padding-top: 30px;
-}
-
-/* Match Card */
-.bracket-match-card {
-  background-color: #0e1626;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.bracket-match-card--live {
-  border-color: rgba(16, 185, 129, 0.6);
-  background-color: #0b1924;
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
-}
-
-.bracket-match-card--highlighted {
-  border-color: rgba(56, 189, 248, 0.4);
-  background-color: #0d192e;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.12);
-  padding: 14px 16px;
-}
-
-.match-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #94a3b8;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  padding-bottom: 6px;
-}
-
-.match-partai {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.live-dot-pulse {
-  width: 7px;
-  height: 7px;
-  background-color: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 6px #10b981;
-  animation: pulse-ring 1.5s infinite;
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-}
-
-.match-status-badge {
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.match-status-badge.neutral {
-  background-color: rgba(100, 116, 139, 0.2);
-  color: #94a3b8;
-}
-
-.match-status-badge.emerald {
-  background-color: rgba(16, 185, 129, 0.2);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-/* Athlete Row */
-.match-card__athlete {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: background 0.15s ease;
-}
-
-.match-card__athlete--red {
-  background-color: rgba(220, 38, 38, 0.06);
-}
-
-.match-card__athlete--blue {
-  background-color: rgba(37, 99, 235, 0.06);
-}
-
-.match-card__athlete--detailed {
-  padding: 8px 10px;
-}
-
-.athlete-name-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.corner-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-
-.corner-dot.red {
-  background-color: #dc2626;
-  box-shadow: 0 0 6px rgba(220, 38, 38, 0.5);
-}
-.corner-dot.blue {
-  background-color: #2563eb;
-  box-shadow: 0 0 6px rgba(37, 99, 235, 0.5);
-}
-
-.athlete-name {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #e2e8f0;
-}
-
-.athlete-contingent {
-  font-size: 0.6875rem;
-  color: #64748b;
-}
-
-.athlete-score {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: #cbd5e1;
-}
-
-.athlete--winner .athlete-name {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.athlete--winner .athlete-score {
-  color: #10b981;
-  font-weight: 800;
-}
-
-.corner-tag {
-  font-size: 0.6875rem;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.corner-tag.red {
-  background-color: rgba(220, 38, 38, 0.2);
-  color: #ef4444;
-  border: 1px solid rgba(220, 38, 38, 0.3);
-}
-
-.corner-tag.blue {
-  background-color: rgba(37, 99, 235, 0.2);
-  color: #38bdf8;
-  border: 1px solid rgba(37, 99, 235, 0.3);
-}
-
-.match-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #64748b;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  padding-top: 6px;
-}
-
-.match-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
-  margin-top: 4px;
-}
-
-.match-time-hint {
-  font-size: 0.75rem;
-  color: #94a3b8;
-}
-
-.load-arena-btn {
-  background-color: #10b981;
-  color: #064e3b;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: all 0.15s ease;
-}
-
-.load-arena-btn:hover {
-  background-color: #34d399;
-  transform: translateY(-1px);
-}
-
 /* ==========================================================================
    BOTTOM STICKY DOCK / COMMAND BAR
    ========================================================================== */
@@ -2784,6 +2578,205 @@ function handleLoadToMat1() {
   transform: scale(0.95);
 }
 
+/* ==========================================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .ops-hamburger-btn {
+    display: inline-flex;
+  }
+  .ops-sidebar-close {
+    display: inline-flex;
+  }
+  .ops-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(3px);
+    z-index: 45;
+  }
+  .ops-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: none;
+  }
+  .ops-sidebar--open {
+    transform: translateX(0);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+  }
+  .ops-topbar {
+    padding: 10px 16px;
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .ops-topbar__titles {
+    flex: 1 1 auto;
+    min-width: 160px;
+  }
+  .ops-topbar__comp-select {
+    max-width: 100%;
+  }
+  .comp-dropdown {
+    max-width: 180px;
+  }
+  .ops-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ops-filter-grid .filter-card:first-child {
+    grid-column: span 2;
+  }
+  .ops-metrics-bar {
+    grid-template-columns: repeat(2, 1fr) 1.5fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .ops-topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .ops-topbar__heading {
+    font-size: 0.9375rem;
+  }
+  .ops-topbar__sub {
+    font-size: 0.625rem;
+  }
+  .comp-label,
+  .arena-label {
+    display: none;
+  }
+  .comp-dropdown {
+    max-width: 140px;
+    font-size: 0.75rem;
+  }
+  .ops-topbar__system-pills .system-pill {
+    display: none;
+  }
+  .ops-banner-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .ops-banner-title-group {
+    gap: 12px;
+  }
+  .ops-banner-main-title {
+    font-size: 1.125rem;
+  }
+  .ops-banner-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ops-banner-actions button,
+  .ops-banner-actions :deep(button) {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .ops-filter-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ops-filter-grid .filter-card:first-child {
+    grid-column: span 1;
+  }
+  .ops-metrics-bar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .metric-block--progress {
+    grid-column: span 2;
+  }
+  .metric-val {
+    font-size: 1.1rem;
+  }
+  .ops-content-scroll {
+    padding: 14px 12px 180px 12px;
+    gap: 12px;
+  }
+  .ops-content-scroll--pin {
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+  }
+  .ops-dock {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    gap: 10px;
+  }
+  .ops-dock__match-info {
+    gap: 10px;
+  }
+  .ops-dock__athlete-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+  .ops-dock__match-title {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+  .ops-dock__actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+  .ops-dock__actions > button,
+  .ops-dock__actions > :deep(button) {
+    flex: 1 1 50%;
+    justify-content: center;
+  }
+  .ops-dock__legal {
+    justify-content: space-between;
+    text-align: left;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 8px;
+  }
+  .legal-shield {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ops-topbar__titles {
+    min-width: 120px;
+  }
+  .ops-topbar__comp-select {
+    padding: 4px 8px;
+  }
+  .comp-dropdown {
+    max-width: 120px;
+  }
+  .ops-metrics-bar {
+    grid-template-columns: 1fr;
+  }
+  .metric-block--progress {
+    grid-column: span 1;
+  }
+  .ops-dock__actions {
+    flex-direction: column;
+  }
+  .ops-dock__actions > button,
+  .ops-dock__actions > :deep(button) {
+    width: 100%;
+  }
+}
+
 /* Print Styles */
 @media print {
   .ops-sidebar,
@@ -2805,7 +2798,7 @@ function handleLoadToMat1() {
     padding: 0 !important;
     overflow: visible !important;
   }
-  .bracket-match-card {
+  :deep(.t-match-card) {
     background: #ffffff !important;
     border: 1px solid #000000 !important;
     color: #000000 !important;
