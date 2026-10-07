@@ -24,6 +24,12 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Gender      string  `json:"gender" validate:"required,oneof=male female putra putri"`
 		WeightClass string  `json:"weight_class" validate:"required"`
 		RulesetID   *string `json:"ruleset_id,omitempty"`
+
+		AgeGroup       string   `json:"age_group"`
+		PresetStandard string   `json:"preset_standard"`
+		MinWeight      *float64 `json:"min_weight"`
+		MaxWeight      *float64 `json:"max_weight"`
+		BracketMode    string   `json:"bracket_mode"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -31,11 +37,16 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := domain.Category{
-		CompetitionID: compID,
-		Name:          req.Name,
-		Gender:        req.Gender,
-		WeightClass:   req.WeightClass,
-		RulesetID:     req.RulesetID,
+		CompetitionID:  compID,
+		Name:           req.Name,
+		Gender:         req.Gender,
+		WeightClass:    req.WeightClass,
+		RulesetID:      req.RulesetID,
+		AgeGroup:       req.AgeGroup,
+		PresetStandard: req.PresetStandard,
+		MinWeight:      req.MinWeight,
+		MaxWeight:      req.MaxWeight,
+		BracketMode:    req.BracketMode,
 	}
 	if err := h.Service.CreateCategory(&c); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)

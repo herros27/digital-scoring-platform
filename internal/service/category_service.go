@@ -31,6 +31,9 @@ func (s *CategoryService) CreateCategory(c *domain.Category) error {
 	if c.Gender == "" {
 		return errors.New("gender is required")
 	}
+	if err := normalizeCategory(c); err != nil {
+		return err
+	}
 	c.CreatedAt = time.Now()
 	return s.repo.Create(c)
 }
@@ -54,4 +57,43 @@ func (s *CategoryService) ListCategories(competitionID string) ([]domain.Categor
 		return nil, domain.ErrInvalidInput
 	}
 	return s.repo.ListByCompetition(competitionID)
+}
+
+// normalizeCategory mengisi default (IPSI, dewasa, single elimination) dan memvalidasi metadata kategori.
+func normalizeCategory(c *domain.Category) error {
+	if c.PresetStandard == "" {
+		c.PresetStandard = domain.PresetIPSI
+	}
+	if c.PresetStandard != domain.PresetIPSI && c.PresetStandard != domain.PresetPersilat26 {
+		return errors.New("preset_standard must be 'ipsi' or 'persilat_2026'")
+	}
+	if c.AgeGroup == "" {
+		c.AgeGroup = domain.AgeDewasa
+	}
+	valid := false
+	for _, b := range domain.AgeBands(c.PresetStandard) {
+		if b.Code == c.AgeGroup {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return errors.New("age_group '" + c.AgeGroup + "' is not valid for preset " + c.PresetStandard)
+	}
+	if c.BracketMode == "" {
+		c.BracketMode = domain.BracketSingleElim
+	}
+	if c.BracketMode != domain.BracketSingleElim && c.BracketMode != domain.BracketPemasalan4 {
+		return errors.New("bracket_mode must be 'single_elimination' or 'pemasalan_4'")
+	}
+	if c.MinWeight != nil && *c.MinWeight < 0 {
+		return errors.New("min_weight cannot be negative")
+	}
+	if c.MaxWeight != nil && *c.MaxWeight <= 0 {
+		return errors.New("max_weight must be positive")
+	}
+	if c.MinWeight != nil && c.MaxWeight != nil && *c.MinWeight > *c.MaxWeight {
+		return errors.New("min_weight cannot exceed max_weight")
+	}
+	return nil
 }

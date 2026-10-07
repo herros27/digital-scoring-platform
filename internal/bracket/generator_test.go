@@ -149,3 +149,66 @@ func filterSlotsByRound(slots []store.BracketSlot, round int) []store.BracketSlo
 	}
 	return res
 }
+
+func TestSplitPemasalanGroups(t *testing.T) {
+	ids := func(n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = string(rune('a' + i))
+		}
+		return out
+	}
+	cases := map[int][]int{2: {2}, 3: {3}, 4: {4}, 5: {3, 2}, 7: {4, 3}, 9: {3, 3, 3}}
+	for n, want := range cases {
+		groups := SplitPemasalanGroups(ids(n))
+		if len(groups) != len(want) {
+			t.Fatalf("n=%d groups=%d want %d", n, len(groups), len(want))
+		}
+		for i, g := range groups {
+			if len(g) != want[i] {
+				t.Errorf("n=%d group %d size %d want %d", n, i, len(g), want[i])
+			}
+		}
+	}
+	if SplitPemasalanGroups(ids(1)) != nil {
+		t.Error("single participant must yield no groups")
+	}
+}
+
+func TestGenerateMiniSlots_IsolatedGroups(t *testing.T) {
+	ids := []string{"a", "b", "c", "d", "e", "f", "g"} // 4 + 3
+	slots := GenerateMiniSlots("comp", "A", "male", ids)
+	AssignCategory(slots, "cat-1")
+
+	seen := map[[2]int]bool{}
+	parts := 0
+	for _, s := range slots {
+		key := [2]int{s.Round, s.SlotIndex}
+		if seen[key] {
+			t.Fatalf("duplicate slot round=%d index=%d", s.Round, s.SlotIndex)
+		}
+		seen[key] = true
+		if s.CategoryID == nil || *s.CategoryID != "cat-1" {
+			t.Fatal("slot missing category")
+		}
+		if s.Round == 1 && s.ParticipantID != nil {
+			parts++
+		}
+	}
+	if parts != 7 {
+		t.Errorf("round-1 participants=%d want 7", parts)
+	}
+	// Setiap slot ronde 1 harus menunjuk parent dalam grup yang sama (index/2 dalam grup).
+	byID := map[string]store.BracketSlot{}
+	for _, s := range slots {
+		byID[s.ID] = s
+	}
+	for _, s := range slots {
+		if s.Round == 1 && s.NextSlotID != nil {
+			parent := byID[*s.NextSlotID]
+			if s.SlotIndex/4 != parent.SlotIndex/2 {
+				t.Errorf("slot %d leaks into group of parent %d", s.SlotIndex, parent.SlotIndex)
+			}
+		}
+	}
+}

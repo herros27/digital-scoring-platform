@@ -115,3 +115,60 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 func slotKey(round, index int) string {
 	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(string(rune(round*1000+index)))).String()
 }
+
+// pemasalanGroupSize adalah ukuran maksimum satu mini-bracket pemasalan (2 semifinalis + 2 finalis).
+const pemasalanGroupSize = 4
+
+// SplitPemasalanGroups membagi peserta ke mini-bracket (maks 4 per grup) seimbang,
+// sehingga tidak ada grup berisi 1 peserta (mis. 5 peserta -> 3 + 2, bukan 4 + 1).
+func SplitPemasalanGroups(participantIDs []string) [][]string {
+	n := len(participantIDs)
+	if n < 2 {
+		return nil
+	}
+	groups := (n + pemasalanGroupSize - 1) / pemasalanGroupSize
+	base, extra := n/groups, n%groups
+	out := make([][]string, 0, groups)
+	pos := 0
+	for g := 0; g < groups; g++ {
+		size := base
+		if g < extra {
+			size++
+		}
+		out = append(out, participantIDs[pos:pos+size])
+		pos += size
+	}
+	return out
+}
+
+// GenerateMiniSlots menyusun bagan pemasalan: setiap grup (maks 4 peserta) adalah mini-bracket
+// semifinal + final yang berdiri sendiri. Slot_index tiap grup digeser agar tidak bertabrakan:
+// ronde 1 menempati 4*g..4*g+3 dan ronde 2 menempati 2*g..2*g+1, sehingga pasangan (index^1)
+// selalu berada dalam grup yang sama.
+func GenerateMiniSlots(competitionID, weightClass, gender string, participantIDs []string) []store.BracketSlot {
+	var all []store.BracketSlot
+	for g, group := range SplitPemasalanGroups(participantIDs) {
+		slots := GenerateSlots(competitionID, weightClass, gender, group)
+		for i := range slots {
+			switch slots[i].Round {
+			case 1:
+				slots[i].SlotIndex += pemasalanGroupSize * g
+			default:
+				slots[i].SlotIndex += 2 * g
+			}
+		}
+		all = append(all, slots...)
+	}
+	return all
+}
+
+// AssignCategory menandai seluruh slot sebagai milik kategori tertentu.
+func AssignCategory(slots []store.BracketSlot, categoryID string) {
+	if categoryID == "" {
+		return
+	}
+	for i := range slots {
+		id := categoryID
+		slots[i].CategoryID = &id
+	}
+}

@@ -22,16 +22,23 @@ type Arena struct {
 }
 
 type Participant struct {
-	ID                 string    `json:"id"`
-	CompetitionID      string    `json:"competition_id"`
-	AthleteID          string    `json:"athlete_id,omitempty"`
-	ContingentID       string    `json:"contingent_id,omitempty"`
-	Name               string    `json:"name,omitempty"`
-	Club               string    `json:"club,omitempty"`
-	WeightClass        string    `json:"weight_class"`
-	Gender             string    `json:"gender"`
-	RegistrationStatus string    `json:"registration_status"`
-	CreatedAt          time.Time `json:"created_at"`
+	ID                 string          `json:"id"`
+	CompetitionID      string          `json:"competition_id"`
+	AthleteID          string          `json:"athlete_id,omitempty"`
+	ContingentID       string          `json:"contingent_id,omitempty"`
+	Name               string          `json:"name,omitempty"`
+	Club               string          `json:"club,omitempty"`
+	WeightClass        string          `json:"weight_class"`
+	Gender             string          `json:"gender"`
+	RegistrationStatus string          `json:"registration_status"`
+	CategoryID         string          `json:"category_id,omitempty"`
+	CategoryName       string          `json:"category_name,omitempty"`
+	AgeGroup           string          `json:"age_group,omitempty"`
+	BirthDate          string          `json:"birth_date,omitempty"`
+	NIK                string          `json:"nik,omitempty"`
+	ActualWeight       *float64        `json:"actual_weight,omitempty"`
+	DocsVerified       map[string]bool `json:"docs_verified,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
 }
 
 type Match struct {
@@ -99,6 +106,7 @@ type BracketSlot struct {
 	Gender        string  `json:"gender"`
 	Round         int     `json:"round"`
 	SlotIndex     int     `json:"slot_index"`
+	CategoryID    *string `json:"category_id,omitempty"`
 	ParticipantID *string `json:"participant_id"`
 	IsBye         bool    `json:"is_bye"`
 	WinnerID      *string `json:"winner_id"`
@@ -122,6 +130,8 @@ type Athlete struct {
 	Name         string    `json:"name" validate:"required,min=2,max=100"`
 	Gender       string    `json:"gender" validate:"required,oneof=male female putra putri"`
 	Team         string    `json:"team" validate:"required,min=1,max=100"`
+	BirthDate    string    `json:"birth_date,omitempty"` // YYYY-MM-DD
+	NIK          string    `json:"nik,omitempty" validate:"omitempty,max=50"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -135,13 +145,18 @@ type Contingent struct {
 }
 
 type Category struct {
-	ID            string    `json:"id"`
-	CompetitionID string    `json:"competition_id"`
-	Name          string    `json:"name"`
-	Gender        string    `json:"gender"`
-	WeightClass   string    `json:"weight_class"`
-	RulesetID     *string   `json:"ruleset_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	CompetitionID  string    `json:"competition_id"`
+	Name           string    `json:"name"`
+	Gender         string    `json:"gender"`
+	WeightClass    string    `json:"weight_class"`
+	RulesetID      *string   `json:"ruleset_id,omitempty"`
+	AgeGroup       string    `json:"age_group"`
+	PresetStandard string    `json:"preset_standard"`
+	MinWeight      *float64  `json:"min_weight,omitempty"`
+	MaxWeight      *float64  `json:"max_weight,omitempty"`
+	BracketMode    string    `json:"bracket_mode"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Ruleset struct {

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 )
 
 // ---------- Athlete ----------
@@ -10,20 +11,27 @@ type AthleteStore struct {
 	DB *sql.DB
 }
 
+// athleteColumns membaca birth_date sebagai teks YYYY-MM-DD (” untuk data lama tanpa tanggal lahir).
+const athleteColumns = `id, name, gender, team, COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''), COALESCE(nik, ''), created_at`
+
+func scanAthlete(row rowScanner, a *Athlete) error {
+	return row.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.BirthDate, &a.NIK, &a.CreatedAt)
+}
+
 func (s *AthleteStore) Create(a *Athlete) error {
 	if a.ContingentID != "" {
-		query := `INSERT INTO athletes (name, gender, team, contingent_id) VALUES ($1, $2, $3, $4) RETURNING id, created_at`
-		return s.DB.QueryRow(query, a.Name, a.Gender, a.Team, a.ContingentID).Scan(&a.ID, &a.CreatedAt)
+		query := `INSERT INTO athletes (name, gender, team, contingent_id, birth_date, nik)
+			VALUES ($1, $2, $3, $4, NULLIF($5, '')::date, NULLIF($6, '')) RETURNING id, created_at`
+		return s.DB.QueryRow(query, a.Name, a.Gender, a.Team, a.ContingentID, a.BirthDate, a.NIK).Scan(&a.ID, &a.CreatedAt)
 	}
-	query := `INSERT INTO athletes (name, gender, team) VALUES ($1, $2, $3) RETURNING id, created_at`
-	return s.DB.QueryRow(query, a.Name, a.Gender, a.Team).Scan(&a.ID, &a.CreatedAt)
+	query := `INSERT INTO athletes (name, gender, team, birth_date, nik)
+		VALUES ($1, $2, $3, NULLIF($4, '')::date, NULLIF($5, '')) RETURNING id, created_at`
+	return s.DB.QueryRow(query, a.Name, a.Gender, a.Team, a.BirthDate, a.NIK).Scan(&a.ID, &a.CreatedAt)
 }
 
 func (s *AthleteStore) GetByID(id string) (*Athlete, error) {
 	a := &Athlete{}
-	err := s.DB.QueryRow(`SELECT id, name, gender, team, created_at FROM athletes WHERE id = $1`, id).Scan(
-		&a.ID, &a.Name, &a.Gender, &a.Team, &a.CreatedAt,
-	)
+	err := scanAthlete(s.DB.QueryRow(`SELECT `+athleteColumns+` FROM athletes WHERE id = $1`, id), a)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +39,7 @@ func (s *AthleteStore) GetByID(id string) (*Athlete, error) {
 }
 
 func (s *AthleteStore) List() ([]Athlete, error) {
-	rows, err := s.DB.Query(`SELECT id, name, gender, team, created_at FROM athletes ORDER BY name`)
+	rows, err := s.DB.Query(`SELECT ` + athleteColumns + ` FROM athletes ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +47,9 @@ func (s *AthleteStore) List() ([]Athlete, error) {
 	var list []Athlete
 	for rows.Next() {
 		var a Athlete
-		rows.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.CreatedAt)
+		if err := scanAthlete(rows, &a); err != nil {
+			return nil, err
+		}
 		list = append(list, a)
 	}
 	return list, rows.Err()
@@ -53,7 +63,7 @@ func (s *AthleteStore) ListPaged(gender string, limit, offset int) ([]Athlete, i
 	}
 
 	query := `
-		SELECT id, name, gender, team, created_at 
+		SELECT ` + athleteColumns + `
 		FROM athletes 
 		WHERE ($1 = '' OR gender = $1) 
 		ORDER BY name ASC 
@@ -67,7 +77,7 @@ func (s *AthleteStore) ListPaged(gender string, limit, offset int) ([]Athlete, i
 	var list []Athlete
 	for rows.Next() {
 		var a Athlete
-		if err := rows.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.CreatedAt); err != nil {
+		if err := scanAthlete(rows, &a); err != nil {
 			return nil, 0, err
 		}
 		list = append(list, a)
@@ -80,6 +90,18 @@ func (s *AthleteStore) ListPaged(gender string, limit, offset int) ([]Athlete, i
 
 func (s *AthleteStore) RegisterToCompetition(competitionID, athleteID, weightClass, gender string) error {
 	return s.RegisterParticipant(competitionID, athleteID, "", weightClass, gender, "registered")
+}
+
+// RegisterParticipantInCategory mendaftarkan atlet ke kategori spesifik (category_id).
+func (s *AthleteStore) RegisterParticipantInCategory(competitionID, athleteID, contingentID, categoryID, weightClass, gender, status string) error {
+	if status == "" {
+		status = "pending"
+	}
+	_, err := s.DB.Exec(`
+		INSERT INTO participants (competition_id, athlete_id, contingent_id, category_id, weight_class, gender, registration_status)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7)`,
+		competitionID, athleteID, contingentID, categoryID, weightClass, gender, status)
+	return err
 }
 
 func (s *AthleteStore) RegisterParticipant(competitionID, athleteID, contingentID, weightClass, gender, status string) error {
@@ -112,27 +134,55 @@ func (s *AthleteStore) UpdateParticipantStatus(participantID, status string) err
 	return nil
 }
 
-func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Participant, error) {
-	baseQuery := `
+const participantSelect = `
 		SELECT p.id, p.competition_id, 
 		       COALESCE(p.athlete_id::text, ''), 
 		       COALESCE(p.contingent_id::text, a.contingent_id::text, ''), 
 		       COALESCE(a.name, p.name, ''), 
 		       COALESCE(NULLIF(a.team, ''), c.name, ''), 
-		       p.weight_class, 
+		       COALESCE(p.weight_class, ''), 
 		       p.gender, 
 		       COALESCE(p.registration_status, 'registered'), 
+		       COALESCE(p.category_id::text, ''),
+		       COALESCE(cat.name, ''),
+		       COALESCE(cat.age_group, ''),
+		       COALESCE(to_char(a.birth_date, 'YYYY-MM-DD'), ''),
+		       COALESCE(a.nik, ''),
+		       p.actual_weight,
+		       COALESCE(p.docs_verified, '{}'::jsonb),
 		       p.created_at
 		FROM participants p
 		LEFT JOIN athletes a ON p.athlete_id = a.id
 		LEFT JOIN contingents c ON COALESCE(p.contingent_id, a.contingent_id) = c.id
-		WHERE p.competition_id = $1`
+		LEFT JOIN categories cat ON p.category_id = cat.id`
+
+func scanParticipant(row rowScanner, part *Participant) error {
+	var weight sql.NullFloat64
+	var docs []byte
+	if err := row.Scan(&part.ID, &part.CompetitionID, &part.AthleteID, &part.ContingentID,
+		&part.Name, &part.Club, &part.WeightClass, &part.Gender, &part.RegistrationStatus,
+		&part.CategoryID, &part.CategoryName, &part.AgeGroup, &part.BirthDate, &part.NIK,
+		&weight, &docs, &part.CreatedAt); err != nil {
+		return err
+	}
+	if weight.Valid {
+		w := weight.Float64
+		part.ActualWeight = &w
+	}
+	part.DocsVerified = map[string]bool{}
+	if len(docs) > 0 {
+		_ = json.Unmarshal(docs, &part.DocsVerified)
+	}
+	return nil
+}
+
+func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Participant, error) {
 	var rows *sql.Rows
 	var err error
 	if status != "" {
-		rows, err = s.DB.Query(baseQuery+` AND p.registration_status = $2 ORDER BY p.created_at DESC`, competitionID, status)
+		rows, err = s.DB.Query(participantSelect+` WHERE p.competition_id = $1 AND p.registration_status = $2 ORDER BY p.created_at DESC`, competitionID, status)
 	} else {
-		rows, err = s.DB.Query(baseQuery+` ORDER BY p.created_at DESC`, competitionID)
+		rows, err = s.DB.Query(participantSelect+` WHERE p.competition_id = $1 ORDER BY p.created_at DESC`, competitionID)
 	}
 	if err != nil {
 		return nil, err
@@ -142,8 +192,7 @@ func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Partici
 	var list []Participant
 	for rows.Next() {
 		var part Participant
-		if err := rows.Scan(&part.ID, &part.CompetitionID, &part.AthleteID, &part.ContingentID,
-			&part.Name, &part.Club, &part.WeightClass, &part.Gender, &part.RegistrationStatus, &part.CreatedAt); err != nil {
+		if err := scanParticipant(rows, &part); err != nil {
 			return nil, err
 		}
 		list = append(list, part)
@@ -154,9 +203,43 @@ func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Partici
 	return list, rows.Err()
 }
 
+// GetParticipantByID mengambil satu peserta beserta metadata kategori/atlet.
+func (s *AthleteStore) GetParticipantByID(id string) (*Participant, error) {
+	part := &Participant{}
+	if err := scanParticipant(s.DB.QueryRow(participantSelect+` WHERE p.id = $1`, id), part); err != nil {
+		return nil, err
+	}
+	return part, nil
+}
+
+// SaveVerification menyimpan status, hasil timbang aktual, dan checklist berkas sekaligus.
+func (s *AthleteStore) SaveVerification(participantID, status string, actualWeight *float64, docs map[string]bool) error {
+	if docs == nil {
+		docs = map[string]bool{}
+	}
+	docsJSON, err := json.Marshal(docs)
+	if err != nil {
+		return err
+	}
+	res, err := s.DB.Exec(`UPDATE participants
+		SET registration_status = $1, actual_weight = COALESCE($2, actual_weight), docs_verified = $3::jsonb
+		WHERE id = $4`, status, actualWeight, string(docsJSON), participantID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error) {
 	rows, err := s.DB.Query(`
-		SELECT a.id, a.name, a.gender, a.team, a.created_at
+		SELECT a.id, a.name, a.gender, a.team, COALESCE(to_char(a.birth_date, 'YYYY-MM-DD'), ''), COALESCE(a.nik, ''), a.created_at
 		FROM athletes a
 		JOIN participants p ON p.athlete_id = a.id
 		WHERE p.competition_id = $1 ORDER BY a.name`, competitionID)
@@ -167,7 +250,9 @@ func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error
 	var list []Athlete
 	for rows.Next() {
 		var a Athlete
-		rows.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.CreatedAt)
+		if err := scanAthlete(rows, &a); err != nil {
+			return nil, err
+		}
 		list = append(list, a)
 	}
 	return list, rows.Err()

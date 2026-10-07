@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/herros27/digital-scoring/internal/auth"
 	"github.com/herros27/digital-scoring/internal/cache"
@@ -13,6 +14,22 @@ import (
 type AthleteHandler struct {
 	Service *service.AthleteService
 	Cache   *cache.Cache
+	// Competition opsional: tanggal mulai kejuaraan dipakai sebagai tanggal acuan hitung umur.
+	Competition *service.CompetitionService
+}
+
+// ageReferenceDate tanggal acuan golongan umur: hari pertama kejuaraan, fallback hari ini.
+func (h *AthleteHandler) ageReferenceDate(compID string) time.Time {
+	if h.Competition != nil {
+		if comp, err := h.Competition.GetCompetitionByID(compID); err == nil && comp != nil && comp.StartDate != "" {
+			if len(comp.StartDate) >= 10 {
+				if t, err := time.Parse("2006-01-02", comp.StartDate[:10]); err == nil {
+					return t
+				}
+			}
+		}
+	}
+	return time.Now()
 }
 
 func (h *AthleteHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +88,10 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		Name        string `json:"name"`
 		Gender      string `json:"gender"`
 		Team        string `json:"team"`
-		WeightClass string `json:"weight_class" validate:"required"`
+		BirthDate   string `json:"birth_date"`
+		NIK         string `json:"nik" validate:"omitempty,max=50"`
+		CategoryID  string `json:"category_id"`
+		WeightClass string `json:"weight_class" validate:"required_without=CategoryID"`
 	}
 
 	var req RegisterRequest
@@ -100,6 +120,19 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 			Name:         req.Name,
 			Gender:       req.Gender,
 			Team:         req.Team,
+			BirthDate:    req.BirthDate,
+			NIK:          req.NIK,
+		}
+		if req.CategoryID != "" && req.BirthDate == "" {
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", "birth_date wajib diisi untuk pendaftaran ke kategori golongan umur", nil)
+			return
+		}
+		if req.CategoryID != "" {
+			// Validasi umur/gender sebelum atlet dibuat agar tidak ada atlet yatim bila ditolak.
+			if _, err := h.Service.CheckCategoryEligibility(compID, req.CategoryID, &newAthlete, h.ageReferenceDate(compID)); err != nil {
+				Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+				return
+			}
 		}
 		if err := h.Service.CreateAthlete(&newAthlete); err != nil {
 			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
@@ -109,7 +142,15 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		gender = newAthlete.Gender
 	}
 
-	if err := h.Service.RegisterParticipant(compID, athleteID, contingentID, req.WeightClass, gender, status); err != nil {
+	weightClass := req.WeightClass
+	if req.CategoryID != "" {
+		cat, err := h.Service.RegisterParticipantToCategory(compID, athleteID, contingentID, req.CategoryID, status, h.ageReferenceDate(compID))
+		if err != nil {
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+			return
+		}
+		weightClass = cat.WeightClass
+	} else if err := h.Service.RegisterParticipant(compID, athleteID, contingentID, req.WeightClass, gender, status); err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
@@ -123,7 +164,8 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		"competition_id": compID,
 		"athlete_id":     athleteID,
 		"contingent_id":  contingentID,
-		"weight_class":   req.WeightClass,
+		"category_id":    req.CategoryID,
+		"weight_class":   weightClass,
 		"status":         status,
 	})
 }
@@ -138,14 +180,25 @@ func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Status string `json:"status" validate:"required,oneof=verified rejected"`
+		Status       string          `json:"status" validate:"required,oneof=verified rejected"`
+		ActualWeight *float64        `json:"actual_weight"`
+		DocsVerified map[string]bool `json:"docs_verified"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
-	if err := h.Service.VerifyParticipant(participantID, req.Status); err != nil {
+	res, err := h.Service.VerifyParticipantDetailed(participantID, service.VerifyInput{
+		Status:       req.Status,
+		ActualWeight: req.ActualWeight,
+		Docs:         req.DocsVerified,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
@@ -154,9 +207,10 @@ func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Reques
 		h.Cache.InvalidateCompetition(compID)
 	}
 
-	Ok(w, map[string]string{
+	Ok(w, map[string]any{
 		"participant_id": participantID,
-		"status":         req.Status,
+		"status":         res.Status,
+		"reason":         res.Reason,
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/herros27/digital-scoring/internal/bracket"
+	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/store"
 )
 
@@ -15,6 +16,12 @@ type BracketRepository interface {
 	GetByID(id string) (*store.BracketSlot, error)
 	UpdateWinner(slotID, winnerID string) error
 	SetParticipant(slotID, participantID string) error
+}
+
+// CategoryBracketRepository adalah kemampuan opsional repo bagan untuk isolasi per category_id.
+type CategoryBracketRepository interface {
+	GetByCategoryID(competitionID, categoryID string) ([]store.BracketSlot, error)
+	DeleteByCategoryID(competitionID, categoryID string) error
 }
 
 type MatchCreatorRepository interface {
@@ -45,24 +52,59 @@ func (s *BracketService) WithArenaStore(a ArenaListRepository) *BracketService {
 	return s
 }
 
-// GenerateBracket membuat seluruh slot turnamen untuk kategori tertentu
+// GenerateBracket membuat seluruh slot turnamen untuk kategori tertentu (berdasarkan kelas bobot + gender).
 func (s *BracketService) GenerateBracket(competitionID, weightClass, gender string, participantIDs []string) ([]store.BracketSlot, error) {
+	return s.generate(competitionID, "", weightClass, gender, "", participantIDs)
+}
+
+// GenerateCategoryBracket membuat bagan yang terisolasi per category_id. bracketMode
+// "pemasalan_4" menghasilkan mini-bracket (maks 4 peserta per grup) untuk kategori usia dini.
+func (s *BracketService) GenerateCategoryBracket(competitionID, categoryID, weightClass, gender, bracketMode string, participantIDs []string) ([]store.BracketSlot, error) {
+	if categoryID == "" {
+		return nil, errors.New("category_id is required")
+	}
+	if _, ok := s.repo.(CategoryBracketRepository); !ok {
+		return nil, errors.New("bracket repository does not support per-category brackets")
+	}
+	return s.generate(competitionID, categoryID, weightClass, gender, bracketMode, participantIDs)
+}
+
+func (s *BracketService) generate(competitionID, categoryID, weightClass, gender, bracketMode string, participantIDs []string) ([]store.BracketSlot, error) {
 	if len(participantIDs) < 2 {
 		return nil, errors.New("minimum 2 participants required to generate a bracket")
 	}
 
 	// Hapus slot bagan sebelumnya jika ada (mendukung regenerasi / acak ulang)
-	existing, err := s.repo.GetByCompetitionCategory(competitionID, weightClass, gender)
-	if err != nil {
-		return nil, err
-	}
-	if len(existing) > 0 {
-		if err := s.repo.DeleteByCompetitionCategory(competitionID, weightClass, gender); err != nil {
+	if categoryID != "" {
+		cr := s.repo.(CategoryBracketRepository)
+		existing, err := cr.GetByCategoryID(competitionID, categoryID)
+		if err != nil {
 			return nil, err
+		}
+		if len(existing) > 0 {
+			if err := cr.DeleteByCategoryID(competitionID, categoryID); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		existing, err := s.repo.GetByCompetitionCategory(competitionID, weightClass, gender)
+		if err != nil {
+			return nil, err
+		}
+		if len(existing) > 0 {
+			if err := s.repo.DeleteByCompetitionCategory(competitionID, weightClass, gender); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	slots := bracket.GenerateSlots(competitionID, weightClass, gender, participantIDs)
+	var slots []store.BracketSlot
+	if bracketMode == domain.BracketPemasalan4 {
+		slots = bracket.GenerateMiniSlots(competitionID, weightClass, gender, participantIDs)
+	} else {
+		slots = bracket.GenerateSlots(competitionID, weightClass, gender, participantIDs)
+	}
+	bracket.AssignCategory(slots, categoryID)
 	if err := s.repo.CreateBatch(slots); err != nil {
 		return nil, err
 	}
@@ -114,6 +156,15 @@ func (s *BracketService) GenerateBracket(competitionID, weightClass, gender stri
 	}
 
 	return slots, nil
+}
+
+// GetBracketTreeByCategory mengambil bagan terisolasi milik satu kategori.
+func (s *BracketService) GetBracketTreeByCategory(competitionID, categoryID string) ([]store.BracketSlot, error) {
+	cr, ok := s.repo.(CategoryBracketRepository)
+	if !ok {
+		return nil, errors.New("bracket repository does not support per-category brackets")
+	}
+	return cr.GetByCategoryID(competitionID, categoryID)
 }
 
 // GetBracketTree mengambil struktur pohon bagan pertandingan

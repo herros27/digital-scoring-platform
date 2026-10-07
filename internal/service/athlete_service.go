@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -16,7 +17,14 @@ type AthleteRepository interface {
 }
 
 type AthleteService struct {
-	repo AthleteRepository
+	repo         AthleteRepository
+	categoryRepo CategoryRepository
+}
+
+// WithCategoryRepo mengaktifkan validasi kategori (umur/gender/bobot) pada pendaftaran & verifikasi.
+func (s *AthleteService) WithCategoryRepo(r CategoryRepository) *AthleteService {
+	s.categoryRepo = r
+	return s
 }
 
 func NewAthleteService(repo AthleteRepository) *AthleteService {
@@ -29,6 +37,13 @@ func (s *AthleteService) CreateAthlete(a *domain.Athlete) error {
 	}
 	if a.Gender == "" {
 		return errors.New("gender is required")
+	}
+	a.BirthDate = strings.TrimSpace(a.BirthDate)
+	a.NIK = strings.TrimSpace(a.NIK)
+	if a.BirthDate != "" {
+		if _, err := domain.ParseBirthDate(a.BirthDate); err != nil {
+			return err
+		}
 	}
 	a.CreatedAt = time.Now()
 	return s.repo.Create(a)
@@ -139,4 +154,133 @@ func (s *AthleteService) ListAthletesByCompetition(competitionID string) ([]doma
 		return nil, domain.ErrInvalidInput
 	}
 	return s.repo.ListByCompetition(competitionID)
+}
+
+// ---------- Kategori, timbang badan, & verifikasi berkas ----------
+
+// CategoryParticipantManager adalah kemampuan opsional repo atlet untuk fitur kategori IPSI.
+type CategoryParticipantManager interface {
+	RegisterParticipantInCategory(competitionID, athleteID, contingentID, categoryID, weightClass, gender, status string) error
+	GetParticipantByID(id string) (*domain.Participant, error)
+	SaveVerification(participantID, status string, actualWeight *float64, docs map[string]bool) error
+}
+
+// RegisterParticipantToCategory mendaftarkan atlet ke kategori resmi setelah memvalidasi gender &
+// golongan umur pada tanggal acuan (hari pertama kejuaraan). Mengembalikan kategori yang dipakai.
+func (s *AthleteService) RegisterParticipantToCategory(competitionID, athleteID, contingentID, categoryID, status string, ref time.Time) (*domain.Category, error) {
+	if competitionID == "" || athleteID == "" || categoryID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if s.categoryRepo == nil {
+		return nil, errors.New("category validation is not configured")
+	}
+	cm, ok := s.repo.(CategoryParticipantManager)
+	if !ok {
+		return nil, errors.New("athlete repository does not support category registration")
+	}
+	athlete, err := s.GetAthleteByID(athleteID)
+	if err != nil {
+		return nil, err
+	}
+	cat, err := s.CheckCategoryEligibility(competitionID, categoryID, athlete, ref)
+	if err != nil {
+		return nil, err
+	}
+	if err := cm.RegisterParticipantInCategory(competitionID, athleteID, contingentID, cat.ID, cat.WeightClass, domain.NormalizeGender(athlete.Gender), status); err != nil {
+		return nil, err
+	}
+	return cat, nil
+}
+
+// CheckCategoryEligibility memastikan kategori milik kompetisi dan atlet (gender + golongan umur)
+// sah untuk kategori itu, tanpa menyimpan apa pun. Dipanggil sebelum atlet baru dibuat agar tidak ada data yatim.
+func (s *AthleteService) CheckCategoryEligibility(competitionID, categoryID string, a *domain.Athlete, ref time.Time) (*domain.Category, error) {
+	if s.categoryRepo == nil {
+		return nil, errors.New("category validation is not configured")
+	}
+	cat, err := s.categoryRepo.GetByID(categoryID)
+	if err != nil {
+		return nil, errors.New("category not found")
+	}
+	if cat == nil || cat.CompetitionID != competitionID {
+		return nil, errors.New("category not found in this competition")
+	}
+	if err := domain.CheckEligibility(a, cat, ref); err != nil {
+		return nil, err
+	}
+	return cat, nil
+}
+
+// VerifyInput data meja verifikasi: hasil timbang aktual + checklist berkas.
+type VerifyInput struct {
+	Status       string
+	ActualWeight *float64
+	Docs         map[string]bool
+}
+
+// VerifyResult hasil akhir verifikasi (status bisa berbeda dari yang diminta bila bobot tidak sah).
+type VerifyResult struct {
+	Status string
+	Reason string
+}
+
+// VerifyParticipantDetailed menerapkan aturan resmi: tanpa toleransi bobot (0 kg) dan
+// berkas perlindungan atlet di bawah umur harus lengkap sebelum status VERIFIED.
+func (s *AthleteService) VerifyParticipantDetailed(participantID string, in VerifyInput) (*VerifyResult, error) {
+	if participantID == "" || (in.Status != "verified" && in.Status != "rejected") {
+		return nil, domain.ErrInvalidInput
+	}
+	if in.ActualWeight != nil && (*in.ActualWeight <= 0 || *in.ActualWeight > 300) {
+		return nil, errors.New("actual_weight must be between 0 and 300 kg")
+	}
+	cm, ok := s.repo.(CategoryParticipantManager)
+	if !ok {
+		// Repo lama tanpa dukungan kategori: perilaku verifikasi sederhana.
+		return &VerifyResult{Status: in.Status}, s.VerifyParticipant(participantID, in.Status)
+	}
+	part, err := cm.GetParticipantByID(participantID)
+	if err != nil {
+		return nil, err
+	}
+	if part == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	docs := part.DocsVerified
+	if in.Docs != nil {
+		docs = in.Docs
+	}
+	weight := part.ActualWeight
+	if in.ActualWeight != nil {
+		weight = in.ActualWeight
+	}
+
+	result := &VerifyResult{Status: in.Status}
+	if in.Status == "verified" && part.CategoryID != "" && s.categoryRepo != nil {
+		cat, err := s.categoryRepo.GetByID(part.CategoryID)
+		if err != nil {
+			return nil, err
+		}
+		if missing := domain.MissingDocs(cat.AgeGroup, docs); len(missing) > 0 {
+			return nil, errors.New("berkas belum lengkap: " + strings.Join(missing, ", "))
+		}
+		if cat.HasWeightBounds() {
+			if weight == nil {
+				return nil, errors.New("hasil timbang badan (actual_weight) wajib diisi untuk kategori bertingkat bobot")
+			}
+			switch cat.CheckWeight(*weight) {
+			case domain.WeightOver:
+				result.Status = domain.ParticipantOverweight
+				result.Reason = "bobot melebihi batas kelas (tanpa toleransi)"
+			case domain.WeightUnder:
+				result.Status = domain.ParticipantUnderweight
+				result.Reason = "bobot di bawah batas kelas (tanpa toleransi)"
+			}
+		}
+	}
+
+	if err := cm.SaveVerification(participantID, result.Status, in.ActualWeight, docs); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

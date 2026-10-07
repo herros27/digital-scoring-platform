@@ -41,7 +41,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
 	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo)
 	categoryService := service.NewCategoryService(categoryRepo)
-	athleteService := service.NewAthleteService(athleteRepo)
+	athleteService := service.NewAthleteService(athleteRepo).WithCategoryRepo(categoryRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
 	matchService.SetRulesetResolver(rulesetService)
 	matchService.SetArenaStore(arenaRepo)
@@ -66,9 +66,9 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	arenaH := &handler.ArenaHandler{Service: arenaService}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
 	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo, Matches: matchService}
-	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, Cache: appCache}
+	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, CategoryService: categoryService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
-	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache}
+	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache, Competition: compService}
 	rulesetH := &handler.RulesetHandler{Service: rulesetService}
 	officialH := &handler.OfficialHandler{Service: officialService}
 	contingentH := &handler.ContingentHandler{Service: contingentService}

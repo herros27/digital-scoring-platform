@@ -19,8 +19,8 @@ func (s *BracketStore) CreateBatch(slots []BracketSlot) error {
 	query := `
 		INSERT INTO bracket_slots (
 			id, competition_id, weight_class, gender, round, slot_index, 
-			participant_id, is_bye, winner_id, next_slot_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			participant_id, is_bye, winner_id, next_slot_id, category_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	stmt, err := tx.Prepare(query)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *BracketStore) CreateBatch(slots []BracketSlot) error {
 		_, err := stmt.Exec(
 			slot.ID, slot.CompetitionID, slot.WeightClass, slot.Gender,
 			slot.Round, slot.SlotIndex, slot.ParticipantID, slot.IsBye,
-			slot.WinnerID, slot.NextSlotID,
+			slot.WinnerID, slot.NextSlotID, slot.CategoryID,
 		)
 		if err != nil {
 			return err
@@ -45,9 +45,9 @@ func (s *BracketStore) CreateBatch(slots []BracketSlot) error {
 // GetByCompetitionCategory mengambil semua slot bagan untuk kategori tertentu
 func (s *BracketStore) GetByCompetitionCategory(competitionID, weightClass, gender string) ([]BracketSlot, error) {
 	query := `
-		SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id
+		SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
 		FROM bracket_slots
-		WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+		WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL
 		ORDER BY round ASC, slot_index ASC
 	`
 	rows, err := s.DB.Query(query, competitionID, weightClass, gender)
@@ -62,7 +62,7 @@ func (s *BracketStore) GetByCompetitionCategory(competitionID, weightClass, gend
 		err := rows.Scan(
 			&b.ID, &b.CompetitionID, &b.WeightClass, &b.Gender,
 			&b.Round, &b.SlotIndex, &b.ParticipantID, &b.IsBye,
-			&b.WinnerID, &b.NextSlotID,
+			&b.WinnerID, &b.NextSlotID, &b.CategoryID,
 		)
 		if err != nil {
 			return nil, err
@@ -81,10 +81,10 @@ func (s *BracketStore) DeleteByCompetitionCategory(competitionID, weightClass, g
 		  AND status = 'idle' 
 		  AND (
 		    bracket_slot_id IN (
-		      SELECT id FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+		      SELECT id FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL
 		    )
 		    OR athlete_red_id IN (
-		      SELECT id FROM participants WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+		      SELECT id FROM participants WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL
 		    )
 		  )
 	`
@@ -96,7 +96,7 @@ func (s *BracketStore) DeleteByCompetitionCategory(competitionID, weightClass, g
 	unlinkQuery := `
 		UPDATE matches SET bracket_slot_id = NULL 
 		WHERE competition_id = $1 AND bracket_slot_id IN (
-			SELECT id FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+			SELECT id FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL
 		)
 	`
 	if _, err := s.DB.Exec(unlinkQuery, competitionID, weightClass, gender); err != nil {
@@ -104,7 +104,7 @@ func (s *BracketStore) DeleteByCompetitionCategory(competitionID, weightClass, g
 	}
 
 	// 3. Hapus seluruh slot pada kategori tersebut
-	query := `DELETE FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3`
+	query := `DELETE FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL`
 	_, err := s.DB.Exec(query, competitionID, weightClass, gender)
 	return err
 }
@@ -127,14 +127,14 @@ func (s *BracketStore) SetParticipant(slotID, participantID string) error {
 func (s *BracketStore) GetByID(id string) (*BracketSlot, error) {
 	b := &BracketSlot{}
 	query := `
-		SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id
+		SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
 		FROM bracket_slots
 		WHERE id = $1
 	`
 	err := s.DB.QueryRow(query, id).Scan(
 		&b.ID, &b.CompetitionID, &b.WeightClass, &b.Gender,
 		&b.Round, &b.SlotIndex, &b.ParticipantID, &b.IsBye,
-		&b.WinnerID, &b.NextSlotID,
+		&b.WinnerID, &b.NextSlotID, &b.CategoryID,
 	)
 	return b, err
 }
@@ -163,17 +163,29 @@ func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
 		if err == nil && parentSlot != nil {
 			siblingIndex := parentSlot.SlotIndex ^ 1
 			var siblingSlot BracketSlot
-			siblingQuery := `
-				SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id
-				FROM bracket_slots
-				WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND round = $4 AND slot_index = $5
-				LIMIT 1
-			`
-			errSibling := s.DB.QueryRow(siblingQuery, parentSlot.CompetitionID, parentSlot.WeightClass, parentSlot.Gender, parentSlot.Round, siblingIndex).Scan(
-				&siblingSlot.ID, &siblingSlot.CompetitionID, &siblingSlot.WeightClass, &siblingSlot.Gender,
-				&siblingSlot.Round, &siblingSlot.SlotIndex, &siblingSlot.ParticipantID, &siblingSlot.IsBye,
-				&siblingSlot.WinnerID, &siblingSlot.NextSlotID,
-			)
+			var errSibling error
+			if parentSlot.CategoryID != nil && *parentSlot.CategoryID != "" {
+				// Bagan terisolasi per kategori: kelas bobot yang sama di golongan umur berbeda tidak boleh bertabrakan.
+				errSibling = s.DB.QueryRow(`
+					SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
+					FROM bracket_slots
+					WHERE competition_id = $1 AND category_id = $2 AND round = $3 AND slot_index = $4
+					LIMIT 1`, parentSlot.CompetitionID, *parentSlot.CategoryID, parentSlot.Round, siblingIndex).Scan(
+					&siblingSlot.ID, &siblingSlot.CompetitionID, &siblingSlot.WeightClass, &siblingSlot.Gender,
+					&siblingSlot.Round, &siblingSlot.SlotIndex, &siblingSlot.ParticipantID, &siblingSlot.IsBye,
+					&siblingSlot.WinnerID, &siblingSlot.NextSlotID, &siblingSlot.CategoryID,
+				)
+			} else {
+				errSibling = s.DB.QueryRow(`
+					SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
+					FROM bracket_slots
+					WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL AND round = $4 AND slot_index = $5
+					LIMIT 1`, parentSlot.CompetitionID, parentSlot.WeightClass, parentSlot.Gender, parentSlot.Round, siblingIndex).Scan(
+					&siblingSlot.ID, &siblingSlot.CompetitionID, &siblingSlot.WeightClass, &siblingSlot.Gender,
+					&siblingSlot.Round, &siblingSlot.SlotIndex, &siblingSlot.ParticipantID, &siblingSlot.IsBye,
+					&siblingSlot.WinnerID, &siblingSlot.NextSlotID, &siblingSlot.CategoryID,
+				)
+			}
 
 			if errSibling == nil && siblingSlot.ParticipantID != nil && *siblingSlot.ParticipantID != "" {
 				var redSlot, blueSlot *BracketSlot
@@ -207,4 +219,50 @@ func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
 	}
 
 	return nil
+}
+
+// GetByCategoryID mengambil seluruh slot bagan milik satu kategori.
+func (s *BracketStore) GetByCategoryID(competitionID, categoryID string) ([]BracketSlot, error) {
+	rows, err := s.DB.Query(`
+		SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
+		FROM bracket_slots
+		WHERE competition_id = $1 AND category_id = $2
+		ORDER BY round ASC, slot_index ASC`, competitionID, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []BracketSlot
+	for rows.Next() {
+		var b BracketSlot
+		if err := rows.Scan(&b.ID, &b.CompetitionID, &b.WeightClass, &b.Gender,
+			&b.Round, &b.SlotIndex, &b.ParticipantID, &b.IsBye,
+			&b.WinnerID, &b.NextSlotID, &b.CategoryID); err != nil {
+			return nil, err
+		}
+		list = append(list, b)
+	}
+	return list, rows.Err()
+}
+
+// DeleteByCategoryID menghapus bagan satu kategori (acak ulang) beserta partai idle-nya.
+func (s *BracketStore) DeleteByCategoryID(competitionID, categoryID string) error {
+	if _, err := s.DB.Exec(`
+		DELETE FROM matches
+		WHERE competition_id = $1 AND status = 'idle' AND (
+			bracket_slot_id IN (SELECT id FROM bracket_slots WHERE competition_id = $1 AND category_id = $2)
+			OR athlete_red_id IN (SELECT id FROM participants WHERE competition_id = $1 AND category_id = $2)
+		)`, competitionID, categoryID); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`
+		UPDATE matches SET bracket_slot_id = NULL
+		WHERE competition_id = $1 AND bracket_slot_id IN (
+			SELECT id FROM bracket_slots WHERE competition_id = $1 AND category_id = $2
+		)`, competitionID, categoryID); err != nil {
+		return err
+	}
+	_, err := s.DB.Exec(`DELETE FROM bracket_slots WHERE competition_id = $1 AND category_id = $2`, competitionID, categoryID)
+	return err
 }

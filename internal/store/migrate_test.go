@@ -11,7 +11,7 @@ import (
 )
 
 func TestEmbeddedMigrations(t *testing.T) {
-	// 1. Verify FS has all 16 migration files
+	// 1. Verify FS has all 22 migration files
 	entries, err := fs.ReadDir(migrations.FS, ".")
 	if err != nil {
 		t.Fatalf("failed to read embedded migrations dir: %v", err)
@@ -34,19 +34,19 @@ func TestEmbeddedMigrations(t *testing.T) {
 		}
 	}
 
-	if sqlCount != 21 {
-		t.Fatalf("expected 21 SQL migration files, found %d", sqlCount)
+	if sqlCount != 22 {
+		t.Fatalf("expected 22 SQL migration files, found %d", sqlCount)
 	}
 
-	// 2. Verify goose can collect and sequence all 21 migrations
+	// 2. Verify goose can collect and sequence all 22 migrations
 	goose.SetBaseFS(migrations.FS)
 	migrationsList, err := goose.CollectMigrations(".", 0, goose.MaxVersion)
 	if err != nil {
 		t.Fatalf("failed to collect migrations: %v", err)
 	}
 
-	if len(migrationsList) != 21 {
-		t.Fatalf("expected 21 collected migrations, got %d", len(migrationsList))
+	if len(migrationsList) != 22 {
+		t.Fatalf("expected 22 collected migrations, got %d", len(migrationsList))
 	}
 
 	for i, m := range migrationsList {

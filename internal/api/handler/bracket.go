@@ -5,12 +5,14 @@ import (
 
 	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/service"
+	"github.com/herros27/digital-scoring/internal/store"
 )
 
 type BracketHandler struct {
-	Service        *service.BracketService
-	AthleteService *service.AthleteService
-	Cache          *cache.Cache
+	Service         *service.BracketService
+	AthleteService  *service.AthleteService
+	CategoryService *service.CategoryService
+	Cache           *cache.Cache
 }
 
 // POST /api/v1/competitions/{comp_id}/brackets/generate
@@ -19,8 +21,9 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 
 	var req struct {
-		WeightClass    string   `json:"weight_class" validate:"required"`
-		Gender         string   `json:"gender" validate:"required,oneof=male female putra putri"`
+		CategoryID     string   `json:"category_id"`
+		WeightClass    string   `json:"weight_class"`
+		Gender         string   `json:"gender" validate:"omitempty,oneof=male female putra putri"`
 		ParticipantIDs []string `json:"participant_ids"`
 	}
 
@@ -29,12 +32,33 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Bagan terisolasi per kategori: weight_class/gender/mode diambil dari kategori itu sendiri.
+	bracketMode := ""
+	if req.CategoryID != "" {
+		if h.CategoryService == nil {
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", "category brackets are not enabled", nil)
+			return
+		}
+		cat, err := h.CategoryService.GetCategoryByID(req.CategoryID)
+		if err != nil || cat.CompetitionID != compID {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "category not found in this competition", nil)
+			return
+		}
+		req.WeightClass = cat.WeightClass
+		req.Gender = cat.Gender
+		bracketMode = cat.BracketMode
+	}
+
 	// Auto-populate from verified participants if participant_ids omitted
 	if len(req.ParticipantIDs) == 0 && h.AthleteService != nil {
 		parts, err := h.AthleteService.ListParticipants(compID, "verified")
 		if err == nil {
 			for _, p := range parts {
-				if p.WeightClass == req.WeightClass && p.Gender == req.Gender {
+				if req.CategoryID != "" {
+					if p.CategoryID == req.CategoryID {
+						req.ParticipantIDs = append(req.ParticipantIDs, p.ID)
+					}
+				} else if p.WeightClass == req.WeightClass && p.Gender == req.Gender && p.CategoryID == "" {
 					req.ParticipantIDs = append(req.ParticipantIDs, p.ID)
 				}
 			}
@@ -50,7 +74,7 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 			var verifiedIDs []string
 			for _, pid := range req.ParticipantIDs {
 				st := statusMap[pid]
-				if st != "pending" && st != "rejected" {
+				if st != "pending" && st != "rejected" && st != "overweight" && st != "underweight" {
 					verifiedIDs = append(verifiedIDs, pid)
 				}
 			}
@@ -63,7 +87,13 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slots, err := h.Service.GenerateBracket(compID, req.WeightClass, req.Gender, req.ParticipantIDs)
+	var slots []store.BracketSlot
+	var err error
+	if req.CategoryID != "" {
+		slots, err = h.Service.GenerateCategoryBracket(compID, req.CategoryID, req.WeightClass, req.Gender, bracketMode, req.ParticipantIDs)
+	} else {
+		slots, err = h.Service.GenerateBracket(compID, req.WeightClass, req.Gender, req.ParticipantIDs)
+	}
 	if err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
@@ -82,6 +112,16 @@ func (h *BracketHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	weightClass := r.URL.Query().Get("weight_class")
 	gender := r.URL.Query().Get("gender")
+
+	if categoryID := r.URL.Query().Get("category_id"); categoryID != "" {
+		tree, err := h.Service.GetBracketTreeByCategory(compID, categoryID)
+		if err != nil {
+			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+			return
+		}
+		Ok(w, tree)
+		return
+	}
 
 	if weightClass == "" || gender == "" {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class and gender query parameters required", nil)
