@@ -79,26 +79,10 @@ func (s *MatchStore) SetWinner(matchID, winnerID string) error {
 	return err
 }
 
-func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]Match, int, error) {
-	var total int
-	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND ($2 = '' OR status = $2)`
-	if err := s.DB.QueryRow(countQuery, competitionID, status).Scan(&total); err != nil {
-		return nil, 0, err
-	}
+const matchColumns = `id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at`
 
-	query := `
-		SELECT id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at 
-		FROM matches 
-		WHERE competition_id = $1 AND ($2 = '' OR status = $2)
-		ORDER BY created_at DESC 
-		LIMIT $3 OFFSET $4`
-	rows, err := s.DB.Query(query, competitionID, status, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	var list []Match
+func scanMatches(rows *sql.Rows) ([]Match, error) {
+	list := []Match{}
 	for rows.Next() {
 		var m Match
 		var arenaID, bracketSlotID, winnerID sql.NullString
@@ -107,7 +91,7 @@ func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit,
 			&m.AthleteRedID, &m.AthleteBlueID, &m.CurrentRound,
 			&m.Status, &winnerID, &m.CreatedAt, &m.StartedAt, &m.FinishedAt,
 		); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		if arenaID.Valid {
 			m.ArenaID = arenaID.String
@@ -120,13 +104,130 @@ func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit,
 		}
 		list = append(list, m)
 	}
-	if list == nil {
-		list = []Match{}
+	return list, rows.Err()
+}
+
+func (s *MatchStore) ListByCompetitionPaged(competitionID, status string, limit, offset int) ([]Match, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND ($2 = '' OR status = $2)`
+	if err := s.DB.QueryRow(countQuery, competitionID, status).Scan(&total); err != nil {
+		return nil, 0, err
 	}
-	return list, total, rows.Err()
+
+	rows, err := s.DB.Query(`
+		SELECT `+matchColumns+`
+		FROM matches
+		WHERE competition_id = $1 AND ($2 = '' OR status = $2)
+		ORDER BY created_at DESC
+		LIMIT $3 OFFSET $4`, competitionID, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	list, err := scanMatches(rows)
+	return list, total, err
+}
+
+// ListByArenaPaged daftar partai pada satu gelanggang dalam urutan antrean (paling awal dibuat lebih dulu).
+func (s *MatchStore) ListByArenaPaged(competitionID, arenaID, status string, limit, offset int) ([]Match, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM matches WHERE competition_id = $1 AND arena_id = $2 AND ($3 = '' OR status = $3)`
+	if err := s.DB.QueryRow(countQuery, competitionID, arenaID, status).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := s.DB.Query(`
+		SELECT `+matchColumns+`
+		FROM matches
+		WHERE competition_id = $1 AND arena_id = $2 AND ($3 = '' OR status = $3)
+		ORDER BY created_at ASC, id ASC
+		LIMIT $4 OFFSET $5`, competitionID, arenaID, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	list, err := scanMatches(rows)
+	return list, total, err
 }
 
 func (s *MatchStore) ListByCompetition(competitionID string) ([]Match, error) {
 	list, _, err := s.ListByCompetitionPaged(competitionID, "", 10000, 0)
 	return list, err
+}
+
+// MatchInfo data tampilan sebuah partai untuk scoreboard publik.
+type MatchInfo struct {
+	RedName, BlueName   string
+	RedTeam, BlueTeam   string
+	WeightClass, Gender string
+	CompetitionName     string
+	// Number nomor urut partai pada antrean gelanggangnya (paling awal dibuat = 1)
+	Number int
+}
+
+// GetMatchInfo mengambil nama atlet, kontingen, kelas, nama kejuaraan, dan nomor partai.
+func (s *MatchStore) GetMatchInfo(matchID string) (MatchInfo, error) {
+	var info MatchInfo
+	var rn, bn, rt, bt, wc, g, cn sql.NullString
+	err := s.DB.QueryRow(`
+		SELECT ra.name, ba.name, ra.team, ba.team,
+		       COALESCE(rp.weight_class, bp.weight_class), COALESCE(rp.gender, bp.gender),
+		       c.name,
+		       (SELECT COUNT(*) FROM matches m2
+		         WHERE m2.competition_id = m.competition_id
+		           AND m2.arena_id IS NOT DISTINCT FROM m.arena_id
+		           AND (m2.created_at, m2.id) <= (m.created_at, m.id))
+		FROM matches m
+		JOIN competitions c ON c.id = m.competition_id
+		LEFT JOIN participants rp ON rp.id = m.athlete_red_id
+		LEFT JOIN athletes ra ON ra.id = rp.athlete_id
+		LEFT JOIN participants bp ON bp.id = m.athlete_blue_id
+		LEFT JOIN athletes ba ON ba.id = bp.athlete_id
+		WHERE m.id = $1`, matchID).Scan(&rn, &bn, &rt, &bt, &wc, &g, &cn, &info.Number)
+	info.RedName, info.BlueName = rn.String, bn.String
+	info.RedTeam, info.BlueTeam = rt.String, bt.String
+	info.WeightClass, info.Gender = wc.String, g.String
+	info.CompetitionName = cn.String
+	return info, err
+}
+
+// GetCornerNames mengambil nama atlet sudut merah dan biru untuk sebuah pertandingan.
+func (s *MatchStore) GetCornerNames(matchID string) (red, blue string, err error) {
+	var r, b sql.NullString
+	err = s.DB.QueryRow(`
+		SELECT ra.name, ba.name
+		FROM matches m
+		LEFT JOIN participants rp ON rp.id = m.athlete_red_id
+		LEFT JOIN athletes ra ON ra.id = rp.athlete_id
+		LEFT JOIN participants bp ON bp.id = m.athlete_blue_id
+		LEFT JOIN athletes ba ON ba.id = bp.athlete_id
+		WHERE m.id = $1`, matchID).Scan(&r, &b)
+	return r.String, b.String, err
+}
+
+// Reschedule mengembalikan partai berstatus cancelled ke idle dan menghapus skor per ronde,
+// sehingga partai dapat dimuat ke gelanggang dan dimulai lagi dari 0-0. Mengembalikan false
+// bila partai tidak berstatus cancelled (tidak ada yang diubah).
+func (s *MatchStore) Reschedule(id string) (bool, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`UPDATE matches
+		SET status = 'idle', current_round = 1, winner_id = NULL, started_at = NULL, finished_at = NULL
+		WHERE id = $1 AND status = 'cancelled'`, id)
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, nil
+	}
+	if _, err := tx.Exec(`DELETE FROM match_scores WHERE match_id = $1`, id); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
 }

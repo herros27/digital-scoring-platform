@@ -72,6 +72,43 @@ func (s *BracketStore) GetByCompetitionCategory(competitionID, weightClass, gend
 	return list, rows.Err()
 }
 
+// DeleteByCompetitionCategory menghapus seluruh slot bagan untuk kategori tertentu saat acak ulang bagan
+func (s *BracketStore) DeleteByCompetitionCategory(competitionID, weightClass, gender string) error {
+	// 1. Hapus partai idle lama pada kategori ini agar jadwal pertandingan bersih dan selaras dengan bagan baru
+	deleteIdleQuery := `
+		DELETE FROM matches 
+		WHERE competition_id = $1 
+		  AND status = 'idle' 
+		  AND (
+		    bracket_slot_id IN (
+		      SELECT id FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+		    )
+		    OR athlete_red_id IN (
+		      SELECT id FROM participants WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+		    )
+		  )
+	`
+	if _, err := s.DB.Exec(deleteIdleQuery, competitionID, weightClass, gender); err != nil {
+		return err
+	}
+
+	// 2. Unlink bracket_slot_id pada matches yang tersisa (misal match running/finished) agar tidak melanggar foreign key constraint
+	unlinkQuery := `
+		UPDATE matches SET bracket_slot_id = NULL 
+		WHERE competition_id = $1 AND bracket_slot_id IN (
+			SELECT id FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3
+		)
+	`
+	if _, err := s.DB.Exec(unlinkQuery, competitionID, weightClass, gender); err != nil {
+		return err
+	}
+
+	// 3. Hapus seluruh slot pada kategori tersebut
+	query := `DELETE FROM bracket_slots WHERE competition_id = $1 AND weight_class = $2 AND gender = $3`
+	_, err := s.DB.Exec(query, competitionID, weightClass, gender)
+	return err
+}
+
 // UpdateWinner memperbarui winner_id pada slot tertentu
 func (s *BracketStore) UpdateWinner(slotID, winnerID string) error {
 	query := `UPDATE bracket_slots SET winner_id = $1 WHERE id = $2`
@@ -117,7 +154,56 @@ func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
 	}
 
 	if currentSlot.NextSlotID != nil && *currentSlot.NextSlotID != "" {
-		return s.SetParticipant(*currentSlot.NextSlotID, winnerID)
+		if err := s.SetParticipant(*currentSlot.NextSlotID, winnerID); err != nil {
+			return err
+		}
+
+		// Otomatis buat match untuk babak selanjutnya jika kedua sudut (merah & biru) sudah terisi pemenang
+		parentSlot, err := s.GetByID(*currentSlot.NextSlotID)
+		if err == nil && parentSlot != nil {
+			siblingIndex := parentSlot.SlotIndex ^ 1
+			var siblingSlot BracketSlot
+			siblingQuery := `
+				SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id
+				FROM bracket_slots
+				WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND round = $4 AND slot_index = $5
+				LIMIT 1
+			`
+			errSibling := s.DB.QueryRow(siblingQuery, parentSlot.CompetitionID, parentSlot.WeightClass, parentSlot.Gender, parentSlot.Round, siblingIndex).Scan(
+				&siblingSlot.ID, &siblingSlot.CompetitionID, &siblingSlot.WeightClass, &siblingSlot.Gender,
+				&siblingSlot.Round, &siblingSlot.SlotIndex, &siblingSlot.ParticipantID, &siblingSlot.IsBye,
+				&siblingSlot.WinnerID, &siblingSlot.NextSlotID,
+			)
+
+			if errSibling == nil && siblingSlot.ParticipantID != nil && *siblingSlot.ParticipantID != "" {
+				var redSlot, blueSlot *BracketSlot
+				if parentSlot.SlotIndex%2 == 0 {
+					redSlot = parentSlot
+					blueSlot = &siblingSlot
+				} else {
+					redSlot = &siblingSlot
+					blueSlot = parentSlot
+				}
+
+				var existingMatchID string
+				checkMatchQuery := `SELECT id FROM matches WHERE competition_id = $1 AND bracket_slot_id = $2 LIMIT 1`
+				errCheck := s.DB.QueryRow(checkMatchQuery, parentSlot.CompetitionID, redSlot.ID).Scan(&existingMatchID)
+				if errCheck == sql.ErrNoRows {
+					var arenaID sql.NullString
+					_ = s.DB.QueryRow(`SELECT id FROM arenas WHERE competition_id = $1 ORDER BY name ASC LIMIT 1`, parentSlot.CompetitionID).Scan(&arenaID)
+
+					insertMatchQuery := `
+						INSERT INTO matches (competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status)
+						VALUES ($1, $2, $3, $4, $5, $6, 'idle')
+					`
+					var aID any = nil
+					if arenaID.Valid {
+						aID = arenaID.String
+					}
+					_, _ = s.DB.Exec(insertMatchQuery, parentSlot.CompetitionID, aID, redSlot.ID, *redSlot.ParticipantID, *blueSlot.ParticipantID, redSlot.Round)
+				}
+			}
+		}
 	}
 
 	return nil

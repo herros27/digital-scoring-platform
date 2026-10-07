@@ -104,9 +104,18 @@ func TestAutomaticBracketAdvancement(t *testing.T) {
 		t.Fatalf("StartMatch failed: %v", err)
 	}
 
-	// Finish match -> trigger finalize and winner determination
-	if err := svc.FinishMatch("match-bracket-1"); err != nil {
-		t.Fatalf("FinishMatch failed: %v", err)
+	// Skor seri: pertandingan tidak boleh berakhir dan pemenang tidak boleh maju ke bagan
+	// sebelum wasit memutuskan
+	if err := svc.FinishMatch("match-bracket-1"); err == nil {
+		t.Fatal("FinishMatch pada skor seri harus ditolak")
+	}
+	if _, advanced := bracketAdvancer.advanced["slot-round1-A"]; advanced {
+		t.Fatal("bagan tidak boleh maju sebelum ada pemenang")
+	}
+
+	// Keputusan wasit -> finalize, pemenang ditetapkan dan dimajukan di bagan
+	if err := svc.FinishMatchWithWinner("match-bracket-1", "red"); err != nil {
+		t.Fatalf("FinishMatchWithWinner failed: %v", err)
 	}
 
 	// Check if match status and winner were updated
@@ -115,7 +124,7 @@ func TestAutomaticBracketAdvancement(t *testing.T) {
 		t.Fatalf("GetByID failed: %v", err)
 	}
 	if finishedMatch.WinnerID != "athlete-101" {
-		t.Fatalf("expected winner 'athlete-101' (red by default/score), got %s", finishedMatch.WinnerID)
+		t.Fatalf("expected winner 'athlete-101' (keputusan wasit: red), got %s", finishedMatch.WinnerID)
 	}
 
 	// Verify bracket advancer received the winner for slot-round1-A

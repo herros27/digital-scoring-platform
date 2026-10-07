@@ -44,6 +44,10 @@ func (s *ArenaStore) Update(a *Arena) error {
 }
 
 func (s *ArenaStore) Delete(id string) error {
+	// Clean up foreign keys before removing arena
+	_, _ = s.DB.Exec(`DELETE FROM judge_pins WHERE arena_id = $1`, id)
+	_, _ = s.DB.Exec(`UPDATE matches SET arena_id = NULL WHERE arena_id = $1`, id)
+
 	query := `DELETE FROM arenas WHERE id = $1`
 	_, err := s.DB.Exec(query, id)
 	return err

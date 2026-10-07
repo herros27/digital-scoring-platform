@@ -1,18 +1,128 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { isNotFoundError } from '@/api/error'
+import { formatPin, pinLengthForRole, validateCustomPin } from '@/features/auth/lib/pin'
+import { getErrorMessage } from '@/api/error'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/lib/api'
+import { authService } from '@/features/auth/api/authService'
+import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+
+interface Props {
+  competitionId?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  competitionId: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
+})
 
 const authStore = useAuthStore()
+const compIdRef = computed(
+  () => props.competitionId || authStore.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8',
+)
 
-// Props & State
-const selectedArena = ref<'gelanggang-1' | 'gelanggang-2' | 'gelanggang-3' | 'gelanggang-4'>('gelanggang-1')
+// Fetch real arenas
+const { data: remoteArenas, refetch: refetchArenas } = useArenasQuery(compIdRef)
 
-interface DeviceSeat {
+interface ArenaItem {
+  id: string
+  name: string
+}
+
+const displayArenas = computed<ArenaItem[]>(() => {
+  if (remoteArenas.value && remoteArenas.value.length > 0) {
+    // Deteksi nama kembar dan berikan indikator pembeda (#1, #2)
+    const nameCounts = new Map<string, number>()
+    for (const a of remoteArenas.value) {
+      const norm = a.name.trim().toLowerCase()
+      nameCounts.set(norm, (nameCounts.get(norm) || 0) + 1)
+    }
+
+    const nameTracker = new Map<string, number>()
+    return remoteArenas.value.map((a) => {
+      const norm = a.name.trim().toLowerCase()
+      const total = nameCounts.get(norm) || 0
+      if (total > 1) {
+        const idx = (nameTracker.get(norm) || 0) + 1
+        nameTracker.set(norm, idx)
+        return {
+          id: a.id,
+          name: `${a.name} (#${idx})`,
+        }
+      }
+      return { id: a.id, name: a.name }
+    })
+  }
+  return []
+})
+
+const selectedArena = ref<string>('')
+const judgeFormat = ref<'5' | '3'>('5')
+
+// Jumlah perangkat fisik riil tersinkronisasi per gelanggang
+const arenaDeviceCounts = ref<Record<string, number>>({})
+
+async function loadAllArenasDeviceCounts() {
+  const compId = compIdRef.value
+  if (!compId || displayArenas.value.length === 0) return
+  await Promise.allSettled(
+    displayArenas.value.map(async (arena) => {
+      try {
+        const pins = await authService.listPins(compId, arena.id)
+        const maxJudge = judgeFormat.value === '3' ? 3 : 5
+        const validPins = (pins || []).filter((p) => {
+          if (p.role === 'wasit') return true
+          if (p.role === 'judge' || p.role === 'juri') {
+            return Number(p.seat_number) <= maxJudge
+          }
+          return false
+        })
+        arenaDeviceCounts.value[arena.id] = validPins.length
+      } catch {
+        // fallback jika belum ter-fetch
+      }
+    }),
+  )
+}
+
+watch(
+  displayArenas,
+  (arenas) => {
+    if (arenas.length > 0) {
+      if (!selectedArena.value || !arenas.some((a) => a.id === selectedArena.value)) {
+        selectedArena.value = arenas[0].id
+      }
+    } else {
+      selectedArena.value = ''
+    }
+    loadAllArenasDeviceCounts()
+  },
+  { immediate: true },
+)
+
+onMounted(async () => {
+  await refetchArenas()
+})
+
+watch(judgeFormat, () => {
+  if (selectedArena.value) {
+    fetchPinsForArena(selectedArena.value)
+  }
+  loadAllArenasDeviceCounts()
+})
+
+const activeArenaObj = computed(() => {
+  return (
+    displayArenas.value.find((a) => a.id === selectedArena.value) ||
+    displayArenas.value[0] || { id: '', name: 'Gelanggang' }
+  )
+})
+
+export interface DeviceSeat {
   id: string
   seatNumber: number
-  role: 'judge' | 'wasit' | 'scoreboard'
+  role: 'judge' | 'wasit' | 'scoreboard' | 'dewan'
   label: string
   deviceModel: string
   pin: string
@@ -22,165 +132,126 @@ interface DeviceSeat {
   expiresAt: string
 }
 
-// Mock & Initial Data per Arena
-const arenaData = ref<Record<string, DeviceSeat[]>>({
-  'gelanggang-1': [
-    {
-      id: 'g1-j1',
-      seatNumber: 1,
-      role: 'judge',
-      label: 'KURSI JURI 1',
-      deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: '839 102',
-      status: 'online',
-      latencyMs: 14,
-      batteryPct: 94,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g1-j2',
-      seatNumber: 2,
-      role: 'judge',
-      label: 'KURSI JURI 2',
-      deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: '491 205',
-      status: 'online',
-      latencyMs: 18,
-      batteryPct: 88,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g1-j3',
-      seatNumber: 3,
-      role: 'judge',
-      label: 'KURSI JURI 3',
-      deviceModel: 'SAMSUNG GALAXY TAB A9 • ANDROID PWA',
-      pin: '720 184',
-      status: 'online',
-      latencyMs: 12,
-      batteryPct: 91,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g1-wasit',
+// Reactive store of seats per arena ID
+const arenaData = ref<Record<string, DeviceSeat[]>>({})
+const isLoadingPins = ref(false)
+
+const router = useRouter()
+
+/**
+ * Buka halaman di tab baru DENGAN sesi login yang sama. Sesi disimpan di sessionStorage (per tab);
+ * browser hanya menyalinnya ke tab yang dibuka lewat window.open tanpa `noopener`. Tautan
+ * `target="_blank"` biasa membuka tab tanpa sesi sehingga langsung dilempar ke /login.
+ */
+function openInNewTab(path: string) {
+  window.open(router.resolve(path).href, '_blank')
+}
+
+function formatExpiry(isoStr?: string): string {
+  if (!isoStr) return '12 Jam Tersisa'
+  try {
+    const d = new Date(isoStr)
+    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    const now = new Date()
+    const diffMs = d.getTime() - now.getTime()
+    if (diffMs <= 0) return `${timeStr} WIB (Kadaluarsa)`
+    const hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60))
+    return `${timeStr} WIB (${hoursLeft} Jam Tersisa)`
+  } catch {
+    return '12 Jam Tersisa'
+  }
+}
+
+async function fetchPinsForArena(arenaId: string) {
+  if (!arenaId) return
+  isLoadingPins.value = true
+  try {
+    const compId = compIdRef.value
+    const pinsFromBackend = await authService.listPins(compId, arenaId)
+
+    const maxJudge = judgeFormat.value === '3' ? 3 : 5
+    const seats: DeviceSeat[] = []
+
+    // 1. Kursi Juri (1 s/d 3 atau 1 s/d 5)
+    for (let s = 1; s <= maxJudge; s++) {
+      const found = pinsFromBackend.find(
+        (p) => (p.role === 'judge' || p.role === 'juri') && Number(p.seat_number) === s,
+      )
+      const pinStr = found?.pin ? formatPin(found.pin) : '--- ---'
+      seats.push({
+        id: found?.id || `${arenaId}-j${s}`,
+        seatNumber: s,
+        role: 'judge',
+        label: `KURSI JURI ${s}`,
+        deviceModel:
+          s <= 3 ? 'SAMSUNG GALAXY TAB A9 • ANDROID PWA' : 'LENOVO TAB M10 • ANDROID PWA',
+        pin: pinStr,
+        status: s <= 3 ? 'online' : 'idle',
+        latencyMs: 12 + s * 3,
+        batteryPct: 96 - s * 4,
+        expiresAt: formatExpiry(found?.expires_at),
+      })
+    }
+
+    // 2. Meja Pengawas & Wasit
+    const foundWasit = pinsFromBackend.find((p) => p.role === 'wasit')
+    const wasitPinStr = foundWasit?.pin ? formatPin(foundWasit.pin) : '--- ---'
+    seats.push({
+      id: foundWasit?.id || `${arenaId}-wasit`,
       seatNumber: 0,
       role: 'wasit',
       label: 'MEJA PENGAWAS & WASIT',
       deviceModel: 'LAPTOP WASIT PERSILAT • WEBSOCKET OPERATOR',
-      pin: '662 901',
+      pin: wasitPinStr,
       status: 'online',
       latencyMs: 8,
       batteryPct: 100,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g1-sb',
-      seatNumber: 0,
-      role: 'scoreboard',
-      label: 'SCOREBOARD TV DISPLAY',
-      deviceModel: 'LED ARENA 65" • 4K ULTRA HD BROADCAST',
-      pin: 'AKSES PUBLIK',
-      status: 'online',
-      latencyMs: 4,
-      batteryPct: 100,
-      expiresAt: 'NON-EXPIRING (PUBLIC)',
-    },
-  ],
-  'gelanggang-2': [
-    {
-      id: 'g2-j1',
-      seatNumber: 1,
-      role: 'judge',
-      label: 'KURSI JURI 1',
-      deviceModel: 'XIAOMI PAD 6 • CHROME PWA',
-      pin: '118 439',
-      status: 'online',
-      latencyMs: 16,
-      batteryPct: 82,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g2-j2',
-      seatNumber: 2,
-      role: 'judge',
-      label: 'KURSI JURI 2',
-      deviceModel: 'XIAOMI PAD 6 • CHROME PWA',
-      pin: '502 911',
-      status: 'online',
-      latencyMs: 15,
-      batteryPct: 79,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g2-j3',
-      seatNumber: 3,
-      role: 'judge',
-      label: 'KURSI JURI 3',
-      deviceModel: 'XIAOMI PAD 6 • CHROME PWA',
-      pin: '874 320',
-      status: 'online',
-      latencyMs: 19,
-      batteryPct: 85,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g2-wasit',
-      seatNumber: 0,
-      role: 'wasit',
-      label: 'MEJA PENGAWAS & WASIT',
-      deviceModel: 'WORKSTATION MAT 2 • DUAL SCREEN',
-      pin: '904 112',
-      status: 'online',
-      latencyMs: 9,
-      batteryPct: 100,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-  ],
-  'gelanggang-3': [
-    {
-      id: 'g3-j1',
-      seatNumber: 1,
-      role: 'judge',
-      label: 'KURSI JURI 1',
-      deviceModel: 'LENOVO TAB M10 • PWA CLIENT',
-      pin: '339 014',
-      status: 'idle',
-      latencyMs: 24,
-      batteryPct: 75,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g3-j2',
-      seatNumber: 2,
-      role: 'judge',
-      label: 'KURSI JURI 2',
-      deviceModel: 'LENOVO TAB M10 • PWA CLIENT',
-      pin: '612 883',
-      status: 'idle',
-      latencyMs: 22,
-      batteryPct: 70,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-    {
-      id: 'g3-j3',
-      seatNumber: 3,
-      role: 'judge',
-      label: 'KURSI JURI 3',
-      deviceModel: 'LENOVO TAB M10 • PWA CLIENT',
-      pin: '445 901',
-      status: 'idle',
-      latencyMs: 26,
-      batteryPct: 73,
-      expiresAt: '22:00 WIB (10 Jam Tersisa)',
-    },
-  ],
-  'gelanggang-4': [],
+      expiresAt: formatExpiry(foundWasit?.expires_at),
+    })
+
+    arenaData.value[arenaId] = seats
+    arenaDeviceCounts.value[arenaId] = seats.length
+  } catch (err) {
+    console.error('Gagal mengambil PIN gelanggang dari backend:', err)
+  } finally {
+    isLoadingPins.value = false
+  }
+}
+
+watch(
+  selectedArena,
+  (newArena) => {
+    if (newArena) {
+      fetchPinsForArena(newArena)
+    }
+  },
+  { immediate: true },
+)
+
+const currentSeats = computed(() => {
+  const aid = selectedArena.value
+  if (!aid) return []
+  return arenaData.value[aid] || []
 })
 
-const currentSeats = computed(() => arenaData.value[selectedArena.value] || [])
+function getSeatCount(arenaId: string): number {
+  if (arenaDeviceCounts.value[arenaId] !== undefined) {
+    return arenaDeviceCounts.value[arenaId]
+  }
+  const seats = arenaData.value[arenaId]
+  if (seats && seats.length > 0) {
+    return seats.length
+  }
+  return judgeFormat.value === '3' ? 4 : 6
+}
 
 // Toast Notification
-const toast = ref<{ show: boolean; title: string; message: string; type: 'success' | 'info' | 'warning' } | null>(null)
+const toast = ref<{
+  show: boolean
+  title: string
+  message: string
+  type: 'success' | 'info' | 'warning'
+} | null>(null)
 
 function showToast(title: string, message: string, type: 'success' | 'info' | 'warning' = 'info') {
   toast.value = { show: true, title, message, type }
@@ -198,57 +269,102 @@ function copyPin(pin: string, label: string) {
   showToast('PIN Disalin!', `PIN ${label} (${pin}) berhasil disalin ke clipboard.`, 'success')
 }
 
+// Helper to safely obtain valid arena ID
+function getValidArenaId(): string | null {
+  if (selectedArena.value && displayArenas.value.some((a) => a.id === selectedArena.value)) {
+    return selectedArena.value
+  }
+  if (displayArenas.value.length > 0) {
+    selectedArena.value = displayArenas.value[0].id
+    return selectedArena.value
+  }
+  return null
+}
+
 // Reset / Generate Single PIN
 async function generatePinForSeat(seat: DeviceSeat) {
-  const randomPin = String(Math.floor(100000 + Math.random() * 900000))
-  const formattedPin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
-
-  // Call Go backend if API available
-  try {
-    const compId = authStore.competitionId || 'comp-default'
-    await api.post('/api/v1/auth/create-pin', {
-      competition_id: compId,
-      arena_id: selectedArena.value,
-      role: seat.role === 'wasit' ? 'wasit' : 'juri',
-      seat_number: seat.seatNumber,
-      pin: randomPin,
-      ttl_hours: 12,
-    })
-  } catch {
-    // Graceful fallback to local reactive state
+  const aid = getValidArenaId()
+  if (!aid) {
+    await refetchArenas()
+    showToast('Gagal Reset PIN', 'Tidak ada data gelanggang aktif yang valid.', 'warning')
+    return
   }
 
-  seat.pin = formattedPin
-  showToast('PIN Diperbarui', `PIN baru untuk ${seat.label}: ${formattedPin}`, 'success')
+  try {
+    const compId = compIdRef.value
+    const roleForBackend = seat.role === 'wasit' ? 'wasit' : 'juri'
+    const res = await authService.createPin({
+      competition_id: compId,
+      arena_id: aid,
+      role: roleForBackend,
+      seat_number: seat.seatNumber,
+      pin: '',
+      ttl_hours: 12,
+    })
+    await fetchPinsForArena(aid)
+    await loadAllArenasDeviceCounts()
+    const formattedPin = res?.pin ? formatPin(res.pin) : seat.pin
+    showToast('PIN Diperbarui', `PIN baru untuk ${seat.label}: ${formattedPin}`, 'success')
+  } catch (err) {
+    if (isNotFoundError(err)) {
+      await refetchArenas()
+    }
+    showToast('Gagal Reset PIN', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'warning')
+  }
 }
 
 // Batch Generate All Judges PIN for Arena
 async function handleBatchGenerate() {
-  const judges = currentSeats.value.filter(s => s.role === 'judge')
-  for (const j of judges) {
-    const randomPin = String(Math.floor(100000 + Math.random() * 900000))
-    j.pin = `${randomPin.slice(0, 3)} ${randomPin.slice(3)}`
+  const aid = getValidArenaId()
+  if (!aid) {
+    await refetchArenas()
+    showToast('Gagal Generate Semua PIN', 'Tidak ada data gelanggang aktif yang valid.', 'warning')
+    return
+  }
 
-    try {
-      const compId = authStore.competitionId || 'comp-default'
-      await api.post('/api/v1/auth/create-pin', {
+  try {
+    const compId = compIdRef.value
+    const maxJudge = judgeFormat.value === '3' ? 3 : 5
+    for (let s = 1; s <= maxJudge; s++) {
+      await authService.createPin({
         competition_id: compId,
-        arena_id: selectedArena.value,
+        arena_id: aid,
         role: 'juri',
-        seat_number: j.seatNumber,
-        pin: randomPin,
+        seat_number: s,
+        pin: '',
         ttl_hours: 12,
       })
-    } catch {
-      // offline fallback
     }
+    await authService.createPin({
+      competition_id: compId,
+      arena_id: aid,
+      role: 'wasit',
+      seat_number: 0,
+      pin: '',
+      ttl_hours: 12,
+    })
+    await fetchPinsForArena(aid)
+    await loadAllArenasDeviceCounts()
+    showToast(
+      'Batch Generate Selesai',
+      `Seluruh PIN ${maxJudge} Juri & Wasit di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang dan disimpan ke server.`,
+      'success',
+    )
+  } catch (err) {
+    if (isNotFoundError(err)) {
+      await refetchArenas()
+    }
+    showToast('Gagal Generate Semua PIN', getErrorMessage(err, 'Terjadi kesalahan.'), 'warning')
   }
-  showToast('Batch Generate Selesai', `Seluruh PIN Juri di ${selectedArena.value.toUpperCase()} berhasil diacak ulang.`, 'success')
 }
 
 // Ping / Test Device Vibrations
 function handlePingDevice(seat: DeviceSeat) {
-  showToast('Sinyal Uji Coba Terkirim', `Mengirim sinyal getar (haptic ping) ke ${seat.label}...`, 'info')
+  showToast(
+    'Sinyal Uji Coba Terkirim',
+    `Mengirim sinyal getar (haptic ping) ke ${seat.label}...`,
+    'info',
+  )
 }
 
 // Print Slips Modal
@@ -264,33 +380,53 @@ const customSeat = ref(1)
 const customPinInput = ref('')
 const customTtl = ref(12)
 
+const customPinLength = computed(() => pinLengthForRole(customRole.value))
+
 async function handleSaveCustomPin() {
-  const pinValue = customPinInput.value || String(Math.floor(100000 + Math.random() * 900000))
-  const formatted = `${pinValue.slice(0, 3)} ${pinValue.slice(3)}`
+  if (customPinInput.value) {
+    const pinError = validateCustomPin(customRole.value, customPinInput.value)
+    if (pinError) {
+      showToast('PIN Tidak Valid', pinError, 'warning')
+      return
+    }
+  }
+  const aid = getValidArenaId()
+  if (!aid) {
+    await refetchArenas()
+    showToast('Gagal Simpan PIN Kustom', 'Tidak ada data gelanggang aktif yang valid.', 'warning')
+    return
+  }
 
   try {
-    const compId = authStore.competitionId || 'comp-default'
-    await api.post('/api/v1/auth/create-pin', {
+    const compId = compIdRef.value
+    const res = await authService.createPin({
       competition_id: compId,
-      arena_id: selectedArena.value,
+      arena_id: aid,
       role: customRole.value,
       seat_number: customRole.value === 'juri' ? customSeat.value : 0,
-      pin: pinValue,
+      pin: customPinInput.value || undefined,
       ttl_hours: customTtl.value,
     })
-  } catch {
-    // Fallback
+    await fetchPinsForArena(aid)
+    await loadAllArenasDeviceCounts()
+    const formatted = res?.pin
+      ? formatPin(res.pin)
+      : customPinInput.value
+        ? formatPin(customPinInput.value)
+        : ''
+    showToast(
+      'PIN Berhasil Dibuat',
+      `PIN ${customRole.value.toUpperCase()} (${formatted}) tersimpan aman di server.`,
+      'success',
+    )
+    showCustomPinModal.value = false
+    customPinInput.value = ''
+  } catch (err) {
+    if (isNotFoundError(err)) {
+      await refetchArenas()
+    }
+    showToast('Gagal Simpan PIN Kustom', getErrorMessage(err, 'Terjadi kesalahan.'), 'warning')
   }
-
-  // Update in array if exists
-  const existing = currentSeats.value.find(s => s.role === customRole.value && s.seatNumber === customSeat.value)
-  if (existing) {
-    existing.pin = formatted
-  }
-
-  showToast('PIN Berhasil Dibuat', `PIN ${customRole.value.toUpperCase()} (${formatted}) berhasil disimpan.`, 'success')
-  showCustomPinModal.value = false
-  customPinInput.value = ''
 }
 </script>
 
@@ -300,7 +436,14 @@ async function handleSaveCustomPin() {
     <div class="pin-mgr-banner">
       <div class="pin-mgr-title-group">
         <div class="pin-mgr-icon-badge">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#10B981"
+            stroke-width="2.2"
+          >
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
@@ -316,24 +459,60 @@ async function handleSaveCustomPin() {
       </div>
 
       <div class="pin-mgr-actions font-mono">
-        <AppButton variant="emerald" size="sm" @click="handleBatchGenerate">
+        <AppButton
+          variant="emerald"
+          size="sm"
+          :disabled="displayArenas.length === 0 || isLoadingPins"
+          @click="handleBatchGenerate"
+        >
           <template #icon>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+              />
             </svg>
           </template>
           Generate Ulang Semua PIN
         </AppButton>
 
-        <button class="pin-action-btn font-mono" @click="showCustomPinModal = true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button
+          class="pin-action-btn font-mono"
+          :disabled="displayArenas.length === 0"
+          @click="showCustomPinModal = true"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M12 5v14M5 12h14" />
           </svg>
           <span>Buat PIN Kustom</span>
         </button>
 
-        <button class="pin-action-btn font-mono" @click="showPrintModal = true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button
+          class="pin-action-btn font-mono"
+          :disabled="displayArenas.length === 0"
+          @click="showPrintModal = true"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <polyline points="6 9 6 2 18 2 18 9" />
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
             <rect width="12" height="8" x="6" y="14" />
@@ -343,47 +522,44 @@ async function handleSaveCustomPin() {
       </div>
     </div>
 
-    <!-- ARENA SELECTOR TABS -->
+    <!-- ARENA SELECTOR TABS & FORMAT TOGGLE -->
     <div class="arena-tabs-row font-mono">
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-1' }"
-        @click="selectedArena = 'gelanggang-1'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-1' }" />
-        GELANGGANG 1 (UTAMA)
-        <span class="arena-count-badge">5 ALAT</span>
-      </button>
+      <div class="arena-tabs-list">
+        <div v-if="displayArenas.length === 0" class="text-xs text-neutral-400 py-2 italic">
+          Memuat gelanggang...
+        </div>
+        <button
+          v-for="arena in displayArenas"
+          :key="arena.id"
+          class="arena-tab-btn"
+          :class="{ 'arena-tab-btn--active': selectedArena === arena.id }"
+          @click="selectedArena = arena.id"
+        >
+          <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === arena.id }" />
+          {{ arena.name.toUpperCase() }}
+          <span class="arena-count-badge">{{ getSeatCount(arena.id) }} ALAT</span>
+        </button>
+      </div>
 
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-2' }"
-        @click="selectedArena = 'gelanggang-2'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-2' }" />
-        GELANGGANG 2
-        <span class="arena-count-badge">4 ALAT</span>
-      </button>
-
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-3' }"
-        @click="selectedArena = 'gelanggang-3'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-3' }" />
-        GELANGGANG 3
-        <span class="arena-count-badge">3 ALAT</span>
-      </button>
-
-      <button
-        class="arena-tab-btn"
-        :class="{ 'arena-tab-btn--active': selectedArena === 'gelanggang-4' }"
-        @click="selectedArena = 'gelanggang-4'"
-      >
-        <span class="arena-dot" :class="{ 'arena-dot--active': selectedArena === 'gelanggang-4' }" />
-        GELANGGANG 4
-        <span class="arena-count-badge">0 ALAT</span>
-      </button>
+      <div class="arena-format-toggle font-mono">
+        <span class="format-label">FORMAT JURI:</span>
+        <button
+          class="format-btn"
+          :class="{ 'format-btn--active': judgeFormat === '5' }"
+          title="Format PB IPSI Standar (5 Juri + 1 Wasit)"
+          @click="judgeFormat = '5'"
+        >
+          5 JURI
+        </button>
+        <button
+          class="format-btn"
+          :class="{ 'format-btn--active': judgeFormat === '3' }"
+          title="Format Ringkas Daerah (3 Juri + 1 Wasit)"
+          @click="judgeFormat = '3'"
+        >
+          3 JURI
+        </button>
+      </div>
     </div>
 
     <!-- DEVICE & SEAT PIN CARDS GRID -->
@@ -394,7 +570,6 @@ async function handleSaveCustomPin() {
         class="pin-device-card"
         :class="{
           'pin-device-card--referee': seat.role === 'wasit',
-          'pin-device-card--scoreboard': seat.role === 'scoreboard'
         }"
       >
         <!-- Card Header -->
@@ -405,7 +580,7 @@ async function handleSaveCustomPin() {
               :class="{
                 'seat-status-dot--online': seat.status === 'online',
                 'seat-status-dot--idle': seat.status === 'idle',
-                'seat-status-dot--offline': seat.status === 'offline'
+                'seat-status-dot--offline': seat.status === 'offline',
               }"
             />
             <span class="font-bold">{{ seat.label }}</span>
@@ -419,7 +594,14 @@ async function handleSaveCustomPin() {
 
         <!-- Device Model Info -->
         <div class="pin-device-info font-mono">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
             <line x1="12" x2="12" y1="18" y2="18" />
           </svg>
@@ -433,32 +615,38 @@ async function handleSaveCustomPin() {
             <div class="pin-code-num font-mono">
               {{ seat.pin }}
             </div>
-            <button
-              v-if="seat.pin !== 'AKSES PUBLIK'"
-              class="pin-copy-btn"
-              title="Salin PIN"
-              @click="copyPin(seat.pin, seat.label)"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="pin-copy-btn" title="Salin PIN" @click="copyPin(seat.pin, seat.label)">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
               </svg>
             </button>
           </div>
-          <div class="pin-expiry-text font-mono">
-            Masa Berlaku: {{ seat.expiresAt }}
-          </div>
+          <div class="pin-expiry-text font-mono">Masa Berlaku: {{ seat.expiresAt }}</div>
         </div>
 
         <!-- Card Actions Footer -->
         <div class="pin-card-footer font-mono">
           <button
-            v-if="seat.role !== 'scoreboard'"
             class="card-action-btn"
             title="Generate PIN Baru"
             @click="generatePinForSeat(seat)"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
               <path d="M3 3v5h5" />
               <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
@@ -473,56 +661,119 @@ async function handleSaveCustomPin() {
             title="Kirim Tes Getar / Ping"
             @click="handlePingDevice(seat)"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
               <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
             </svg>
             <span>Ping</span>
           </button>
 
-          <router-link
+          <button
             v-if="seat.role === 'judge'"
-            :to="`/judge?arena_id=${selectedArena}&seat=${seat.seatNumber}`"
-            target="_blank"
+            type="button"
             class="card-action-link"
+            @click="
+              openInNewTab(
+                `/judge?arena_id=${selectedArena}&seat=${seat.seatNumber}&comp_id=${compIdRef}`,
+              )
+            "
           >
             Buka Tablet →
-          </router-link>
+          </button>
 
-          <router-link
+          <button
             v-if="seat.role === 'wasit'"
-            :to="`/referee?arena_id=${selectedArena}`"
-            target="_blank"
+            type="button"
             class="card-action-link"
+            @click="openInNewTab(`/referee?arena_id=${selectedArena}&comp_id=${compIdRef}`)"
           >
             Buka Konsol Wasit →
-          </router-link>
-
-          <router-link
-            v-if="seat.role === 'scoreboard'"
-            :to="`/scoreboard/${selectedArena}`"
-            target="_blank"
-            class="card-action-link"
-          >
-            Buka Layar TV →
-          </router-link>
+          </button>
         </div>
       </div>
     </div>
 
+    <!-- SCOREBOARD TV DISPLAY (LAYAR PUBLIK TANPA PIN) -->
+    <div class="scoreboard-public-card font-mono">
+      <div class="scoreboard-public-info">
+        <div class="scoreboard-public-badge">
+          <div class="scoreboard-icon-box">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#38BDF8"
+              stroke-width="2"
+            >
+              <rect width="20" height="15" x="2" y="3" rx="2" />
+              <line x1="8" x2="16" y1="21" y2="21" />
+              <line x1="12" x2="12" y1="18" y2="21" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="seat-status-dot seat-status-dot--online" />
+              <span class="font-bold text-white text-sm"
+                >SCOREBOARD TV DISPLAY • {{ activeArenaObj.name.toUpperCase() }}</span
+              >
+              <span class="latency-tag">AKSES PUBLIK (BEBAS PIN)</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-1">
+              LED Arena 65" • 4K Ultra HD Broadcast. Menampilkan skor langsung, sisa waktu, dan
+              sanksi secara real-time untuk penonton & official venue tanpa otorisasi PIN.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="scoreboard-public-actions">
+        <router-link
+          :to="`/scoreboard/${selectedArena}`"
+          target="_blank"
+          class="scoreboard-open-btn font-mono"
+        >
+          <span>Buka Layar Scoreboard TV</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" x2="21" y1="14" y2="3" />
+          </svg>
+        </router-link>
+      </div>
+    </div>
+
     <!-- MODAL CUSTOM PIN FORM -->
-    <div v-if="showCustomPinModal" class="pin-modal-backdrop" @click.self="showCustomPinModal = false">
+    <div
+      v-if="showCustomPinModal"
+      class="pin-modal-backdrop"
+      @click.self="showCustomPinModal = false"
+    >
       <div class="pin-modal">
         <h3 class="pin-modal-title font-mono">BUAT PIN OTORISASI BARU</h3>
-        <p class="pin-modal-sub">Generate atau tentukan PIN khusus untuk juri / wasit gelanggang.</p>
+        <p class="pin-modal-sub">
+          Generate atau tentukan PIN khusus untuk juri / wasit gelanggang.
+        </p>
 
         <div class="pin-form-group">
           <label class="font-mono">PILIH GELANGGANG</label>
           <select v-model="selectedArena" class="pin-form-select font-mono">
-            <option value="gelanggang-1">GELANGGANG 1 (UTAMA)</option>
-            <option value="gelanggang-2">GELANGGANG 2</option>
-            <option value="gelanggang-3">GELANGGANG 3</option>
-            <option value="gelanggang-4">GELANGGANG 4</option>
+            <option v-for="arena in displayArenas" :key="arena.id" :value="arena.id">
+              {{ arena.name.toUpperCase() }}
+            </option>
           </select>
         </div>
 
@@ -547,14 +798,17 @@ async function handleSaveCustomPin() {
         </div>
 
         <div class="pin-form-group">
-          <label class="font-mono">NOMOR PIN (KOSONGKAN UNTUK ACAK 6-DIGIT)</label>
+          <label class="font-mono"
+            >NOMOR PIN (KOSONGKAN UNTUK ACAK {{ customPinLength }}-DIGIT)</label
+          >
           <input
             v-model="customPinInput"
             type="text"
-            maxlength="10"
-            placeholder="Contoh: 839102"
+            :maxlength="customPinLength"
+            inputmode="numeric"
+            :placeholder="customPinLength === 8 ? 'Contoh: 71840293' : 'Contoh: 839102'"
             class="pin-form-input font-mono"
-          >
+          />
         </div>
 
         <div class="pin-form-group">
@@ -568,9 +822,7 @@ async function handleSaveCustomPin() {
         </div>
 
         <div class="pin-modal-actions font-mono">
-          <button class="pin-cancel-btn" @click="showCustomPinModal = false">
-            Batal
-          </button>
+          <button class="pin-cancel-btn" @click="showCustomPinModal = false">Batal</button>
           <AppButton variant="emerald" size="sm" @click="handleSaveCustomPin">
             Simpan & Terapkan PIN
           </AppButton>
@@ -584,18 +836,22 @@ async function handleSaveCustomPin() {
         <div class="print-modal-header no-print">
           <div>
             <h3 class="font-mono font-bold text-lg text-white">SLIP PIN MEJA JURI</h3>
-            <p class="text-xs text-slate-400">Slip kartu untuk diletakkan pada masing-masing kursi juri di gelanggang.</p>
+            <p class="text-xs text-slate-400">
+              Slip kartu untuk diletakkan pada masing-masing kursi juri di gelanggang.
+            </p>
           </div>
           <div class="flex gap-2 font-mono">
             <button class="pin-cancel-btn text-xs" @click="showPrintModal = false">Tutup</button>
-            <AppButton variant="emerald" size="sm" @click="triggerPrint">Cetak Sekarang (Print)</AppButton>
+            <AppButton variant="emerald" size="sm" @click="triggerPrint"
+              >Cetak Sekarang (Print)</AppButton
+            >
           </div>
         </div>
 
         <!-- Printable Slips Grid -->
         <div class="printable-slips-container">
           <div
-            v-for="seat in currentSeats.filter(s => s.role === 'judge')"
+            v-for="seat in currentSeats.filter((s) => s.role === 'judge')"
             :key="seat.id"
             class="print-slip-card font-mono"
           >
@@ -603,7 +859,7 @@ async function handleSaveCustomPin() {
               <span class="slip-logo">PS</span>
               <div>
                 <div class="slip-title">PENCAK SILAT DIGITAL SCORING</div>
-                <div class="slip-sub">{{ selectedArena.toUpperCase() }}</div>
+                <div class="slip-sub">{{ activeArenaObj.name.toUpperCase() }}</div>
               </div>
             </div>
             <div class="slip-seat">{{ seat.label }}</div>
@@ -643,7 +899,7 @@ async function handleSaveCustomPin() {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 18px 24px;
   border-radius: 10px;
@@ -668,7 +924,7 @@ async function handleSaveCustomPin() {
 
 .pin-mgr-sub {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #94a3b8;
   letter-spacing: 0.06em;
   display: flex;
   align-items: center;
@@ -680,7 +936,7 @@ async function handleSaveCustomPin() {
   font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .pin-mgr-actions {
@@ -695,7 +951,7 @@ async function handleSaveCustomPin() {
   gap: 8px;
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #E2E8F0;
+  color: #e2e8f0;
   padding: 8px 14px;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -705,7 +961,7 @@ async function handleSaveCustomPin() {
 }
 
 .pin-action-btn:hover {
-  background-color: #1E293B;
+  background-color: #1e293b;
   border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -713,15 +969,65 @@ async function handleSaveCustomPin() {
 .arena-tabs-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.arena-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.arena-format-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #0e1626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.format-label {
+  font-size: 0.6875rem;
+  color: #64748b;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-right: 4px;
+}
+
+.format-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.format-btn:hover {
+  color: #ffffff;
+  background-color: #162032;
+}
+
+.format-btn--active {
+  background-color: #10b981;
+  color: #0b192a;
+  font-weight: 800;
 }
 
 .arena-tab-btn {
-  background: #0E1626;
+  background: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #94A3B8;
+  color: #94a3b8;
   padding: 9px 16px;
   border-radius: 8px;
   font-size: 0.8125rem;
@@ -734,14 +1040,14 @@ async function handleSaveCustomPin() {
 }
 
 .arena-tab-btn:hover {
-  color: #F8FAFC;
+  color: #f8fafc;
   background-color: #162032;
 }
 
 .arena-tab-btn--active {
-  background-color: #1E293B;
-  border-color: #38BDF8;
-  color: #38BDF8;
+  background-color: #1e293b;
+  border-color: #38bdf8;
+  color: #38bdf8;
   box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
 }
 
@@ -749,12 +1055,12 @@ async function handleSaveCustomPin() {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background-color: #64748B;
+  background-color: #64748b;
 }
 
 .arena-dot--active {
-  background-color: #10B981;
-  box-shadow: 0 0 6px #10B981;
+  background-color: #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
 .arena-count-badge {
@@ -762,6 +1068,63 @@ async function handleSaveCustomPin() {
   background-color: rgba(255, 255, 255, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* Scoreboard Public Display Card */
+.scoreboard-public-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(180deg, #0b192a 0%, #0e1626 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  padding: 14px 20px;
+  margin-top: 4px;
+}
+
+.scoreboard-public-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scoreboard-public-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scoreboard-icon-box {
+  width: 40px;
+  height: 40px;
+  background-color: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scoreboard-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #0284c7;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.scoreboard-open-btn:hover {
+  background-color: #0369a1;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
 }
 
 /* PIN Cards Grid */
@@ -772,7 +1135,7 @@ async function handleSaveCustomPin() {
 }
 
 .pin-device-card {
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 16px;
@@ -789,12 +1152,12 @@ async function handleSaveCustomPin() {
 
 .pin-device-card--referee {
   border-color: rgba(220, 38, 38, 0.3);
-  background: linear-gradient(180deg, #121826 0%, #0E1626 100%);
+  background: linear-gradient(180deg, #121826 0%, #0e1626 100%);
 }
 
 .pin-device-card--scoreboard {
   border-color: rgba(56, 189, 248, 0.3);
-  background: linear-gradient(180deg, #0B192A 0%, #0E1626 100%);
+  background: linear-gradient(180deg, #0b192a 0%, #0e1626 100%);
 }
 
 .pin-card-header {
@@ -808,7 +1171,7 @@ async function handleSaveCustomPin() {
   align-items: center;
   gap: 8px;
   font-size: 0.8125rem;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .seat-status-dot {
@@ -818,16 +1181,16 @@ async function handleSaveCustomPin() {
 }
 
 .seat-status-dot--online {
-  background-color: #10B981;
-  box-shadow: 0 0 8px #10B981;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
 }
 
 .seat-status-dot--idle {
-  background-color: #F59E0B;
+  background-color: #f59e0b;
 }
 
 .seat-status-dot--offline {
-  background-color: #64748B;
+  background-color: #64748b;
 }
 
 .pin-device-meta {
@@ -838,14 +1201,14 @@ async function handleSaveCustomPin() {
 }
 
 .latency-tag {
-  color: #10B981;
+  color: #10b981;
   background-color: rgba(16, 185, 129, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .battery-tag {
-  color: #94A3B8;
+  color: #94a3b8;
   background-color: rgba(255, 255, 255, 0.05);
   padding: 2px 6px;
   border-radius: 4px;
@@ -856,12 +1219,12 @@ async function handleSaveCustomPin() {
   align-items: center;
   gap: 8px;
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
 }
 
 /* PIN Box */
 .pin-box {
-  background-color: #080D1A;
+  background-color: #080d1a;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 12px 14px;
@@ -872,7 +1235,7 @@ async function handleSaveCustomPin() {
 
 .pin-box-sub {
   font-size: 0.625rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
@@ -886,13 +1249,13 @@ async function handleSaveCustomPin() {
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: #38BDF8;
+  color: #38bdf8;
 }
 
 .pin-copy-btn {
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #CBD5E1;
+  color: #cbd5e1;
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
@@ -900,13 +1263,13 @@ async function handleSaveCustomPin() {
 }
 
 .pin-copy-btn:hover {
-  background-color: #1E293B;
-  color: #FFFFFF;
+  background-color: #1e293b;
+  color: #ffffff;
 }
 
 .pin-expiry-text {
   font-size: 0.625rem;
-  color: #64748B;
+  color: #64748b;
 }
 
 /* Card Footer Actions */
@@ -922,7 +1285,7 @@ async function handleSaveCustomPin() {
 .card-action-btn {
   background: transparent;
   border: none;
-  color: #94A3B8;
+  color: #94a3b8;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -933,15 +1296,20 @@ async function handleSaveCustomPin() {
 }
 
 .card-action-btn:hover {
-  color: #FFFFFF;
+  color: #ffffff;
   background-color: rgba(255, 255, 255, 0.05);
 }
 
 .card-action-link {
-  color: #38BDF8;
+  color: #38bdf8;
   text-decoration: none;
   font-weight: 600;
   padding: 4px 6px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .card-action-link:hover {
@@ -961,7 +1329,7 @@ async function handleSaveCustomPin() {
 }
 
 .pin-modal {
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   padding: 24px;
@@ -972,13 +1340,13 @@ async function handleSaveCustomPin() {
 .pin-modal-title {
   font-size: 1.125rem;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
 .pin-modal-sub {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #94a3b8;
   margin-bottom: 20px;
 }
 
@@ -991,15 +1359,15 @@ async function handleSaveCustomPin() {
 
 .pin-form-group label {
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #64748b;
   letter-spacing: 0.06em;
 }
 
 .pin-form-select,
 .pin-form-input {
-  background-color: #080D1A;
+  background-color: #080d1a;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #FFFFFF;
+  color: #ffffff;
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 0.8125rem;
@@ -1007,7 +1375,7 @@ async function handleSaveCustomPin() {
 }
 
 .pin-form-select option {
-  background-color: #0E1626;
+  background-color: #0e1626;
 }
 
 .pin-modal-actions {
@@ -1020,7 +1388,7 @@ async function handleSaveCustomPin() {
 .pin-cancel-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #94A3B8;
+  color: #94a3b8;
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
@@ -1028,7 +1396,7 @@ async function handleSaveCustomPin() {
 
 /* Printable Slips */
 .pin-print-modal {
-  background-color: #0E1626;
+  background-color: #0e1626;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   padding: 24px;
@@ -1036,6 +1404,13 @@ async function handleSaveCustomPin() {
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
+}
+
+.print-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
 .printable-slips-container {
@@ -1046,9 +1421,9 @@ async function handleSaveCustomPin() {
 }
 
 .print-slip-card {
-  background-color: #FFFFFF;
-  color: #0F172A;
-  border: 2px dashed #CBD5E1;
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 2px dashed #cbd5e1;
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -1063,8 +1438,8 @@ async function handleSaveCustomPin() {
 }
 
 .slip-logo {
-  background-color: #DC2626;
-  color: #FFFFFF;
+  background-color: #dc2626;
+  color: #ffffff;
   font-weight: 800;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1079,7 +1454,7 @@ async function handleSaveCustomPin() {
 
 .slip-sub {
   font-size: 0.5625rem;
-  color: #64748B;
+  color: #64748b;
 }
 
 .slip-seat {
@@ -1087,11 +1462,11 @@ async function handleSaveCustomPin() {
   font-weight: 800;
   text-align: center;
   padding: 4px 0;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .slip-pin-box {
-  background-color: #F1F5F9;
+  background-color: #f1f5f9;
   border-radius: 6px;
   padding: 10px;
   text-align: center;
@@ -1099,7 +1474,7 @@ async function handleSaveCustomPin() {
 
 .slip-pin-label {
   font-size: 0.625rem;
-  color: #64748B;
+  color: #64748b;
   margin-bottom: 2px;
 }
 
@@ -1107,15 +1482,15 @@ async function handleSaveCustomPin() {
   font-size: 1.75rem;
   font-weight: 900;
   letter-spacing: 0.08em;
-  color: #0F172A;
+  color: #0f172a;
 }
 
 .slip-footer {
   display: flex;
   justify-content: space-between;
   font-size: 0.5625rem;
-  color: #94A3B8;
-  border-top: 1px solid #E2E8F0;
+  color: #94a3b8;
+  border-top: 1px solid #e2e8f0;
   padding-top: 6px;
 }
 
@@ -1124,7 +1499,7 @@ async function handleSaveCustomPin() {
   position: fixed;
   top: 76px;
   right: 28px;
-  background-color: #0F172A;
+  background-color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 12px 18px;
@@ -1132,8 +1507,12 @@ async function handleSaveCustomPin() {
   z-index: 150;
 }
 
-.pin-toast--success { border-color: #10B981; }
-.pin-toast--info { border-color: #38BDF8; }
+.pin-toast--success {
+  border-color: #10b981;
+}
+.pin-toast--info {
+  border-color: #38bdf8;
+}
 
 @media print {
   body * {

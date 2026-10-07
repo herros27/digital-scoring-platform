@@ -4,11 +4,14 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/herros27/digital-scoring/internal/auth"
 	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/consensus"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/hub"
+	"github.com/herros27/digital-scoring/internal/orchestrator"
 	"github.com/herros27/digital-scoring/internal/service"
 	"github.com/herros27/digital-scoring/internal/store"
 )
@@ -25,7 +28,16 @@ func (h *MatchHandler) List(w http.ResponseWriter, r *http.Request) {
 	page, limit, _ := ParsePagination(r)
 	status := r.URL.Query().Get("status")
 
-	matches, total, err := h.Service.GetMatchesByCompetitionPaged(compID, status, page, limit)
+	var (
+		matches []store.Match
+		total   int
+		err     error
+	)
+	if arenaID := r.URL.Query().Get("arena_id"); arenaID != "" {
+		matches, total, err = h.Service.GetMatchesByArenaPaged(compID, arenaID, status, page, limit)
+	} else {
+		matches, total, err = h.Service.GetMatchesByCompetitionPaged(compID, status, page, limit)
+	}
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
@@ -62,42 +74,49 @@ func (h *MatchHandler) Create(w http.ResponseWriter, r *http.Request) {
 	Ok(w, m)
 }
 
-// GET /ws/arena/{arena_id}?token=eyJ...
-// WS upgrade — auth via query param (WS tidak support custom header saat handshake)
+// GET /ws/arena/{arena_id}[?token=eyJ...]
+// WS upgrade — auth via query param (WS tidak support custom header saat handshake).
+//
+//   - Tanpa token: penonton publik (scoreboard TV), role "scoreboard". Hanya bisa
+//     menerima siaran dan sync_request; semua perintah ditolak orchestrator.
+//     Hub tidak dibuat untuk penonton, sehingga arena yang belum punya pertandingan
+//     aktif dijawab 404 (klien akan mencoba lagi).
+//   - Dengan token PIN: arena pada token harus sama dengan arena yang dituju.
+//   - Dengan token login email (tanpa arena): hanya admin, dewan, dan wasit.
 func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 	arenaID := r.PathValue("arena_id")
 
 	tokenStr := r.URL.Query().Get("token")
 	if tokenStr == "" {
-		// Scoreboard display publik / penonton tidak memerlukan autentikasi
-		h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, "public-scoreboard", hub.RoleScoreboard, 0)
+		spectatorHub, err := h.HubManager.Get(arenaID)
+		if err != nil {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "no active match in this arena", nil)
+			return
+		}
+		spectatorHub.HandleWSWithSeat(w, r, "scoreboard-"+uuid.NewString(), hub.RoleScoreboard, 0)
 		return
 	}
+
 	claims, err := auth.ParseToken(tokenStr)
 	if err != nil {
 		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 		return
 	}
-
-	role := hub.Role(claims.Role)
-	if claims.Role == "juri" || claims.Role == "judge" {
-		role = hub.RoleJudge
-		if claims.ArenaID != "" && claims.ArenaID != arenaID {
-			Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch", nil)
-			return
-		}
-	} else if claims.Role == "wasit" || claims.Role == "referee" {
-		role = hub.RoleReferee
-	} else if claims.Role == "admin" || claims.Role == "dewan" {
-		role = hub.RoleAdmin
+	// Token PIN selalu terikat ke satu arena dan harus cocok. Token login email
+	// (tanpa arena) hanya diterima untuk petugas: admin, dewan, wasit.
+	unscopedOperator := claims.ArenaID == "" && hub.IsOperatorClaim(claims.Role)
+	if claims.ArenaID != arenaID && !unscopedOperator {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "token arena mismatch", nil)
+		return
 	}
 
+	// Token login email (admin/dewan/wasit) tidak membawa pin_id; beri ID unik per koneksi
 	clientID := claims.JudgePinID
 	if clientID == "" {
-		clientID = "client-" + string(role)
+		clientID = "official-" + uuid.NewString()
 	}
 
-	h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, clientID, role, claims.SeatNumber)
+	h.HubManager.GetOrCreate(arenaID).HandleWSWithSeat(w, r, clientID, hub.RoleFromClaim(claims.Role), claims.SeatNumber)
 }
 
 // POST /api/v1/competitions/{comp_id}/matches/{id}/load-arena
@@ -165,14 +184,56 @@ func (h *MatchHandler) Resume(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	matchID := r.PathValue("id")
-	if err := h.Service.FinishMatch(matchID); err != nil {
-		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+
+	// Body opsional: {"winner":"red"|"blue"} = keputusan wasit (wajib bila skor seri)
+	var req struct {
+		Winner string `json:"winner" validate:"omitempty,oneof=red blue"`
+		// Method dasar keputusan seri: extra_round | lighter_weight | coin_toss (kosong = keputusan wasit)
+		Method string `json:"method" validate:"omitempty,oneof=referee_decision extra_round lighter_weight coin_toss"`
+	}
+	if r.ContentLength != 0 {
+		if err := Decode(r, &req); err != nil {
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+			return
+		}
+	}
+
+	if err := h.Service.FinishMatchWithDecision(matchID, req.Winner, req.Method); err != nil {
+		code := "INVALID_STATE_TRANSITION"
+		if errors.Is(err, orchestrator.ErrTieNeedsDecision) {
+			code = "TIE_NEEDS_DECISION"
+		}
+		Fail(w, http.StatusBadRequest, code, err.Error(), nil)
 		return
 	}
 	if h.Cache != nil {
 		h.Cache.InvalidateCompetition(compID)
 	}
 	Ok(w, map[string]string{"status": "finished"})
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/outcome
+// Body: {"outcome":"ko|tko|walkover|withdrawal","winner":"red|blue","note":"..."}
+func (h *MatchHandler) Outcome(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	matchID := r.PathValue("id")
+	var req struct {
+		Outcome string `json:"outcome" validate:"required,oneof=ko tko walkover withdrawal"`
+		Winner  string `json:"winner" validate:"required,oneof=red blue"`
+		Note    string `json:"note" validate:"omitempty,max=200"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	if err := h.Service.DeclareOutcome(matchID, req.Outcome, req.Winner, req.Note); err != nil {
+		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]string{"status": "finished", "result_type": req.Outcome})
 }
 
 // POST /api/v1/competitions/{comp_id}/matches/{id}/cancel
@@ -187,6 +248,24 @@ func (h *MatchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		h.Cache.InvalidateCompetition(compID)
 	}
 	Ok(w, map[string]string{"status": "cancelled"})
+}
+
+// POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule
+func (h *MatchHandler) Reschedule(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	matchID := r.PathValue("id")
+	if err := h.Service.RescheduleMatch(matchID); err != nil {
+		status, code := http.StatusBadRequest, "INVALID_STATE_TRANSITION"
+		if errors.Is(err, domain.ErrMatchNotFound) {
+			status, code = http.StatusNotFound, "NOT_FOUND"
+		}
+		Fail(w, status, code, err.Error(), nil)
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]string{"status": "idle"})
 }
 
 // GET /api/v1/competitions/{comp_id}/matches/{id}/scores

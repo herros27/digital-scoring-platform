@@ -27,6 +27,75 @@ type Hub struct {
 	unregister chan *Client
 	// callback ke orchestrator
 	OnMessage func(arenaID string, client *Client, msg Message)
+	// onPresence dipanggil (di luar kunci hub) setiap ada klien yang terhubung/terputus
+	onPresence func()
+	// owner pemilik callback saat ini (orchestrator), dipakai Release agar tidak melepas milik partai lain
+	owner any
+}
+
+// Presence ringkasan perangkat yang sedang terhubung di arena.
+type Presence struct {
+	JudgeSeats  map[int]bool // nomor kursi juri yang online
+	Referees    int
+	Admins      int
+	Scoreboards int
+}
+
+// Presence menghitung perangkat yang terhubung saat ini.
+func (h *Hub) Presence() Presence {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	p := Presence{JudgeSeats: make(map[int]bool)}
+	for c := range h.clients {
+		switch {
+		case c.Role.IsJudge():
+			p.JudgeSeats[c.SeatNumber] = true
+		case c.Role == RoleReferee:
+			p.Referees++
+		case c.Role == RoleAdmin:
+			p.Admins++
+		case c.Role == RoleScoreboard:
+			p.Scoreboards++
+		}
+	}
+	return p
+}
+
+// Attach memasang owner (orchestrator) sebagai penerima pesan dan perubahan kehadiran arena ini.
+func (h *Hub) Attach(owner any, onMessage func(arenaID string, client *Client, msg Message), onPresence func()) {
+	h.mu.Lock()
+	h.owner = owner
+	h.OnMessage = onMessage
+	h.onPresence = onPresence
+	h.mu.Unlock()
+}
+
+// Release melepas callback bila owner masih pemiliknya; tidak berpengaruh bila partai lain
+// sudah dimuat ke arena ini. Setelah dilepas, sync_request tidak lagi dijawab partai lama.
+func (h *Hub) Release(owner any) {
+	h.mu.Lock()
+	if h.owner == owner {
+		h.owner = nil
+		h.OnMessage = nil
+		h.onPresence = nil
+	}
+	h.mu.Unlock()
+}
+
+// SetOnPresence memasang callback perubahan kehadiran (aman dipanggil saat hub berjalan).
+func (h *Hub) SetOnPresence(fn func()) {
+	h.mu.Lock()
+	h.onPresence = fn
+	h.mu.Unlock()
+}
+
+func (h *Hub) notifyPresence() {
+	h.mu.RLock()
+	fn := h.onPresence
+	h.mu.RUnlock()
+	if fn != nil {
+		fn()
+	}
 }
 
 func NewHub(arenaID string) *Hub {
@@ -48,21 +117,30 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			log.Printf("[hub:%s] client connected: %s (%s)", h.ArenaID, client.ID, client.Role)
 			metrics.IncWSConnections(h.ArenaID, string(client.Role))
+			h.notifyPresence()
 
 		case client := <-h.unregister:
 			h.mu.Lock()
+			removed := false
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
+				removed = true
 				log.Printf("[hub:%s] client disconnected: %s", h.ArenaID, client.ID)
 				metrics.DecWSConnections(h.ArenaID, string(client.Role))
 			}
 			h.mu.Unlock()
+			if removed {
+				h.notifyPresence()
+			}
 
 		case inbound := <-h.inbound:
 			// judge tidak bisa lihat input judge lain
-			if h.OnMessage != nil {
-				h.OnMessage(h.ArenaID, inbound.client, inbound.msg)
+			h.mu.RLock()
+			onMessage := h.OnMessage
+			h.mu.RUnlock()
+			if onMessage != nil {
+				onMessage(h.ArenaID, inbound.client, inbound.msg)
 			}
 		}
 	}

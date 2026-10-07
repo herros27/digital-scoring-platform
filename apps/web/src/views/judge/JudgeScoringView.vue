@@ -1,43 +1,87 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
+import { DEFAULT_TECHNIQUES } from '@/composables/techniques'
+import { useConsensusFeedback } from '@/composables/consensusFeedback'
+import type { WsTechniqueKind } from '@/composables/useWebSocket'
+import {
+  MATCH_STATUS_LABEL,
+  matchStatusFromState,
+  type MatchStatus,
+} from '@/composables/matchStatus'
 import { useHaptics } from '@/composables/useHaptics'
 import { generateUUID } from '@/lib/uuid'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/lib/api'
+import { authService } from '@/features/auth/api/authService'
+import { MAX_PIN_LENGTH, isCompletePin, pinLoginErrorMessage } from '@/features/auth/lib/pin'
+import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 // Query or session params
-const arenaId = computed(() => authStore.arenaId || (route.query.arena_id as string) || (route.params.arena_id as string) || 'gelanggang-1')
-const compId = computed(() => authStore.competitionId || (route.query.comp_id as string) || 'comp-default')
+const arenaId = computed(
+  () =>
+    authStore.arenaId ||
+    (route.query.arena_id as string) ||
+    (route.params.arena_id as string) ||
+    '',
+)
+const compId = computed(() => authStore.competitionId || (route.query.comp_id as string) || '')
 const judgeSeat = computed(() => authStore.seatNumber || Number(route.query.seat) || 1)
-const judgeName = computed(() => `JURI ${judgeSeat.value} • GELANGGANG ${arenaId.value.toUpperCase()}`)
+
+// Nama gelanggang dari server (ID hanya untuk koneksi, tidak ditampilkan ke pengguna)
+const arenaName = ref('')
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+async function loadArenaName() {
+  arenaName.value = ''
+  if (!authStore.token || !compId.value || !UUID_RE.test(arenaId.value)) return
+  try {
+    const arenas = await arenaService.getArenas(compId.value)
+    arenaName.value = arenas.find((a) => a.id === arenaId.value)?.name ?? ''
+  } catch {
+    // nama tidak tersedia: tampilan memakai label umum
+  }
+}
+watch([() => authStore.token, arenaId, compId], loadArenaName, { immediate: true })
+
+const arenaLabel = computed(() => (arenaName.value || 'GELANGGANG').toUpperCase())
+const judgeName = computed(() => `JURI ${judgeSeat.value} • ${arenaLabel.value}`)
 const judgeIdTag = computed(() => `JURI-ID #${String(judgeSeat.value).padStart(2, '0')}`)
 
 // --- Match Context ---
 const currentRound = ref(1)
-const roundStatus = ref('BERJALAN')
+const matchStatus = ref<MatchStatus>('idle')
+const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
+// Skor ditolak server saat istirahat; tombol dikunci agar juri tidak mengira input tercatat.
+const isBreak = computed(() => matchStatus.value === 'break')
+
+// Daftar tombol teknik mengikuti ruleset pertandingan yang dimuat (nilai poin dari server)
+const techniques = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
+const TECHNIQUE_HINT: Record<string, string> = {
+  technique: 'SERANGAN TANGAN SAH',
+  knockdown: 'SERANGAN KAKI SAH',
+  fall: 'TEKNIK BANTINGAN / SAPUAN',
+  catch_fall: 'TANGKAPAN LALU JATUHKAN',
+  combo_1_2: 'PUKULAN LALU TENDANGAN',
+  combo_1_1: 'DUA PUKULAN BERUNTUN',
+}
+// Lebih dari 4 teknik: tombol disusun dua kolom agar semuanya tetap terlihat tanpa menggulir
+const denseButtons = computed(() => techniques.value.length > 4)
+const techniqueHint = (type: string) => TECHNIQUE_HINT[type] ?? 'TEKNIK SAH'
 const latencyMs = ref(12)
 
-const redAthlete = ref({
-  name: 'AHMAD FAUZI',
-  team: 'KONTINGEN JAWA TENGAH',
-  category: 'KELAS C (55-60 KG)',
-})
+const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
+const blueAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', category: '' })
 
-const blueAthlete = ref({
-  name: 'BAYU PRATAMA',
-  team: 'KONTINGEN JAWA TIMUR',
-  category: 'KELAS C (55-60 KG)',
-})
-
-// Consensus Indicators (5 dots per side)
-const redConsensusDots = ref([true, true, true, false, false])
-const blueConsensusDots = ref([true, true, true, true, false])
+// Umpan balik konsensus: lampu per sudut = jumlah juri yang sudah sepakat (anonim), jumlah lampu = juri ruleset
+const feedback = useConsensusFeedback(() => techniques.value)
+feedback.attach()
+const redConsensusDots = feedback.dots('red')
+const blueConsensusDots = feedback.dots('blue')
 
 // Touch Logs
 interface TouchLog {
@@ -48,21 +92,22 @@ interface TouchLog {
   idempotencyKey: string
 }
 
-const lastRedTouch = ref<TouchLog | null>({
-  technique: 'PUKULAN',
-  points: 1,
-  target: 'red',
-  timeStr: '01:32',
-  idempotencyKey: 'init-red',
-})
+const lastRedTouch = ref<TouchLog | null>(null)
 
-const lastBlueTouch = ref<TouchLog | null>({
-  technique: 'TENDANGAN',
-  points: 2,
-  target: 'blue',
-  timeStr: '01:31',
-  idempotencyKey: 'init-blue',
-})
+const lastBlueTouch = ref<TouchLog | null>(null)
+
+// Nama atlet dari pertandingan yang sedang aktif di gelanggang ini (bila ada)
+async function loadAthleteNames() {
+  try {
+    const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
+    if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete
+    if (snapshot.blue_athlete) blueAthlete.value.name = snapshot.blue_athlete
+  } catch {
+    // tetap memakai placeholder
+  }
+}
+
+let syncedMatchId = ''
 
 // Haptics
 const haptics = useHaptics()
@@ -71,20 +116,21 @@ const haptics = useHaptics()
 const timer = useTimer()
 
 // Real-Time WebSocket
-const currentToken = computed(() => authStore.token || (sessionStorage.getItem('token') as string) || undefined)
+const currentToken = computed(() => authStore.token || undefined)
 const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value, currentToken.value)
 
 // Active button tap animation state
 const activeBtn = ref<string | null>(null)
 
 // PIN Modal State
-const showPinModal = ref(!authStore.isAuthenticated && route.query.demo !== 'true')
+const showPinModal = ref(!authStore.isAuthenticated)
 const pinInput = ref('')
+const pinSlots = computed(() => (pinInput.value.length > 6 ? 8 : 6))
 const pinError = ref('')
 const pinLoading = ref(false)
 
 function handlePinNumber(num: number | string) {
-  if (pinInput.value.length < 6) {
+  if (pinInput.value.length < MAX_PIN_LENGTH) {
     pinInput.value += String(num)
   }
 }
@@ -95,52 +141,37 @@ function handlePinClear() {
 }
 
 async function handlePinSubmit() {
-  if (pinInput.value.length < 4) {
-    pinError.value = 'PIN minimal 4 - 6 digit'
+  if (!isCompletePin(pinInput.value)) {
+    pinError.value = 'PIN harus 6 digit (juri) atau 8 digit (wasit)'
     return
   }
   pinLoading.value = true
   pinError.value = ''
   try {
-    const res = await api.post<{
-      token: string
-      role: 'judge'
-      seat_number: number
-      arena_id: string
-      competition_id: string
-    }>('/api/v1/auth/judge-login', {
-      competition_id: compId.value,
-      arena_id: arenaId.value,
-      pin: pinInput.value,
-    })
+    const res = await authService.judgeLogin({ pin: pinInput.value })
 
     authStore.setSession({
       token: res.token,
-      role: 'judge',
+      role: res.role || 'judge',
       seatNumber: res.seat_number,
       arenaId: res.arena_id,
       competitionId: res.competition_id,
     })
     showPinModal.value = false
-  } catch (err: any) {
-    pinError.value = err.message || 'PIN salah atau gagal terhubung ke backend server'
+  } catch (err) {
+    pinError.value = pinLoginErrorMessage(err)
   } finally {
     pinLoading.value = false
   }
 }
 
-function handleEnterDemo() {
-  authStore.setSession({
-    token: 'mock-judge-demo-token',
-    role: 'judge',
-    seatNumber: Number(route.query.seat) || 1,
-    arenaId: arenaId.value,
-    competitionId: compId.value,
-  })
+async function handleJudgeLogout() {
+  await authStore.logout()
   showPinModal.value = false
+  router.push('/judge/login')
 }
 
-function handleScoreTap(target: 'red' | 'blue', technique: 'technique' | 'knockdown' | 'fall', points: number, label: string) {
+function handleScoreTap(target: 'red' | 'blue', technique: string, points: number, label: string) {
   // 1. Tactile feedback
   haptics.trigger(50)
 
@@ -204,26 +235,55 @@ function handleCancelLast() {
 }
 
 onMounted(() => {
-  // Sync initial timer to 01:28 (88000ms) as shown in Figma 02_judge_tablet_pwa.png
-  timer.sync(88000, true)
+  void loadAthleteNames()
+
+  // Request state sync from backend hub
+  sendMessage('sync_request', {})
 
   onMessage('sync_response', (payload) => {
+    // partai baru dimuat ke gelanggang: muat ulang nama atlet
+    if (payload.match_id && payload.match_id !== syncedMatchId) {
+      syncedMatchId = payload.match_id
+      void loadAthleteNames()
+    }
+    if (payload.techniques?.length) techniques.value = payload.techniques
+    feedback.configure(payload.judge_count, payload.consensus?.majority)
+    matchStatus.value =
+      matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running)
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? false,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
+  onMessage('consensus_progress', (payload) => feedback.onProgress(payload))
+  onMessage('score_confirmed', (payload) => feedback.onConfirmed(payload))
+
   onMessage('state_change', (payload) => {
+    matchStatus.value =
+      matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
+    if (matchStatus.value === 'break' || matchStatus.value === 'finished') feedback.reset()
     if (payload.round) currentRound.value = payload.round
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, true)
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? true,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
   onMessage('timer_sync', (payload) => {
-    if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running)
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? false,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 })
@@ -252,11 +312,21 @@ onMounted(() => {
           BABAK {{ currentRound }} - {{ roundStatus }}
         </div>
         <div class="judge-timer-badge font-mono">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <span>{{ timer.formattedTime.value }}</span>
+        </div>
+        <div v-if="isBreak" class="judge-break-note font-mono">
+          Babak berikutnya dimulai otomatis dalam {{ timer.formattedTime.value }}
         </div>
       </div>
 
@@ -267,8 +337,17 @@ onMounted(() => {
         <span class="judge-chip-text">STATUS ARENA</span>
 
         <span class="judge-sync-chip">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#34D399"
+            stroke-width="2"
+          >
+            <path
+              d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+            />
           </svg>
           {{ latencyMs }}ms SYNCED
         </span>
@@ -280,7 +359,14 @@ onMounted(() => {
           title="Toggle Getaran / Haptics"
           @click="haptics.toggle"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
@@ -288,7 +374,14 @@ onMounted(() => {
 
         <!-- Cancel / Undo Button -->
         <button class="judge-batal-btn" @click="handleCancelLast">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
             <path d="M9 14 4 9l5-5" />
             <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
           </svg>
@@ -296,7 +389,14 @@ onMounted(() => {
         </button>
 
         <div class="judge-avatar" title="Ganti Sesi Juri / PIN" @click="showPinModal = true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
           </svg>
@@ -307,7 +407,14 @@ onMounted(() => {
     <!-- COMPLIANCE SUB-HEADER STRIP -->
     <section class="judge-compliance-strip font-mono">
       <div class="judge-comp-left">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#34D399"
+          stroke-width="2"
+        >
           <path d="m14 12-8.5 8.5a2.12 2.12 0 1 1-3-3L11 9" />
           <path d="M15 13 9 7l4-4 6 6z" />
         </svg>
@@ -315,7 +422,14 @@ onMounted(() => {
       </div>
 
       <div class="judge-comp-center">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" stroke-width="2">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#FCA5A5"
+          stroke-width="2"
+        >
           <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
           <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
           <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
@@ -338,9 +452,7 @@ onMounted(() => {
         <!-- Header Sudut Merah -->
         <div class="judge-corner__header">
           <div class="judge-athlete-info">
-            <div class="judge-corner-badge judge-corner-badge--red font-mono">
-              SUDUT MERAH
-            </div>
+            <div class="judge-corner-badge judge-corner-badge--red font-mono">SUDUT MERAH</div>
             <h2 class="judge-athlete-name">{{ redAthlete.name }}</h2>
             <div class="judge-athlete-meta font-mono">
               {{ redAthlete.team }} &bull; {{ redAthlete.category }}
@@ -354,97 +466,104 @@ onMounted(() => {
                 v-for="(on, idx) in redConsensusDots"
                 :key="idx"
                 class="judge-dot-light"
-                :class="{ 'judge-dot-light--red': on }"
+                :class="{
+                  'judge-dot-light--red': on,
+                  'judge-dot-light--confirmed': on && feedback.sides.red.confirmed,
+                }"
               />
             </div>
+            <span
+              v-if="feedback.sides.red.text"
+              class="judge-consensus-text"
+              :class="{ 'judge-consensus-text--ok': feedback.sides.red.confirmed }"
+              data-test="consensus-text-red"
+              >{{ feedback.sides.red.text }}</span
+            >
           </div>
         </div>
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Red -->
-        <div class="judge-buttons-list">
-          <!-- PUKULAN (+1) -->
+        <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
           <button
+            v-for="tech in techniques"
+            :key="tech.type"
             class="judge-btn judge-btn--red"
-            :class="{ 'judge-btn--active': activeBtn === 'red-technique' }"
-            @click="handleScoreTap('red', 'technique', 1, 'PUKULAN')"
+            :class="{ 'judge-btn--active': activeBtn === 'red-' + tech.type }"
+            :disabled="isBreak"
+            @click="handleScoreTap('red', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
-              <!-- Glove Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
-                <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <template v-if="tech.type === 'technique'">
+                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+                  <path
+                    d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+                  />
+                </template>
+                <template v-else-if="tech.type === 'knockdown'">
+                  <circle cx="16" cy="4" r="2" />
+                  <path d="m14 7-3 4-4-1" />
+                  <path d="m11 11 3 5 4-1" />
+                  <path d="m5 17 5-2" />
+                </template>
+                <template v-else>
+                  <circle cx="7" cy="5" r="2" />
+                  <path d="M5 9h6l4 5" />
+                  <path d="M6 14l2 5" />
+                  <path d="M12 17l6 2" />
+                </template>
               </svg>
             </div>
             <div class="judge-btn__label-group">
-              <span class="judge-btn__title">PUKULAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN TANGAN SAH</span>
+              <span class="judge-btn__title">{{ tech.label.toUpperCase() }}</span>
+              <span class="judge-btn__subtitle font-mono">{{ techniqueHint(tech.type) }}</span>
             </div>
-            <div class="judge-btn__pts font-mono">+1</div>
-          </button>
-
-          <!-- TENDANGAN (+2) -->
-          <button
-            class="judge-btn judge-btn--red"
-            :class="{ 'judge-btn--active': activeBtn === 'red-knockdown' }"
-            @click="handleScoreTap('red', 'knockdown', 2, 'TENDANGAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Martial Arts Leg/Kick Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="16" cy="4" r="2" />
-                <path d="m14 7-3 4-4-1" />
-                <path d="m11 11 3 5 4-1" />
-                <path d="m5 17 5-2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">TENDANGAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN KAKI SAH</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+2</div>
-          </button>
-
-          <!-- JATUHAN (+3) -->
-          <button
-            class="judge-btn judge-btn--red"
-            :class="{ 'judge-btn--active': activeBtn === 'red-fall' }"
-            @click="handleScoreTap('red', 'fall', 3, 'JATUHAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Takedown/Sweep Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="7" cy="5" r="2" />
-                <path d="M5 9h6l4 5" />
-                <path d="M6 14l2 5" />
-                <path d="M12 17l6 2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">JATUHAN</span>
-              <span class="judge-btn__subtitle font-mono">TEKNIK BANTINGAN / SAPUAN</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+3</div>
+            <div class="judge-btn__pts font-mono">+{{ tech.points }}</div>
           </button>
         </div>
 
         <!-- Touch Feedback Strip Red -->
         <footer class="judge-touch-strip font-mono">
           <div class="judge-touch-last">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
               <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
               <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
             </svg>
             <span v-if="lastRedTouch">
-              SENTUHAN TERAKHIR: <strong>{{ lastRedTouch.technique }} (+{{ lastRedTouch.points }})</strong> [{{ lastRedTouch.timeStr }}]
+              SENTUHAN TERAKHIR:
+              <strong>{{ lastRedTouch.technique }} (+{{ lastRedTouch.points }})</strong> [{{
+                lastRedTouch.timeStr
+              }}]
             </span>
             <span v-else class="text-slate-500">BELUM ADA SENTUHAN</span>
           </div>
 
           <div v-if="lastRedTouch" class="judge-touch-status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#34D399"
+              stroke-width="2.5"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span>TERCATAT</span>
@@ -457,9 +576,7 @@ onMounted(() => {
         <!-- Header Sudut Biru -->
         <div class="judge-corner__header">
           <div class="judge-athlete-info">
-            <div class="judge-corner-badge judge-corner-badge--blue font-mono">
-              SUDUT BIRU
-            </div>
+            <div class="judge-corner-badge judge-corner-badge--blue font-mono">SUDUT BIRU</div>
             <h2 class="judge-athlete-name">{{ blueAthlete.name }}</h2>
             <div class="judge-athlete-meta font-mono">
               {{ blueAthlete.team }} &bull; {{ blueAthlete.category }}
@@ -473,97 +590,104 @@ onMounted(() => {
                 v-for="(on, idx) in blueConsensusDots"
                 :key="idx"
                 class="judge-dot-light"
-                :class="{ 'judge-dot-light--blue': on }"
+                :class="{
+                  'judge-dot-light--blue': on,
+                  'judge-dot-light--confirmed': on && feedback.sides.blue.confirmed,
+                }"
               />
             </div>
+            <span
+              v-if="feedback.sides.blue.text"
+              class="judge-consensus-text"
+              :class="{ 'judge-consensus-text--ok': feedback.sides.blue.confirmed }"
+              data-test="consensus-text-blue"
+              >{{ feedback.sides.blue.text }}</span
+            >
           </div>
         </div>
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Blue -->
-        <div class="judge-buttons-list">
-          <!-- PUKULAN (+1) -->
+        <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
           <button
+            v-for="tech in techniques"
+            :key="tech.type"
             class="judge-btn judge-btn--blue"
-            :class="{ 'judge-btn--active': activeBtn === 'blue-technique' }"
-            @click="handleScoreTap('blue', 'technique', 1, 'PUKULAN')"
+            :class="{ 'judge-btn--active': activeBtn === 'blue-' + tech.type }"
+            :disabled="isBreak"
+            @click="handleScoreTap('blue', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
-              <!-- Glove Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
-                <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <template v-if="tech.type === 'technique'">
+                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+                  <path
+                    d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+                  />
+                </template>
+                <template v-else-if="tech.type === 'knockdown'">
+                  <circle cx="16" cy="4" r="2" />
+                  <path d="m14 7-3 4-4-1" />
+                  <path d="m11 11 3 5 4-1" />
+                  <path d="m5 17 5-2" />
+                </template>
+                <template v-else>
+                  <circle cx="7" cy="5" r="2" />
+                  <path d="M5 9h6l4 5" />
+                  <path d="M6 14l2 5" />
+                  <path d="M12 17l6 2" />
+                </template>
               </svg>
             </div>
             <div class="judge-btn__label-group">
-              <span class="judge-btn__title">PUKULAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN TANGAN SAH</span>
+              <span class="judge-btn__title">{{ tech.label.toUpperCase() }}</span>
+              <span class="judge-btn__subtitle font-mono">{{ techniqueHint(tech.type) }}</span>
             </div>
-            <div class="judge-btn__pts font-mono">+1</div>
-          </button>
-
-          <!-- TENDANGAN (+2) -->
-          <button
-            class="judge-btn judge-btn--blue"
-            :class="{ 'judge-btn--active': activeBtn === 'blue-knockdown' }"
-            @click="handleScoreTap('blue', 'knockdown', 2, 'TENDANGAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Kicking Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="16" cy="4" r="2" />
-                <path d="m14 7-3 4-4-1" />
-                <path d="m11 11 3 5 4-1" />
-                <path d="m5 17 5-2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">TENDANGAN</span>
-              <span class="judge-btn__subtitle font-mono">SERANGAN KAKI SAH</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+2</div>
-          </button>
-
-          <!-- JATUHAN (+3) -->
-          <button
-            class="judge-btn judge-btn--blue"
-            :class="{ 'judge-btn--active': activeBtn === 'blue-fall' }"
-            @click="handleScoreTap('blue', 'fall', 3, 'JATUHAN')"
-          >
-            <div class="judge-btn__icon-box">
-              <!-- Takedown Icon -->
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="7" cy="5" r="2" />
-                <path d="M5 9h6l4 5" />
-                <path d="M6 14l2 5" />
-                <path d="M12 17l6 2" />
-              </svg>
-            </div>
-            <div class="judge-btn__label-group">
-              <span class="judge-btn__title">JATUHAN</span>
-              <span class="judge-btn__subtitle font-mono">TEKNIK BANTINGAN / SAPUAN</span>
-            </div>
-            <div class="judge-btn__pts font-mono">+3</div>
+            <div class="judge-btn__pts font-mono">+{{ tech.points }}</div>
           </button>
         </div>
 
         <!-- Touch Feedback Strip Blue -->
         <footer class="judge-touch-strip font-mono">
           <div class="judge-touch-last">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
               <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
               <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
             </svg>
             <span v-if="lastBlueTouch">
-              SENTUHAN TERAKHIR: <strong>{{ lastBlueTouch.technique }} (+{{ lastBlueTouch.points }})</strong> [{{ lastBlueTouch.timeStr }}]
+              SENTUHAN TERAKHIR:
+              <strong>{{ lastBlueTouch.technique }} (+{{ lastBlueTouch.points }})</strong> [{{
+                lastBlueTouch.timeStr
+              }}]
             </span>
             <span v-else class="text-slate-500">BELUM ADA SENTUHAN</span>
           </div>
 
           <div v-if="lastBlueTouch" class="judge-touch-status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#34D399"
+              stroke-width="2.5"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span>TERCATAT</span>
@@ -574,15 +698,11 @@ onMounted(() => {
 
     <!-- BOTTOM COMPLIANCE STRIP -->
     <footer class="judge-bottom-bar font-mono">
-      <div class="judge-bottom__left">
-        STANDAR RESMI PB IPSI / PERSILAT 2024
-      </div>
+      <div class="judge-bottom__left">STANDAR RESMI PB IPSI / PERSILAT 2024</div>
       <div class="judge-bottom__center text-emerald-400">
         TRANSMISI TERENKRIPSI KE KETUA PERTANDINGAN
       </div>
-      <div class="judge-bottom__right">
-        TOTAL SKOR DISEMBUNYIKAN (ATURAN PERSILAT PASAL 28)
-      </div>
+      <div class="judge-bottom__right">TOTAL SKOR DISEMBUNYIKAN (ATURAN PERSILAT PASAL 28)</div>
     </footer>
 
     <!-- PIN LOGIN ONBOARDING MODAL -->
@@ -590,7 +710,14 @@ onMounted(() => {
       <div class="judge-pin-modal">
         <div class="judge-pin-header">
           <div class="judge-pin-icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2">
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#10B981"
+              stroke-width="2.2"
+            >
               <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
@@ -601,12 +728,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="judge-pin-meta font-mono">
+        <div v-if="arenaId" class="judge-pin-meta font-mono">
           <div class="judge-pin-meta-item">
             <span class="label">GELANGGANG:</span>
-            <span class="val">{{ arenaId }}</span>
+            <span class="val">{{ arenaLabel }}</span>
           </div>
-          <div class="judge-pin-meta-item">
+          <div v-if="authStore.seatNumber || route.query.seat" class="judge-pin-meta-item">
             <span class="label">KURSI:</span>
             <span class="val">JURI {{ judgeSeat }}</span>
           </div>
@@ -615,7 +742,7 @@ onMounted(() => {
         <!-- PIN Display Dots -->
         <div class="judge-pin-display font-mono">
           <span
-            v-for="i in 6"
+            v-for="i in pinSlots"
             :key="i"
             class="judge-pin-dot"
             :class="{ 'judge-pin-dot--filled': pinInput.length >= i }"
@@ -633,15 +760,11 @@ onMounted(() => {
           <button v-for="n in 9" :key="n" class="numpad-btn" @click="handlePinNumber(n)">
             {{ n }}
           </button>
-          <button class="numpad-btn numpad-btn--clear" @click="handlePinClear">
-            C
-          </button>
-          <button class="numpad-btn" @click="handlePinNumber(0)">
-            0
-          </button>
+          <button class="numpad-btn numpad-btn--clear" @click="handlePinClear">C</button>
+          <button class="numpad-btn" @click="handlePinNumber(0)">0</button>
           <button
             class="numpad-btn numpad-btn--submit"
-            :disabled="pinLoading || pinInput.length < 4"
+            :disabled="pinLoading || !isCompletePin(pinInput)"
             @click="handlePinSubmit"
           >
             {{ pinLoading ? '...' : 'OK' }}
@@ -649,8 +772,12 @@ onMounted(() => {
         </div>
 
         <div class="judge-pin-footer font-mono">
-          <button class="demo-link-btn" @click="handleEnterDemo">
-            Mode Uji Coba Offline (Demo) →
+          <button
+            v-if="authStore.isAuthenticated"
+            class="judge-link-btn text-rose-400"
+            @click="handleJudgeLogout"
+          >
+            Keluar dari Tablet Juri (Logout)
           </button>
         </div>
       </div>
@@ -833,6 +960,20 @@ onMounted(() => {
   border-color: #10b981;
 }
 
+.judge-break-note {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.judge-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
 .judge-batal-btn {
   display: inline-flex;
   align-items: center;
@@ -878,15 +1019,23 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-.judge-comp-left, .judge-comp-center, .judge-comp-right {
+.judge-comp-left,
+.judge-comp-center,
+.judge-comp-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.text-peach-200 { color: #fca5a5; }
-.text-cyan-400 { color: #22d3ee; }
-.judge-bar-divider { opacity: 0.3; }
+.text-peach-200 {
+  color: #fca5a5;
+}
+.text-cyan-400 {
+  color: #22d3ee;
+}
+.judge-bar-divider {
+  opacity: 0.3;
+}
 
 /* --- Main Split Screen (Two Columns) --- */
 .judge-grid {
@@ -972,14 +1121,38 @@ onMounted(() => {
 }
 
 .judge-dot-light {
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.15);
 }
 .judge-dot-light--red {
   background-color: #ef4444;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+.judge-dot-light--confirmed {
+  animation: judge-dot-pop 0.35s ease-out;
+}
+@keyframes judge-dot-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.7);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.judge-consensus-indicator .judge-consensus-text {
+  font-size: 0.625rem;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+  max-width: 190px;
+  text-align: right;
+}
+.judge-consensus-indicator .judge-consensus-text--ok {
+  color: #34d399;
 }
 .judge-dot-light--blue {
   background-color: #3b82f6;
@@ -993,6 +1166,26 @@ onMounted(() => {
   gap: 12px;
   flex: 1;
 }
+.judge-buttons-list--dense {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 10px;
+}
+.judge-buttons-list--dense .judge-btn {
+  min-height: 70px;
+  padding: 10px 14px;
+}
+.judge-buttons-list--dense .judge-btn__title {
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+.judge-buttons-list--dense .judge-btn__pts {
+  font-size: 1.6rem;
+}
+.judge-buttons-list--dense .judge-btn__icon-box {
+  display: none;
+}
 
 .judge-btn {
   flex: 1;
@@ -1005,9 +1198,12 @@ onMounted(() => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+  transition:
+    transform 0.08s ease,
+    filter 0.08s ease,
+    box-shadow 0.08s ease;
   user-select: none;
-  min-height: 100px;
+  min-height: 80px;
 }
 
 /* Touch active tactile bevel */
@@ -1022,10 +1218,14 @@ onMounted(() => {
   background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
   border-color: rgba(239, 68, 68, 0.6);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 18px rgba(185, 28, 28, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px rgba(185, 28, 28, 0.35);
 }
 .judge-btn--red.judge-btn--active {
-  box-shadow: 0 0 35px rgba(239, 68, 68, 0.9), inset 0 0 15px rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 35px rgba(239, 68, 68, 0.9),
+    inset 0 0 15px rgba(255, 255, 255, 0.35);
 }
 
 /* Blue Button Styling */
@@ -1033,10 +1233,14 @@ onMounted(() => {
   background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
   border-color: rgba(96, 165, 250, 0.6);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 18px rgba(29, 78, 216, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px rgba(29, 78, 216, 0.35);
 }
 .judge-btn--blue.judge-btn--active {
-  box-shadow: 0 0 35px rgba(96, 165, 250, 0.9), inset 0 0 15px rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 35px rgba(96, 165, 250, 0.9),
+    inset 0 0 15px rgba(255, 255, 255, 0.35);
 }
 
 .judge-btn__icon-box {
@@ -1125,8 +1329,15 @@ onMounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 /* ==========================================================================
@@ -1144,7 +1355,7 @@ onMounted(() => {
 }
 
 .judge-pin-modal {
-  background-color: #0B1120;
+  background-color: #0b1120;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 14px;
   padding: 24px 28px;
@@ -1179,13 +1390,13 @@ onMounted(() => {
 .judge-pin-title {
   font-size: 1.125rem;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #ffffff;
   line-height: 1.2;
 }
 
 .judge-pin-desc {
   font-size: 0.6875rem;
-  color: #94A3B8;
+  color: #94a3b8;
   margin-top: 2px;
 }
 
@@ -1194,7 +1405,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  background-color: #0F172A;
+  background-color: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 6px 12px;
@@ -1203,12 +1414,12 @@ onMounted(() => {
 }
 
 .judge-pin-meta-item .label {
-  color: #64748B;
+  color: #64748b;
   margin-right: 6px;
 }
 
 .judge-pin-meta-item .val {
-  color: #38BDF8;
+  color: #38bdf8;
   font-weight: 700;
 }
 
@@ -1223,12 +1434,12 @@ onMounted(() => {
 }
 
 .judge-pin-dot--filled {
-  color: #10B981;
+  color: #10b981;
   text-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 }
 
 .judge-pin-error {
-  color: #EF4444;
+  color: #ef4444;
   font-size: 0.75rem;
   margin-bottom: 12px;
   text-align: center;
@@ -1246,7 +1457,7 @@ onMounted(() => {
   height: 52px;
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #F8FAFC;
+  color: #f8fafc;
   font-size: 1.25rem;
   font-weight: 700;
   border-radius: 8px;
@@ -1258,7 +1469,7 @@ onMounted(() => {
 }
 
 .numpad-btn:hover {
-  background-color: #1E293B;
+  background-color: #1e293b;
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
@@ -1268,19 +1479,19 @@ onMounted(() => {
 }
 
 .numpad-btn--clear {
-  color: #EF4444;
+  color: #ef4444;
   background-color: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.2);
 }
 
 .numpad-btn--submit {
-  color: #064E3B;
-  background-color: #10B981;
-  border-color: #10B981;
+  color: #064e3b;
+  background-color: #10b981;
+  border-color: #10b981;
 }
 
 .numpad-btn--submit:hover {
-  background-color: #34D399;
+  background-color: #34d399;
 }
 
 .numpad-btn--submit:disabled {
@@ -1294,17 +1505,17 @@ onMounted(() => {
   text-align: center;
 }
 
-.demo-link-btn {
+.judge-link-btn {
   background: transparent;
   border: none;
-  color: #64748B;
+  color: #64748b;
   font-size: 0.6875rem;
   cursor: pointer;
   text-decoration: underline;
   transition: color 0.15s ease;
 }
 
-.demo-link-btn:hover {
-  color: #94A3B8;
+.judge-link-btn:hover {
+  color: #94a3b8;
 }
 </style>

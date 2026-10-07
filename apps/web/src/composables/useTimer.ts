@@ -1,68 +1,79 @@
-import { ref, computed, onUnmounted } from 'vue'
+import { computed, getCurrentInstance, onUnmounted, ref } from 'vue'
+import { serverClock } from './serverClock'
 
-export function useTimer() {
+export interface UseTimerOptions {
+  /** Sumber waktu server (epoch ms). Bawaan: jam server hasil penyelarasan. Dapat diganti untuk tes. */
+  now?: () => number
+  /** Interval penyegaran tampilan (ms). */
+  tickMs?: number
+}
+
+/**
+ * Hitung mundur pertandingan yang ditampilkan di semua layar.
+ *
+ * Sisa waktu TIDAK dikurangi per ketukan interval (itu melenceng dan diperlambat browser pada
+ * tab/jendela yang tidak fokus). Sebaliknya server mengirim tenggat absolut (`endsAtMs`) dan
+ * setiap tampilan menghitung `tenggat − jam server` pada tiap penyegaran, sehingga semua layar
+ * menunjukkan angka yang sama dan langsung benar lagi setelah jendela kembali aktif.
+ */
+export function useTimer(options: UseTimerOptions = {}) {
+  const now = options.now ?? serverClock.now
+  const tickMs = options.tickMs ?? 100
+
   const remainingMs = ref(0)
   const isRunning = ref(false)
-  let ticker: any = null
+  let deadline = 0 // tenggat dalam waktu server (epoch ms)
+  let ticker: ReturnType<typeof setInterval> | null = null
 
-  function sync(ms: number, running: boolean) {
-    remainingMs.value = Math.max(0, ms)
-    isRunning.value = running
-
+  function stopTicker() {
     if (ticker) {
       clearInterval(ticker)
       ticker = null
     }
+  }
 
-    if (running && remainingMs.value > 0) {
-      ticker = setInterval(() => {
-        if (remainingMs.value > 100) {
-          remainingMs.value -= 100
-        } else {
-          remainingMs.value = 0
-          isRunning.value = false
-          if (ticker) {
-            clearInterval(ticker)
-            ticker = null
-          }
-        }
-      }, 100)
+  function tick() {
+    const left = deadline - now()
+    if (left > 0) {
+      remainingMs.value = left
+      return
     }
+    remainingMs.value = 0
+    isRunning.value = false
+    stopTicker()
+  }
+
+  /**
+   * Selaraskan dengan server. `ms` = sisa waktu saat pesan dibuat; `endsAtMs` = tenggat absolut
+   * (hanya saat berjalan). Tanpa `endsAtMs` (server lama) tenggat dihitung dari `ms` + jam sekarang.
+   */
+  function sync(ms: number, running: boolean, endsAtMs?: number) {
+    stopTicker()
+    isRunning.value = running
+    if (!running) {
+      remainingMs.value = Math.max(0, ms)
+      return
+    }
+    deadline = endsAtMs && endsAtMs > 0 ? endsAtMs : now() + Math.max(0, ms)
+    tick()
+    if (isRunning.value) ticker = setInterval(tick, tickMs)
   }
 
   function pause() {
+    if (isRunning.value) remainingMs.value = Math.max(0, deadline - now())
     isRunning.value = false
-    if (ticker) {
-      clearInterval(ticker)
-      ticker = null
-    }
+    stopTicker()
   }
 
-  const minutes = computed(() => {
-    const totalSecs = Math.max(0, Math.floor(remainingMs.value / 1000))
-    return Math.floor(totalSecs / 60)
-  })
+  // Dibulatkan ke atas: 119,9 dtk tampil 02:00 (angka baru berganti setelah satu detik penuh berlalu)
+  const totalSeconds = computed(() => Math.max(0, Math.ceil(remainingMs.value / 1000)))
+  const minutes = computed(() => Math.floor(totalSeconds.value / 60))
+  const seconds = computed(() => totalSeconds.value % 60)
+  const formattedTime = computed(
+    () => `${String(minutes.value).padStart(2, '0')}:${String(seconds.value).padStart(2, '0')}`,
+  )
 
-  const seconds = computed(() => {
-    const totalSecs = Math.max(0, Math.floor(remainingMs.value / 1000))
-    return totalSecs % 60
-  })
+  if (getCurrentInstance()) onUnmounted(stopTicker)
 
-  const formattedTime = computed(() => {
-    return `${String(minutes.value).padStart(2, '0')}:${String(seconds.value).padStart(2, '0')}`
-  })
-
-  onUnmounted(() => {
-    if (ticker) clearInterval(ticker)
-  })
-
-  return {
-    remainingMs,
-    isRunning,
-    minutes,
-    seconds,
-    formattedTime,
-    sync,
-    pause,
-  }
+  return { remainingMs, isRunning, minutes, seconds, formattedTime, sync, pause }
 }

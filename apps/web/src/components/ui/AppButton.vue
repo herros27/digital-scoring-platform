@@ -2,7 +2,16 @@
 import { computed } from 'vue'
 
 interface Props {
-  variant?: 'primary' | 'secondary' | 'inverted' | 'outlined' | 'corner-red' | 'corner-blue' | 'tertiary' | 'emerald' | 'danger'
+  variant?:
+    | 'primary'
+    | 'secondary'
+    | 'inverted'
+    | 'outlined'
+    | 'corner-red'
+    | 'corner-blue'
+    | 'tertiary'
+    | 'emerald'
+    | 'danger'
   size?: 'sm' | 'md' | 'lg' | 'xl'
   disabled?: boolean
   loading?: boolean
@@ -43,12 +52,7 @@ const buttonClasses = computed(() => {
 </script>
 
 <template>
-  <button
-    :type="type"
-    :class="buttonClasses"
-    :disabled="disabled || loading"
-    @click="handleClick"
-  >
+  <button :type="type" :class="buttonClasses" :disabled="disabled || loading" @click="handleClick">
     <span v-if="loading" class="app-btn__spinner" />
     <span class="app-btn__content">
       <slot />
@@ -192,12 +196,12 @@ const buttonClasses = computed(() => {
 
 /* Danger / Destructive Red */
 .app-btn--danger {
-  background-color: #DC2626;
-  color: #FFFFFF;
+  background-color: #dc2626;
+  color: #ffffff;
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
 }
 .app-btn--danger:hover:not(:disabled) {
-  background-color: #EF4444;
+  background-color: #ef4444;
   transform: translateY(-1px);
 }
 

@@ -34,19 +34,19 @@ func TestEmbeddedMigrations(t *testing.T) {
 		}
 	}
 
-	if sqlCount != 16 {
-		t.Fatalf("expected 16 SQL migration files, found %d", sqlCount)
+	if sqlCount != 21 {
+		t.Fatalf("expected 21 SQL migration files, found %d", sqlCount)
 	}
 
-	// 2. Verify goose can collect and sequence all 16 migrations
+	// 2. Verify goose can collect and sequence all 21 migrations
 	goose.SetBaseFS(migrations.FS)
 	migrationsList, err := goose.CollectMigrations(".", 0, goose.MaxVersion)
 	if err != nil {
 		t.Fatalf("failed to collect migrations: %v", err)
 	}
 
-	if len(migrationsList) != 16 {
-		t.Fatalf("expected 16 collected migrations, got %d", len(migrationsList))
+	if len(migrationsList) != 21 {
+		t.Fatalf("expected 21 collected migrations, got %d", len(migrationsList))
 	}
 
 	for i, m := range migrationsList {

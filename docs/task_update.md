@@ -35,7 +35,7 @@
     - Mounted `GET /api/v1/competitions/{comp_id}/matches/{id}/scores` in `internal/api/router.go`.
     - Added automated unit test in `tests/match_service_test.go`.
 12. **OpenAPI Spec & WebSocket Contract Documentation (P0)** –
-    - Updated `docs/openapi.yaml` with complete two-way WebSocket protocol schemas (`score_event`, `referee_command`, `penalty_event`, `state_change`, `score_update`, `score_confirmed`, `match_result`, `error`).
+    - Updated `docs/openapi.yaml` with complete two-way WebSocket protocol schemas (klien: `judge_input`, `state_change` + `action`, `penalty`, `sync_request`; server: `sync_response`, `state_change`, `score_update`, `score_confirmed`, `match_result`, `error`; dikoreksi mengikuti kode backend).
     - Documented Category, Athlete, Match Lifecycle, and Score endpoints.
 13. **Automatic Bracket Advancement (P1)** –
     - Added `AdvanceWinner()` in `BracketStore` (`internal/store/bracket.go`).
@@ -136,10 +136,153 @@
     - Dedicated `tests/` folder exclusively for end-to-end tournament scenario integration tests (`contingent_test.go`, `match_service_test.go`, `official_and_report_test.go`, `ruleset_crud_test.go`, `admin_features_test.go`, `p1_features_test.go`, `p2_features_test.go`).
 32. **Public Health Check Endpoint (`GET /api/v1/health`)** –
     - Mounted `GET /api/v1/health` in `internal/api/router.go` checking database ping and reporting service status.
+33. **Sinkronisasi Multi-Device & Penyimpanan Persisten PIN Gelanggang (`GET /api/v1/auth/pins` & Migrasi 017)** –
+    - Menambahkan migrasi database [`migrations/017_judge_pins_raw_pin.sql`](file:///d:/Freelance/DigitalScoring/migrations/017_judge_pins_raw_pin.sql) untuk kolom `raw_pin VARCHAR(20)` pada tabel `judge_pins`.
+    - Mengimplementasikan arsitektur penyimpanan ganda: `pin_hash` (bcrypt) untuk verifikasi login tablet juri/wasit (`POST /api/v1/auth/judge-login`), dan `raw_pin` untuk inspeksi authorized admin serta sinkronisasi multi-device panitia.
+    - Menambahkan endpoint `GET /api/v1/auth/pins?competition_id={compId}&arena_id={arenaId}` di [`internal/api/handler/auth.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/auth.go) yang dilindungi RBAC (`admin`, `dewan`).
+    - Mekanisme server-side auto-provisioning: jika kursi gelanggang (Juri 1–5 atau Wasit) belum memiliki PIN aktif atau sudah kadaluarsa, backend otomatis mem-generate PIN numerik kriptografis 6-digit baru (TTL 12 jam) dan menyimpannya secara persisten ke database PostgreSQL.
+    - Pembersihan duplikasi (stale cleanup): `POST /api/v1/auth/create-pin` secara otomatis menghapus rekaman PIN lama pada kursi/role yang sama sebelum menyimpan PIN baru.
+    - Integrasi frontend: [`apps/web/src/views/admin/DevicePinManager.vue`](file:///d:/Freelance/DigitalScoring/apps/web/src/views/admin/DevicePinManager.vue) beralih sepenuhnya ke sinkronisasi database server via `listPins`, mengeliminasi dependensi lokal `localStorage` dan string PIN hardcoded/palsu.
+    - Dokumentasi OpenAPI diperbarui di [`docs/openapi.yaml`](file:///d:/Freelance/DigitalScoring/docs/openapi.yaml) dan kredensial di [`docs/CREDENTIALS.md`](file:///d:/Freelance/DigitalScoring/docs/CREDENTIALS.md).
+34. **Validasi Keunikan Nama Gelanggang & Safe Deletion (`ArenaService` & `ArenaStore`)** –
+    - Menambahkan validasi `strings.EqualFold` pada [`ArenaService.CreateArena`](file:///d:/Freelance/DigitalScoring/internal/service/arena_service.go) dan `UpdateArena` untuk mencegah duplikasi nama gelanggang kembar dalam kompetisi yang sama.
+    - Menambahkan mekanisme safe deletion pada [`ArenaStore.Delete`](file:///d:/Freelance/DigitalScoring/internal/store/arena.go) untuk membersihkan relasi foreign key (`judge_pins` dan `matches.arena_id = NULL`) secara aman sebelum baris arena dihapus.
+35. **Validasi Eksistensi Gelanggang pada Pembuatan PIN & Defensive Guard Frontend** –
+    - Backend: Menambahkan `ErrArenaNotFound` pada [`internal/auth/pin.go`](file:///d:/Freelance/DigitalScoring/internal/auth/pin.go) yang memverifikasi eksistensi gelanggang di database sebelum melakukan insert ke tabel `judge_pins`. Di handler [`internal/api/handler/auth.go`](file:///d:/Freelance/DigitalScoring/internal/api/handler/auth.go), mengembalikan status HTTP 404 (`NOT_FOUND`) dengan pesan ramah jika ID gelanggang tidak valid atau sudah dihapus.
+    - Frontend: Memperbaiki [`apps/web/src/views/admin/DevicePinManager.vue`](file:///d:/Freelance/DigitalScoring/apps/web/src/views/admin/DevicePinManager.vue) dengan menghapus fallback ID statis palsu, menambahkan hook `onMounted` dan sinkronisasi otomatis `refetchArenas()`, serta menyematkan `getValidArenaId()` guard sebelum proses generate PIN agar tidak pernah mengirimkan ID gelanggang basi (*stale*) ke server.
+
+
+36. **Perbaikan WebSocket, Akses Penonton Publik, dan Siaran Event** –
+    - `MetricsMiddleware` (`statusRecorder`) kini meneruskan `http.Hijacker`/`Flusher`; sebelumnya seluruh upgrade WebSocket gagal dengan "response does not implement http.Hijacker".
+    - `GET /ws/arena/{arena_id}` tanpa token diterima sebagai penonton publik (role `scoreboard`, read-only) hanya untuk arena yang sudah punya hub; selain itu 404. Token PIN harus cocok dengan arena; token login email (tanpa arena) hanya untuk `admin`, `dewan`, `wasit`.
+    - Role JWT `wasit`/`dewan` dipetakan ke `hub.RoleReferee` (`hub.RoleFromClaim`) sehingga wasit dapat start/pause/penalty.
+    - Orchestrator menyiarkan `score_confirmed`; `state_change` membawa `timer_running` (jeda tidak lagi tampak sebagai `round_N` yang berjalan).
+    - `GET /api/v1/live/scoreboard/{arena_id}` mengembalikan snapshot pertandingan aktif (status, ronde, timer, total skor, nama atlet) lewat `MatchService.GetLiveSnapshot`.
+    - Dokumentasi: `docs/openapi.yaml` dan README disamakan dengan protokol sebenarnya.
+37. **Login Juri/Wasit Hanya dengan PIN (Migrasi 018)** –
+    - `POST /api/v1/auth/judge-login` menerima `{ "pin" }` saja; turnamen, gelanggang, role, dan kursi ditentukan server dari PIN.
+    - Kolom `judge_pins.pin_lookup` (HMAC-SHA256 dari PIN dengan kunci turunan JWT secret, indeks unik) untuk pencarian O(1); bcrypt diverifikasi sekali setelah ketemu. Migrasi menghapus PIN lama (tahap development).
+    - PIN unik di seluruh sistem (`ErrPinTaken` -> HTTP 409); PIN acak dibuat ulang otomatis bila bentrok (`PinStore.CreateWithRandomPIN`). PIN juri 6 digit, PIN wasit 8 digit; PIN kustom divalidasi.
+    - `auth.AttemptLimiter`: 5 PIN salah beruntun dalam 15 menit mengunci IP 15 menit (HTTP 429 + `Retry-After`).
+    - Seeder: PIN wasit `11110001` (Gelanggang A) dan `22220001` (Gelanggang B).
+    - Tes database nyata di `tests/pin_login_test.go`; CI menyediakan service Postgres (`TEST_DB_URL`). Simulasi `apps/web/scripts/e2e-simulation.mjs` kini memverifikasi (keluar kode 1 bila gagal).
+
+38. **Dukungan Meja Wasit: Sanksi Bertipe, Diskualifikasi, Koreksi Waktu, Sinyal Arena, Kehadiran & Log Real-time** –
+    - Sanksi: katalog resmi di server (`binaan_1/2`, `teguran_1/2`, `peringatan_1/2`); klien hanya mengirim `type`, poin ditentukan server. Satu jenis hanya sekali per sudut; sanksi sebelum pertandingan dimulai/sesudah selesai ditolak. `penalty_revoke` membatalkan sanksi terakhir sudut dan mengembalikan poin. Daftar sanksi disiarkan (`penalties`) dan ada pada snapshot.
+    - Aksi kontrol baru pada `state_change`: `disqualify` (lawan menang, `result_type: disqualification`), `adjust_time` (+/- ms, dibatasi 1 detik..durasi ronde), `reset_round` (hanya saat dijeda). `Timer.Adjust/Reset`.
+    - Skor seri tidak lagi dimenangkan otomatis oleh sudut merah (placeholder lama): selesai manual saat seri ditolak (`TIE_NEEDS_DECISION`) kecuali wasit menyertakan `winner` (`referee_decision`); waktu ronde 3 habis dengan skor seri -> `tie_pending` sampai wasit memutuskan. `POST .../matches/{id}/finish` menerima body `{"winner"}` opsional.
+    - `arena_signal` (`gong`, `medic`, `var`) disiarkan ke semua klien; status medic/VAR tersimpan di server dan tampil sebagai banner di scoreboard; gong berbunyi (Web Audio).
+    - Kehadiran perangkat: `hub.Presence()` + callback perubahan; orchestrator melacak input juri terakhir per kursi dan menyiarkan `presence` ke meja wasit/admin.
+    - `appendEvent` kini menambah `clock_ms` + `round` ke setiap kejadian dan menyiarkannya sebagai `match_event` ke meja wasit/admin (log real-time); penonton publik dan juri tidak menerimanya.
+    - `GET /competitions/{comp_id}/matches?arena_id=` mengembalikan antrean partai satu gelanggang (urutan antrean); snapshot menambah info ruleset (nama, durasi ronde/istirahat, total ronde).
+    - Tes: `internal/orchestrator/referee_ops_test.go` (sanksi, pembatalan, DQ, koreksi waktu, sinyal, kehadiran, log, seri; telah diuji dengan mutasi) dan perluasan `apps/web/scripts/e2e-simulation.mjs` (49 pemeriksaan terhadap backend nyata).
+39. **Sinkronisasi Waktu Pertandingan Antar Layar (Timer Berbasis Tenggat)** –
+    - Masalah: waktu di wasit, juri, dan scoreboard sering berbeda sampai pertandingan dijeda. Penyebab: server mengurangi sisa waktu per 1 detik penuh (sisa waktu bisa basi hingga 1 detik, jeda menghilangkan pecahan detik) dan hanya mengirimnya saat ada event; klien menghitung mundur sendiri dengan `setInterval` yang dikurangi 100 ms per ketukan (melenceng, dan diperlambat browser pada tab/jendela tidak fokus), dimulai dari saat masing-masing menerima pesan.
+    - `Timer` ditulis ulang berbasis tenggat (`time.AfterFunc`, presisi ms; jeda/koreksi/reset menggeser tenggat; callback lama diabaikan lewat nomor generasi). Payload `state_change`, `sync_response`, dan `timer_sync` memuat `timer_ends_at_ms` + `server_time_ms`. Server menyiarkan `timer_sync` tiap 5 detik selama berjalan (berhenti saat dijeda).
+    - Klien: `serverClock` memperkirakan selisih jam dari `server_time_ms` (sampel terbesar = tundaan terkecil); `useTimer` menghitung `tenggat − jam server` tiap 100 ms. Tampilan dibulatkan ke atas.
+    - Pengukuran 3 layar nyata (wasit, juri dengan `setInterval` dilambatkan 1 detik, scoreboard; 30 detik): kode lama 74/74 sampel berbeda, selisih terbesar 28 detik; kode baru 2/74 berbeda (hanya di pergantian detik), selisih terbesar 1 detik.
+    - Tes: `internal/orchestrator/timer_test.go`, `timer_sync_test.go`; `serverClock.test.ts`, `useTimer.test.ts`.
+
+40. **Jadwalkan Ulang Partai yang Dibatalkan** –
+    - `POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule` (admin/dewan/wasit): partai `cancelled` kembali `idle`, skor per ronde dihapus, diulang dari 0-0. Partai yang bukan `cancelled` atau masih aktif di gelanggang ditolak (400).
+    - Log kejadian lama tetap di tabel `match_events` untuk audit; kejadian `match_rescheduled` menjadi batas, dan `GET .../events` hanya mengembalikan kejadian sejak batas itu.
+    - Frontend: tombol "Jadwalkan Ulang" pada baris BATAL di antrean wasit dan banner "PARTAI DIBATALKAN" di Kontrol Tanding.
+
+41. **Ruleset Memuat Sanksi, Teknik, dan Konsensus (Regulasi Dapat Dikustomisasi)** –
+    - `scoring` ruleset kini punya bagian opsional `techniques`, `penalties`, `consensus` (`internal/rules`); kosong = nilai turunan/bawaan sehingga ruleset lama tetap jalan. Validasi pada `POST/PUT /rulesets`.
+    - Server membaca semuanya dari ruleset aktif: nilai teknik (`pointsFor`), katalog sanksi, engine konsensus (`NewEngineWith(window, majority)`); `score_type` di luar ruleset (selain `undo`) ditolak `BAD_PAYLOAD`. Sanksi ber-`action: disqualify` (Peringatan III) langsung mengakhiri partai dengan kemenangan lawan.
+    - Bawaan/preset: Teguran II = -2 (sebelumnya -1), Peringatan III = diskualifikasi, tombol baru Tangkapan + Jatuhan (1+3 = 4), konsensus 2 dari 3 juri dalam 3 detik. Migrasi `019` melengkapi preset `IPSI 2024` dan `PERSILAT International` yang sudah ada di database.
+    - Snapshot `sync_response` menambah `techniques`, `judge_count`, `consensus`. Frontend: tombol tablet juri dan ringkasan teknik mengikuti ruleset, panel Verifikasi Juri menampilkan 3 atau 5 kursi, Peringatan III meminta konfirmasi diskualifikasi.
+    - Tes: `internal/rules/ruleset_test.go`, `internal/orchestrator/ruleset_test.go`, `TestConsensusEngine_ConfigurableMajorityAndWindow`; e2e 51 pemeriksaan; browser wasit 50/50 dan juri (4 tombol, konsensus Tangkapan + Jatuhan = 4).
+    - Belum: tiebreak resmi otomatis, tombol KO/TKO/WO/undur diri, editor ruleset di frontend (langkah 3-5).
+
+42. **Aturan Seri Resmi (Tiebreak Otomatis)** –
+    - Seri skor bersih kini diselesaikan server menurut `scoring.tiebreak` ruleset: (1) potongan sanksi paling sedikit, (2) jumlah teknik terbanyak menurut urutan prioritas (bawaan dari nilai tertinggi: Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan). Berlaku saat waktu ronde terakhir habis dan saat `finish` manual. Jumlah teknik dihitung dari konsensus juri (`techCount` di orkestrator).
+    - Bila semua langkah otomatis seri, wasit memutuskan manual: `finish` menerima `winner` + `method` (`extra_round`, `lighter_weight`, `coin_toss`; kosong = `referee_decision`). `result_type` baru: `tiebreak_penalties`, `tiebreak_technique`, `tiebreak_extra_round`, `tiebreak_lighter_weight`, `tiebreak_coin_toss`. Kejadian baru `tiebreak_resolved`; snapshot `sync_response` memuat `tiebreak` (aturan + `auto_result`).
+    - Konsol wasit: "Selesaikan" saat seri menerapkan aturan seri otomatis; bila masih seri, dialog berlanjut ke pilihan dasar keputusan + pemenang. Label hasil di konsol dan scoreboard (`composables/matchResult.ts`).
+    - Tes: `internal/orchestrator/tiebreak_test.go` (urutan sanksi/teknik, seri penuh, kedaluwarsa ronde 3, metode manual), `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e lolos; browser wasit 50/50.
+    - Batasan: kombinasi 1+2 dan 1+1 pada urutan regulasi belum menjadi jenis teknik terpisah; babak tambahan/timbang/koin dilakukan di luar sistem lalu dicatat wasit.
+
+43. **Hasil Khusus: KO, TKO, WO, Undur Diri** –
+    - Ruleset `scoring.outcomes` (`{type, label, phase}`; bawaan `ko`/`tko` in_match, `walkover` before_start, `withdrawal` any). Wasit menyatakan hasil lewat WebSocket `state_change` `declare_outcome` atau `POST /api/v1/competitions/{comp_id}/matches/{id}/outcome` (`outcome`, `winner`, `note` maks 200 karakter); `result_type` = jenis hasil, pemenang dimajukan di bagan seperti hasil lain. Partai yang baru dimuat (belum dimulai) tetap bisa diselesaikan lewat WO atau Undur Diri.
+    - Kejadian baru `outcome_declared` (label, sudut pemenang, catatan); snapshot `sync_response` memuat `outcomes`.
+    - Konsol wasit: baris "HASIL KHUSUS" di panel Kontrol Tanding; tombol aktif sesuai fase partai, dialog memilih sudut pemenang.
+    - Tes: `internal/orchestrator/outcome_test.go`, `internal/rules/ruleset_test.go`, `confirmRequest.test.ts`; e2e 67 pemeriksaan (bagian 12 khusus hasil khusus); browser `outcome.mjs` 10/10.
+    - Belum: pencatatan hitungan wasit dan panggilan WO otomatis (3x panggilan, interval 30 detik) masih dilakukan manual oleh wasit.
+
+44. **Editor Ruleset di Frontend & Penghubung Kejuaraan → Ruleset** –
+    - Tab **Regulasi & Ruleset** (`/ops?tab=regulasi`, admin/dewan): daftar, buat, ubah, duplikat, hapus. Editor memuat waktu/babak, teknik, sanksi (+diskualifikasi), konsensus (contoh kalimat otomatis), aturan seri (urutan prioritas teknik dengan tombol naik/turun, metode manual), dan hasil khusus (aktif/nonaktif + fase). Validasi klien mencerminkan server (`lib/rulesetDraft.ts`).
+    - **Perbaikan penghubung:** kolom `competitions.ruleset_id` sebelumnya tidak pernah dibaca/ditulis store sehingga partai selalu memakai ruleset bawaan Go (inilah sebab Jatuhan sempat bernilai 2). Kini `ruleset_id` tersimpan di create/update/list/get, divalidasi UUID, dan dipakai saat partai dimuat. Nama pendek lama (`ipsi`, `persilat`) juga dicocokkan ke ruleset basis data (kata pertama nama).
+    - Formulir kejuaraan memilih ruleset dari daftar basis data (sebelumnya dua radio tetap bernama `PERSILAT 2024`/`IPSI 2024` yang tidak cocok dengan ruleset mana pun).
+    - API: `POST/PUT/DELETE /rulesets` menjawab 409 `CONFLICT` untuk nama+versi ganda dan ruleset yang masih dipakai kejuaraan.
+    - Tes: `rulesetDraft.test.ts`, `ruleset_service_test.go`; browser `rulesetui.mjs` 16/16 (duplikat IPSI → 5 juri/3 sepakat/Jatuhan 5/tanpa KO → dipakai kejuaraan → sync_response partai memuatnya → hapus ditolak saat dipakai).
+
+45. **Pemulihan Partai Setelah Server Restart** –
+    - Tabel `match_runtime` (migrasi `020`) menyimpan keadaan partai aktif: state, sisa waktu, skor, sanksi, hitungan teknik, sinyal dokter/VAR, keputusan wasit, dan ruleset yang dipakai saat dimuat. Ditulis pada setiap perubahan (hook di `broadcastState`/`broadcastScoreUpdate`/`broadcastPenalties`/sinyal arena) dan tiap 5 detik selama timer berjalan; dihapus saat selesai/dibatalkan/dijadwalkan ulang.
+    - `MatchService.RestoreActiveMatches` dipanggil saat router dibuat: ronde berjalan **dipulihkan dijeda** dengan sisa waktu catatan terakhir (`recovered: true`, kejadian `match_recovered`), istirahat dilanjutkan otomatis, partai yang belum dimulai kembali apa adanya; partai selesai/dibatalkan/rusak dibersihkan.
+    - Konsol wasit menampilkan banner "SERVER DIMULAI ULANG" selama masih dijeda dan memuat ulang log (kejadian pemulihan dicatat sebelum klien tersambung).
+    - Ditemukan dan diperbaiki saat tes: setelah ronde berakhir, keadaan istirahat sempat tersimpan dengan timer lama karena siaran terjadi sebelum timer istirahat dibuat; kini disimpan lagi setelah timer istirahat berjalan.
+    - Tes: `internal/orchestrator/runtime_test.go` (simpan→pulihkan identik, lanjut+konsensus+selesai, catatan jeda/koreksi waktu, istirahat, idle, data rusak/selesai, batal/DQ menghapus, tie_pending); `restart.mjs` (kill -9 terhadap server nyata, 19 pemeriksaan) dan `restartui.mjs` (konsol wasit tersambung ulang sendiri, 6 pemeriksaan).
+    - Batasan: input juri yang belum mencapai konsensus tidak dipulihkan; catatan sisa waktu berselang 5 detik.
+
+46. **Lampu Konsensus di Tablet Juri** –
+    - Server mengirim `consensus_progress` `{target, score_type, round, count, needed, window_ms}` hanya ke tablet juri setiap ada tekanan yang belum mencapai kesepakatan (anonim: jumlah saja, tanpa identitas kursi). Wasit dan scoreboard tidak menerimanya. `ConsensusResult` kini membawa `Count` juga saat belum diterima; engine menyediakan `Majority()` dan `Window()`.
+    - Tablet: jumlah lampu = jumlah juri ruleset; menyala sebanyak juri yang sepakat dengan teks "PUKULAN 1/2 • MENUNGGU JURI LAIN", padam sendiri setelah window; saat `score_confirmed` menyala penuh dengan "PUKULAN +1 TERKONFIRMASI" beberapa saat. Direset saat istirahat/selesai. Logika di `composables/consensusFeedback.ts`.
+    - Tes: `internal/orchestrator/progress_test.go`, `consensusFeedback.test.ts`; browser `konsensus.mjs` 15/15 (juri 1 lewat UI, juri 2 lewat WebSocket).
+
+47. **Teknik Kombinasi 1+2 dan 1+1** –
+    - Preset `IPSI 2024` dan `PERSILAT International` memuat `combo_1_2` (Kombinasi Pukulan + Tendangan, 3 poin) dan `combo_1_1` (Kombinasi 2 Pukulan, 2 poin) selain Tangkapan+Jatuhan; migrasi `021` melengkapi preset yang sudah ada di database. Urutan prioritas seri preset kini persis 1+3, 3, 1+2, 2, 1+1, 1 (juga bila diturunkan otomatis dari nilai + urutan daftar).
+    - Tablet juri menyusun tombol dua kolom bila teknik lebih dari 4 (semua tetap terlihat di 1280x800). Label teknik di log dan editor ruleset ikut.
+    - Tes: `TestPresets_TiebreakOrderFollowsRegulation`, `TestTiebreak_CombinationsRankBetweenFallAndKnockdown`; browser `ruleset.mjs` (6 tombol, +1,+2,+3,+4,+3,+2).
+
+48. **Label Scoreboard dari Server** –
+    - `GET /live/scoreboard/{arena_id}` kini memuat `competition_name`, `class_label` (mis. "Kelas A Putri"), `red_team`, `blue_team`, dan `match_number` (urutan partai pada antrean gelanggang), selain nama atlet/gelanggang; saat belum ada partai tetap memuat `arena_name` dan `competition_name`. Query `MatchStore.GetMatchInfo`.
+    - Server menyiarkan `sync_response` ke semua klien gelanggang saat partai dimuat (`Orchestrator.BroadcastSnapshot`), sehingga scoreboard, tablet juri, dan konsol wasit yang sudah terbuka langsung menyesuaikan diri (nama atlet, ruleset, tampilan pemenang lama ditutup) tanpa reload.
+    - Scoreboard: judul kejuaraan, kelas "KELAS A PUTRI • TANDING", kontingen, "PARTAI #n", dan label ruleset tidak lagi tertanam.
+    - Tes: `TestBroadcastSnapshot_ReachesAllClientsWithMatchContext`, `TestClassLabel`; browser `scoreboard.mjs` 11/11.
+
+49. **Perbaikan CI GitHub & Format Prettier Wajib** –
+    - Riwayat run GitHub Actions (dibaca lewat API) menunjukkan job `Test & Lint` (dengan layanan PostgreSQL) dan `Frontend Lint, Test & Build` sudah hijau, tetapi job `Docker Build Check` gagal di setiap push: `Unable to resolve action actions/setup-buildx-action, repository not found`. Diperbaiki menjadi `docker/setup-buildx-action@v3`.
+    - Seluruh `apps/web/src` diformat (`npm run format`, commit terpisah) dan `npm run format:check` ditambahkan ke job frontend. Satu handler `@click` berisi dua pernyataan di `CompetitionsView` dipindah ke fungsi karena format Prettier-nya tidak diterima kompiler Vue.
+    - Setelah format: lint, typecheck, 98 tes, build, dan seluruh skrip browser (wasit 50/50, hasil khusus, konsensus, ruleset, scoreboard, editor ruleset, juri) tetap lolos.
+
+50. **Image Docker Frontend & Compose Satu Pintu** –
+    - `apps/web/Dockerfile` (node:22-alpine membangun `dist`, nginx:1.27-alpine menyajikannya) dan `apps/web/nginx.conf`: SPA fallback, cache panjang untuk `/assets/`, proxy `/api/`, `/ws/` (WebSocket, timeout 1 jam), dan `/docs` ke layanan `app`; `X-Forwarded-For` ditimpa dengan alamat sambungan asli. Layanan `web` ditambahkan pada `docker-compose.yml` (`WEB_PORT`, bawaan 80); `JWT_SECRET` dapat diatur lewat environment (nilai bawaan lama tetap sebagai contoh).
+    - CI: job Docker membangun image backend dan web serta menjalankan `nginx -t` pada image web.
+    - Terverifikasi: `docker compose config` valid; di GitHub Actions (run commit `a4de783`) ketiga job hijau, termasuk build image backend, build image web, dan `nginx -t` (pada `69ea192` job frontend sempat gagal di Format Check karena handler yang saya perbaiki manual belum diformat; sudah diperbaiki). Belum diuji: menjalankan stack penuh (`docker compose up`) dan proxy WebSocket melalui nginx; lingkungan pengembangan ini tidak punya daemon Docker.
+
+51. **Konfigurasi dari `.env` (Compose) dan Variabel CI** –
+    - `.env.example` ditambahkan (sebelumnya tidak ada dan `.gitignore` ikut mengabaikannya; kini `!.env.example`) memuat semua variabel backend, PostgreSQL, dan port host. `docker-compose.yml` memakai `${VAR:-bawaan}` untuk `POSTGRES_USER`, `POSTGRES_DB`, `JWT_SECRET`, `WEB_PORT`, `APP_PORT`, `POSTGRES_PORT`; `DB_URL` backend dirakit dari nilai yang sama dengan layanan postgres dan healthcheck memakai variabel di dalam container, sehingga tidak ada nama pengguna/database yang tertulis dua kali.
+    - `ci.yml`: nama database/pengguna (service postgres, healthcheck, `TEST_DB_URL`) memakai Repository Variables `POSTGRES_DB`/`POSTGRES_USER` dengan nilai bawaan yang sama. CI tidak dapat membaca `.env` lokal; versi alat tetap ditetapkan di tempatnya.
+    - Tes: `TestEnvExample_ListsEveryConfigVariable`; `docker compose config` diperiksa dengan nilai bawaan, nilai timpaan, dan `--env-file .env.example`.
+52. **Pengaman JWT_SECRET pada Mode Production** –
+    - Sebelumnya backend diam-diam memakai kunci bawaan yang terlihat di repo bila `JWT_SECRET` kosong, bahkan pada `ENV=production`, sehingga token (termasuk token admin) dapat dipalsukan. `Config.Validate()` (dipanggil di `cmd/server/main.go`) kini menolak start pada `ENV=production` bila `JWT_SECRET` kosong, sama dengan nilai contoh di repo (`dev-secret-change-in-prod`, nilai contoh compose lama), atau kurang dari 32 karakter; mode lain tidak terpengaruh.
+    - `docker-compose.yml`: `JWT_SECRET` kini wajib (`${JWT_SECRET:?...}`), compose berhenti dengan pesan jelas sebelum container dijalankan; nilai contoh lama dihapus.
+    - Tes: `TestValidate_ProductionRejectsWeakJWTSecret`; biner diuji langsung (production + kunci lemah → keluar kode 1 dengan pesan; development tidak terpengaruh).
+
+53. **`env_file: .env` Wajib pada Compose** –
+    - Layanan `app` memakai `env_file: .env` (berkas wajib ada; tanpa `.env` compose berhenti dengan "env file ... not found"). Seluruh isi `.env` menjadi environment backend, sehingga `AUTO_MIGRATE` dan `SEED_DATA` kini ikut diteruskan ke container (sebelumnya tidak). `environment:` menimpa tiga nilai yang harus berbeda di dalam container: `PORT=8080`, `ENV=production`, dan `DB_URL` ke layanan `postgres` (`DB_URL` di `.env` untuk `go run` di host). Layanan `postgres` dan `web` tidak diberi `env_file` agar `JWT_SECRET` tidak masuk container yang tidak membutuhkannya.
+    - CI (job Docker): membuat `.env` dari `.env.example` lalu `docker compose config --quiet`, sehingga berkas compose ikut tervalidasi.
+    - Diperiksa dengan `docker compose config`: tanpa `.env` berhenti dengan pesan jelas (galat JWT_SECRET atau "env file not found"), dengan `.env` environment backend benar (DB_URL internal, ENV production, PORT 8080, JWT_SECRET/AUTO_MIGRATE/SEED_DATA dari `.env`). Menjalankan stack penuh belum diuji (tidak ada daemon Docker).
+54. **Berkas `.env.prod` untuk Docker (`.env` untuk Development)** –
+    - `env_file` layanan `app` kini `.env.prod` (wajib ada); `JWT_SECRET` tidak lagi ditulis di `environment` (sebelumnya nilai hasil interpolasi `.env` akan menimpa `.env.prod`) sehingga datang dari `.env.prod` dan dijaga pengaman backend. Dijalankan dengan `docker compose --env-file .env.prod up -d --build` agar `${VAR}` (port, `POSTGRES_*`) juga dari `.env.prod`.
+    - `.gitignore`: `.env.*` kecuali `.env.example` (sebelumnya hanya `.env`, sehingga `.env.prod` berisi rahasia dapat ikut ter-commit). CI: membuat `.env.prod` dari contoh lalu `docker compose --env-file .env.prod config --quiet`.
+    - Diperiksa dengan `docker compose config`: tanpa `.env.prod` berhenti dengan pesan jelas; dengan `.env.prod` (pengguna/database/port/JWT dari berkas itu, `DB_URL` internal dan `ENV=production` tetap). Menjalankan stack penuh belum diuji.
+
+55. **Perapian permukaan publik** –
+    - `/metrics` tidak lagi terbuka: tanpa `METRICS_TOKEN` hanya dilayani dari loopback (`RemoteAddr`, header `X-Forwarded-For` diabaikan), dengan token wajib `Authorization: Bearer <token>`; selain itu 404. Nginx tidak mem-proxy `/metrics`, jadi tidak terjangkau dari luar.
+    - `GET /api/v1/health` hanya mengembalikan `{"status":"ok"}`; bila database tidak merespons 503 `UNAVAILABLE` tanpa rincian (detail masuk log server).
+    - Halaman `/design-system` dihapus beserta `DesignSystemView`, `HomeView` (yatim) dan komponen UI yang tidak dipakai (`AppCard`, `AppDock`, `AppIconBadge`, `AppProgressBar`).
+    - Base URL `/` kini diarahkan ke `/scoreboard` (daftar pertandingan live); halaman itu memuat tautan Login Petugas, Login Juri/Wasit (PIN), dan Daftar Kontingen. Mengembalikan ke login cukup mengubah `redirect` rute `home` di `router/index.ts`.
+    - Tes: `TestMetricsAccess_LoopbackOnlyWithoutToken`, `TestHealthHandler_NoDetailsOnFailure`, tes router untuk `/`.
+56. **Halaman `/scoreboard` lebih informatif** –
+    - Endpoint publik baru `GET /api/v1/live/schedule`: kejuaraan `active`, gelanggangnya, dan sampai 3 partai `idle` berikutnya per gelanggang (nomor partai sama dengan scoreboard; partai yang sudah dimuat ke gelanggang tidak diulang).
+    - Halaman menampilkan nama kejuaraan, lokasi, dan tanggal di bagian atas, bagian "Sedang Berlangsung", "Jadwal Berikutnya" per gelanggang, dan kartu Akses Petugas. Logo memakai tanda merek aplikasi karena kejuaraan belum punya data logo.
+    - Diperiksa di browser terhadap backend nyata; kegagalan jadwal tidak menyembunyikan daftar live.
 
 ## Status Backend Development & UAT Readiness
 - **Development Backend**: **100% SELESAI** untuk seluruh kebutuhan fitur core, business logic, WebSocket, scoring, audit trail, security hardening, dan database migration.
-- **Test Suite**: **100% PASS** (Seluruh unit test dan skenario integrasi lolos tanpa error).
+- **Test Suite**: **100% PASS** (`go test -race ./...` termasuk tes database nyata untuk login PIN; simulasi e2e REST+WebSocket lolos).
 - **UAT / Requirement Readiness**: Memenuhi 100% spesifikasi fungsional backend sesuai `architecture-backend.md` dan `workLog/api-missing-requirements.md`.
 
 ## Next Steps (Production Deployment & Operations)

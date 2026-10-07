@@ -6,31 +6,53 @@ services:
     container_name: scoring-backend
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
+    # Berkas .env.prod WAJIB ada (cp .env.example .env.prod, lalu isi JWT_SECRET dll.): compose berhenti bila
+    # tidak ditemukan. Seluruh isinya menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...).
+    # Jalankan selalu dengan:  docker compose --env-file .env.prod up -d --build
+    # agar ${VAR} di berkas ini (port, POSTGRES_*) juga dibaca dari .env.prod, bukan dari .env (development).
+    # Nilai di `environment` di bawah menimpa .env.prod karena harus berbeda di dalam container.
+    env_file:
+      - .env.prod
     environment:
-      - PORT=8080
-      - ENV=production
-      - DB_URL=postgres://scoring_user@postgres:5432/digital_scoring?sslmode=disable
-      - JWT_SECRET=change-this-in-production-secret-key-123
+      - PORT=8080 # nginx dan pemetaan port menuju 8080 di dalam container
+      - ENV=production # jalur Docker = produksi; development memakai `go run` dengan .env
+      # .env berisi DB_URL untuk `go run` di host (localhost); di dalam container database bernama `postgres`
+      - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
+      # JWT_SECRET sengaja tidak ditulis di sini: nilainya datang dari .env.prod (env_file). Backend menolak
+      # start bila kosong, masih nilai contoh, atau < 32 karakter (ENV=production).
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Frontend (Vue) + proxy API/WebSocket. Pintu masuk utama: http://<host>:${WEB_PORT:-80}/
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: scoring-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      - app
 
   postgres:
     image: postgres:16-alpine
     container_name: scoring-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: digital_scoring
-      POSTGRES_USER: scoring_user
+      POSTGRES_DB: ${POSTGRES_DB:-digital_scoring}
+      POSTGRES_USER: ${POSTGRES_USER:-scoring_user}
       POSTGRES_PASSWORD: ""
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scoring_user -d digital_scoring"]
+      # $$ = variabel diperluas di dalam container (nilai POSTGRES_USER/POSTGRES_DB di atas)
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5

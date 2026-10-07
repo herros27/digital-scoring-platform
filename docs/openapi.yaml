@@ -18,7 +18,11 @@ paths:
   /api/v1/auth/judge-login:
     post:
       summary: Login Tablet Juri / Wasit menggunakan PIN
-      description: Memvalidasi 6-digit PIN juri untuk arena tertentu dan mengembalikan token JWT untuk koneksi WebSocket.
+      description: |
+        Login hanya dengan PIN. Turnamen, gelanggang, role, dan kursi ditentukan server dari data PIN
+        (setiap PIN unik di seluruh sistem). PIN juri 6 digit, PIN wasit 8 digit. Mengembalikan token JWT
+        untuk koneksi WebSocket. Setelah 5 kali PIN salah beruntun dalam 15 menit, IP klien dikunci 15 menit
+        (HTTP 429 `TOO_MANY_ATTEMPTS` dengan header `Retry-After`).
       tags:
         - Authentication
       requestBody:
@@ -27,19 +31,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [competition_id, arena_id, pin]
+              required: [pin]
               properties:
-                competition_id:
-                  type: string
-                  format: uuid
-                  example: "3de882af-1b3e-4026-beb2-0d08e7e1c57d"
-                arena_id:
-                  type: string
-                  format: uuid
-                  example: "c48ee982-dccc-4f27-8ba4-f9672d1827bb"
                 pin:
                   type: string
-                  example: "123456"
+                  pattern: '^[0-9]{6,8}$'
+                  example: "123001"
       responses:
         '200':
           description: Login berhasil, token JWT diberikan
@@ -71,6 +68,12 @@ paths:
                         format: uuid
         '401':
           description: PIN salah atau kadaluarsa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Terlalu banyak PIN salah beruntun; IP dikunci sementara (lihat header `Retry-After`)
           content:
             application/json:
               schema:
@@ -188,6 +191,30 @@ paths:
         '401':
           description: Email atau password salah
 
+  /api/v1/auth/logout:
+    post:
+      summary: Logout Sesi Pengguna
+      description: Konfirmasi logout dari server. Pada arsitektur Stateless JWT, klien wajib menghapus token dari storage lokal.
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Berhasil logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "OK"
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "successfully logged out"
+
   /api/v1/auth/create-pin:
     post:
       summary: Generate PIN Baru untuk Petugas Pertandingan (Admin / Dewan)
@@ -219,7 +246,7 @@ paths:
                   example: 1
                 pin:
                   type: string
-                  description: Optional. Jika tidak diisi, server akan men-generate PIN 6 angka acak.
+                  description: Optional. Jika tidak diisi, server membuat PIN acak yang unik (6 digit; 8 digit untuk role wasit). PIN kustom harus berupa angka dengan panjang sesuai role dan unik di seluruh sistem; bila bentrok server menjawab HTTP 409 `PIN_TAKEN`.
                   example: "839201"
                 ttl_hours:
                   type: integer
@@ -262,6 +289,79 @@ paths:
                         format: date-time
         '403':
           description: Forbidden (Hanya admin/dewan yang diizinkan)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/pins:
+    get:
+      summary: Mengambil Daftar PIN Aktif per Gelanggang (Admin / Dewan)
+      description: Mengambil seluruh PIN aktif untuk gelanggang tertentu secara sinkron dari database. Jika arena belum memiliki PIN, server akan otomatis men-generate PIN awal untuk 5 Juri dan 1 Wasit.
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: competition_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID kompetisi yang aktif
+        - name: arena_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID gelanggang yang dipilih
+      responses:
+        '200':
+          description: Daftar PIN juri dan wasit aktif berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        competition_id:
+                          type: string
+                          format: uuid
+                        arena_id:
+                          type: string
+                          format: uuid
+                        role:
+                          type: string
+                          example: "judge"
+                        seat_number:
+                          type: integer
+                          example: 1
+                        pin:
+                          type: string
+                          example: "703351"
+                        expires_at:
+                          type: string
+                          format: date-time
+        '400':
+          description: Bad Request (competition_id atau arena_id tidak disertakan)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Hanya admin atau dewan yang berwenang)
           content:
             application/json:
               schema:
@@ -363,6 +463,13 @@ paths:
                 ruleset_name:
                   type: string
                   example: "IPSI 2024"
+                ruleset_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Ruleset dari `GET /api/v1/rulesets` yang dipakai partai kejuaraan ini. Bila diisi, ruleset ini
+                    dipakai saat partai dimuat ke gelanggang; bila kosong, server mencocokkan `ruleset_name`
+                    (nama lengkap, atau kata pertama seperti `ipsi`) dengan ruleset basis data, lalu berkas/bawaan.
       responses:
         '201':
           description: Kompetisi dibuat
@@ -418,6 +525,10 @@ paths:
                   format: date
                 ruleset_name:
                   type: string
+                ruleset_id:
+                  type: string
+                  format: uuid
+                  description: Ganti ruleset kejuaraan (berlaku untuk partai yang dimuat setelahnya). String kosong melepas ruleset.
       responses:
         '200':
           description: Data kompetisi berhasil diperbarui
@@ -987,7 +1098,10 @@ paths:
   # -------------------------------------------------------
   /api/v1/competitions/{comp_id}/matches:
     get:
-      summary: Daftar Pertandingan pada Kompetisi (Mendukung Pagination & Filter Status)
+      summary: Daftar Pertandingan pada Kompetisi (Mendukung Pagination, Filter Status & Gelanggang)
+      description: |
+        Tanpa `arena_id`: terbaru lebih dulu. Dengan `arena_id`: antrean partai gelanggang itu, urut dari
+        yang paling awal dibuat (dipakai konsol wasit untuk menampilkan antrean).
       tags:
         - Match
       security:
@@ -999,6 +1113,13 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: arena_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Hanya partai pada gelanggang ini (urutan antrean)
         - name: page
           in: query
           required: false
@@ -1237,6 +1358,101 @@ paths:
   /api/v1/competitions/{comp_id}/matches/{id}/finish:
     post:
       summary: Selesaikan Pertandingan & Hitung Pemenang (Admin / Dewan / Wasit)
+      description: |
+        Pemenang dihitung dari skor bersih (poin teknik dikurangi sanksi). Bila skor **seri**, server menjalankan
+        aturan seri ruleset (`tiebreak.steps`): potongan sanksi paling sedikit, lalu teknik terbanyak menurut
+        `technique_priority` (mis. Tangkapan+Jatuhan, Jatuhan, Tendangan, Pukulan); `result_type` menjadi
+        `tiebreak_penalties` atau `tiebreak_technique`. Bila semua langkah otomatis masih seri, server menolak dengan
+        400 `TIE_NEEDS_DECISION` kecuali body menyertakan `winner` (keputusan manual; `method` menentukan dasar
+        keputusan dan `result_type`: `referee_decision` bila kosong, atau `tiebreak_extra_round`,
+        `tiebreak_lighter_weight`, `tiebreak_coin_toss`).
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                winner:
+                  type: string
+                  enum: [red, blue]
+                  description: Pemenang menurut keputusan wasit (wajib bila seri dan aturan seri otomatis tidak menemukan pemenang)
+                method:
+                  type: string
+                  enum: [referee_decision, extra_round, lighter_weight, coin_toss]
+                  description: Dasar keputusan manual. Selain `referee_decision`, harus ada pada `tiebreak.manual_methods` ruleset.
+      responses:
+        '200':
+          description: Pertandingan selesai dan pemenang ditentukan (status finished)
+        '400':
+          description: Status tidak valid, atau skor seri tanpa `winner` (`TIE_NEEDS_DECISION`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/competitions/{comp_id}/matches/{id}/outcome:
+    post:
+      summary: Nyatakan Hasil Khusus KO / TKO / WO / Undur Diri (Admin / Dewan / Wasit)
+      description: |
+        Mengakhiri partai dengan hasil di luar skor. `winner` adalah sudut yang MENANG; `result_type` hasil
+        pertandingan menjadi jenis hasil (`ko`, `tko`, `walkover`, `withdrawal`). Kapan tiap jenis boleh dinyatakan
+        diatur `outcomes[].phase` pada ruleset (bawaan: `ko`/`tko` setelah dimulai, `walkover` sebelum dimulai,
+        `withdrawal` kapan saja). Partai yang sudah selesai ditolak. Pemenang dimajukan di bagan seperti hasil lain.
+      tags:
+        - Match Lifecycle
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome, winner]
+              properties:
+                outcome: { type: string, enum: [ko, tko, walkover, withdrawal] }
+                winner: { type: string, enum: [red, blue] }
+                note: { type: string, maxLength: 200, example: "Lawan tidak hadir setelah 3x panggilan" }
+      responses:
+        '200':
+          description: Partai selesai dengan hasil khusus
+        '400':
+          description: Jenis hasil tidak tersedia pada ruleset, fase tidak sesuai, atau partai sudah selesai (`INVALID_STATE_TRANSITION`)
+
+  /api/v1/competitions/{comp_id}/matches/{id}/reschedule:
+    post:
+      summary: Jadwalkan Ulang Partai yang Dibatalkan (Admin / Dewan / Wasit)
+      description: |
+        Mengembalikan partai berstatus `cancelled` ke `idle` dan menghapus skor per ronde, sehingga partai bisa
+        dimuat ke gelanggang lagi dan diulang dari 0-0. Log kejadian percobaan lama tetap tersimpan untuk audit
+        tetapi tidak lagi ditampilkan oleh `GET .../events` (disaring sejak kejadian `match_rescheduled` terakhir).
       tags:
         - Match Lifecycle
       security:
@@ -1256,7 +1472,11 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Pertandingan selesai dan pemenang ditentukan (status finished)
+          description: Partai kembali `idle`
+        '400':
+          description: Partai tidak berstatus cancelled, atau masih aktif di gelanggang (`INVALID_STATE_TRANSITION`)
+        '404':
+          description: Partai tidak ditemukan
 
   /api/v1/competitions/{comp_id}/matches/{id}/cancel:
     post:
@@ -1593,6 +1813,72 @@ paths:
                     total_rounds:
                       type: integer
                       example: 3
+                    techniques:
+                      type: array
+                      description: |
+                        Teknik yang dinilai juri (`type` = `score_type` pada `judge_input`). Kosong = diturunkan dari
+                        `technique_points`/`knockdown_points`/`fall_points` (Pukulan, Tendangan, Jatuhan).
+                        Kode `undo` dan `penalty` dicadangkan sistem.
+                      items:
+                        type: object
+                        required: [type, label, points]
+                        properties:
+                          type: { type: string, example: catch_fall, description: "huruf kecil/angka/underscore" }
+                          label: { type: string, example: "Tangkapan + Jatuhan" }
+                          points: { type: integer, minimum: 1, example: 4 }
+                    penalties:
+                      type: array
+                      description: |
+                        Tabel sanksi. Kosong = bawaan: Binaan 1-2 (0), Teguran 1 (-1), Teguran 2 (-2),
+                        Peringatan 1 (-5), Peringatan 2 (-10), Peringatan 3 (diskualifikasi).
+                      items:
+                        type: object
+                        required: [type, label]
+                        properties:
+                          type: { type: string, example: teguran_2 }
+                          label: { type: string, example: "Teguran 2" }
+                          points: { type: integer, minimum: 0, example: 2, description: "Potongan nilai bagi sudut yang dikenai" }
+                          action:
+                            type: string
+                            enum: [disqualify]
+                            description: "`disqualify` = sanksi ini langsung mendiskualifikasi sudut yang dikenai"
+                    outcomes:
+                      type: array
+                      description: |
+                        Hasil khusus yang dapat dinyatakan wasit. Kosong = bawaan: `ko` (in_match), `tko` (in_match),
+                        `walkover` (before_start), `withdrawal` (any).
+                      items:
+                        type: object
+                        required: [type, label, phase]
+                        properties:
+                          type: { type: string, enum: [ko, tko, walkover, withdrawal] }
+                          label: { type: string, example: "Menang Teknik (TKO)" }
+                          phase: { type: string, enum: [before_start, in_match, any] }
+                    tiebreak:
+                      type: object
+                      description: |
+                        Aturan seri. Kosong = sanksi paling sedikit, lalu teknik terbanyak (urut dari nilai tertinggi),
+                        lalu keputusan manual wasit.
+                      properties:
+                        steps:
+                          type: array
+                          items: { type: string, enum: [fewest_penalties, technique_priority] }
+                          description: Langkah otomatis, dijalankan berurutan sampai ada pemenang
+                        technique_priority:
+                          type: array
+                          items: { type: string }
+                          description: Kode teknik dari yang paling bernilai (default dari nilai poin teknik, besar ke kecil)
+                        manual_methods:
+                          type: array
+                          items: { type: string, enum: [extra_round, lighter_weight, coin_toss] }
+                          description: Dasar keputusan manual yang boleh dipilih wasit bila semua langkah otomatis seri
+                    consensus:
+                      type: object
+                      description: Aturan kesepakatan juri. Kosong = 3 juri, mayoritas 2, window 3000 ms.
+                      properties:
+                        judges: { type: integer, minimum: 1, maximum: 5, example: 3 }
+                        majority: { type: integer, minimum: 1, example: 2, description: "Jumlah juri yang harus sepakat (<= judges)" }
+                        window_ms: { type: integer, minimum: 500, maximum: 10000, example: 3000 }
                 status:
                   type: string
                   example: "active"
@@ -1959,6 +2245,92 @@ paths:
   # -------------------------------------------------------
   # LIVE SCOREBOARD (PUBLIC)
   # -------------------------------------------------------
+  /api/v1/live/arenas:
+    get:
+      summary: Daftar Gelanggang yang Sedang Berlangsung (Publik)
+      description: |
+        Semua gelanggang yang punya pertandingan aktif (state bukan `finished`/`cancelled`), dibaca dari
+        orchestrator di memori dan diurutkan menurut nama gelanggang. Dipakai halaman `/scoreboard`.
+      tags:
+        - Live Scoreboard
+      responses:
+        '200':
+          description: Daftar (kosong bila tidak ada pertandingan berlangsung)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        arena_id: { type: string, format: uuid }
+                        arena_name: { type: string }
+                        match_id: { type: string, format: uuid }
+                        state: { type: string, example: round_1 }
+                        round: { type: integer }
+                        red_athlete: { type: string }
+                        blue_athlete: { type: string }
+                        red_total: { type: integer }
+                        blue_total: { type: integer }
+
+  /api/v1/live/schedule:
+    get:
+      summary: Jadwal Partai Berikutnya per Gelanggang (Publik)
+      description: |
+        Kejuaraan berstatus `active` beserta gelanggangnya dan sampai 3 partai berstatus `idle` berikutnya
+        per gelanggang (urut nomor partai). Partai yang sudah dimuat ke gelanggang tidak diulang di sini
+        (muncul di `/live/arenas`). Dipakai halaman `/scoreboard`.
+      tags:
+        - Live Scoreboard
+      responses:
+        '200':
+          description: Daftar kejuaraan aktif (kosong bila tidak ada)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        competition_id: { type: string, format: uuid }
+                        name: { type: string }
+                        location: { type: string }
+                        start_date: { type: string, example: '2026-10-10' }
+                        end_date: { type: string, example: '2026-10-15' }
+                        arenas:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              arena_id: { type: string, format: uuid }
+                              arena_name: { type: string }
+                              upcoming:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    match_id: { type: string, format: uuid }
+                                    match_number: { type: integer }
+                                    class_label: { type: string, example: Kelas A Putra }
+                                    red_athlete: { type: string }
+                                    blue_athlete: { type: string }
+                                    red_team: { type: string }
+                                    blue_team: { type: string }
+        '500':
+          description: Gagal memuat jadwal
+
   /api/v1/live/scoreboard/{arena_id}:
     get:
       summary: Live Scoreboard Feed (Publik / Layar Penonton)
@@ -1973,7 +2345,61 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Status live scoring gelanggang saat ini
+          description: |
+            Keadaan pertandingan yang sedang aktif di gelanggang (dibaca dari orchestrator di memori),
+            atau `{"status": "no active match"}` bila belum ada pertandingan yang dimuat / sudah selesai.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      arena_name:
+                        type: string
+                        description: Nama gelanggang (ada juga saat `no active match`)
+                      competition_name:
+                        type: string
+                        description: Nama kejuaraan (ada juga saat `no active match`)
+                      class_label:
+                        type: string
+                        description: Kelas partai, mis. "Kelas A Putri"
+                        example: "Kelas A Putri"
+                      red_athlete: { type: string }
+                      blue_athlete: { type: string }
+                      red_team: { type: string, description: Kontingen atlet sudut merah }
+                      blue_team: { type: string, description: Kontingen atlet sudut biru }
+                      match_number:
+                        type: integer
+                        description: Nomor urut partai pada antrean gelanggangnya (paling awal dibuat = 1)
+                      status:
+                        type: string
+                        description: Status mesin pertandingan (`ready`, `round_1`, `break_1`, ...) atau `no active match`
+                        example: round_1
+                      match_id:
+                        type: string
+                        format: uuid
+                      arena_id:
+                        type: string
+                        format: uuid
+                      round:
+                        type: integer
+                      timer_remaining_ms:
+                        type: integer
+                      timer_running:
+                        type: boolean
+                      red_total:
+                        type: integer
+                      blue_total:
+                        type: integer
+                      red_athlete:
+                        type: string
+                      blue_athlete:
+                        type: string
 
   # -------------------------------------------------------
   # WEBSOCKET REAL-TIME CHANNEL & PROTOCOL
@@ -1984,17 +2410,26 @@ paths:
       description: |
         Endpoint WebSocket dua arah untuk sinkronisasi live match, scoring konsensus juri, kontrol wasit, dan timer.
         
-        **Autentikasi**: Menggunakan Query Param `?token=<JWT_TOKEN>`.
+        **Autentikasi** (Query Param `?token=<JWT_TOKEN>`):
+        * **Tanpa token** — penonton publik (layar scoreboard TV), role `scoreboard`. Hanya menerima siaran dan
+          boleh mengirim `sync_request`; perintah lain dijawab `error` `FORBIDDEN`. Hanya bisa terhubung ke
+          gelanggang yang punya pertandingan aktif (hub dibuat saat `load-arena`); selain itu HTTP 404.
+        * **Token PIN** (`/auth/judge-login`, login hanya dengan PIN) — terikat satu gelanggang; `arena_id` pada token harus sama dengan
+          path, bila tidak HTTP 403. Role `judge` boleh mengirim `judge_input`; role `wasit` dipetakan menjadi
+          `referee` dan boleh mengontrol pertandingan.
+        * **Token login email** (`/auth/login`, tanpa arena) — hanya role `admin`, `dewan`, dan `wasit`,
+          dan boleh terhubung ke gelanggang mana pun.
         
         ---
         ### 📡 Kontrak Pesan WebSocket (Protocol Contract):
         
         #### 1. Client ➔ Server
-        * **Input Penilaian Juri (`score_event`)**:
+        * **Input Penilaian Juri (`judge_input`)** — hanya role `judge`:
           ```json
           {
-            "type": "score_event",
+            "type": "judge_input",
             "payload": {
+              "event_id": "uuid (kunci idempotensi)",
               "score_type": "technique",
               "target": "red",
               "round": 1
@@ -2003,29 +2438,60 @@ paths:
           ```
           * `score_type`: `technique` (+1), `knockdown` (+2), `fall` (+2/3)
           * `target`: `red` atau `blue`
-        
-        * **Perintah Wasit / Kontrol Laga (`referee_command`)**:
+
+        * **Perintah Wasit / Kontrol Laga (`state_change`)** — hanya `referee` (wasit/dewan) dan `admin`:
           ```json
           {
-            "type": "referee_command",
+            "type": "state_change",
             "payload": {
               "action": "start"
             }
           }
           ```
           * `action`: `start`, `pause`, `resume`, `finish`, `cancel`
-          
-        * **Pemberian Peringatan / Hukuman (`penalty_event`)**:
+          * `finish` pada skor seri menjalankan aturan seri otomatis ruleset (sanksi paling sedikit, lalu teknik
+            terbanyak). Bila masih seri, ditolak (`INVALID_STATE_TRANSITION`) kecuali menyertakan
+            `"winner": "red"|"blue"` (+ opsional `"method": "extra_round"|"lighter_weight"|"coin_toss"`).
+            Waktu habis di ronde terakhir dengan skor seri yang terselesaikan aturan otomatis langsung berakhir;
+            bila tidak, `state_change` membawa `tie_pending: true` sampai wasit memutuskan.
+          * `disqualify` + `"target": "red"|"blue"` — sudut itu didiskualifikasi, lawan menang (`result_type`
+            `disqualification`), pertandingan berakhir.
+          * `declare_outcome` + `"outcome": "ko"|"tko"|"walkover"|"withdrawal"`, `"winner": "red"|"blue"`, opsional
+            `"note"` (maks 200 karakter) — hasil khusus; pemenang = `winner`, `result_type` = jenis hasil. Kapan boleh
+            dinyatakan diatur `phase` tiap jenis pada ruleset (`ko`/`tko` setelah dimulai, `walkover` sebelum dimulai,
+            `withdrawal` kapan saja).
+          * `adjust_time` + `"delta_ms"` (+/-) — koreksi sisa waktu ronde (dibatasi 1 detik s/d durasi ronde);
+            hanya saat berada di dalam ronde.
+          * `reset_round` — kembalikan sisa waktu ronde ke durasi penuh; hanya saat dijeda.
+
+        * **Sanksi (`penalty`)** — hanya `referee`/`admin`, hanya saat pertandingan berlangsung. Poin potongan
+          ditentukan server dari katalog (`penalty_catalog` pada `sync_response`), klien hanya mengirim jenisnya.
+          Setiap jenis hanya boleh dijatuhkan sekali per sudut (`PENALTY_ALREADY_APPLIED`):
           ```json
           {
-            "type": "penalty_event",
+            "type": "penalty",
             "payload": {
               "target": "blue",
-              "penalty_type": "warning",
-              "round": 1
+              "type": "teguran_1"
             }
           }
           ```
+          Jenis bawaan: `binaan_1` (0), `binaan_2` (0), `teguran_1` (-1), `teguran_2` (-1), `peringatan_1` (-5),
+          `peringatan_2` (-10).
+
+        * **Batalkan Sanksi Terakhir (`penalty_revoke`)** — mengembalikan poin sanksi terakhir pada sudut itu:
+          ```json
+          { "type": "penalty_revoke", "payload": { "target": "blue" } }
+          ```
+
+        * **Sinyal Arena (`arena_signal`)** — hanya `referee`/`admin`:
+          ```json
+          { "type": "arena_signal", "payload": { "signal": "gong" } }
+          { "type": "arena_signal", "payload": { "signal": "medic", "active": true } }
+          { "type": "arena_signal", "payload": { "signal": "var", "active": false } }
+          ```
+          `gong` sesaat (disiarkan ke semua klien); `medic` dan `var` memiliki status aktif/nonaktif yang tersimpan
+          di server dan tampil sebagai banner pada layar scoreboard.
 
         * **Sinkronisasi Reconnect (`sync_request`)**:
           ```json
@@ -2046,28 +2512,72 @@ paths:
               "round": 2,
               "timer_remaining_ms": 75000,
               "timer_running": true,
+              "timer_ends_at_ms": 1791289800000,
+              "server_time_ms": 1791289725000,
               "scores": [
                 {"RedTechnical": 3, "BlueTechnical": 2, "RedPenalties": 0, "BluePenalties": 0},
                 {"RedTechnical": 1, "BlueTechnical": 4, "RedPenalties": 0, "BluePenalties": 1}
               ],
               "red_total": 4,
               "blue_total": 5,
-              "server_time": "2026-10-04T06:30:00Z"
+              "server_time": "2026-10-04T06:30:00Z",
+              "ruleset_name": "IPSI 2024",
+              "round_duration_ms": 120000,
+              "break_duration_ms": 60000,
+              "total_rounds": 3,
+              "penalties": [
+                {"id": 1, "round": 1, "target": "red", "type": "teguran_1", "label": "Teguran 1", "points": 1, "clock_ms": 98000}
+              ],
+              "penalty_catalog": [{"type": "teguran_1", "label": "Teguran 1", "points": 1}],
+              "medic_active": false,
+              "var_active": false,
+              "tie_pending": false,
+              "recovered": false,
+              "result": null,
+              "presence": {
+                "judges": [{"seat": 1, "connected": true, "inputs": 3, "last_input": {"score_type": "technique", "target": "red", "round": 1, "clock_ms": 98000, "at": "2026-10-04T06:29:55Z"}}],
+                "referees": 1, "admins": 0, "scoreboards": 1
+              }
             }
           }
           ```
-        * **Status & Timer Pertandingan (`state_change`)**:
+          Bidang meja wasit (`ruleset_name` dst.) juga ada pada `GET /api/v1/live/scoreboard/{arena_id}`.
+        * **Status & Timer Pertandingan (`state_change`)**: dikirim setiap start/pause/resume/finish/cancel
+          dan pergantian ronde. Saat dijeda, `state` tetap `round_N` dan `timer_running` bernilai `false`.
           ```json
           {
             "type": "state_change",
             "payload": {
-              "match_id": "uuid",
-              "status": "round_1",
+              "state": "round_1",
               "round": 1,
-              "remaining_ms": 118000
+              "timer_remaining_ms": 118000,
+              "timer_running": true,
+              "timer_ends_at_ms": 1791289800000,
+              "server_time_ms": 1791289682000,
+              "tie_pending": false
             }
           }
           ```
+        * **Sinkronisasi Waktu (`timer_sync`)**: disiarkan server setiap 5 detik selama timer berjalan, dengan isi
+          `{timer_remaining_ms, timer_running, timer_ends_at_ms, server_time_ms}`. Sisa waktu dihitung server dari
+          jam (presisi milidetik, bukan kelipatan detik).
+
+          **Cara klien menampilkan waktu (wajib agar semua layar selaras):** jangan mengurangi sisa waktu per ketukan
+          interval. Hitung `sisa = timer_ends_at_ms − waktu_server_sekarang` pada setiap penyegaran tampilan, dengan
+          `waktu_server_sekarang = Date.now() + selisih_jam`; `selisih_jam` diperkirakan dari `server_time_ms` pada
+          setiap pesan (ambil sampel terbesar dalam beberapa pesan terakhir = tundaan jaringan terkecil). Dengan begitu
+          wasit, juri, dan scoreboard menampilkan angka yang sama dan tidak melenceng walau tab diperlambat browser.
+        * **Daftar Sanksi (`penalties`)**: disiarkan ke semua klien setiap sanksi dijatuhkan/dibatalkan —
+          `{"penalties": [{"id", "round", "target", "type", "label", "points", "clock_ms"}]}`.
+        * **Sinyal Arena (`arena_signal`)**: `{"signal": "gong"|"medic"|"var", "active": true}`.
+        * **Kehadiran Perangkat (`presence`)** — hanya ke meja wasit/admin, saat perangkat terhubung/terputus atau
+          juri mengirim input: `{"judges": [{"seat", "connected", "inputs", "last_input"}], "referees", "admins", "scoreboards"}`.
+        * **Log Kejadian (`match_event`)** — hanya ke meja wasit/admin; sama dengan baris `GET .../matches/{id}/events`
+          (`payload` sudah berupa objek, selalu memuat `clock_ms` dan `round`):
+          `{"id", "match_id", "event_type", "payload", "judge_id", "created_at"}`.
+          Jenis: `match_started`, `match_paused`, `match_resumed`, `match_finished`, `match_cancelled`, `round_started`,
+          `round_ended`, `judge_input`, `score_confirmed`, `penalty_applied`, `penalty_revoked`, `disqualified`,
+          `referee_decision`, `outcome_declared`, `match_recovered`, `tiebreak_resolved`, `tie_pending`, `time_adjusted`, `round_reset`, `arena_signal`.
         * **Update Skor Resmi (`score_update`)**:
           ```json
           {
@@ -2094,12 +2604,23 @@ paths:
             }
           }
           ```
+        * **Kemajuan Konsensus Juri (`consensus_progress`, hanya ke tablet juri)**: dikirim setiap ada tekanan juri yang
+          belum mencapai kesepakatan. Anonim (jumlah saja, tanpa identitas kursi) agar juri tidak saling terpengaruh;
+          wasit dan scoreboard tidak menerimanya. Tablet menyalakan `count` lampu dari `judge_count` lampu dan
+          memadamkannya setelah `window_ms` bila tidak ada kesepakatan; `score_confirmed` menandai terkonfirmasi.
+          ```json
+          {
+            "type": "consensus_progress",
+            "payload": {"target": "red", "score_type": "technique", "round": 1, "count": 1, "needed": 2, "window_ms": 3000}
+          }
+          ```
         * **Hasil Akhir Pertandingan (`match_result`)**:
           ```json
           {
             "type": "match_result",
             "payload": {
-              "winner": "red",
+              "winner": "uuid peserta pemenang",
+              "corner": "red",
               "result_type": "point_win",
               "scores": [...]
             }

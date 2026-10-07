@@ -11,7 +11,7 @@ Backend system untuk **Pencak Silat Kategori Tanding** dengan real-time scoring,
 | Backend API + WS | Go 1.27 (stdlib `net/http` + `gorilla/websocket`) |
 | Rules Engine | Go struct-based, dynamic rule set dari JSON/DB |
 | Database | PostgreSQL 16 (`jackc/pgx/v5` driver via stdlib) |
-| Auth & Security | PIN (bcrypt) + JWT (HS256) + Token Bucket Rate Limiting (`golang.org/x/time/rate`) |
+| Auth & Security | PIN (lookup HMAC-SHA256 + bcrypt) + JWT (HS256) + Token Bucket Rate Limiting (`golang.org/x/time/rate`) + kunci IP setelah PIN salah |
 | Validation | `go-playground/validator/v10` |
 | Caching & Metrics | In-Memory TTL Cache (`internal/cache`) + Prometheus (`internal/metrics`) |
 | Deployment | Single binary + systemd + Caddy reverse proxy |
@@ -26,7 +26,7 @@ internal/
   api/                       # HTTP handlers, router, middleware (JWT, RBAC, CORS, RateLimit)
     handler/                 # REST handlers (auth, competition, match, arena, bracket, official, contingent, report, live)
     swagger.go               # Swagger UI + OpenAPI spec
-  auth/                      # Random PIN generation (crypto/rand), bcrypt, JWT claims (role & seat)
+  auth/                      # PIN (crypto/rand, lookup HMAC, validasi per role), pembatas percobaan gagal, bcrypt, JWT claims (role & seat)
   bracket/                   # Single-elimination bracket generator & tree traversal
   cache/                     # In-memory TTL report cache with concurrent invalidation
   config/                    # Centralized environment & app settings (godotenv + env/v11)
@@ -43,10 +43,14 @@ internal/
 rulesets/
   ipsi_2024.json             # IPSI 2024 ruleset
   persilat_v7.json           # PERSILAT ruleset
-migrations/                  # SQL migrations (001 s/d 016) + Auto-migration engine
+migrations/                  # SQL migrations (001 s/d 018) + Auto-migration engine
 tests/                       # End-to-end integration test scenarios (tournament lifecycle & workflows)
-docker-compose.yml           # Local PostgreSQL
-docs/openapi.yaml            # OpenAPI 3.0 spec & WebSocket protocol contracts
+docker-compose.yml           # PostgreSQL + backend + frontend (nginx)
+docs/
+  openapi.yaml               # OpenAPI 3.0 spec & WebSocket protocol contracts
+  task_update.md             # Log progres & status fitur backend
+  frontend_progress.md       # Log progres, status modul & gap analysis frontend
+  CREDENTIALS.md             # Kredensial akun uji coba & format otorisasi
 ```
 
 ---
@@ -101,7 +105,10 @@ Arena A Hub          Arena B Hub
 ```
 - Role-based broadcast: judge hanya terima ack sendiri, referee/scoreboard terima semua
 - Auth via query param: `wss://host/ws/arena/{id}?token=<JWT>`
-- Reconnection + full state snapshot recovery
+  - **Tanpa token** = penonton publik (scoreboard TV), role `scoreboard`, read-only; hanya bisa terhubung ke arena yang sudah punya pertandingan aktif (selain itu HTTP 404)
+  - **Token PIN** (juri/wasit) harus cocok dengan arena yang dituju (selain itu HTTP 403); role `wasit` dan `dewan` dipetakan ke `referee`
+  - **Token login email** (tanpa arena) hanya diterima untuk `admin`, `dewan`, `wasit`
+- Reconnection + full state snapshot recovery (`sync_request` → `sync_response`)
 
 ### 5. Match Orchestrator
 Koordinator pusat per match:
@@ -128,11 +135,12 @@ MatchOrchestrator
 | Flow | Aktor | Method | Scope & Token Lifetime |
 |------|-------|--------|------------------------|
 | **Officials** | Admin, Dewan, Operator, Wasit | Email & Password (bcrypt) → JWT | 24 jam (`role: admin / dewan / operator / wasit`) |
-| **Juri Gelanggang** | Tablet Juri | 6-digit random PIN → JWT | Scoped ke: `competition_id`, `arena_id`, `role: judge`, `seat_number: 1..n` |
+| **Juri & Wasit Gelanggang** | Tablet Juri / Meja Wasit | PIN saja (juri 6 digit, wasit 8 digit) → JWT | Turnamen, gelanggang, role, dan kursi ditentukan server dari PIN; token scoped ke `competition_id`, `arena_id`, `role: judge/wasit`, `seat_number` |
 | **Kontingen** | Manajer Tim / Pelatih | Email & Password (bcrypt) → JWT | 24 jam (`role: contingent`) |
 
 - **Clean Architecture Juri**: Pemisahan tegas antara otorisasi (`role: "judge"`) dan nomor kursi fisik gelanggang (`seat_number`). Mendukung format juri dinamis (1, 3, 5, dst).
-- **Server-Side PIN**: PIN di-generate otomatis secara kriptografis (`crypto/rand`) dengan expiration time (`expires_at`).
+- **Login PIN-saja**: setiap PIN unik di seluruh sistem (dicari lewat `judge_pins.pin_lookup`, HMAC-SHA256 terindeks). PIN salah 5x beruntun mengunci IP 15 menit (HTTP 429).
+- **Server-Side PIN & Multi-Device Sync**: PIN di-generate otomatis secara kriptografis (`crypto/rand`) dengan expiration time (`expires_at`), disimpan persisten dalam database (`judge_pins.raw_pin`), dan disinkronisasi ke seluruh perangkat admin/operator via `GET /api/v1/auth/pins`.
 
 ### 8. Pendaftaran Atlet & Verifikasi Panitia (Contingent Workflow)
 - **Portal Kontingen**: Perwakilan kontingen dapat mendaftar mandiri (`/api/v1/auth/contingent/register`) dan mendaftarkan atlet asuhannya.
@@ -140,11 +148,11 @@ MatchOrchestrator
 - **Meja Timbang / Verifikasi**: Panitia (Admin / Dewan) memverifikasi berkas & timbang badan peserta (`PUT .../participants/{id}/verify`) menjadi `verified` atau `rejected`.
 - **Bracket Safeguard**: Hanya atlet berstatus `verified` yang dapat dimasukkan ke dalam bagan pertandingan single-elimination.
 
-### 9. Database (PostgreSQL 16) - 16 Versioned Migrations
+### 9. Database (PostgreSQL 16) - 17 Versioned Migrations
 Tabel database terstruktur & termigrasi lengkap:
 - `competitions`, `arenas`, `categories`, `rulesets`
 - `athletes`, `contingents`, `participants` (dengan `registration_status`), `officials`
-- `judge_pins` (dengan `seat_number INT`), `matches`, `match_scores`, `match_events` (audit trail), `bracket_slots`
+- `judge_pins` (dengan `seat_number INT` dan `raw_pin VARCHAR`), `matches`, `match_scores`, `match_events` (audit trail), `bracket_slots`
 
 ---
 
@@ -157,8 +165,9 @@ Tabel database terstruktur & termigrasi lengkap:
 
 ### 1. Start Database
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
+*(`docker compose up -d` tanpa nama layanan membangun dan menjalankan seluruh sistem; lihat "Menjalankan Seluruh Sistem dengan Docker".)*
 Default: `postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable`
 
 ### 2. Configure Environment
@@ -169,7 +178,7 @@ export ENV="development"  # atau "production"
 ```
 
 ### 3. Run Migrations (Otomatis)
-Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 016) akan otomatis diterapkan:
+Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 018) akan otomatis diterapkan:
 ```bash
 go run ./cmd/server
 ```
@@ -196,7 +205,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/v1/auth/login` | Public | Login akun Official (Admin/Dewan/Operator/Wasit) via email & password |
-| POST | `/api/v1/auth/judge-login` | Public | Login Juri gelanggang via PIN 6-digit → JWT (claims: `role: judge`, `seat_number`) |
+| POST | `/api/v1/auth/judge-login` | Public | Login juri/wasit hanya dengan `{ "pin" }` (6 digit juri, 8 digit wasit) → JWT (claims: `role`, `arena_id`, `competition_id`, `seat_number`) |
 | POST | `/api/v1/auth/contingent/register` | Public | Registrasi akun manajer kontingen baru |
 | POST | `/api/v1/auth/contingent/login` | Public | Login akun kontingen via email & password → JWT (`role: contingent`) |
 | POST | `/api/v1/auth/create-pin` | Admin, Dewan | Generate PIN acak/custom untuk juri gelanggang tertentu |
@@ -252,6 +261,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/resume` | Admin, Dewan, Wasit | Lanjutkan ronde yang terjeda |
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/finish` | Admin, Dewan, Wasit | Selesaikan match & otomatis majukan pemenang di bagan |
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/cancel` | Admin, Dewan, Wasit | Batalkan pertandingan |
+| POST | `/api/v1/competitions/{comp_id}/matches/{id}/reschedule` | Admin, Dewan, Wasit | Jadwalkan ulang partai yang dibatalkan (kembali `idle`, skor dihapus, diulang dari 0-0) |
 | GET | `/api/v1/competitions/{comp_id}/matches/{id}/scores` | JWT | Rincian skor akumulatif & breakdown per-seat juri |
 | POST | `/api/v1/competitions/{comp_id}/matches/{id}/scores` | JWT (Judge) | Submit skor HTTP fallback (didukung `Idempotency-Key` header) |
 | GET | `/api/v1/competitions/{comp_id}/matches/{id}/events` | JWT | Riwayat lengkap event log / audit trail pertandingan |
@@ -292,8 +302,10 @@ GET http://localhost:8080/docs/openapi.yaml
 ### 11. Live Scoreboard & WebSocket
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/live/scoreboard/{arena_id}` | Public | Live scoreboard feed publik (polling fallback) |
-| GET | `/ws/arena/{arena_id}?token=<JWT>` | Query Token | Real-time bi-directional channel gelanggang (Websocket) |
+| GET | `/api/v1/live/arenas` | Public | Daftar gelanggang yang sedang punya pertandingan aktif (nama gelanggang, atlet, ronde, skor) |
+| GET | `/api/v1/live/schedule` | Public | Kejuaraan aktif, gelanggangnya, dan 3 partai menunggu berikutnya per gelanggang |
+| GET | `/api/v1/live/scoreboard/{arena_id}` | Public | Snapshot pertandingan aktif di arena (status, ronde, timer, total skor, nama atlet) atau `{"status":"no active match"}` |
+| GET | `/ws/arena/{arena_id}[?token=<JWT>]` | Token opsional | Real-time bi-directional channel gelanggang (Websocket); tanpa token = penonton read-only |
 
 ---
 
@@ -302,25 +314,39 @@ GET http://localhost:8080/docs/openapi.yaml
 ### Client → Server
 | Type | From | Payload |
 |------|------|---------|
-| `score` | Judge | `{technique, target, round}` |
-| `penalty_recommend` | Judge | `{type, level, target}` |
-| `match_start` | Referee | `{}` |
-| `match_pause` | Referee | `{reason}` |
-| `match_resume` | Referee | `{}` |
-| `penalty_apply` | Referee | `{type, level, target, points}` |
-| `override` | Admin | `{ref_event_id, new_points, reason}` |
+| `judge_input` | Judge | `{event_id, score_type, target, round}` (`event_id` = kunci idempotensi) |
+| `state_change` | Referee, Admin | `{action}` dengan `action` = `start` \| `pause` \| `resume` \| `finish` (+`winner` bila seri) \| `cancel` \| `disqualify` (+`target`) \| `declare_outcome` (+`outcome`, `winner`, `note`) \| `adjust_time` (+`delta_ms`) \| `reset_round` |
+| `penalty` | Referee, Admin | `{target, type}`; poin potongan ditentukan server dari katalog (`binaan_1/2`, `teguran_1/2`, `peringatan_1/2`) |
+| `penalty_revoke` | Referee, Admin | `{target}` membatalkan sanksi terakhir sudut itu |
+| `arena_signal` | Referee, Admin | `{signal: "gong"}` atau `{signal: "medic"\|"var", active}` |
+| `sync_request` | Semua | `{}` |
 
 ### Server → Client
 | Type | To | Payload |
 |------|----|---------|
-| `ack` | Sender | `{seq, status}` |
-| `state_update` | All | `{state, round, timer}` |
-| `score_confirmed` | All except judge | `{technique, points, judges[], target}` |
-| `score_unconfirmed` | Judge | `{technique, reason}` |
-| `timer_sync` | All | `{remaining_ms, running, round, server_ts}` |
-| `penalty_applied` | All | `{type, level, points, target, by}` |
-| `match_result` | All | `{winner, result_type, scores}` |
-| `error` | Sender | `{code, message, ref_seq}` |
+| `sync_response` | Pengirim `sync_request` | `{match_id, arena_id, state, round, timer_remaining_ms, timer_running, scores[], red_total, blue_total, server_time, ruleset_name, round_duration_ms, break_duration_ms, total_rounds, penalties[], penalty_catalog[], medic_active, var_active, tie_pending, presence, result}` |
+| `state_change` | All | `{state, round, timer_remaining_ms, timer_running, timer_ends_at_ms, server_time_ms, tie_pending}` (saat dijeda `state` tetap `round_N`, `timer_running=false`; `tie_pending=true` bila waktu ronde terakhir habis dengan skor seri) |
+| `timer_sync` | All | `{timer_remaining_ms, timer_running, timer_ends_at_ms, server_time_ms}` setiap 5 detik selama timer berjalan |
+| `penalties` | All | `{penalties: [{id, round, target, type, label, points, clock_ms}]}` |
+| `arena_signal` | All | `{signal, active}` |
+| `presence` | Referee, Admin | `{judges: [{seat, connected, inputs, last_input}], referees, admins, scoreboards}` |
+| `match_event` | Referee, Admin | log kejadian real-time (sama dengan `GET .../matches/{id}/events`, payload selalu memuat `clock_ms` dan `round`) |
+| `score_update` | All | `{round, red_technical, blue_technical, red_penalties, blue_penalties}` |
+| `score_confirmed` | All | `{score_type, target, points, count, round}` |
+| `consensus_progress` | Hanya tablet juri | `{target, score_type, round, count, needed, window_ms}`: berapa juri (anonim, tanpa identitas kursi) yang sudah menekan teknik dan sudut yang sama dalam window; dikirim saat belum mencapai kesepakatan. Dipakai lampu konsensus di tablet juri |
+| `match_result` | All | `{winner, corner, result_type, scores}` |
+| `error` | Pengirim | `{code, message}` (mis. `FORBIDDEN`, `SCORING_NOT_ALLOWED`, `INVALID_STATE_TRANSITION`) |
+
+Timer berjalan di server berbasis **tenggat absolut** (`timer_ends_at_ms`), bukan penghitung per detik. Klien menghitung `sisa = tenggat − jam server`
+pada tiap penyegaran tampilan (jam server diselaraskan dari `server_time_ms`), dan server menyiarkan `timer_sync` tiap 5 detik. Dengan begitu
+wasit, juri, dan scoreboard menampilkan waktu yang sama walau tab diperlambat browser.
+
+**Skor seri:** pertandingan tidak pernah dimenangkan otomatis oleh sudut merah. Server menjalankan aturan seri ruleset (`tiebreak`):
+1. **Potongan sanksi paling sedikit** menang (`result_type` = `tiebreak_penalties`).
+2. **Teknik terbanyak** menurut urutan prioritas (preset: 1+3 Tangkapan+Jatuhan, 3 Jatuhan, 1+2 Kombinasi Pukulan+Tendangan, 2 Tendangan, 1+1 Kombinasi 2 Pukulan, 1 Pukulan; ruleset tanpa urutan eksplisit memakai nilai tertinggi lebih dulu; `tiebreak_technique`). Sudut dengan jumlah lebih banyak pada jenis teknik paling bernilai yang jumlahnya berbeda menang.
+3. Bila masih seri, pertandingan menunggu keputusan manual wasit (`tie_pending` pada waktu habis; `TIE_NEEDS_DECISION` lewat REST). Wasit menyertakan `winner` dan dasar keputusan `method`: `extra_round` (babak tambahan), `lighter_weight` (timbang ulang), `coin_toss` (undian koin), atau kosong = keputusan wasit (`tiebreak_extra_round`, `tiebreak_lighter_weight`, `tiebreak_coin_toss`, `referee_decision`).
+
+Langkah 1-2 dihitung server dari data pertandingan; babak tambahan, timbang ulang, dan undian koin dilakukan di luar sistem lalu hasilnya dicatat wasit. Kombinasi serangan 1+2 (`combo_1_2`, 3 poin) dan 1+1 (`combo_1_1`, 2 poin) tersedia sebagai teknik terpisah pada preset sehingga urutan prioritas seri sesuai regulasi; hapus dari ruleset bila event tidak memakainya. Diskualifikasi (`disqualify`) memenangkan sudut lawan.
 
 ---
 
@@ -343,6 +369,79 @@ GET http://localhost:8080/docs/openapi.yaml
 }
 ```
 Simpan di `rulesets/{name}.json` atau buat langsung via REST API `POST /api/v1/rulesets` (tersimpan di database PostgreSQL).
+
+### Mengelola ruleset dari antarmuka
+Admin dan dewan membuka **Regulasi & Ruleset** di panel operasional (`/ops?tab=regulasi`): daftar ruleset, **Ubah**, **Duplikat** (mis. salin preset IPSI lalu ubah angkanya), **Hapus**, dan **Ruleset Baru**. Editor memuat waktu dan babak, teknik dan nilainya, sanksi (termasuk centang Diskualifikasi), konsensus juri, aturan seri (urutan prioritas teknik), dan hasil khusus, dengan validasi yang sama seperti server. Ruleset dipilih saat membuat atau mengubah kejuaraan (disimpan sebagai `ruleset_id`); perubahan berlaku untuk partai yang dimuat ke gelanggang setelah disimpan, partai yang sedang berjalan tidak berubah. Ruleset yang masih dipakai kejuaraan tidak dapat dihapus (409 `CONFLICT`), begitu juga nama+versi ganda.
+
+### Sanksi, teknik, dan konsensus per ruleset
+Selain poin dan durasi, `scoring` dapat memuat tiga bagian opsional. Bila dikosongkan, server memakai nilai turunan/bawaan sehingga ruleset lama tetap berjalan:
+
+```json
+"techniques": [
+  {"type": "technique",  "label": "Pukulan",             "points": 1},
+  {"type": "catch_fall", "label": "Tangkapan + Jatuhan", "points": 4}
+],
+"penalties": [
+  {"type": "teguran_2",    "label": "Teguran 2",    "points": 2},
+  {"type": "peringatan_3", "label": "Peringatan 3", "points": 0, "action": "disqualify"}
+],
+"consensus": {"judges": 3, "majority": 2, "window_ms": 3000}
+```
+- **`techniques`**: tombol di tablet juri dan nilainya. `type` adalah `score_type` yang dikirim juri; jenis di luar daftar (selain `undo`) ditolak.
+- **`penalties`**: katalog sanksi konsol wasit. `points` = potongan nilai; `action: "disqualify"` membuat sanksi itu langsung mendiskualifikasi sudut yang dikenai. Bawaan: Binaan 1-2 (0), Teguran 1 (-1), Teguran 2 (-2), Peringatan 1 (-5), Peringatan 2 (-10), Peringatan 3 (diskualifikasi). **Cocokkan dengan peraturan event.**
+- **`outcomes`**: hasil khusus yang boleh dinyatakan wasit. Tiap item `{type, label, phase}` dengan `type` ∈ `ko`, `tko`, `walkover`, `withdrawal` dan `phase` ∈ `before_start`, `in_match`, `any`. Bawaan: KO dan TKO setelah pertandingan dimulai, WO sebelum dimulai, Undur Diri kapan saja. Dinyatakan lewat WebSocket `declare_outcome` atau `POST .../matches/{id}/outcome` dengan `winner` (sudut yang menang); `result_type` hasil = jenis hasil.
+- **`tiebreak`**: `steps` (`fewest_penalties`, `technique_priority`), `technique_priority` (kode teknik dari yang paling bernilai), `manual_methods` (`extra_round`, `lighter_weight`, `coin_toss`). Kosong = bawaan di bagian "Skor seri".
+- **`consensus`**: `judges` (1-5, jumlah kursi yang ditampilkan), `majority` (juri yang harus sepakat), `window_ms` (500-10000).
+- Preset `IPSI 2024` dan `PERSILAT International` (seeder dan migrasi 019) memuat ketiganya; teknik "Tangkapan + Jatuhan" (1+3) bernilai 4 sebagai tombol terpisah dari Jatuhan (3), serta "Kombinasi Pukulan + Tendangan" (1+2 = 3) dan "Kombinasi 2 Pukulan" (1+1 = 2) (migrasi 021 melengkapi preset yang sudah ada). Tablet juri menyusun tombol dua kolom bila teknik lebih dari 4.
+- `POST/PUT /api/v1/rulesets` memvalidasi bagian ini (kode unik huruf kecil/angka/underscore, nilai teknik > 0, potongan >= 0, `majority` <= `judges`).
+
+---
+
+## Menjalankan Seluruh Sistem dengan Docker
+
+`docker compose up -d --build` membangun dan menjalankan tiga layanan:
+
+| Layanan | Isi | Port host |
+|---|---|---|
+| `postgres` | PostgreSQL 16 (data di volume `postgres_data`) | 5432 |
+| `app` | Backend Go (`Dockerfile` di akar repo; migrasi otomatis) | 8080 |
+| `web` | Frontend Vue hasil `npm run build` disajikan nginx, plus proxy `/api/`, `/ws/`, `/docs` ke `app` (`apps/web/Dockerfile`, `apps/web/nginx.conf`) | `${WEB_PORT:-80}` |
+
+Semua perangkat cukup membuka satu alamat, `http://<alamat-server>/`: tablet juri `/judge/login`, konsol wasit `/referee` (lewat login PIN wasit), scoreboard `/scoreboard` (daftar gelanggang yang sedang berlangsung), panel operasi `/ops`, dokumentasi API `/docs`. Frontend memakai alamat relatif, jadi tidak ada alamat server yang tertanam dan WebSocket otomatis lewat proxy yang sama.
+
+```bash
+cp .env.example .env.prod   # WAJIB (compose berhenti bila .env.prod tidak ada); isi JWT_SECRET acak dan nilai lain (tidak masuk git)
+docker compose --env-file .env.prod up -d --build
+# data awal (akun admin, kompetisi contoh): dari mesin yang punya Go
+DB_URL="postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable" go run ./cmd/seed
+```
+
+### Konfigurasi dari `.env`
+`.env.example` adalah daftar lengkap variabel (dan satu-satunya sumber nilai bawaan). **Berkas `.env.prod` wajib ada untuk docker compose** (`.env` dipakai untuk development; kedua berkas, dan semua `.env.*` selain `.env.example`, diabaikan git): layanan `app` memakai `env_file: .env.prod`, jadi seluruh isinya (`JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`, ...) menjadi environment backend, kecuali tiga nilai yang ditimpa compose karena harus berbeda di dalam container (`PORT=8080`, `ENV=production`, dan `DB_URL` yang diarahkan ke layanan `postgres`; `DB_URL` di `.env.prod` tidak dipakai di Docker). Mengisi `SEED_DATA=true` di `.env.prod` membuat backend di Docker mengisi data contoh saat start (nyalakan hanya untuk start pertama). Jalankan selalu dengan `--env-file .env.prod` agar `${VAR}` pada `docker-compose.yml` juga dibaca dari `.env.prod` (tanpa opsi itu compose membaca `.env` development untuk nilai-nilai ini, sedangkan `JWT_SECRET` tetap dari `.env.prod`): `POSTGRES_USER`, `POSTGRES_DB` (dipakai layanan `postgres`, healthcheck, dan `DB_URL` backend, jadi tidak perlu ditulis dua kali), `JWT_SECRET`, serta port host `WEB_PORT`, `APP_PORT`, `POSTGRES_PORT`. Backend yang dijalankan langsung (`go run ./cmd/server`) membaca `.env` lewat godotenv (`PORT`, `ENV`, `DB_URL`, `JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`). Variabel environment host mengalahkan `.env`.
+
+**CI GitHub tidak dapat membaca `.env`** (berkas itu sengaja tidak di-commit dan job berjalan di mesin lain). Untuk nilai non-rahasia, `ci.yml` memakai Repository Variables (Settings → Secrets and variables → Actions → Variables) bernama `POSTGRES_USER` dan `POSTGRES_DB`, dengan nilai bawaan yang sama dengan `.env.example` bila variabel itu tidak dibuat. Rahasia nyata (mis. `JWT_SECRET` produksi) tidak pernah dibutuhkan CI dan sebaiknya tidak disimpan di repo atau variabel biasa. Versi alat (Go dari `go.mod`, Node 22 pada `ci.yml` dan `apps/web/Dockerfile`) sengaja ditetapkan di tempatnya.
+
+Catatan:
+- nginx menimpa header `X-Forwarded-For` dengan alamat sambungan asli, sehingga pembatas percobaan PIN (15 menit setelah 5 salah) tidak bisa dihindari dengan header palsu. Jangan mempublikasikan port 8080 backend langsung ke jaringan venue bila ingin mengandalkan ini; hapus pemetaan `8080:8080` pada `docker-compose.yml` untuk produksi.
+- `JWT_SECRET` **wajib** diisi di `.env` atau environment: `docker compose up` berhenti dengan pesan jelas bila kosong, dan backend (`ENV=production`, yang diatur compose) menolak start bila nilainya kosong, masih nilai contoh dari repo, atau kurang dari 32 karakter. Buat nilai acak dengan `openssl rand -base64 48`. Database memakai `trust` tanpa kata sandi, cocok untuk jaringan venue tertutup saja.
+- CI membangun kedua image dan memeriksa sintaks konfigurasi nginx (`nginx -t`).
+
+---
+
+## Pemulihan Setelah Server Restart
+
+Keadaan partai yang sedang berlangsung disimpan di tabel `match_runtime` (satu baris per partai aktif) setiap ada perubahan (dimuat, mulai, jeda, lanjut, skor sah, sanksi, sinyal dokter/VAR, koreksi waktu, pergantian babak) dan sisa waktu dicatat tiap 5 detik selama timer berjalan. Isinya: state mesin, sisa waktu, skor per babak, sanksi aktif, hitungan teknik (untuk aturan seri), keputusan wasit yang sudah ditetapkan, dan **ruleset yang dipakai saat partai dimuat** (mengubah ruleset di editor tidak mengubah partai yang berjalan, juga setelah restart). Baris dihapus saat partai selesai, dibatalkan, atau dijadwalkan ulang.
+
+Saat server start, semua partai tersimpan dipulihkan ke gelanggang yang sama (gelanggang tetap terkunci oleh partai itu):
+
+| Keadaan saat server mati | Setelah restart |
+|---|---|
+| Ronde berjalan atau dijeda | **Dijeda** dengan sisa waktu catatan terakhir; snapshot `recovered: true`, log mencatat `match_recovered`. Wasit memeriksa waktu (±10 detik) lalu menekan Lanjutkan |
+| Istirahat antar babak | Hitung mundur istirahat berlanjut otomatis |
+| Dimuat ke gelanggang, belum dimulai | Kembali apa adanya |
+| Selesai atau dibatalkan | Tidak dipulihkan |
+
+Tablet juri, konsol wasit, dan scoreboard tersambung ulang sendiri dan meminta sinkronisasi; konsol wasit menampilkan banner "Server dimulai ulang". Yang tidak ikut dipulihkan: input juri yang belum mencapai konsensus (jendela beberapa detik; juri cukup menekan lagi). Catatan sisa waktu berselang 5 detik, sehingga bila server mati saat ronde berjalan, waktu yang tersisa bisa paling banyak 5 detik lebih sedikit dari kenyataan, dan wasit dapat mengoreksinya. Basis data harus tetap tersedia (volume PostgreSQL persisten di Docker).
 
 ---
 
@@ -411,19 +510,31 @@ WantedBy=multi-user.target
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
-Returns: DB status, active arenas, active matches, WS connections.
+Returns `{"status":"ok"}`, atau 503 bila database tidak merespons (tanpa rincian). Endpoint ini publik; metrik ada di `/metrics`.
+
+`/metrics` (Prometheus) hanya dapat diakses dari loopback; untuk scraper jarak jauh isi `METRICS_TOKEN` lalu kirim `Authorization: Bearer <token>`. Nginx pada image web tidak mem-proxy `/metrics`.
 
 ---
 
 ## Development
 
+### Database Seeding & Default Credentials
+Untuk mengisi database kosong dengan data turnamen realistis (kompetisi, 2 gelanggang, kategori tanding, 4 kontingen, 8 atlet, bagan turnamen, match aktif, serta PIN wasit & juri):
+```bash
+go run ./cmd/seed/main.go
+```
+Daftar lengkap akun login official, kontingen, dan PIN wasit/juri didokumentasikan di:  
+👉 **[docs/CREDENTIALS.md](docs/CREDENTIALS.md)**
+
 ### Run Tests
 ```bash
 go test -v -count=1 ./...
 ```
+
 Menjalankan seluruh **automated unit tests** (co-located di `internal/`) dan **integration test scenarios** (di `tests/`) dengan hasil 100% PASS:
 - **Unit Tests (`internal/`)**:
-  - `internal/auth`: Token issuance, verification, expiration, seat number, bcrypt PIN
+  - `internal/auth`: Token issuance, verification, expiration, seat number, bcrypt PIN, validasi/generator/lookup PIN, pembatas percobaan gagal (kunci IP)
+  - `internal/hub`: Pemetaan role JWT → role hub (wasit/dewan → referee)
   - `internal/bracket`: Single elimination tree generator, BYE handling, auto-advance
   - `internal/consensus`: Majority voting (2/3), sliding window (3s), duplicate suppression
   - `internal/statemachine`: Round lifecycle flow, invalid transitions, early finish
@@ -432,14 +543,25 @@ Menjalankan seluruh **automated unit tests** (co-located di `internal/`) dan **i
   - `internal/cache`: TTL cache hit/miss, concurrent invalidation
   - `internal/metrics`: Prometheus metric vectors & latency histogram
   - `internal/config`: Environment parser & defaults
-  - `internal/api`: Token bucket rate limiting middleware & struct validator
+  - `internal/api`: Token bucket rate limiting middleware, struct validator, WebSocket melalui `MetricsMiddleware`, akses WebSocket (penonton publik, token PIN, token email)
 - **Integration Tests (`tests/`)**:
+  - `tests/pin_login_test.go`: Login hanya dengan PIN (database nyata): keunikan global, kedaluwarsa, rotasi, panjang per role, kunci IP, `create-pin` 409/400
   - `tests/contingent_test.go`: End-to-end contingent portal, athlete registration & verification
   - `tests/match_service_test.go`: Full match lifecycle, timer, WebSocket broadcast & scoring
   - `tests/official_and_report_test.go`: Tournament report aggregation, medals table, export
   - `tests/ruleset_crud_test.go`: Dynamic database ruleset CRUD integration
   - `tests/admin_features_test.go`: Arena CRUD & Competition administrative operations
   - `tests/p1_features_test.go` & `tests/p2_features_test.go`: Phase 1 & 2 feature regression tests
+
+Tes login PIN (`tests/pin_login_test.go`) memakai database PostgreSQL nyata dan dilewati bila tidak tersedia
+(default `postgres://scoring_user@localhost:5432/digital_scoring`, atau set `TEST_DB_URL`). CI menyediakannya lewat service Postgres.
+
+Simulasi end-to-end (REST + WebSocket + konsensus juri, 20+ pemeriksaan; butuh backend berjalan dan data seed):
+```bash
+go run ./cmd/seed
+go run ./cmd/server &
+node apps/web/scripts/e2e-simulation.mjs   # keluar dengan kode 1 bila ada pemeriksaan gagal
+```
 
 ### Generate Migration
 ```bash

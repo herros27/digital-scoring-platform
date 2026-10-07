@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 )
 
@@ -80,5 +81,45 @@ func TestConfig_DotEnvFile(t *testing.T) {
 	}
 	if cfg.JWTSecret != "from-dotenv-file" {
 		t.Errorf("expected JWTSecret from .env file, got %s", cfg.JWTSecret)
+	}
+}
+
+// .env.example harus memuat setiap variabel yang dibaca Config, agar dokumentasi konfigurasi tidak basi.
+func TestEnvExample_ListsEveryConfigVariable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".env.example"))
+	if err != nil {
+		t.Fatalf(".env.example tidak ditemukan: %v", err)
+	}
+	for _, key := range []string{"PORT", "ENV", "DB_URL", "JWT_SECRET", "AUTO_MIGRATE", "SEED_DATA", "POSTGRES_USER", "POSTGRES_DB"} {
+		if !regexp.MustCompile(`(?m)^` + key + `=`).Match(data) {
+			t.Errorf(".env.example tidak memuat %s", key)
+		}
+	}
+}
+
+func TestValidate_ProductionRejectsWeakJWTSecret(t *testing.T) {
+	long := "mock-jwt-secret-key-for-test-32chars-ok!"
+	cases := []struct {
+		name   string
+		env    string
+		secret string
+		ok     bool
+	}{
+		{"development apa pun lolos", "development", "dev-secret-change-in-prod", true},
+		{"development kosong lolos", "development", "", true},
+		{"production kosong ditolak", "production", "", false},
+		{"production nilai contoh kode ditolak", "production", "dev-secret-change-in-prod", false},
+		{"production nilai contoh compose ditolak", "production", "change-this-in-production-secret-key-123", false},
+		{"production terlalu pendek ditolak", "production", "short-secret", false},
+		{"production 31 karakter ditolak", "production", "0123456789012345678901234567890", false},
+		{"production 32 karakter lolos", "production", "01234567890123456789012345678901", true},
+		{"production acak panjang lolos", "production", long, true},
+	}
+	for _, c := range cases {
+		cfg := &Config{Env: c.env, JWTSecret: c.secret}
+		err := cfg.Validate()
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err = %v, want ok=%v", c.name, err, c.ok)
+		}
 	}
 }

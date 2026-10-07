@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 
 interface Props {
-  variant?: 'primary' | 'secondary' | 'tertiary' | 'neutral' | 'red' | 'blue' | 'emerald' | 'warning'
+  variant?:
+    'primary' | 'secondary' | 'tertiary' | 'neutral' | 'red' | 'blue' | 'emerald' | 'warning'
   size?: 'sm' | 'md' | 'lg'
   dot?: boolean
   pulse?: boolean
@@ -116,7 +117,8 @@ const badgeClasses = computed(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }

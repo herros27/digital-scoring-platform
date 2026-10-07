@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"time"
 
@@ -16,7 +17,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
+// NewRouter merakit seluruh rute. metricsToken (METRICS_TOKEN) kosong = /metrics hanya dari loopback.
+func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Handler {
 	// in-memory cache (Otter S3-FIFO)
 	appCache := cache.MustNew(10_000)
 
@@ -37,21 +39,33 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	compService := service.NewCompetitionService(compRepo)
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
 	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
-	bracketService := service.NewBracketService(bracketRepo)
+	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo)
 	categoryService := service.NewCategoryService(categoryRepo)
 	athleteService := service.NewAthleteService(athleteRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
 	matchService.SetRulesetResolver(rulesetService)
+	matchService.SetArenaStore(arenaRepo)
+	matchService.SetRuntimeStore(&store.MatchRuntimeStore{DB: db})
+	if n, err := matchService.RestoreActiveMatches(); err != nil {
+		log.Printf("[match] pemulihan partai gagal: %v", err)
+	} else if n > 0 {
+		log.Printf("[match] %d partai dipulihkan dalam keadaan dijeda setelah restart", n)
+	}
 	officialService := service.NewOfficialService(officialRepo)
 	contingentService := service.NewContingentService(contingentRepo)
 	reportService := service.NewReportService(compRepo, arenaRepo, categoryRepo, athleteRepo, matchRepo)
 
 	// handlers
-	authH := &handler.AuthHandler{Pins: pinRepo}
+	authH := &handler.AuthHandler{
+		Pins: pinRepo,
+		// PIN salah 5x beruntun dalam 15 menit -> IP dikunci 15 menit (PIN 6-8 digit, login tanpa ID).
+		Lockout:   auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
+		ClientKey: ClientIP,
+	}
 	compH := &handler.CompetitionHandler{Service: compService}
 	arenaH := &handler.ArenaHandler{Service: arenaService}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
-	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo}
+	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo, Matches: matchService}
 	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
 	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache}
@@ -66,21 +80,11 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	mux.HandleFunc("GET /docs", SwaggerHandler())
 	mux.HandleFunc("GET /docs/openapi.yaml", OpenAPISpecHandler("docs/openapi.yaml"))
 
-	// === Prometheus Metrics (Public) ===
-	mux.Handle("GET /metrics", promhttp.Handler())
+	// === Prometheus Metrics (hanya loopback, atau dengan METRICS_TOKEN) ===
+	mux.Handle("GET /metrics", MetricsAccess(metricsToken)(promhttp.Handler()))
 
-	// === Health Check (Public) ===
-	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		dbStatus := "connected"
-		if err := db.Ping(); err != nil {
-			dbStatus = "error: " + err.Error()
-		}
-		handler.Ok(w, map[string]any{
-			"status":   "ok",
-			"database": dbStatus,
-			"version":  "1.0.0",
-		})
-	})
+	// === Health Check (publik, tanpa detail) ===
+	mux.HandleFunc("GET /api/v1/health", HealthHandler(db))
 
 	// Rate limiters:
 	// Auth endpoints: 10 req/min, burst 10 per IP (brute force mitigation for PIN & password)
@@ -94,6 +98,9 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	mux.Handle("POST /api/v1/auth/login", authLimiter(http.HandlerFunc(officialH.Login)))
 	mux.Handle("POST /api/v1/auth/contingent/register", authLimiter(http.HandlerFunc(contingentH.Register)))
 	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
+	mux.HandleFunc("POST /api/v1/auth/logout", authH.Logout)
+	mux.HandleFunc("GET /api/v1/live/arenas", liveH.Arenas)
+	mux.HandleFunc("GET /api/v1/live/schedule", liveH.Schedule)
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
 
 	// === Public cached tournament views (Otter in-memory cache) ===
@@ -115,6 +122,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
 
 	// Auth & PIN (Admin only)
+	protected.Handle("GET /api/v1/auth/pins", adminOrDewan(http.HandlerFunc(authH.ListPINs)))
 	protected.Handle("POST /api/v1/auth/create-pin", adminOrDewan(http.HandlerFunc(authH.CreatePIN)))
 
 	// Competitions
@@ -156,7 +164,9 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager) http.Handler {
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/pause", matchOperators(http.HandlerFunc(matchH.Pause)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/resume", matchOperators(http.HandlerFunc(matchH.Resume)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/finish", matchOperators(http.HandlerFunc(matchH.Finish)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/outcome", matchOperators(http.HandlerFunc(matchH.Outcome)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/cancel", matchOperators(http.HandlerFunc(matchH.Cancel)))
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule", matchOperators(http.HandlerFunc(matchH.Reschedule)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.GetScores)
 	protected.HandleFunc("POST /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.SubmitScore)
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/events", matchH.GetEvents)

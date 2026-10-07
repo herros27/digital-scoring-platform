@@ -23,6 +23,11 @@ func main() {
 
 	// 2. Inisialisasi Logger & Auth JWT Secret
 	logger.Init(cfg.IsProduction())
+	if err := cfg.Validate(); err != nil {
+		logger.Log.Error("konfigurasi tidak aman, server tidak dijalankan", "error", err,
+			"petunjuk", "buat nilai acak: openssl rand -base64 48, lalu isi JWT_SECRET di .env")
+		os.Exit(1)
+	}
 	auth.SetJWTSecret(cfg.JWTSecret)
 
 	// 3. Hubungkan Database & Jalankan Migrasi Otomatis
@@ -36,9 +41,24 @@ func main() {
 		}
 	}
 
+	if cfg.SeedData {
+		if summary, err := store.SeedData(db); err != nil {
+			logger.Log.Error("database seed failed", "error", err)
+		} else {
+			logger.Log.Info("🌱 database seed applied successfully",
+				"officials", summary.Officials,
+				"contingents", summary.Contingents,
+				"athletes", summary.Athletes,
+				"participants", summary.Participants,
+				"matches", summary.Matches,
+				"judge_pins", summary.JudgePins,
+			)
+		}
+	}
+
 	// 4. Hub Manager & Router
 	hubManager := hub.NewManager()
-	router := api.NewRouter(db, hubManager)
+	router := api.NewRouter(db, hubManager, cfg.MetricsToken)
 
 	// 5. Production HTTP Server Configuration
 	server := &http.Server{

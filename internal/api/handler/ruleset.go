@@ -46,6 +46,10 @@ func (h *RulesetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	rs, err := h.Service.CreateRuleset(input)
 	if err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", err.Error(), nil)
+			return
+		}
 		if errors.Is(err, domain.ErrInvalidInput) {
 			Fail(w, http.StatusBadRequest, "INVALID_INPUT", err.Error(), nil)
 			return
@@ -67,6 +71,10 @@ func (h *RulesetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	rs, err := h.Service.UpdateRuleset(id, input)
 	if err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", err.Error(), nil)
+			return
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", "ruleset not found", nil)
 			return
@@ -81,6 +89,10 @@ func (h *RulesetHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *RulesetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.Service.DeleteRuleset(id); err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", err.Error(), nil)
+			return
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", "ruleset not found", nil)
 			return

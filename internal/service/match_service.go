@@ -2,6 +2,10 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"log"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/herros27/digital-scoring/internal/consensus"
@@ -34,10 +38,55 @@ type MatchService struct {
 	matchStore      *store.MatchStore
 	bracketStore    orchestrator.BracketAdvancer
 	rulesetResolver RulesetResolver
+	arenaStore      *store.ArenaStore
+	runtimeStore    *store.MatchRuntimeStore
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
 }
+
+// classLabel label kelas pertandingan, mis. "Kelas A Putri" (sama dengan konsol wasit).
+func classLabel(weightClass, gender string) string {
+	g := gender
+	switch strings.ToLower(gender) {
+	case "male", "putra":
+		g = "Putra"
+	case "female", "putri":
+		g = "Putri"
+	}
+	return strings.TrimSpace(fmt.Sprintf("Kelas %s %s", weightClass, g))
+}
+
+// ArenaContext nama gelanggang dan nama kejuaraannya (untuk layar scoreboard saat belum ada partai).
+func (s *MatchService) ArenaContext(arenaID string) (arenaName, competitionName string) {
+	if s.arenaStore == nil {
+		return "", ""
+	}
+	a, err := s.arenaStore.GetByID(arenaID)
+	if err != nil || a == nil {
+		return "", ""
+	}
+	if s.compRepo != nil {
+		if c, err := s.compRepo.GetByID(a.CompetitionID); err == nil && c != nil {
+			competitionName = c.Name
+		}
+	}
+	return a.Name, competitionName
+}
+
+// ArenaName mengembalikan nama gelanggang, atau "" bila tidak diketahui.
+func (s *MatchService) ArenaName(arenaID string) string {
+	if s.arenaStore == nil {
+		return ""
+	}
+	if a, err := s.arenaStore.GetByID(arenaID); err == nil {
+		return a.Name
+	}
+	return ""
+}
+
+// SetArenaStore memungkinkan daftar scoreboard publik menampilkan nama gelanggang.
+func (s *MatchService) SetArenaStore(a *store.ArenaStore) { s.arenaStore = a }
 
 func (s *MatchService) SetRulesetResolver(resolver RulesetResolver) {
 	s.rulesetResolver = resolver
@@ -95,6 +144,44 @@ func (s *MatchService) GetMatchesByCompetitionPaged(competitionID, status string
 	}
 
 	return []store.Match{}, 0, nil
+}
+
+// GetMatchesByArenaPaged daftar partai pada satu gelanggang (urutan antrean).
+func (s *MatchService) GetMatchesByArenaPaged(competitionID, arenaID, status string, page, limit int) ([]store.Match, int, error) {
+	if competitionID == "" || arenaID == "" {
+		return nil, 0, domain.ErrInvalidInput
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if s.matchStore != nil {
+		return s.matchStore.ListByArenaPaged(competitionID, arenaID, status, limit, (page-1)*limit)
+	}
+
+	// Tanpa store (mis. repositori tiruan): saring dari daftar kompetisi
+	all, _, err := s.GetMatchesByCompetitionPaged(competitionID, status, 1, 10000)
+	if err != nil {
+		return nil, 0, err
+	}
+	filtered := make([]store.Match, 0, len(all))
+	for _, m := range all {
+		if m.ArenaID == arenaID {
+			filtered = append(filtered, m)
+		}
+	}
+	total := len(filtered)
+	start := (page - 1) * limit
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return filtered[start:end], total, nil
 }
 
 func (s *MatchService) CreateMatch(m *store.Match) error {
@@ -164,8 +251,59 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	}
 
 	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore)
+	if s.runtimeStore != nil {
+		orch.SetRuntimeStore(s.runtimeStore)
+	}
 	s.activeOrchestrators[matchID] = orch
+	// beri tahu layar yang sudah tersambung (scoreboard, tablet, konsol) bahwa partai baru dimuat
+	orch.BroadcastSnapshot()
 	return nil
+}
+
+// SetRuntimeStore memasang penyimpanan keadaan partai aktif untuk pemulihan setelah server restart.
+func (s *MatchService) SetRuntimeStore(rs *store.MatchRuntimeStore) { s.runtimeStore = rs }
+
+// RestoreActiveMatches memulihkan partai yang masih berlangsung saat server terakhir berhenti.
+// Mengembalikan jumlah partai yang dipulihkan. Baris untuk partai yang sudah selesai/dibatalkan atau
+// rusak dibersihkan. Ronde yang berjalan dipulihkan dalam keadaan dijeda (lihat orchestrator.Restore).
+func (s *MatchService) RestoreActiveMatches() (int, error) {
+	if s.runtimeStore == nil {
+		return 0, nil
+	}
+	records, err := s.runtimeStore.List()
+	if err != nil {
+		return 0, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	restored := 0
+	for _, rec := range records {
+		if _, exists := s.activeOrchestrators[rec.MatchID]; exists {
+			continue
+		}
+		if s.matchStore != nil {
+			if m, err := s.matchStore.GetByID(rec.MatchID); err != nil || m == nil || m.Status == "finished" || m.Status == "cancelled" {
+				_ = s.runtimeStore.Delete(rec.MatchID)
+				continue
+			}
+		}
+		var mStore orchestrator.MatchStore
+		if s.matchStore != nil {
+			mStore = s.matchStore
+		} else if s.matchRepo != nil {
+			mStore = s.matchRepo
+		}
+		orch, err := orchestrator.Restore(rec, s.hubManager.GetOrCreate(rec.ArenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore, s.runtimeStore)
+		if err != nil {
+			log.Printf("[match] gagal memulihkan partai %s: %v", rec.MatchID, err)
+			_ = s.runtimeStore.Delete(rec.MatchID)
+			continue
+		}
+		s.activeOrchestrators[rec.MatchID] = orch
+		restored++
+	}
+	return restored, nil
 }
 
 // GetOrchestrator mengambil Orchestrator berdasarkan matchID
@@ -205,11 +343,34 @@ func (s *MatchService) ResumeMatch(matchID string) error {
 }
 
 func (s *MatchService) FinishMatch(matchID string) error {
+	return s.FinishMatchWithWinner(matchID, "")
+}
+
+// FinishMatchWithWinner mengakhiri pertandingan; winner ("red"/"blue") = keputusan wasit, wajib bila skor seri.
+func (s *MatchService) FinishMatchWithWinner(matchID, winner string) error {
+	return s.FinishMatchWithDecision(matchID, winner, "")
+}
+
+// FinishMatchWithDecision seperti FinishMatchWithWinner dengan dasar keputusan (method): salah satu
+// metode manual seri pada ruleset (extra_round, lighter_weight, coin_toss); kosong = keputusan wasit.
+func (s *MatchService) FinishMatchWithDecision(matchID, winner, method string) error {
 	o, err := s.GetOrchestrator(matchID)
 	if err != nil {
 		return err
 	}
-	return o.Finish()
+	if winner == "" {
+		return o.Finish()
+	}
+	return o.FinishWithDecision(winner, method)
+}
+
+// DeclareOutcome menyatakan hasil khusus (ko, tko, walkover, withdrawal) dengan winner = "red"/"blue".
+func (s *MatchService) DeclareOutcome(matchID, outcome, winner, note string) error {
+	o, err := s.GetOrchestrator(matchID)
+	if err != nil {
+		return err
+	}
+	return o.DeclareOutcome(outcome, winner, note)
 }
 
 func (s *MatchService) CancelMatch(matchID string) error {
@@ -281,4 +442,176 @@ func (s *MatchService) SubmitScoreInput(matchID string, input consensus.JudgeInp
 		return nil, false, err
 	}
 	return o.SubmitJudgeInput(input, idempotencyKey)
+}
+
+// GetLiveSnapshot mengembalikan keadaan pertandingan yang sedang aktif di sebuah arena
+// untuk layar scoreboard publik. ok=false bila tidak ada pertandingan aktif.
+func (s *MatchService) GetLiveSnapshot(arenaID string) (snapshot map[string]any, ok bool) {
+	s.mu.RLock()
+	var live *orchestrator.Orchestrator
+	for _, orch := range s.activeOrchestrators {
+		if orch.GetArenaID() == arenaID && orch.IsActive() {
+			live = orch
+			break
+		}
+	}
+	s.mu.RUnlock()
+	if live == nil {
+		return nil, false
+	}
+
+	snapshot = live.Snapshot()
+	snapshot["status"] = snapshot["state"]
+	snapshot["arena_name"] = s.ArenaName(arenaID)
+	if s.matchStore != nil {
+		if info, err := s.matchStore.GetMatchInfo(live.GetMatchID()); err == nil {
+			snapshot["red_athlete"] = info.RedName
+			snapshot["blue_athlete"] = info.BlueName
+			snapshot["red_team"] = info.RedTeam
+			snapshot["blue_team"] = info.BlueTeam
+			snapshot["class_label"] = classLabel(info.WeightClass, info.Gender)
+			snapshot["competition_name"] = info.CompetitionName
+			snapshot["match_number"] = info.Number
+		}
+	}
+	return snapshot, true
+}
+
+// ListLiveArenas mengembalikan ringkasan semua gelanggang yang sedang punya pertandingan
+// aktif (belum selesai/dibatalkan), diurutkan menurut nama gelanggang.
+func (s *MatchService) ListLiveArenas() []map[string]any {
+	s.mu.RLock()
+	live := make([]*orchestrator.Orchestrator, 0, len(s.activeOrchestrators))
+	for _, orch := range s.activeOrchestrators {
+		if orch.IsActive() {
+			live = append(live, orch)
+		}
+	}
+	s.mu.RUnlock()
+
+	list := make([]map[string]any, 0, len(live))
+	for _, orch := range live {
+		snap := orch.Snapshot()
+		item := map[string]any{
+			"arena_id":   orch.GetArenaID(),
+			"arena_name": s.ArenaName(orch.GetArenaID()),
+			"match_id":   orch.GetMatchID(),
+			"state":      snap["state"],
+			"round":      snap["round"],
+			"red_total":  snap["red_total"],
+			"blue_total": snap["blue_total"],
+		}
+		if s.matchStore != nil {
+			if red, blue, err := s.matchStore.GetCornerNames(orch.GetMatchID()); err == nil {
+				item["red_athlete"] = red
+				item["blue_athlete"] = blue
+			}
+		}
+		list = append(list, item)
+	}
+	sort.Slice(list, func(i, j int) bool {
+		ni, _ := list[i]["arena_name"].(string)
+		nj, _ := list[j]["arena_name"].(string)
+		if ni != nj {
+			return ni < nj
+		}
+		ai, _ := list[i]["arena_id"].(string)
+		aj, _ := list[j]["arena_id"].(string)
+		return ai < aj
+	})
+	return list
+}
+
+// RescheduleMatch mengulang partai yang dibatalkan dari 0-0. Hanya partai berstatus cancelled
+// yang dapat dijadwalkan ulang; skor lama dihapus dan log lama disembunyikan (tetap tersimpan).
+func (s *MatchService) RescheduleMatch(matchID string) error {
+	if matchID == "" || s.matchStore == nil {
+		return domain.ErrInvalidInput
+	}
+	s.mu.RLock()
+	existing, ok := s.activeOrchestrators[matchID]
+	s.mu.RUnlock()
+	if ok && existing.IsActive() {
+		return fmt.Errorf("%w: partai masih aktif di gelanggang", domain.ErrInvalidStateTransition)
+	}
+	if m, err := s.matchStore.GetByID(matchID); err != nil || m == nil {
+		return domain.ErrMatchNotFound
+	}
+	changed, err := s.matchStore.Reschedule(matchID)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return fmt.Errorf("%w: hanya partai yang dibatalkan yang dapat dijadwalkan ulang", domain.ErrInvalidStateTransition)
+	}
+	s.mu.Lock()
+	if old, ok := s.activeOrchestrators[matchID]; ok {
+		old.Release()
+		delete(s.activeOrchestrators, matchID)
+	}
+	s.mu.Unlock()
+	if s.runtimeStore != nil {
+		_ = s.runtimeStore.Delete(matchID)
+	}
+	if s.eventStore != nil {
+		_ = s.eventStore.Append(&store.MatchEvent{MatchID: matchID, EventType: "match_rescheduled", Payload: "{}"})
+	}
+	return nil
+}
+
+// UpcomingPerArena jumlah partai menunggu yang ditampilkan per gelanggang pada jadwal publik.
+const UpcomingPerArena = 3
+
+// ListSchedule menyusun jadwal publik: kejuaraan aktif, gelanggangnya, dan beberapa partai
+// berikutnya per gelanggang. Partai yang sudah dimuat ke gelanggang (tampil di daftar live)
+// tidak diulang di jadwal.
+func (s *MatchService) ListSchedule() ([]map[string]any, error) {
+	if s.matchStore == nil {
+		return []map[string]any{}, nil
+	}
+	rows, err := s.matchStore.ListUpcoming()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	loaded := make(map[string]bool, len(s.activeOrchestrators))
+	for id, orch := range s.activeOrchestrators {
+		if orch.IsActive() {
+			loaded[id] = true
+		}
+	}
+	s.mu.RUnlock()
+
+	result := []map[string]any{}
+	var comp, arena map[string]any
+	var compID, arenaID string
+	for _, r := range rows {
+		if comp == nil || r.CompetitionID != compID {
+			compID, arenaID = r.CompetitionID, ""
+			comp = map[string]any{
+				"competition_id": r.CompetitionID, "name": r.CompetitionName, "location": r.Location,
+				"start_date": r.StartDate, "end_date": r.EndDate, "arenas": []map[string]any{},
+			}
+			result = append(result, comp)
+		}
+		if arena == nil || r.ArenaID != arenaID {
+			arenaID = r.ArenaID
+			arena = map[string]any{"arena_id": r.ArenaID, "arena_name": r.ArenaName, "upcoming": []map[string]any{}}
+			comp["arenas"] = append(comp["arenas"].([]map[string]any), arena)
+		}
+		if r.MatchID == "" || loaded[r.MatchID] {
+			continue
+		}
+		up := arena["upcoming"].([]map[string]any)
+		if len(up) >= UpcomingPerArena {
+			continue
+		}
+		arena["upcoming"] = append(up, map[string]any{
+			"match_id": r.MatchID, "match_number": r.Number,
+			"red_athlete": r.RedName, "blue_athlete": r.BlueName,
+			"red_team": r.RedTeam, "blue_team": r.BlueTeam,
+			"class_label": classLabel(r.WeightClass, r.Gender),
+		})
+	}
+	return result, nil
 }

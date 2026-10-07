@@ -2,11 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"golang.org/x/time/rate"
 )
 
@@ -144,5 +147,86 @@ func TestRateLimitFunction(t *testing.T) {
 	testHandler.ServeHTTP(rec2, req2)
 	if rec2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", rec2.Code)
+	}
+}
+
+func TestMetricsMiddleware_AllowsWebSocketUpgrade(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade melalui MetricsMiddleware gagal: %v", err)
+			return
+		}
+		defer conn.Close()
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("halo"))
+	})
+	srv := httptest.NewServer(MetricsMiddleware(mux))
+	defer srv.Close()
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(srv.URL, "http")+"/ws", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+	if _, msg, err := conn.ReadMessage(); err != nil || string(msg) != "halo" {
+		t.Fatalf("pesan = %q, err = %v", msg, err)
+	}
+}
+
+func TestMetricsAccess_LoopbackOnlyWithoutToken(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	cases := []struct {
+		name, remote, auth, token string
+		want                      int
+	}{
+		{"loopback tanpa token diizinkan", "127.0.0.1:5555", "", "", 200},
+		{"loopback IPv6 diizinkan", "[::1]:5555", "", "", 200},
+		{"jaringan privat ditolak", "192.168.1.20:5555", "", "", 404},
+		{"jaringan Docker ditolak", "172.18.0.5:5555", "", "", 404},
+		{"publik ditolak", "203.0.113.9:5555", "", "", 404},
+		{"X-Forwarded-For tidak dipercaya", "203.0.113.9:5555", "", "", 404},
+		{"token benar dari mana pun", "203.0.113.9:5555", "Bearer rahasia", "rahasia", 200},
+		{"token salah ditolak", "127.0.0.1:5555", "Bearer salah", "rahasia", 404},
+		{"token diisi tetapi tanpa header ditolak walau loopback", "127.0.0.1:5555", "", "rahasia", 404},
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest("GET", "/metrics", nil)
+		req.RemoteAddr = c.remote
+		req.Header.Set("X-Forwarded-For", "127.0.0.1") // klien tidak bisa menyamar sebagai loopback
+		if c.auth != "" {
+			req.Header.Set("Authorization", c.auth)
+		}
+		rec := httptest.NewRecorder()
+		MetricsAccess(c.token)(ok).ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s: status %d, want %d", c.name, rec.Code, c.want)
+		}
+	}
+}
+
+type fakePinger struct{ err error }
+
+func (f fakePinger) Ping() error { return f.err }
+
+func TestHealthHandler_NoDetailsOnFailure(t *testing.T) {
+	rec := httptest.NewRecorder()
+	HealthHandler(fakePinger{}).ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/health", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"status":"ok"`) {
+		t.Fatalf("sehat: %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "database") || strings.Contains(rec.Body.String(), "version") {
+		t.Errorf("jawaban sehat tidak boleh memuat detail: %s", rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	secret := "dial tcp 10.0.0.5:5432: password authentication failed for user scoring_user"
+	HealthHandler(fakePinger{err: errors.New(secret)}).ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/health", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("tidak sehat: status %d", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "10.0.0.5") || strings.Contains(rec.Body.String(), "scoring_user") || strings.Contains(rec.Body.String(), "password") {
+		t.Errorf("galat database bocor ke klien: %s", rec.Body.String())
 	}
 }

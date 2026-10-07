@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -81,9 +83,23 @@ func (s *CompetitionService) GetCompetitionByID(id string) (*domain.Competition,
 	return comp, nil
 }
 
+var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// validRulesetID: nil/kosong berarti memakai ruleset berdasarkan nama; selain itu harus berupa UUID.
+func validRulesetID(id *string) error {
+	if id == nil || *id == "" || uuidRE.MatchString(*id) {
+		return nil
+	}
+	return fmt.Errorf("%w: ruleset_id harus berupa UUID ruleset", domain.ErrInvalidInput)
+}
+
 func (s *CompetitionService) CreateCompetition(c *domain.Competition) error {
 	if c.Name == "" || c.StartDate == "" || c.EndDate == "" {
 		return errors.New("competition name, start date, and end date are required")
+	}
+
+	if err := validRulesetID(c.RulesetID); err != nil {
+		return err
 	}
 
 	// Default status selalu draft saat pertama dibuat
@@ -133,6 +149,16 @@ func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competi
 	}
 	if update.RulesetName != "" {
 		comp.RulesetName = update.RulesetName
+	}
+	if update.RulesetID != nil {
+		if err := validRulesetID(update.RulesetID); err != nil {
+			return nil, err
+		}
+		if *update.RulesetID == "" {
+			comp.RulesetID = nil
+		} else {
+			comp.RulesetID = update.RulesetID
+		}
 	}
 
 	if err := s.repo.Update(comp); err != nil {

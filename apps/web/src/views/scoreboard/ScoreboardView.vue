@@ -1,64 +1,69 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
-import { api } from '@/lib/api'
+import { playGong } from '@/composables/useGong'
+import { RESULT_LABEL } from '@/composables/matchResult'
+import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
+import { arenaService } from '@/features/arena/api/arenaService'
 
 const route = useRoute()
 const arenaId = computed(() => (route.params.arena_id as string) || 'gelanggang-1')
 
 // --- Match State ---
-const competitionTitle = ref('KEJUARAAN NASIONAL PENCAK SILAT 2025')
-const tournamentSeries = ref('PENCAK SILAT WORLD CHAMPIONSHIPS')
-const arenaName = ref('GELANGGANG 1')
-const categoryName = ref('DEWASA PUTRA — KELAS C (55–60 KG)')
-const matchNumber = ref('MATCH #M-2025-04')
-const rulesetLabel = ref('PERSILAT RULES 2024')
+const competitionTitle = ref('KEJUARAAN PENCAK SILAT')
+const tournamentSeries = ref('PENCAK SILAT DIGITAL SCORING')
+const arenaName = ref('GELANGGANG')
+const categoryName = ref('TANDING')
+const matchNumber = ref('')
+const rulesetLabel = ref('PENCAK SILAT DIGITAL SCORING')
 
 // Round & State
-const currentRound = ref(2)
-const matchStatus = ref<'idle' | 'ready' | 'running' | 'break' | 'paused' | 'finished'>('running')
+const currentRound = ref(1)
+const matchStatus = ref<MatchStatus>('idle')
 
 // Athletes
-const redAthlete = ref({
-  name: 'AHMAD FAUZI',
-  team: 'KONTINGEN JAWA TENGAH',
-  idTag: 'ID: INA-204',
-})
+const redAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', idTag: '' })
+const blueAthlete = ref({ name: 'MENUNGGU PERTANDINGAN', team: '', idTag: '' })
 
-const blueAthlete = ref({
-  name: 'BAYU PRATAMA',
-  team: 'KONTINGEN JAWA TIMUR',
-  idTag: 'ID: INA-188',
-})
-
-// Scores per round
+// Scores per round (red/blue = poin teknik, redPen/bluePen = potongan hukuman)
 const roundScores = ref([
-  { round: 1, red: 4, blue: 5, redPen: 0, bluePen: 0 },
-  { round: 2, red: 8, blue: 4, redPen: 1, bluePen: 2 },
-  { round: 3, red: 2, blue: 2, redPen: 0, bluePen: 1 },
+  { round: 1, red: 0, blue: 0, redPen: 0, bluePen: 0 },
+  { round: 2, red: 0, blue: 0, redPen: 0, bluePen: 0 },
+  { round: 3, red: 0, blue: 0, redPen: 0, bluePen: 0 },
 ])
 
-// Penalties
-const redPenalties = ref({ binaan: 0, teguran: 1, peringatan: 0 })
-const bluePenalties = ref({ binaan: 1, teguran: 2, peringatan: 1 })
+// Total bersih = poin teknik dikurangi potongan hukuman (sama dengan red_total/blue_total server)
+const redTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.red - r.redPen, 0))
+const blueTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.blue - r.bluePen, 0))
+const redPenaltyTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.redPen, 0))
+const bluePenaltyTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.bluePen, 0))
 
-// Totals
-const redTotal = computed(() => {
-  return roundScores.value.reduce((acc, r) => acc + r.red, 0)
-})
-
-const blueTotal = computed(() => {
-  return roundScores.value.reduce((acc, r) => acc + r.blue, 0)
-})
-
-// Jury Consensus status banner
+// Banner status skor
 const consensusStatus = computed(() => {
-  if (redTotal.value > blueTotal.value) return 'MERAH MEMIMPIN (3/5)'
-  if (blueTotal.value > redTotal.value) return 'BIRU MEMIMPIN (3/5)'
-  return 'SKOR IMBANG (5/5)'
+  if (redTotal.value > blueTotal.value) return 'MERAH MEMIMPIN'
+  if (blueTotal.value > redTotal.value) return 'BIRU MEMIMPIN'
+  return 'SKOR IMBANG'
 })
+
+// Chip status per babak, diturunkan dari babak aktif dan status pertandingan
+const roundChips = computed(() =>
+  [1, 2, 3].map((round) => {
+    if (matchStatus.value === 'finished' || round < currentRound.value) {
+      return { round, kind: 'done' as const, label: 'SELESAI' }
+    }
+    if (
+      round > currentRound.value ||
+      matchStatus.value === 'idle' ||
+      matchStatus.value === 'ready'
+    ) {
+      return { round, kind: 'waiting' as const, label: 'MENUNGGU' }
+    }
+    const label = { running: 'AKTIF', paused: 'DIJEDA', break: 'ISTIRAHAT' }[matchStatus.value]
+    return { round, kind: 'active' as const, label: label ?? 'AKTIF' }
+  }),
+)
 
 // Floating Score Animation Toasts
 interface ScoreToast {
@@ -73,13 +78,27 @@ function triggerScoreToast(side: 'red' | 'blue', text: string) {
   const id = ++toastCounter
   activeToasts.value.push({ id, side, text })
   setTimeout(() => {
-    activeToasts.value = activeToasts.value.filter(t => t.id !== id)
+    activeToasts.value = activeToasts.value.filter((t) => t.id !== id)
   }, 1600)
 }
+
+// Sinyal arena dari wasit (banner selama aktif)
+const medicActive = ref(false)
+const varActive = ref(false)
 
 // Winner Announcement Modal
 const showWinnerModal = ref(false)
 const winnerData = ref<{ side: 'red' | 'blue'; name: string; resultType: string } | null>(null)
+
+// Tampilan kemenangan menutup sendiri agar scoreboard kembali terlihat.
+const WINNER_AUTO_CLOSE_MS = 30_000
+let winnerCloseTimer: ReturnType<typeof setTimeout> | undefined
+watch(showWinnerModal, (open) => {
+  clearTimeout(winnerCloseTimer)
+  if (open)
+    winnerCloseTimer = setTimeout(() => (showWinnerModal.value = false), WINNER_AUTO_CLOSE_MS)
+})
+onBeforeUnmount(() => clearTimeout(winnerCloseTimer))
 
 // --- Timer ---
 const timer = useTimer()
@@ -97,47 +116,97 @@ function toggleFullscreen() {
 }
 
 // --- Real-Time WebSocket Connection ---
-const { isConnected, onMessage } = useWebSocket(arenaId.value)
+const { isConnected, sendMessage, onMessage } = useWebSocket(arenaId.value)
 
-onMounted(async () => {
-  // Initialize timer to 01:41 (101 seconds) as depicted in Figma 01_arena_scoreboard.png
-  timer.sync(101000, true)
+const WAITING_NAME = 'MENUNGGU PERTANDINGAN'
+let loadedMatchId = ''
 
+/** Muat label tampilan (kejuaraan, gelanggang, kelas, atlet, kontingen, nomor partai) dari server. */
+async function loadLabels() {
   try {
-    const snapshot = await api.get<any>(`/api/v1/live/scoreboard/${arenaId.value}`)
+    const snapshot = await arenaService.getLiveScoreboard(arenaId.value)
+    if (snapshot?.arena_name) arenaName.value = snapshot.arena_name.toUpperCase()
+    if (snapshot?.competition_name) competitionTitle.value = snapshot.competition_name.toUpperCase()
     if (snapshot && typeof snapshot === 'object' && snapshot.status !== 'no active match') {
       if (snapshot.round) currentRound.value = snapshot.round
-      if (snapshot.red_athlete) redAthlete.value.name = snapshot.red_athlete
-      if (snapshot.blue_athlete) blueAthlete.value.name = snapshot.blue_athlete
+      redAthlete.value = {
+        name: snapshot.red_athlete || WAITING_NAME,
+        team: snapshot.red_team ?? '',
+        idTag: '',
+      }
+      blueAthlete.value = {
+        name: snapshot.blue_athlete || WAITING_NAME,
+        team: snapshot.blue_team ?? '',
+        idTag: '',
+      }
+      categoryName.value = snapshot.class_label
+        ? `${snapshot.class_label.toUpperCase()} • TANDING`
+        : 'TANDING'
+      matchNumber.value = snapshot.match_number ? `PARTAI #${snapshot.match_number}` : ''
+      if (snapshot.ruleset_name) rulesetLabel.value = snapshot.ruleset_name.toUpperCase()
     }
   } catch {
     // Keep local baseline state
   }
+}
+
+onMounted(async () => {
+  await loadLabels()
+
+  // Request sync from backend WebSocket hub
+  sendMessage('sync_request', {})
 
   // Listen to WebSocket broadcasts
   onMessage('sync_response', (payload) => {
-    if (payload.round) currentRound.value = payload.round
-    if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, payload.timer_running)
+    // partai baru dimuat ke gelanggang ini: tutup tampilan pemenang lama dan muat ulang label
+    if (payload.match_id && payload.match_id !== loadedMatchId) {
+      if (loadedMatchId) showWinnerModal.value = false
+      loadedMatchId = payload.match_id
+      void loadLabels()
     }
+    if (payload.ruleset_name) rulesetLabel.value = payload.ruleset_name.toUpperCase()
+    if (payload.medic_active !== undefined) medicActive.value = payload.medic_active
+    if (payload.var_active !== undefined) varActive.value = payload.var_active
+    if (payload.round) currentRound.value = payload.round
+    matchStatus.value =
+      matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? false,
+        payload.timer_ends_at_ms,
+      )
+    }
+    payload.scores?.forEach((score, i) => {
+      const row = roundScores.value[i]
+      if (!row) return
+      row.red = score.RedTechnical
+      row.blue = score.BlueTechnical
+      row.redPen = score.RedPenalties
+      row.bluePen = score.BluePenalties
+    })
   })
 
   onMessage('state_change', (payload) => {
     if (payload.round) currentRound.value = payload.round
-    if (payload.state) {
-      if (payload.state.includes('round')) matchStatus.value = 'running'
-      else if (payload.state.includes('break')) matchStatus.value = 'break'
-      else if (payload.state === 'paused') matchStatus.value = 'paused'
-      else if (payload.state === 'finished') matchStatus.value = 'finished'
-    }
+    matchStatus.value =
+      matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
     if (payload.timer_remaining_ms !== undefined) {
-      timer.sync(payload.timer_remaining_ms, matchStatus.value === 'running')
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? matchStatus.value === 'running',
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
   onMessage('timer_sync', (payload) => {
-    if (payload.remaining_ms !== undefined) {
-      timer.sync(payload.remaining_ms, payload.running)
+    if (payload.timer_remaining_ms !== undefined) {
+      timer.sync(
+        payload.timer_remaining_ms,
+        payload.timer_running ?? false,
+        payload.timer_ends_at_ms,
+      )
     }
   })
 
@@ -147,10 +216,13 @@ onMounted(async () => {
   })
 
   onMessage('score_update', (payload) => {
-    const idx = roundScores.value.findIndex(r => r.round === payload.round)
+    const idx = roundScores.value.findIndex((r) => r.round === payload.round)
     if (idx !== -1) {
-      roundScores.value[idx].red = payload.red_technical
-      roundScores.value[idx].blue = payload.blue_technical
+      if (payload.red_technical !== undefined) roundScores.value[idx].red = payload.red_technical
+      if (payload.blue_technical !== undefined) roundScores.value[idx].blue = payload.blue_technical
+      if (payload.red_penalties !== undefined) roundScores.value[idx].redPen = payload.red_penalties
+      if (payload.blue_penalties !== undefined)
+        roundScores.value[idx].bluePen = payload.blue_penalties
     }
   })
 
@@ -160,20 +232,43 @@ onMounted(async () => {
     winnerData.value = {
       side,
       name,
-      resultType: payload.result_type || 'MENANG ANGKA (POINT WIN)',
+      resultType:
+        RESULT_LABEL[payload.result_type ?? ''] ?? (payload.result_type || RESULT_LABEL.point_win),
     }
     showWinnerModal.value = true
+    medicActive.value = false
+    varActive.value = false
+  })
+
+  // Sinyal dari meja wasit: gong berbunyi sesaat; dokter/VAR menampilkan banner selama aktif
+  onMessage('arena_signal', (payload) => {
+    if (payload.signal === 'gong') playGong()
+    else if (payload.signal === 'medic') medicActive.value = payload.active
+    else if (payload.signal === 'var') varActive.value = payload.active
   })
 })
 </script>
 
 <template>
   <div class="sb-screen">
+    <div v-if="medicActive || varActive" class="sb-signal-banner font-mono">
+      <span v-if="medicActive">⚕ PERTANDINGAN DIHENTIKAN SEMENTARA — DOKTER PERTANDINGAN</span>
+      <span v-if="varActive">▶ TINJAUAN VIDEO (VAR) SEDANG BERJALAN</span>
+    </div>
     <!-- TOP BROADCAST NAVBAR -->
     <header class="sb-topbar">
       <div class="sb-brand">
         <div class="sb-logo-box">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#DC2626"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M18 6 6 18" />
             <path d="m6 6 12 12" />
           </svg>
@@ -189,8 +284,17 @@ onMounted(async () => {
         </span>
         <span class="sb-feed-chip">&bull; 4K 60FPS FEED</span>
         <button class="sb-fs-btn" title="Toggle Fullscreen" @click="toggleFullscreen">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+            />
           </svg>
         </button>
       </div>
@@ -208,7 +312,14 @@ onMounted(async () => {
 
       <div class="sb-banner-center">
         <div class="sb-arena-badge font-mono">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#34D399"
+            stroke-width="2"
+          >
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <path d="M3 9h18M9 21V9" />
           </svg>
@@ -226,32 +337,43 @@ onMounted(async () => {
     <section class="sb-timer-strip">
       <!-- Round Badges (Left) -->
       <div class="sb-round-chips">
-        <div class="sb-round-chip" :class="{ 'sb-round-chip--done': currentRound > 1 }">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <div
+          v-for="chip in roundChips"
+          :key="chip.round"
+          class="sb-round-chip"
+          :class="{
+            'sb-round-chip--done': chip.kind === 'done',
+            'sb-round-chip--active': chip.kind === 'active',
+            'sb-round-chip--dim': chip.kind === 'waiting',
+          }"
+        >
+          <svg
+            v-if="chip.kind === 'done'"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <div class="sb-round-chip__text">
-            <span>BABAK 1</span>
-            <strong>SELESAI</strong>
-          </div>
-        </div>
-
-        <div class="sb-round-chip sb-round-chip--active">
-          <span class="sb-round-chip__dot" />
-          <div class="sb-round-chip__text">
-            <span>BABAK 2</span>
-            <strong>AKTIF</strong>
-          </div>
-        </div>
-
-        <div class="sb-round-chip" :class="{ 'sb-round-chip--dim': currentRound < 3 }">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <span v-else-if="chip.kind === 'active'" class="sb-round-chip__dot" />
+          <svg
+            v-else
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <div class="sb-round-chip__text">
-            <span>BABAK 3</span>
-            <strong>MENUNGGU</strong>
+            <span>BABAK {{ chip.round }}</span>
+            <strong>{{ chip.label }}</strong>
           </div>
         </div>
       </div>
@@ -263,14 +385,21 @@ onMounted(async () => {
         </div>
         <div class="sb-clock-caption font-mono">
           <span class="sb-pulse-dot" />
-          WAKTU BERTANDING
+          {{ matchStatus === 'break' ? 'WAKTU ISTIRAHAT' : 'WAKTU BERTANDING' }}
         </div>
       </div>
 
       <!-- Consensus Badge (Right) -->
       <div class="sb-consensus-box">
         <div class="sb-consensus-chip">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#F87171"
+            stroke-width="2"
+          >
             <path d="m14 12-8.5 8.5a2.12 2.12 0 1 1-3-3L11 9" />
             <path d="M15 13 9 7l4-4 6 6z" />
           </svg>
@@ -292,7 +421,14 @@ onMounted(async () => {
             SUDUT MERAH
           </div>
           <div class="sb-contingent-tag font-mono">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
@@ -313,7 +449,7 @@ onMounted(async () => {
           <!-- Floating Point Toast -->
           <transition-group name="toast-pop">
             <div
-              v-for="toast in activeToasts.filter(t => t.side === 'red')"
+              v-for="toast in activeToasts.filter((t) => t.side === 'red')"
               :key="toast.id"
               class="sb-floating-toast sb-floating-toast--red font-mono"
             >
@@ -338,7 +474,10 @@ onMounted(async () => {
           >
             <div class="sb-round-card__label font-mono">
               BABAK {{ r.round }}
-              <span v-if="r.round === currentRound" class="sb-round-card__dot sb-round-card__dot--red" />
+              <span
+                v-if="r.round === currentRound"
+                class="sb-round-card__dot sb-round-card__dot--red"
+              />
             </div>
             <div class="sb-round-card__val font-mono">{{ r.red }}</div>
           </div>
@@ -347,17 +486,22 @@ onMounted(async () => {
         <!-- Hukuman / Penalties Strip -->
         <footer class="sb-penalties-bar">
           <div class="sb-penalties-label font-mono">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
             </svg>
             <span>HUKUMAN :</span>
           </div>
           <div class="sb-penalties-chips font-mono">
-            <span class="sb-pen-chip">BINAAN: <strong>{{ redPenalties.binaan }}</strong></span>
-            <span class="sb-pen-chip sb-pen-chip--alert-red">
-              TEGURAN: <strong>{{ redPenalties.teguran }} (-{{ redPenalties.teguran }})</strong>
+            <span class="sb-pen-chip" :class="{ 'sb-pen-chip--alert-red': redPenaltyTotal > 0 }">
+              POTONGAN: <strong>{{ redPenaltyTotal > 0 ? `-${redPenaltyTotal}` : 0 }}</strong>
             </span>
-            <span class="sb-pen-chip">PERINGATAN: <strong>{{ redPenalties.peringatan }}</strong></span>
           </div>
         </footer>
       </section>
@@ -370,7 +514,14 @@ onMounted(async () => {
             SUDUT BIRU
           </div>
           <div class="sb-contingent-tag font-mono">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
@@ -391,7 +542,7 @@ onMounted(async () => {
           <!-- Floating Point Toast -->
           <transition-group name="toast-pop">
             <div
-              v-for="toast in activeToasts.filter(t => t.side === 'blue')"
+              v-for="toast in activeToasts.filter((t) => t.side === 'blue')"
               :key="toast.id"
               class="sb-floating-toast sb-floating-toast--blue font-mono"
             >
@@ -416,7 +567,10 @@ onMounted(async () => {
           >
             <div class="sb-round-card__label font-mono">
               BABAK {{ r.round }}
-              <span v-if="r.round === currentRound" class="sb-round-card__dot sb-round-card__dot--blue" />
+              <span
+                v-if="r.round === currentRound"
+                class="sb-round-card__dot sb-round-card__dot--blue"
+              />
             </div>
             <div class="sb-round-card__val font-mono">{{ r.blue }}</div>
           </div>
@@ -425,18 +579,21 @@ onMounted(async () => {
         <!-- Hukuman / Penalties Strip -->
         <footer class="sb-penalties-bar">
           <div class="sb-penalties-label font-mono">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
             </svg>
             <span>HUKUMAN :</span>
           </div>
           <div class="sb-penalties-chips font-mono">
-            <span class="sb-pen-chip">BINAAN: <strong>{{ bluePenalties.binaan }}</strong></span>
-            <span class="sb-pen-chip sb-pen-chip--alert-blue">
-              TEGURAN: <strong>{{ bluePenalties.teguran }} (-{{ bluePenalties.teguran }})</strong>
-            </span>
-            <span class="sb-pen-chip sb-pen-chip--alert-red">
-              PERINGATAN: <strong>{{ bluePenalties.peringatan }} (-5)</strong>
+            <span class="sb-pen-chip" :class="{ 'sb-pen-chip--alert-blue': bluePenaltyTotal > 0 }">
+              POTONGAN: <strong>{{ bluePenaltyTotal > 0 ? `-${bluePenaltyTotal}` : 0 }}</strong>
             </span>
           </div>
         </footer>
@@ -462,11 +619,13 @@ onMounted(async () => {
 
     <!-- WINNER CELEBRATION MODAL OVERLAY -->
     <transition name="fade">
-      <div v-if="showWinnerModal && winnerData" class="sb-winner-overlay" :class="`sb-winner-overlay--${winnerData.side}`">
+      <div
+        v-if="showWinnerModal && winnerData"
+        class="sb-winner-overlay"
+        :class="`sb-winner-overlay--${winnerData.side}`"
+      >
         <div class="sb-winner-card">
-          <div class="sb-winner-badge font-mono">
-            PEMENANG PERTANDINGAN
-          </div>
+          <div class="sb-winner-badge font-mono">PEMENANG PERTANDINGAN</div>
           <h2 class="sb-winner-name">{{ winnerData.name }}</h2>
           <div class="sb-winner-corner font-mono" :class="`text-${winnerData.side}-400`">
             SUDUT {{ winnerData.side.toUpperCase() }}
@@ -492,6 +651,29 @@ onMounted(async () => {
 /* ==========================================================================
    STADIUM BROADCAST SCOREBOARD (Figma Node 1:2 / 01_arena_scoreboard.png)
    ========================================================================== */
+
+.sb-signal-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 10px 16px;
+  background: rgba(217, 119, 6, 0.92);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  animation: sb-signal-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sb-signal-pulse {
+  50% {
+    background: rgba(180, 83, 9, 0.92);
+  }
+}
 
 .sb-screen {
   width: 100vw;
@@ -676,7 +858,11 @@ onMounted(async () => {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 16px 20px;
-  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.08) 0%, rgba(10, 16, 30, 0.4) 100%);
+  background: radial-gradient(
+    circle at center,
+    rgba(16, 185, 129, 0.08) 0%,
+    rgba(10, 16, 30, 0.4) 100%
+  );
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-md);
   margin-top: 14px;
@@ -751,7 +937,9 @@ onMounted(async () => {
   line-height: 1;
   letter-spacing: -0.03em;
   color: #34d399;
-  text-shadow: 0 0 35px rgba(16, 185, 129, 0.55), 0 0 10px rgba(16, 185, 129, 0.8);
+  text-shadow:
+    0 0 35px rgba(16, 185, 129, 0.55),
+    0 0 10px rgba(16, 185, 129, 0.8);
 }
 
 .sb-clock-caption {
@@ -817,13 +1005,21 @@ onMounted(async () => {
 }
 
 .sb-corner--red {
-  background: radial-gradient(ellipse at top left, rgba(220, 38, 38, 0.22) 0%, rgba(13, 20, 36, 0.95) 75%);
+  background: radial-gradient(
+    ellipse at top left,
+    rgba(220, 38, 38, 0.22) 0%,
+    rgba(13, 20, 36, 0.95) 75%
+  );
   border-color: rgba(220, 38, 38, 0.45);
   box-shadow: 0 10px 30px -10px rgba(220, 38, 38, 0.25);
 }
 
 .sb-corner--blue {
-  background: radial-gradient(ellipse at top right, rgba(37, 99, 235, 0.22) 0%, rgba(13, 20, 36, 0.95) 75%);
+  background: radial-gradient(
+    ellipse at top right,
+    rgba(37, 99, 235, 0.22) 0%,
+    rgba(13, 20, 36, 0.95) 75%
+  );
   border-color: rgba(37, 99, 235, 0.45);
   box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.25);
 }
@@ -857,8 +1053,12 @@ onMounted(async () => {
   height: 9px;
   border-radius: 50%;
 }
-.sb-corner-dot--red { background-color: #ef4444; }
-.sb-corner-dot--blue { background-color: #3b82f6; }
+.sb-corner-dot--red {
+  background-color: #ef4444;
+}
+.sb-corner-dot--blue {
+  background-color: #3b82f6;
+}
 
 .sb-contingent-tag {
   display: flex;
@@ -925,12 +1125,16 @@ onMounted(async () => {
 
 .sb-score-box--red .sb-giant-score {
   color: #ef4444;
-  text-shadow: 0 0 45px rgba(239, 68, 68, 0.65), 0 0 15px rgba(239, 68, 68, 0.9);
+  text-shadow:
+    0 0 45px rgba(239, 68, 68, 0.65),
+    0 0 15px rgba(239, 68, 68, 0.9);
 }
 
 .sb-score-box--blue .sb-giant-score {
   color: #3b82f6;
-  text-shadow: 0 0 45px rgba(59, 130, 246, 0.65), 0 0 15px rgba(59, 130, 246, 0.9);
+  text-shadow:
+    0 0 45px rgba(59, 130, 246, 0.65),
+    0 0 15px rgba(59, 130, 246, 0.9);
 }
 
 .sb-score-label {
@@ -1017,8 +1221,12 @@ onMounted(async () => {
   height: 5px;
   border-radius: 50%;
 }
-.sb-round-card__dot--red { background-color: #ef4444; }
-.sb-round-card__dot--blue { background-color: #3b82f6; }
+.sb-round-card__dot--red {
+  background-color: #ef4444;
+}
+.sb-round-card__dot--blue {
+  background-color: #3b82f6;
+}
 
 .sb-round-card__val {
   font-size: 1.75rem;
@@ -1096,7 +1304,8 @@ onMounted(async () => {
   color: #64748b;
 }
 
-.sb-bottom-left, .sb-bottom-right {
+.sb-bottom-left,
+.sb-bottom-right {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1200,13 +1409,30 @@ onMounted(async () => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
-.text-red-400 { color: #f87171; }
-.text-blue-400 { color: #60a5fa; }
-.text-emerald-400 { color: #34d399; }
-.text-slate-500 { color: #64748b; }
-.font-bold { font-weight: 700; }
+.text-red-400 {
+  color: #f87171;
+}
+.text-blue-400 {
+  color: #60a5fa;
+}
+.text-emerald-400 {
+  color: #34d399;
+}
+.text-slate-500 {
+  color: #64748b;
+}
+.font-bold {
+  font-weight: 700;
+}
 </style>

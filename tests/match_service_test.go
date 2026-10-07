@@ -122,9 +122,12 @@ func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 		t.Fatalf("ResumeMatch failed: %v", err)
 	}
 
-	// 7. Finish match-1
-	if err := svc.FinishMatch("match-1"); err != nil {
-		t.Fatalf("FinishMatch failed: %v", err)
+	// 7. Finish match-1: skor 0-0 = seri, wasit wajib menentukan pemenang
+	if err := svc.FinishMatch("match-1"); err == nil {
+		t.Fatal("FinishMatch pada skor seri harus ditolak sampai wasit menentukan pemenang")
+	}
+	if err := svc.FinishMatchWithWinner("match-1", "red"); err != nil {
+		t.Fatalf("FinishMatchWithWinner failed: %v", err)
 	}
 
 	// 8. Now that match-1 is finished, arena-1 should be available for match-2

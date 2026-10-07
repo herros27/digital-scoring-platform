@@ -207,3 +207,19 @@ func TestConsensusEngine_ConcurrentSubmissions(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestConsensusEngine_ConfigurableMajorityAndWindow(t *testing.T) {
+	engine := NewEngineWith(time.Second, 3)
+	mk := func(id string) JudgeInput {
+		return JudgeInput{JudgeID: id, Round: 1, ScoreType: ScoreFall, Target: TargetRed, Timestamp: time.Now()}
+	}
+	if r := engine.Submit(mk("j1")); r == nil || r.Accepted {
+		t.Fatal("1 juri belum cukup")
+	}
+	if r := engine.Submit(mk("j2")); r == nil || r.Accepted {
+		t.Fatal("2 juri belum cukup bila mayoritas 3")
+	}
+	if r := engine.Submit(mk("j3")); r == nil || !r.Accepted || r.Count != 3 {
+		t.Fatalf("3 juri harus diterima: %+v", r)
+	}
+}
