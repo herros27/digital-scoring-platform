@@ -5,7 +5,7 @@ import type {
   CreateCategoryFormValues,
   StandardClassPreset,
 } from '../types/category.schema'
-import { IPSI_STANDARD_PRESETS } from '../types/category.schema'
+import { IPSI_STANDARD_PRESETS, presetToPayload } from '../types/category.schema'
 
 export const categoryService = {
   /**
@@ -40,8 +40,9 @@ export const categoryService = {
   },
 
   /**
-   * 4. Batch seed standard IPSI weight class presets
-   * Convenient helper for tournament admins to quickly populate standard classes
+   * 4. Batch seed preset kelas resmi (IPSI / PERSILAT 2026).
+   * Kategori yang namanya sudah ada dilewati; pembuatan dijalankan paralel terbatas
+   * agar ratusan kelas tidak membanjiri server.
    */
   async seedPresetCategories(
     competitionId: string,
@@ -51,28 +52,26 @@ export const categoryService = {
     const existing = await this.getCategories(competitionId)
     const existingNames = new Set(existing.map((c) => c.name.toLowerCase().trim()))
 
+    const todo = presets.filter((p) => !existingNames.has(p.categoryName.toLowerCase().trim()))
     let created = 0
-    let skipped = 0
+    let failed = 0
 
-    for (const preset of presets) {
-      if (existingNames.has(preset.categoryName.toLowerCase().trim())) {
-        skipped++
-        continue
-      }
-
-      try {
-        await this.createCategory(competitionId, {
-          name: preset.categoryName,
-          gender: preset.gender,
-          weight_class: preset.code,
-        })
-        created++
-      } catch (err) {
-        console.warn(`Failed to seed preset ${preset.categoryName}:`, err)
-        skipped++
+    const CONCURRENCY = 6
+    let cursor = 0
+    const worker = async () => {
+      while (cursor < todo.length) {
+        const preset = todo[cursor++]
+        try {
+          await this.createCategory(competitionId, presetToPayload(preset))
+          created++
+        } catch (err) {
+          console.warn(`Failed to seed preset ${preset.categoryName}:`, err)
+          failed++
+        }
       }
     }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker))
 
-    return { created, skipped }
+    return { created, skipped: presets.length - todo.length + failed }
   },
 }

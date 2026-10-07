@@ -8,11 +8,20 @@ import {
   useSeedPresetsMutation,
 } from '../api/categoryQueries'
 import {
+  BRACKET_MODE_LABELS,
   createCategorySchema,
-  IPSI_STANDARD_PRESETS,
+  presetsFor,
+  type BracketMode,
   type Category,
   type CreateCategoryFormValues,
 } from '../types/category.schema'
+import {
+  AGE_BANDS,
+  PRESET_LABELS,
+  ageGroupLabel,
+  type AgeGroupCode,
+  type PresetStandard,
+} from '../lib/ageGroups'
 
 const props = withDefaults(
   defineProps<{
@@ -47,6 +56,37 @@ const categories = computed(() => rawCategories.value || [])
 
 // UI Filter & Search State
 const activeGenderTab = ref<'all' | 'male' | 'female'>('all')
+// Filter golongan umur: "master" menggabungkan Master A & B.
+type AgeTab = 'all' | 'pra_usia_dini' | 'usia_dini_1' | 'usia_dini_2' | 'pra_remaja' | 'remaja' | 'dewasa' | 'master'
+const activeAgeTab = ref<AgeTab>('all')
+const AGE_TABS: { key: AgeTab; label: string }[] = [
+  { key: 'all', label: 'Semua' },
+  { key: 'pra_usia_dini', label: 'Pra Usia Dini' },
+  { key: 'usia_dini_1', label: 'Usia Dini 1' },
+  { key: 'usia_dini_2', label: 'Usia Dini 2' },
+  { key: 'pra_remaja', label: 'Pra-Remaja' },
+  { key: 'remaja', label: 'Remaja' },
+  { key: 'dewasa', label: 'Dewasa' },
+  { key: 'master', label: 'Master' },
+]
+function matchesAgeTab(c: Category, tab: AgeTab): boolean {
+  if (tab === 'all') return true
+  const g = c.age_group ?? 'dewasa'
+  if (tab === 'master') return g === 'master_a' || g === 'master_b'
+  return g === tab
+}
+function ageTabCount(tab: AgeTab): number {
+  return categories.value.filter((c) => matchesAgeTab(c, tab)).length
+}
+
+function formatWeightRange(c: Category): string {
+  const min = c.min_weight ?? null
+  const max = c.max_weight ?? null
+  if (min === null && max === null) return 'TANPA BATAS'
+  if (min === null) return `≤ ${max} KG`
+  if (max === null) return `> ${min} KG`
+  return `${min}–${max} KG`
+}
 const searchQuery = ref('')
 const sortBy = ref<'class' | 'name'>('class')
 
@@ -72,25 +112,44 @@ function showToast(
 const isModalOpen = ref(false)
 const selectedPresetIndex = ref<number | ''>('')
 const formErrors = ref<Record<string, string>>({})
-const formState = ref<{
+interface CategoryFormState {
   name: string
   gender: 'male' | 'female' | 'putra' | 'putri'
   weight_class: string
-}>({
+  age_group: AgeGroupCode
+  preset_standard: PresetStandard
+  min_weight: number | null
+  max_weight: number | null
+  bracket_mode: BracketMode
+}
+const emptyForm = (): CategoryFormState => ({
   name: '',
   gender: 'male',
   weight_class: 'A',
+  age_group: 'dewasa',
+  preset_standard: 'ipsi',
+  min_weight: null,
+  max_weight: null,
+  bracket_mode: 'single_elimination',
 })
+const formState = ref<CategoryFormState>(emptyForm())
+
+const modalPresets = computed(() => presetsFor(formState.value.preset_standard))
+const modalAgeBands = computed(() => AGE_BANDS[formState.value.preset_standard])
 
 function openCreateModal() {
   selectedPresetIndex.value = ''
-  formState.value = {
-    name: '',
-    gender: 'male',
-    weight_class: 'A',
-  }
+  formState.value = emptyForm()
   formErrors.value = {}
   isModalOpen.value = true
+}
+
+// Mengganti standar mereset template & memastikan golongan umur valid untuk standar tsb.
+function handleStandardChange() {
+  selectedPresetIndex.value = ''
+  if (!modalAgeBands.value.some((b) => b.code === formState.value.age_group)) {
+    formState.value.age_group = modalAgeBands.value[modalAgeBands.value.length - 1].code
+  }
 }
 
 function handlePresetSelect(event: Event) {
@@ -100,11 +159,18 @@ function handlePresetSelect(event: Event) {
 
   const idx = Number(val)
   selectedPresetIndex.value = idx
-  const preset = IPSI_STANDARD_PRESETS[idx]
+  const preset = modalPresets.value[idx]
   if (preset) {
-    formState.value.name = preset.categoryName
-    formState.value.gender = preset.gender
-    formState.value.weight_class = preset.code
+    formState.value = {
+      name: preset.categoryName,
+      gender: preset.gender,
+      weight_class: preset.code,
+      age_group: preset.ageGroup,
+      preset_standard: preset.standard,
+      min_weight: preset.minWeight,
+      max_weight: preset.maxWeight,
+      bracket_mode: preset.bracketMode,
+    }
     formErrors.value = {}
   }
 }
@@ -128,6 +194,11 @@ async function handleSubmitCategory() {
       name: formState.value.name.trim(),
       gender: formState.value.gender,
       weight_class: formState.value.weight_class.trim().toUpperCase(),
+      age_group: formState.value.age_group,
+      preset_standard: formState.value.preset_standard,
+      min_weight: formState.value.min_weight,
+      max_weight: formState.value.max_weight,
+      bracket_mode: formState.value.bracket_mode,
     }
 
     const created = await createMutation.mutateAsync(payload)
@@ -143,25 +214,55 @@ async function handleSubmitCategory() {
   }
 }
 
-// Batch Seed Standard IPSI
+// Batch Seed Preset (PB IPSI / PERSILAT 2026) — admin memilih golongan umur yang dipertandingkan.
+const isSeedOpen = ref(false)
+const seedStandard = ref<PresetStandard>('ipsi')
+const seedGroups = ref<AgeGroupCode[]>([])
+
+const seedBands = computed(() => AGE_BANDS[seedStandard.value])
+const seedPreview = computed(() => presetsFor(seedStandard.value, seedGroups.value))
+
+function openSeedDialog(standard: PresetStandard = 'ipsi') {
+  seedStandard.value = standard
+  seedGroups.value = AGE_BANDS[standard].map((b) => b.code)
+  isSeedOpen.value = true
+}
+
+function setSeedStandard(standard: PresetStandard) {
+  seedStandard.value = standard
+  seedGroups.value = AGE_BANDS[standard].map((b) => b.code)
+}
+
+function toggleSeedGroup(code: AgeGroupCode) {
+  seedGroups.value = seedGroups.value.includes(code)
+    ? seedGroups.value.filter((c) => c !== code)
+    : [...seedGroups.value, code]
+}
+
 async function handleSeedPresets() {
+  if (seedPreview.value.length === 0) {
+    showToast('Pilih Golongan', 'Pilih minimal satu golongan umur yang dipertandingkan.', 'info')
+    return
+  }
+  const label = PRESET_LABELS[seedStandard.value]
   try {
-    const result = await seedMutation.mutateAsync(IPSI_STANDARD_PRESETS)
+    const result = await seedMutation.mutateAsync(seedPreview.value)
+    isSeedOpen.value = false
     if (result.created > 0) {
       showToast(
         'Sinkronisasi Kategori Berhasil',
-        `${result.created} kelas kategori standar IPSI berhasil dibuat (${result.skipped} kelas dilewati karena sudah ada).`,
+        `${result.created} kelas standar ${label} berhasil dibuat (${result.skipped} dilewati karena sudah ada).`,
         'success',
       )
     } else {
       showToast(
         'Kategori Sudah Lengkap',
-        `Semua ${result.skipped} kelas tanding standar IPSI sudah terdaftar di kompetisi ini.`,
+        `Semua ${result.skipped} kelas standar ${label} yang dipilih sudah terdaftar di kompetisi ini.`,
         'info',
       )
     }
   } catch (err) {
-    showToast('Gagal Sinkronisasi', getErrorMessage(err, 'Gagal memuat standar IPSI.'), 'danger')
+    showToast('Gagal Sinkronisasi', getErrorMessage(err, `Gagal memuat standar ${label}.`), 'danger')
   }
 }
 
@@ -188,6 +289,9 @@ const filteredCategories = computed(() => {
     list = list.filter((c) => c.gender === 'female' || c.gender === 'putri')
   }
 
+  // Filter golongan umur
+  list = list.filter((c) => matchesAgeTab(c, activeAgeTab.value))
+
   // Filter search
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase().trim()
@@ -195,6 +299,7 @@ const filteredCategories = computed(() => {
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.weight_class.toLowerCase().includes(q) ||
+        ageGroupLabel(c.age_group, c.preset_standard).toLowerCase().includes(q) ||
         c.gender.toLowerCase().includes(q),
     )
   }
@@ -202,6 +307,11 @@ const filteredCategories = computed(() => {
   // Sort
   list.sort((a, b) => {
     if (sortBy.value === 'class') {
+      const ageOrder = (c: Category) => {
+        const idx = AGE_BANDS.ipsi.findIndex((x) => x.code === (c.age_group ?? 'dewasa'))
+        return idx === -1 ? 99 : idx
+      }
+      if (ageOrder(a) !== ageOrder(b)) return ageOrder(a) - ageOrder(b)
       // Sort by gender first (putra then putri), then weight_class
       const gOrderA = a.gender === 'male' || a.gender === 'putra' ? 0 : 1
       const gOrderB = b.gender === 'male' || b.gender === 'putri' ? 0 : 1
@@ -264,7 +374,7 @@ function handleCategoryClick(cat: Category) {
         </div>
         <div>
           <div class="cat-header__sub font-mono">
-            <span>SISTEM ELIMINASI IPSI RULES 2023</span>
+            <span>REGULASI PB IPSI TERBARU · PERSILAT 2026</span>
             <span class="cat-bullet">•</span>
             <span class="cat-comp-badge"
               >EVENT: {{ (competitionName || 'Kejuaraan').toUpperCase() }}</span
@@ -303,7 +413,7 @@ function handleCategoryClick(cat: Category) {
           variant="secondary"
           size="sm"
           :loading="seedMutation.isPending.value"
-          @click="handleSeedPresets"
+          @click="openSeedDialog('ipsi')"
         >
           <template #icon>
             <svg
@@ -319,7 +429,16 @@ function handleCategoryClick(cat: Category) {
               <path d="M6 10h10" />
             </svg>
           </template>
-          Template Standar IPSI
+          Terapkan Standar PB IPSI
+        </AppButton>
+
+        <AppButton
+          variant="secondary"
+          size="sm"
+          :loading="seedMutation.isPending.value"
+          @click="openSeedDialog('persilat_2026')"
+        >
+          Terapkan Standar PERSILAT 2026
         </AppButton>
 
         <AppButton variant="emerald" size="sm" @click="openCreateModal">
@@ -359,7 +478,7 @@ function handleCategoryClick(cat: Category) {
           <span class="cat-metric-val cat-val-male tabular-nums">{{ stats.male }}</span>
           <span class="cat-metric-badge cat-badge-male font-mono">KELAS A - J</span>
         </div>
-        <span class="cat-metric-desc">Golongan Putra Remaja / Dewasa</span>
+        <span class="cat-metric-desc">Seluruh golongan umur</span>
       </div>
 
       <div class="cat-metric-card cat-metric-card--female">
@@ -369,17 +488,34 @@ function handleCategoryClick(cat: Category) {
           <span class="cat-metric-val cat-val-female tabular-nums">{{ stats.female }}</span>
           <span class="cat-metric-badge cat-badge-female font-mono">KELAS A - F</span>
         </div>
-        <span class="cat-metric-desc">Golongan Putri Remaja / Dewasa</span>
+        <span class="cat-metric-desc">Seluruh golongan umur</span>
       </div>
 
       <div class="cat-metric-card">
         <span class="cat-metric-label">STANDAR ATURAN</span>
         <div class="cat-metric-value-row">
-          <span class="cat-metric-val-text font-mono">IPSI 2023</span>
+          <span class="cat-metric-val-text font-mono">PB IPSI</span>
         </div>
-        <span class="cat-metric-desc">Sistem Gugur Tunggal Digital</span>
+        <span class="cat-metric-desc">Preset PB IPSI / PERSILAT 2026</span>
       </div>
     </section>
+
+    <!-- Filter Golongan Umur -->
+    <nav class="cat-age-tabs font-mono" role="tablist" aria-label="Filter golongan umur">
+      <button
+        v-for="tab in AGE_TABS"
+        :key="tab.key"
+        type="button"
+        class="cat-age-tab"
+        :class="{ 'cat-age-tab--active': activeAgeTab === tab.key }"
+        role="tab"
+        :aria-selected="activeAgeTab === tab.key"
+        @click="activeAgeTab = tab.key"
+      >
+        {{ tab.label }}
+        <span class="cat-tab-badge tabular-nums">{{ ageTabCount(tab.key) }}</span>
+      </button>
+    </nav>
 
     <!-- Controls Toolbar (Search & Filter Tabs) -->
     <section class="cat-toolbar">
@@ -403,7 +539,7 @@ function handleCategoryClick(cat: Category) {
           @click="activeGenderTab = 'male'"
         >
           <span class="cat-tab-dot cat-dot-male" />
-          Dewasa Putra
+          Putra
           <span class="cat-tab-badge tabular-nums">{{ stats.male }}</span>
         </button>
 
@@ -415,7 +551,7 @@ function handleCategoryClick(cat: Category) {
           @click="activeGenderTab = 'female'"
         >
           <span class="cat-tab-dot cat-dot-female" />
-          Dewasa Putri
+          Putri
           <span class="cat-tab-badge tabular-nums">{{ stats.female }}</span>
         </button>
       </div>
@@ -570,7 +706,12 @@ function handleCategoryClick(cat: Category) {
               <span class="cat-badge-dot" />
               {{ isMaleGender(cat.gender) ? 'PUTRA (MERAH)' : 'PUTRI (BIRU)' }}
             </span>
-            <span class="cat-badge-rule font-mono">IPSI 2023</span>
+            <span class="cat-badge-rule font-mono">{{
+              (cat.preset_standard ?? 'ipsi') === 'persilat_2026' ? 'PERSILAT 2026' : 'PB IPSI'
+            }}</span>
+            <span v-if="cat.bracket_mode === 'pemasalan_4'" class="cat-badge-rule font-mono"
+              >PEMASALAN</span
+            >
           </div>
 
           <div class="cat-card__code font-mono">
@@ -585,15 +726,17 @@ function handleCategoryClick(cat: Category) {
 
           <div class="cat-card__spec-box font-mono">
             <div class="cat-spec-item">
-              <span class="cat-spec-label">KELAS BOBOT</span>
-              <span class="cat-spec-value tabular-nums">KELAS {{ cat.weight_class }}</span>
+              <span class="cat-spec-label">RENTANG BOBOT</span>
+              <span class="cat-spec-value tabular-nums">{{ formatWeightRange(cat) }}</span>
             </div>
             <div class="cat-spec-divider" />
             <div class="cat-spec-item">
               <span class="cat-spec-label">GOLONGAN</span>
               <span class="cat-spec-value">{{
-                isMaleGender(cat.gender) ? 'DEWASA PUTRA' : 'DEWASA PUTRI'
-              }}</span>
+                ageGroupLabel(cat.age_group ?? 'dewasa', cat.preset_standard).toUpperCase()
+              }}
+                {{ isMaleGender(cat.gender) ? 'PUTRA' : 'PUTRI' }}</span
+              >
             </div>
           </div>
         </div>
@@ -625,6 +768,84 @@ function handleCategoryClick(cat: Category) {
           </button>
         </footer>
       </article>
+    </div>
+
+    <!-- Seed Standar Dialog -->
+    <div
+      v-if="isSeedOpen"
+      class="cat-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="seed-title"
+      @click.self="isSeedOpen = false"
+    >
+      <div class="cat-modal">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">TEMPLATE KATEGORI</div>
+            <h3 id="seed-title" class="cat-modal__title">
+              Terapkan Standar {{ PRESET_LABELS[seedStandard] }}
+            </h3>
+          </div>
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isSeedOpen = false">
+            ✕
+          </button>
+        </header>
+
+        <div class="cat-modal__body">
+          <div class="cat-seed-standards font-mono" role="tablist" aria-label="Standar regulasi">
+            <button
+              v-for="std in (['ipsi', 'persilat_2026'] as PresetStandard[])"
+              :key="std"
+              type="button"
+              class="cat-age-tab"
+              :class="{ 'cat-age-tab--active': seedStandard === std }"
+              role="tab"
+              :aria-selected="seedStandard === std"
+              @click="setSeedStandard(std)"
+            >
+              {{ PRESET_LABELS[std] }}
+            </button>
+          </div>
+
+          <div class="cat-form-group">
+            <span class="cat-form-label font-mono">GOLONGAN UMUR YANG DIPERTANDINGKAN</span>
+            <label v-for="band in seedBands" :key="band.code" class="cat-seed-check">
+              <input
+                type="checkbox"
+                :checked="seedGroups.includes(band.code)"
+                @change="toggleSeedGroup(band.code)"
+              />
+              <span>
+                <strong>{{ band.label }}</strong>
+                <span class="cat-sub font-mono"> · {{ band.hint }}</span>
+              </span>
+            </label>
+            <span class="cat-form-help"
+              >Contoh: event pelajar cukup centang Usia Dini 1 s.d. Remaja. Kelas yang sudah ada
+              dilewati otomatis. Golongan tanpa tabel bobot resmi dibuat sebagai "Kelas Bebas" dan
+              dapat disesuaikan.</span
+            >
+          </div>
+
+          <footer class="cat-modal__footer font-mono">
+            <span class="cat-sub">{{ seedPreview.length }} kelas akan dibuat</span>
+            <AppButton type="button" variant="secondary" size="md" @click="isSeedOpen = false">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="emerald"
+              size="md"
+              :loading="seedMutation.isPending.value"
+              :disabled="seedPreview.length === 0"
+              @click="handleSeedPresets"
+            >
+              Terapkan
+            </AppButton>
+          </footer>
+        </div>
+      </div>
     </div>
 
     <!-- Create Category Modal Dialog -->
@@ -672,10 +893,25 @@ function handleCategoryClick(cat: Category) {
             </div>
           </div>
 
-          <!-- Preset Selector -->
+          <!-- Standar & Preset Selector -->
+          <div class="cat-form-group">
+            <label for="cat-standard-select" class="cat-form-label font-mono">
+              STANDAR REGULASI
+            </label>
+            <select
+              id="cat-standard-select"
+              v-model="formState.preset_standard"
+              class="cat-form-select font-mono"
+              @change="handleStandardChange"
+            >
+              <option value="ipsi">{{ PRESET_LABELS.ipsi }} (Default)</option>
+              <option value="persilat_2026">{{ PRESET_LABELS.persilat_2026 }}</option>
+            </select>
+          </div>
+
           <div class="cat-form-group">
             <label for="cat-preset-select" class="cat-form-label font-mono">
-              PILIH TEMPLATE KELAS STANDAR IPSI (OPSIONAL)
+              PILIH TEMPLATE KELAS STANDAR (OPSIONAL)
             </label>
             <select
               id="cat-preset-select"
@@ -684,29 +920,21 @@ function handleCategoryClick(cat: Category) {
               @change="handlePresetSelect"
             >
               <option value="">— Input Kustom / Manual —</option>
-              <optgroup label="Dewasa Putra (Sudut Merah)">
-                <option
-                  v-for="(preset, idx) in IPSI_STANDARD_PRESETS.filter((p) => p.gender === 'male')"
-                  :key="idx"
-                  :value="IPSI_STANDARD_PRESETS.indexOf(preset)"
-                >
-                  {{ preset.label }} - PUTRA
-                </option>
-              </optgroup>
-              <optgroup label="Dewasa Putri (Sudut Biru)">
-                <option
-                  v-for="(preset, idx) in IPSI_STANDARD_PRESETS.filter(
-                    (p) => p.gender === 'female',
-                  )"
-                  :key="idx"
-                  :value="IPSI_STANDARD_PRESETS.indexOf(preset)"
-                >
-                  {{ preset.label }} - PUTRI
-                </option>
+              <optgroup
+                v-for="band in modalAgeBands"
+                :key="band.code"
+                :label="`${band.label} (${band.hint})`"
+              >
+                <template v-for="(preset, idx) in modalPresets" :key="idx">
+                  <option v-if="preset.ageGroup === band.code" :value="idx">
+                    {{ preset.gender === 'male' ? 'Putra' : 'Putri' }} · {{ preset.label }}
+                  </option>
+                </template>
               </optgroup>
             </select>
             <span class="cat-form-help"
-              >Memilih template akan otomatis mengisi nama kategori dan rentang bobot.</span
+              >Memilih template akan otomatis mengisi nama, golongan umur, rentang bobot, dan mode
+              bagan.</span
             >
           </div>
 
@@ -730,7 +958,7 @@ function handleCategoryClick(cat: Category) {
           <!-- Gender Radio Options -->
           <div class="cat-form-group">
             <label class="cat-form-label font-mono">
-              GOLONGAN & JENIS KELAMIN <span class="cat-req">*</span>
+              JENIS KELAMIN <span class="cat-req">*</span>
             </label>
             <div class="cat-gender-toggle-group">
               <label
@@ -743,7 +971,7 @@ function handleCategoryClick(cat: Category) {
                 <input v-model="formState.gender" type="radio" value="male" class="sr-only" />
                 <span class="cat-radio-indicator cat-radio-indicator--male" />
                 <div class="cat-radio-text">
-                  <strong>DEWASA PUTRA</strong>
+                  <strong>PUTRA</strong>
                   <span class="cat-sub font-mono">Sudut Merah</span>
                 </div>
               </label>
@@ -758,7 +986,7 @@ function handleCategoryClick(cat: Category) {
                 <input v-model="formState.gender" type="radio" value="female" class="sr-only" />
                 <span class="cat-radio-indicator cat-radio-indicator--female" />
                 <div class="cat-radio-text">
-                  <strong>DEWASA PUTRI</strong>
+                  <strong>PUTRI</strong>
                   <span class="cat-sub font-mono">Sudut Biru</span>
                 </div>
               </label>
@@ -785,6 +1013,79 @@ function handleCategoryClick(cat: Category) {
               formErrors.weight_class
             }}</span>
             <span class="cat-form-help">Kode kelas tanding resmi (A sampai J atau BEBAS).</span>
+          </div>
+
+          <!-- Golongan Umur -->
+          <div class="cat-form-group">
+            <label for="cat-age-group-select" class="cat-form-label font-mono">
+              GOLONGAN UMUR <span class="cat-req">*</span>
+            </label>
+            <select
+              id="cat-age-group-select"
+              v-model="formState.age_group"
+              class="cat-form-select font-mono"
+            >
+              <option v-for="band in modalAgeBands" :key="band.code" :value="band.code">
+                {{ band.label }} — {{ band.hint }}
+              </option>
+            </select>
+            <span v-if="formErrors.age_group" class="cat-form-error">{{
+              formErrors.age_group
+            }}</span>
+          </div>
+
+          <!-- Rentang Bobot -->
+          <div class="cat-form-row">
+            <div class="cat-form-group">
+              <label for="cat-min-weight" class="cat-form-label font-mono">BOBOT MIN (KG)</label>
+              <input
+                id="cat-min-weight"
+                v-model.number="formState.min_weight"
+                type="number"
+                min="0"
+                step="0.1"
+                class="cat-form-input font-mono"
+                placeholder="Kosong = tanpa batas"
+              />
+            </div>
+            <div class="cat-form-group">
+              <label for="cat-max-weight" class="cat-form-label font-mono">BOBOT MAKS (KG)</label>
+              <input
+                id="cat-max-weight"
+                v-model.number="formState.max_weight"
+                type="number"
+                min="0"
+                step="0.1"
+                class="cat-form-input font-mono"
+                :class="{ 'cat-form-input--error': formErrors.max_weight }"
+                placeholder="Kosong = tanpa batas"
+              />
+              <span v-if="formErrors.max_weight" class="cat-form-error">{{
+                formErrors.max_weight
+              }}</span>
+            </div>
+          </div>
+          <span class="cat-form-help"
+            >Penimbangan resmi tanpa toleransi (0 kg): kelebihan/kekurangan 0,1 kg berakibat
+            diskualifikasi. Kosongkan kedua kolom untuk kelas tanpa batas bobot.</span
+          >
+
+          <!-- Mode Bagan -->
+          <div class="cat-form-group">
+            <label for="cat-bracket-mode" class="cat-form-label font-mono">MODE BAGAN</label>
+            <select
+              id="cat-bracket-mode"
+              v-model="formState.bracket_mode"
+              class="cat-form-select font-mono"
+            >
+              <option v-for="(label, key) in BRACKET_MODE_LABELS" :key="key" :value="key">
+                {{ label }}
+              </option>
+            </select>
+            <span class="cat-form-help"
+              >Pemasalan: peserta dibagi ke mini bagan maks. 4 orang (semifinal + final) untuk Pra
+              Usia Dini / Usia Dini 1.</span
+            >
           </div>
 
           <footer class="cat-modal__footer font-mono">
@@ -1659,5 +1960,43 @@ function handleCategoryClick(cat: Category) {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+.cat-age-tabs,
+.cat-seed-standards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+.cat-age-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.cat-age-tab:hover {
+  border-color: currentColor;
+}
+.cat-age-tab--active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgb(16, 185, 129);
+}
+.cat-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.cat-seed-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  cursor: pointer;
 }
 </style>
