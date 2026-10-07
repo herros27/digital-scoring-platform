@@ -5,8 +5,8 @@ IDEA.md
 internal/docs
 
 # Environment
+.env.prod
 .env
-.env.example
 bin
 
 # Frontend
