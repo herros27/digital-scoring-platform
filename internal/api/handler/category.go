@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
@@ -49,6 +50,10 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		BracketMode:    req.BracketMode,
 	}
 	if err := h.Service.CreateCategory(&c); err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), domain.ErrConflict.Error()+": "), nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
@@ -84,4 +89,24 @@ func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Ok(w, cat)
+}
+
+// DELETE /api/v1/competitions/{comp_id}/categories
+// Reset seluruh kategori kejuaraan (untuk mengganti standar PB IPSI <-> PERSILAT 2026).
+func (h *CategoryHandler) Reset(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	if compID == "" {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "competition id is required", nil)
+		return
+	}
+	n, err := h.Service.ResetCategories(compID)
+	if err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", "kategori masih dipakai peserta terdaftar; pindahkan atau hapus peserta tersebut terlebih dahulu", nil)
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, map[string]any{"competition_id": compID, "deleted": n})
 }

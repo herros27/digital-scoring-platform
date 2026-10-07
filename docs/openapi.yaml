@@ -689,6 +689,26 @@ paths:
       responses:
         '201':
           description: Kategori tanding berhasil dibuat
+        '409':
+          description: Kejuaraan sudah memakai standar lain (satu kejuaraan hanya satu standar, PB IPSI atau PERSILAT 2026). Reset kategori terlebih dahulu.
+    delete:
+      summary: Reset Seluruh Kategori Kejuaraan (Admin / Dewan) — untuk mengganti standar
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kategori (dan slot bagan terkait) dihapus; mengembalikan jumlah `deleted`.
+        '409':
+          description: Masih ada peserta terdaftar pada kategori; reset ditolak.
 
   /api/v1/competitions/{comp_id}/categories/{id}:
     get:

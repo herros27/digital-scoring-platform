@@ -65,3 +65,17 @@ export function useSeedPresetsMutation(competitionId: Ref<string>) {
     },
   })
 }
+
+/**
+ * Reset all categories of a competition (switch PB IPSI <-> PERSILAT 2026)
+ */
+export function useResetCategoriesMutation(competitionId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => categoryService.resetCategories(competitionId.value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}

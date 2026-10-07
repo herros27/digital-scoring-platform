@@ -76,3 +76,45 @@ func (s *CategoryStore) ListByCompetition(competitionID string) ([]Category, err
 	}
 	return list, rows.Err()
 }
+
+// DeleteAllByCompetition menghapus seluruh kategori satu kejuaraan (reset standar).
+// Ditolak dengan ErrConflict bila masih ada peserta yang terdaftar pada kategori tsb,
+// agar peserta tidak kehilangan kelasnya secara diam-diam.
+func (s *CategoryStore) DeleteAllByCompetition(competitionID string) (int64, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var used int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM participants p
+		JOIN categories c ON c.id = p.category_id
+		WHERE c.competition_id = $1`, competitionID).Scan(&used); err != nil {
+		return 0, err
+	}
+	if used > 0 {
+		return 0, domain.ErrConflict
+	}
+	// Slot bagan kategori ikut dihapus; partai idle yang terhubung dibersihkan lebih dulu.
+	if _, err := tx.Exec(`
+		DELETE FROM matches WHERE competition_id = $1 AND status = 'idle' AND bracket_slot_id IN (
+			SELECT id FROM bracket_slots WHERE competition_id = $1 AND category_id IS NOT NULL)`, competitionID); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`
+		UPDATE matches SET bracket_slot_id = NULL WHERE competition_id = $1 AND bracket_slot_id IN (
+			SELECT id FROM bracket_slots WHERE competition_id = $1 AND category_id IS NOT NULL)`, competitionID); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`DELETE FROM bracket_slots WHERE competition_id = $1 AND category_id IS NOT NULL`, competitionID); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`DELETE FROM categories WHERE competition_id = $1`, competitionID)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
+}

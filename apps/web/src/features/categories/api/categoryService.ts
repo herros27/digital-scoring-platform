@@ -40,6 +40,15 @@ export const categoryService = {
   },
 
   /**
+   * DELETE /api/v1/competitions/{comp_id}/categories — reset seluruh kategori (ganti standar).
+   * Ditolak 409 bila masih ada peserta terdaftar pada kategori.
+   */
+  async resetCategories(competitionId: string): Promise<{ deleted: number }> {
+    const res = await http.delete<{ deleted: number }>(ENDPOINTS.CATEGORIES.RESET(competitionId))
+    return res.data
+  },
+
+  /**
    * 4. Batch seed preset kelas resmi (IPSI / PERSILAT 2026).
    * Kategori yang namanya sudah ada dilewati; pembuatan dijalankan paralel terbatas
    * agar ratusan kelas tidak membanjiri server.

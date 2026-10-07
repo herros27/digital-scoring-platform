@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -33,6 +34,17 @@ func (s *CategoryService) CreateCategory(c *domain.Category) error {
 	}
 	if err := normalizeCategory(c); err != nil {
 		return err
+	}
+	// Satu kejuaraan hanya boleh memakai satu standar (PB IPSI ATAU PERSILAT 2026).
+	existing, err := s.repo.ListByCompetition(c.CompetitionID)
+	if err != nil {
+		return err
+	}
+	for _, e := range existing {
+		if e.PresetStandard != "" && e.PresetStandard != c.PresetStandard {
+			return fmt.Errorf("%w: kejuaraan ini sudah memakai standar %s; reset kategori terlebih dahulu untuk beralih ke %s",
+				domain.ErrConflict, e.PresetStandard, c.PresetStandard)
+		}
 	}
 	c.CreatedAt = time.Now()
 	return s.repo.Create(c)
@@ -96,4 +108,22 @@ func normalizeCategory(c *domain.Category) error {
 		return errors.New("min_weight cannot exceed max_weight")
 	}
 	return nil
+}
+
+// CategoryResetter kemampuan opsional repo untuk menghapus seluruh kategori satu kejuaraan.
+type CategoryResetter interface {
+	DeleteAllByCompetition(competitionID string) (int64, error)
+}
+
+// ResetCategories menghapus semua kategori kejuaraan agar standar dapat diganti.
+// Mengembalikan ErrConflict bila masih ada peserta yang terdaftar pada kategori.
+func (s *CategoryService) ResetCategories(competitionID string) (int64, error) {
+	if competitionID == "" {
+		return 0, domain.ErrInvalidInput
+	}
+	r, ok := s.repo.(CategoryResetter)
+	if !ok {
+		return 0, errors.New("category repository does not support reset")
+	}
+	return r.DeleteAllByCompetition(competitionID)
 }

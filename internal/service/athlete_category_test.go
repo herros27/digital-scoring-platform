@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -155,5 +156,27 @@ func TestNormalizeCategory(t *testing.T) {
 	p := &domain.Category{AgeGroup: "singa", PresetStandard: domain.PresetPersilat26}
 	if err := normalizeCategory(p); err != nil {
 		t.Errorf("singa valid for persilat: %v", err)
+	}
+}
+
+func TestCreateCategory_OneStandardPerCompetition(t *testing.T) {
+	repo := &mockCategoryRepo{categories: map[string]*domain.Category{}}
+	svc := NewCategoryService(repo)
+	ipsi := &domain.Category{ID: "a", CompetitionID: "c1", Name: "IPSI A", Gender: "male", WeightClass: "A", PresetStandard: domain.PresetIPSI}
+	if err := svc.CreateCategory(ipsi); err != nil {
+		t.Fatal(err)
+	}
+	pers := &domain.Category{ID: "b", CompetitionID: "c1", Name: "PERSILAT", Gender: "male", WeightClass: "BEBAS", AgeGroup: domain.AgeSinga, PresetStandard: domain.PresetPersilat26}
+	err := svc.CreateCategory(pers)
+	if !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("mixing standards must conflict, got %v", err)
+	}
+	// Kejuaraan lain bebas memilih standar sendiri.
+	other := &domain.Category{ID: "c", CompetitionID: "c2", Name: "PERSILAT", Gender: "male", WeightClass: "BEBAS", AgeGroup: domain.AgeSinga, PresetStandard: domain.PresetPersilat26}
+	if err := svc.CreateCategory(other); err != nil {
+		t.Fatalf("other competition: %v", err)
+	}
+	if _, err := svc.ResetCategories("c1"); err == nil {
+		t.Fatal("mock repo has no reset support, expected error")
 	}
 }

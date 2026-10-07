@@ -5,6 +5,7 @@ import { AppButton } from '@/components/ui'
 import {
   useCategoriesQuery,
   useCreateCategoryMutation,
+  useResetCategoriesMutation,
   useSeedPresetsMutation,
 } from '../api/categoryQueries'
 import {
@@ -51,8 +52,34 @@ const {
 } = useCategoriesQuery(activeCompId)
 const createMutation = useCreateCategoryMutation(activeCompId)
 const seedMutation = useSeedPresetsMutation(activeCompId)
+const resetMutation = useResetCategoriesMutation(activeCompId)
 
 const categories = computed(() => rawCategories.value || [])
+
+// Satu kejuaraan hanya boleh memakai SATU standar. Bila sudah ada kategori, standar terkunci
+// sampai kategori di-reset (server juga menolak pencampuran standar).
+const activeStandard = computed<PresetStandard | null>(() => {
+  const first = categories.value[0]
+  return first ? (first.preset_standard ?? 'ipsi') : null
+})
+const availableStandards = computed<PresetStandard[]>(() =>
+  activeStandard.value ? [activeStandard.value] : ['ipsi', 'persilat_2026'],
+)
+
+const isResetOpen = ref(false)
+async function handleResetCategories() {
+  try {
+    const res = await resetMutation.mutateAsync()
+    isResetOpen.value = false
+    showToast(
+      'Kategori Di-reset',
+      `${res.deleted} kategori dihapus. Pilih standar PB IPSI atau PERSILAT 2026 untuk memulai ulang.`,
+      'success',
+    )
+  } catch (err) {
+    showToast('Reset Ditolak', getErrorMessage(err, 'Kategori tidak dapat di-reset.'), 'danger')
+  }
+}
 
 // UI Filter & Search State
 const activeGenderTab = ref<'all' | 'male' | 'female'>('all')
@@ -135,7 +162,7 @@ const emptyForm = (): CategoryFormState => ({
   gender: 'male',
   weight_class: 'A',
   age_group: 'dewasa',
-  preset_standard: 'ipsi',
+  preset_standard: activeStandard.value ?? 'ipsi',
   min_weight: null,
   max_weight: null,
   bracket_mode: 'single_elimination',
@@ -422,35 +449,24 @@ function handleCategoryClick(cat: Category) {
         </AppButton>
 
         <AppButton
+          v-for="std in availableStandards"
+          :key="std"
           variant="secondary"
           size="sm"
           :loading="seedMutation.isPending.value"
-          @click="openSeedDialog('ipsi')"
+          @click="openSeedDialog(std)"
         >
-          <template #icon>
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-              <path d="M6 6h10" />
-              <path d="M6 10h10" />
-            </svg>
-          </template>
-          Terapkan Standar PB IPSI
+          Terapkan Standar {{ std === 'ipsi' ? 'PB IPSI' : 'PERSILAT 2026' }}
         </AppButton>
 
         <AppButton
+          v-if="activeStandard"
           variant="secondary"
           size="sm"
-          :loading="seedMutation.isPending.value"
-          @click="openSeedDialog('persilat_2026')"
+          :loading="resetMutation.isPending.value"
+          @click="isResetOpen = true"
         >
-          Terapkan Standar PERSILAT 2026
+          Reset Kategori
         </AppButton>
 
         <AppButton variant="emerald" size="sm" @click="openCreateModal">
@@ -781,6 +797,54 @@ function handleCategoryClick(cat: Category) {
       </article>
     </div>
 
+    <!-- Reset Kategori Dialog -->
+    <div
+      v-if="isResetOpen"
+      class="cat-modal-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="reset-title"
+      @click.self="isResetOpen = false"
+    >
+      <div class="cat-modal">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">GANTI STANDAR</div>
+            <h3 id="reset-title" class="cat-modal__title">Reset Seluruh Kategori?</h3>
+          </div>
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isResetOpen = false">
+            ✕
+          </button>
+        </header>
+        <div class="cat-modal__body">
+          <p class="cat-form-help">
+            Semua <strong>{{ categories.length }}</strong> kategori standar
+            <strong>{{ activeStandard ? PRESET_LABELS[activeStandard] : '' }}</strong> pada
+            kejuaraan ini akan dihapus beserta bagan yang terkait, lalu Anda dapat memilih standar
+            lain (PB IPSI atau PERSILAT 2026).
+          </p>
+          <p class="cat-form-help">
+            Reset ditolak bila masih ada peserta yang terdaftar pada kategori. Pindahkan atau hapus
+            peserta tersebut terlebih dahulu.
+          </p>
+          <footer class="cat-modal__footer font-mono">
+            <AppButton type="button" variant="secondary" size="md" @click="isResetOpen = false">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="md"
+              :loading="resetMutation.isPending.value"
+              @click="handleResetCategories"
+            >
+              Ya, Reset Kategori
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
     <!-- Seed Standar Dialog -->
     <div
       v-if="isSeedOpen"
@@ -913,11 +977,16 @@ function handleCategoryClick(cat: Category) {
               id="cat-standard-select"
               v-model="formState.preset_standard"
               class="cat-form-select font-mono"
+              :disabled="activeStandard !== null"
               @change="handleStandardChange"
             >
               <option value="ipsi">{{ PRESET_LABELS.ipsi }} (Default)</option>
               <option value="persilat_2026">{{ PRESET_LABELS.persilat_2026 }}</option>
             </select>
+            <span v-if="activeStandard" class="cat-form-help"
+              >Kejuaraan ini memakai standar {{ PRESET_LABELS[activeStandard] }}. Gunakan "Reset
+              Kategori" untuk beralih standar.</span
+            >
           </div>
 
           <div class="cat-form-group">
@@ -1487,17 +1556,12 @@ function handleCategoryClick(cat: Category) {
 /* Card Grid with Container Queries */
 .cat-grid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
-@container (min-width: 640px) {
+@media (max-width: 640px) {
   .cat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@container (min-width: 1024px) {
-  .cat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1790,8 +1854,13 @@ function handleCategoryClick(cat: Category) {
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   overflow: hidden;
+  /* Tinggi dibatasi viewport; header tetap, isi form yang di-scroll. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
 }
 .cat-modal__header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1819,6 +1888,10 @@ function handleCategoryClick(cat: Category) {
   font-size: 1.25rem;
 }
 .cat-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
