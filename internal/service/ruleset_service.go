@@ -53,6 +53,28 @@ func mapRulesetDBError(err error) error {
 	return err
 }
 
+// RulesetUsageRepository kemampuan opsional repo untuk mengetahui kejuaraan yang memakai ruleset.
+type RulesetUsageRepository interface {
+	CompetitionsUsing(id string) ([]string, error)
+}
+
+// guardInUse menolak perubahan yang mengganggu kejuaraan yang sedang memakai ruleset.
+func (s *RulesetService) guardInUse(id, action string) error {
+	u, ok := s.repo.(RulesetUsageRepository)
+	if !ok {
+		return nil
+	}
+	names, err := u.CompetitionsUsing(id)
+	if err != nil {
+		return err
+	}
+	if len(names) > 0 {
+		return fmt.Errorf("%w: ruleset tidak dapat %s karena dipakai kejuaraan: %s",
+			domain.ErrConflict, action, strings.Join(names, ", "))
+	}
+	return nil
+}
+
 // CreateRuleset membuat ruleset baru secara dinamis
 func (s *RulesetService) CreateRuleset(input CreateRulesetInput) (*domain.Ruleset, error) {
 	if input.Name == "" || input.Version == "" {
@@ -107,6 +129,12 @@ func (s *RulesetService) UpdateRuleset(id string, input CreateRulesetInput) (*do
 	}
 
 	if s.repo != nil {
+		// Ruleset yang sedang dipakai tidak boleh diubah menjadi draf/arsip.
+		if status != "active" {
+			if err := s.guardInUse(id, "dijadikan "+status); err != nil {
+				return nil, err
+			}
+		}
 		if err := s.repo.Update(rs); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, domain.ErrNotFound
@@ -125,6 +153,9 @@ func (s *RulesetService) DeleteRuleset(id string) error {
 		return domain.ErrInvalidInput
 	}
 	if s.repo != nil {
+		if err := s.guardInUse(id, "dihapus"); err != nil {
+			return err
+		}
 		if err := s.repo.Delete(id); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return domain.ErrNotFound

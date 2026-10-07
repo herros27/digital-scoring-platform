@@ -528,10 +528,12 @@ paths:
                 ruleset_id:
                   type: string
                   format: uuid
-                  description: Ganti ruleset kejuaraan (berlaku untuk partai yang dimuat setelahnya). String kosong melepas ruleset.
+                  description: Ganti ruleset kejuaraan (satu kejuaraan = satu ruleset). String kosong melepas ruleset. Ditolak 409 bila sudah ada partai berjalan/selesai.
       responses:
         '200':
           description: Data kompetisi berhasil diperbarui
+        '409':
+          description: Ruleset tidak dapat diganti karena sudah ada pertandingan yang berjalan atau selesai.
 
   /api/v1/competitions/{id}/activate:
     put:
@@ -2102,6 +2104,9 @@ paths:
   # -------------------------------------------------------
   # OFFICIALS & OPERATOR MANAGEMENT
   # -------------------------------------------------------
+        '409':
+          description: Ruleset masih dipakai kejuaraan (juga berlaku saat mengubah status ke draf/arsip lewat PUT).
+
   /api/v1/officials:
     get:
       summary: Daftar Petugas / Operator Sistem (Admin / Dewan)

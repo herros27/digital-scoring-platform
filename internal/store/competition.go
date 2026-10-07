@@ -108,3 +108,11 @@ func (s *CompetitionStore) Update(c *Competition) error {
 	_, err := s.DB.Exec(query, c.Name, c.Location, c.StartDate, c.EndDate, c.RulesetName, nullableID(c.RulesetID), c.ID)
 	return err
 }
+
+// HasStartedMatches true bila kejuaraan sudah punya partai yang berjalan atau selesai
+// (status selain idle). Ruleset tidak boleh diganti sesudah itu.
+func (s *CompetitionStore) HasStartedMatches(id string) (bool, error) {
+	var started bool
+	err := s.DB.QueryRow(`SELECT EXISTS (SELECT 1 FROM matches WHERE competition_id = $1 AND status <> 'idle')`, id).Scan(&started)
+	return started, err
+}

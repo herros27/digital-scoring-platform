@@ -123,6 +123,11 @@ func (s *CompetitionService) ActivateCompetition(id string) error {
 	return s.repo.UpdateStatus(id, "active")
 }
 
+// MatchActivityChecker kemampuan opsional repo kejuaraan untuk mengetahui apakah sudah ada partai berjalan.
+type MatchActivityChecker interface {
+	HasStartedMatches(competitionID string) (bool, error)
+}
+
 func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competition) (*domain.Competition, error) {
 	if id == "" {
 		return nil, domain.ErrInvalidInput
@@ -147,13 +152,31 @@ func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competi
 	if update.EndDate != "" {
 		comp.EndDate = update.EndDate
 	}
-	if update.RulesetName != "" {
-		comp.RulesetName = update.RulesetName
-	}
 	if update.RulesetID != nil {
 		if err := validRulesetID(update.RulesetID); err != nil {
 			return nil, err
 		}
+	}
+
+	// Aturan tidak boleh berganti di tengah turnamen: tolak bila sudah ada partai yang berjalan/selesai.
+	rulesetChanged := (update.RulesetName != "" && update.RulesetName != comp.RulesetName) ||
+		(update.RulesetID != nil && !sameRulesetID(update.RulesetID, comp.RulesetID))
+	if rulesetChanged {
+		if chk, ok := s.repo.(MatchActivityChecker); ok {
+			started, err := chk.HasStartedMatches(comp.ID)
+			if err != nil {
+				return nil, err
+			}
+			if started {
+				return nil, fmt.Errorf("%w: ruleset tidak dapat diganti karena sudah ada pertandingan yang berjalan atau selesai", domain.ErrConflict)
+			}
+		}
+	}
+
+	if update.RulesetName != "" {
+		comp.RulesetName = update.RulesetName
+	}
+	if update.RulesetID != nil {
 		if *update.RulesetID == "" {
 			comp.RulesetID = nil
 		} else {
@@ -198,4 +221,15 @@ func (s *CompetitionService) CancelCompetition(id string) error {
 		return domain.ErrCompetitionNotFound
 	}
 	return s.repo.UpdateStatus(id, "cancelled")
+}
+
+func sameRulesetID(a, b *string) bool {
+	av, bv := "", ""
+	if a != nil {
+		av = *a
+	}
+	if b != nil {
+		bv = *b
+	}
+	return av == bv
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
@@ -88,6 +89,10 @@ func (h *CompetitionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, domain.ErrCompetitionNotFound) {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), domain.ErrConflict.Error()+": "), nil)
 			return
 		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)

@@ -121,3 +121,21 @@ func (s *MatchStore) UpdateState(id, status string, round int) error {
 	_, err := s.DB.Exec(`UPDATE matches SET status = $1, current_round = $2, updated_at = NOW() WHERE id = $3`, status, round, id)
 	return err
 }
+
+// CompetitionsUsing nama kejuaraan yang memakai ruleset ini (lewat ruleset_id).
+func (s *RulesetStore) CompetitionsUsing(id string) ([]string, error) {
+	rows, err := s.DB.Query(`SELECT name FROM competitions WHERE ruleset_id = $1 ORDER BY name`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
+}

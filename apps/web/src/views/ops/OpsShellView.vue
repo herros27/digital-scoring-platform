@@ -1278,7 +1278,10 @@ function handleLoadToMat1() {
         />
 
         <!-- TAB REGULASI & RULESET -->
-        <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')" />
+        <RulesetsOpsView
+          v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB LAPORAN & EKSPOR -->
         <ReportsOpsView

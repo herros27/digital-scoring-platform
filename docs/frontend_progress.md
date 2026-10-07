@@ -168,6 +168,10 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
+- **2026-10-07 (halaman Regulasi & Ruleset)**: satu kejuaraan = satu ruleset, dan sekarang terlihat jelas.
+  - Badge status "AKTIF" diganti "TERSEDIA" (artinya boleh dipilih); ruleset yang dipakai kejuaraan terpilih (dropdown Event) diberi badge hijau "DIPAKAI KEJUARAAN INI", dan header menampilkan ruleset yang sedang dipakai.
+  - Tombol "Pakai untuk kejuaraan ini" mengganti ruleset kejuaraan langsung dari halaman ini; kartu menampilkan kejuaraan mana saja yang memakainya.
+  - Backend: ganti ruleset ditolak (409) bila kejuaraan sudah punya partai berjalan/selesai; ruleset yang dipakai kejuaraan tidak dapat dihapus atau dijadikan draf/arsip (409).
 - **2026-10-07 (koreksi sesuai regulasi resmi)**: preset dan berkas disesuaikan dengan *Peraturan Pertandingan PB IPSI 2025* dan *IPSF-PERSILAT Competition Rules Feb 2026*.
   - Tabel kelas bobot Usia Dini 2, Pra-Remaja, Remaja, dan Dewasa terverifikasi identik di kedua regulasi.
   - Pra Usia Dini: hanya Jurus, tidak ada preset Tanding. Usia Dini 1: satu "Kelas Bebas" per gender tanpa batas bobot/timbang (pasangan selisih usia 1 th, tinggi 3 cm, berat 1 kg). Master A & B memakai tabel 24 kelas Dewasa.
