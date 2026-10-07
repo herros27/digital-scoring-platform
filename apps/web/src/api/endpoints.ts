@@ -36,6 +36,7 @@ export const ENDPOINTS = {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/categories`,
     CREATE: (compId: string) => `/api/v1/competitions/${compId}/categories`,
     RESET: (compId: string) => `/api/v1/competitions/${compId}/categories`,
+    ASSIGN_RULESETS: (compId: string) => `/api/v1/competitions/${compId}/categories/ruleset`,
     DETAIL: (compId: string, id: string) => `/api/v1/competitions/${compId}/categories/${id}`,
   },
 

@@ -74,3 +74,49 @@ func TestDeleteRuleset_BlockedWhileInUse(t *testing.T) {
 		t.Fatalf("unused ruleset must delete: %v", err)
 	}
 }
+
+type fakeAssignRepo struct {
+	mockCategoryRepo
+	got []domain.CategoryRulesetAssignment
+}
+
+func (f *fakeAssignRepo) AssignRulesets(_ string, items []domain.CategoryRulesetAssignment) (int64, error) {
+	f.got = items
+	return int64(len(items)), nil
+}
+
+func TestAssignRulesets_Validation(t *testing.T) {
+	repo := &fakeAssignRepo{mockCategoryRepo: mockCategoryRepo{categories: map[string]*domain.Category{}}}
+	exists := map[string]bool{rsA: true}
+	svc := NewCategoryService(repo).WithRulesetLookup(func(id string) bool { return exists[id] })
+
+	if _, err := svc.AssignRulesets("c1", nil); err == nil {
+		t.Error("empty assignments must fail")
+	}
+	// harus tepat satu pemilih
+	if _, err := svc.AssignRulesets("c1", []domain.CategoryRulesetAssignment{{RulesetID: ptr(rsA)}}); err == nil {
+		t.Error("missing selector must fail")
+	}
+	if _, err := svc.AssignRulesets("c1", []domain.CategoryRulesetAssignment{{AgeGroup: "usia_dini_2", CategoryID: "x", RulesetID: ptr(rsA)}}); err == nil {
+		t.Error("both selectors must fail")
+	}
+	if _, err := svc.AssignRulesets("c1", []domain.CategoryRulesetAssignment{{AgeGroup: "bukan_golongan", RulesetID: ptr(rsA)}}); err == nil {
+		t.Error("unknown age group must fail")
+	}
+	if _, err := svc.AssignRulesets("c1", []domain.CategoryRulesetAssignment{{AgeGroup: "usia_dini_2", RulesetID: ptr("bukan-uuid")}}); err == nil {
+		t.Error("non-uuid ruleset must fail")
+	}
+	if _, err := svc.AssignRulesets("c1", []domain.CategoryRulesetAssignment{{AgeGroup: "usia_dini_2", RulesetID: ptr(rsB)}}); err == nil {
+		t.Error("unknown ruleset must fail")
+	}
+	// valid + string kosong = kembali ke ruleset kejuaraan
+	if _, err := svc.AssignRulesets("c1", []domain.CategoryRulesetAssignment{
+		{AgeGroup: "usia_dini_2", RulesetID: ptr(rsA)},
+		{AgeGroup: "usia_dini_1", RulesetID: ptr("")},
+	}); err != nil {
+		t.Fatalf("valid: %v", err)
+	}
+	if repo.got[1].RulesetID != nil {
+		t.Error("empty ruleset_id must become nil (follow competition ruleset)")
+	}
+}

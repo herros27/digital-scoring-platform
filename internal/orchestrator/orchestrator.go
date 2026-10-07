@@ -596,7 +596,7 @@ func (o *Orchestrator) snapshotLocked() map[string]any {
 		"match_id":    o.matchID,
 		"arena_id":    o.arenaID,
 		"state":       string(o.sm.Current()),
-		"round":       o.sm.CurrentRoundNumber(),
+		"round":       o.roundNumberLocked(),
 		"scores":      o.scores[1:4],
 		"red_total":   redTotal,
 		"blue_total":  blueTotal,
@@ -617,25 +617,44 @@ func (o *Orchestrator) startRoundTimer() {
 	o.timer.Start()
 }
 
+// isFinalRoundLocked true bila ronde yang berjalan adalah ronde terakhir menurut ruleset:
+// 3 babak (default) atau 2 babak (mis. Usia Dini, total_rounds=2). Pemanggil memegang o.mu.
+func (o *Orchestrator) isFinalRoundLocked() bool {
+	cur := o.sm.Current()
+	if cur == statemachine.StateRound3 {
+		return true
+	}
+	return cur == statemachine.StateRound2 && o.ruleset.Scoring.TotalRounds == 2
+}
+
+// roundNumberLocked nomor ronde yang ditampilkan, dibatasi total_rounds ruleset
+// (pertandingan 2 babak yang selesai tidak dilaporkan sebagai ronde 3).
+func (o *Orchestrator) roundNumberLocked() int {
+	n := o.sm.CurrentRoundNumber()
+	if tr := o.ruleset.Scoring.TotalRounds; tr > 0 && n > tr {
+		return tr
+	}
+	return n
+}
+
 func (o *Orchestrator) onRoundExpired() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	cur := o.sm.Current()
-
-	// Ronde 3 selesai → langsung finish, kecuali skor seri: pertandingan menunggu keputusan wasit
-	if cur == statemachine.StateRound3 {
+	// Ronde terakhir selesai → langsung finish, kecuali skor seri: pertandingan menunggu keputusan wasit
+	if o.isFinalRoundLocked() {
+		finalRound := o.roundNumberLocked()
 		if o.tiedLocked() {
 			res, ok := o.resolveTiebreakLocked()
 			if !ok {
-				o.appendEvent("tie_pending", map[string]any{"round": 3}, "")
+				o.appendEvent("tie_pending", map[string]any{"round": finalRound}, "")
 				o.broadcastState()
 				return
 			}
 			o.forceTiebreakLocked(res)
 		}
 		o.sm.Transition(statemachine.EventFinish)
-		o.appendEvent("round_ended", map[string]any{"round": 3}, "")
+		o.appendEvent("round_ended", map[string]any{"round": finalRound}, "")
 		o.finalize()
 		return
 	}

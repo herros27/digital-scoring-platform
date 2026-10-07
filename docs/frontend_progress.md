@@ -168,6 +168,10 @@ Berikut rincian aspek yang masih kurang, belum lengkap, atau perlu ditingkatkan 
 
 ## 6. Riwayat Pembaruan Frontend (Changelog)
 
+- **2026-10-07 (durasi & babak per golongan umur)**: regulasi IPSI membedakan durasi (Usia Dini 2 babak × 1,5 menit; Pra-Remaja ke atas 3 babak × 2 menit), PERSILAT juga (Singa/Macan/Pre-Teen 3 × 1,5 menit).
+  - Ruleset khusus kategori (kolom `categories.ruleset_id`) kini benar-benar dipakai: partai memuat ruleset kategori dulu, lalu ruleset kejuaraan. Endpoint `PUT /competitions/{id}/categories/ruleset` (per golongan atau per kategori; 409 bila sudah ada partai berjalan).
+  - Mesin pertandingan kini menghormati `total_rounds`: ruleset 2 babak selesai setelah ronde 2 (sebelumnya selalu 3 ronde, hanya durasi yang diikuti). Seri di ronde terakhir tetap menunggu keputusan wasit.
+  - UI: tombol "Durasi per Golongan" di halaman Kategori (pilih ruleset per golongan, atau "Ikut kejuaraan"), pintasan membuat varian ruleset sesuai regulasi, dan badge durasi di kartu kategori. Ruleset yang dipakai kategori tidak dapat dihapus/diarsip.
 - **2026-10-07 (halaman Regulasi & Ruleset)**: satu kejuaraan = satu ruleset, dan sekarang terlihat jelas.
   - Badge status "AKTIF" diganti "TERSEDIA" (artinya boleh dipilih); ruleset yang dipakai kejuaraan terpilih (dropdown Event) diberi badge hijau "DIPAKAI KEJUARAAN INI", dan header menampilkan ruleset yang sedang dipakai.
   - Tombol "Pakai untuk kejuaraan ini" mengganti ruleset kejuaraan langsung dari halaman ini; kartu menampilkan kejuaraan mana saja yang memakainya.

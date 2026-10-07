@@ -56,7 +56,7 @@ func (o *Orchestrator) tiedLocked() bool {
 
 // tiePendingLocked true saat waktu ronde terakhir habis dengan skor seri dan menunggu keputusan wasit.
 func (o *Orchestrator) tiePendingLocked() bool {
-	if o.sm.Current() != statemachine.StateRound3 ||
+	if !o.isFinalRoundLocked() ||
 		o.timer == nil || o.timer.Remaining() > 0 || o.timer.IsRunning() || !o.tiedLocked() {
 		return false
 	}

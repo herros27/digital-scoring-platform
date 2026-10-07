@@ -69,6 +69,13 @@ export interface Category {
   status?: 'ready' | 'draft' | 'in_progress' | 'completed'
 }
 
+/** Penetapan ruleset khusus: pilih salah satu age_group atau category_id. */
+export interface RulesetAssignment {
+  age_group?: string
+  category_id?: string
+  ruleset_id: string | null
+}
+
 export interface StandardClassPreset {
   code: string
   label: string

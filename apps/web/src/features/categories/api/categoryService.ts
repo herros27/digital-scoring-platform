@@ -1,6 +1,7 @@
 import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
 import type {
+  RulesetAssignment,
   Category,
   CreateCategoryFormValues,
   StandardClassPreset,
@@ -45,6 +46,22 @@ export const categoryService = {
    */
   async resetCategories(competitionId: string): Promise<{ deleted: number }> {
     const res = await http.delete<{ deleted: number }>(ENDPOINTS.CATEGORIES.RESET(competitionId))
+    return res.data
+  },
+
+  /**
+   * PUT /api/v1/competitions/{comp_id}/categories/ruleset
+   * Tetapkan ruleset khusus (durasi/jumlah babak) per golongan umur atau kategori.
+   * ruleset_id null = ikut ruleset kejuaraan. Ditolak 409 bila sudah ada partai berjalan.
+   */
+  async assignRulesets(
+    competitionId: string,
+    assignments: RulesetAssignment[],
+  ): Promise<{ updated: number }> {
+    const res = await http.put<{ updated: number }>(
+      ENDPOINTS.CATEGORIES.ASSIGN_RULESETS(competitionId),
+      { assignments },
+    )
     return res.data
   },
 

@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { categoryService } from './categoryService'
-import type { CreateCategoryFormValues, StandardClassPreset } from '../types/category.schema'
+import type {
+  CreateCategoryFormValues,
+  RulesetAssignment,
+  StandardClassPreset,
+} from '../types/category.schema'
 
 /**
  * Query Key Factory for Categories domain
@@ -76,6 +80,20 @@ export function useResetCategoriesMutation(competitionId: Ref<string>) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) })
       queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}
+
+/**
+ * Assign per-category / per-age-group ruleset (e.g. Usia Dini 2 x 1.5 min)
+ */
+export function useAssignRulesetsMutation(competitionId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (assignments: RulesetAssignment[]) =>
+      categoryService.assignRulesets(competitionId.value, assignments),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) })
     },
   })
 }

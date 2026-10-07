@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -16,6 +17,14 @@ type CategoryRepository interface {
 
 type CategoryService struct {
 	repo CategoryRepository
+	// rulesetExists opsional: memastikan ruleset khusus kategori benar-benar ada.
+	rulesetExists func(id string) bool
+}
+
+// WithRulesetLookup mengaktifkan validasi keberadaan ruleset khusus kategori.
+func (s *CategoryService) WithRulesetLookup(f func(id string) bool) *CategoryService {
+	s.rulesetExists = f
+	return s
 }
 
 func NewCategoryService(repo CategoryRepository) *CategoryService {
@@ -33,6 +42,12 @@ func (s *CategoryService) CreateCategory(c *domain.Category) error {
 		return errors.New("gender is required")
 	}
 	if err := normalizeCategory(c); err != nil {
+		return err
+	}
+	if c.RulesetID != nil && *c.RulesetID == "" {
+		c.RulesetID = nil
+	}
+	if err := s.checkRuleset(c.RulesetID); err != nil {
 		return err
 	}
 	// Satu kejuaraan hanya boleh memakai satu standar (PB IPSI ATAU PERSILAT 2026).
@@ -126,4 +141,52 @@ func (s *CategoryService) ResetCategories(competitionID string) (int64, error) {
 		return 0, errors.New("category repository does not support reset")
 	}
 	return r.DeleteAllByCompetition(competitionID)
+}
+
+var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func (s *CategoryService) checkRuleset(id *string) error {
+	if id == nil || *id == "" {
+		return nil
+	}
+	if !uuidRe.MatchString(*id) {
+		return fmt.Errorf("%w: ruleset_id harus berupa UUID ruleset", domain.ErrInvalidInput)
+	}
+	if s.rulesetExists != nil && !s.rulesetExists(*id) {
+		return fmt.Errorf("%w: ruleset tidak ditemukan", domain.ErrInvalidInput)
+	}
+	return nil
+}
+
+// CategoryRulesetAssigner kemampuan opsional repo untuk menetapkan ruleset khusus kategori.
+type CategoryRulesetAssigner interface {
+	AssignRulesets(competitionID string, items []domain.CategoryRulesetAssignment) (int64, error)
+}
+
+// AssignRulesets menetapkan ruleset khusus (mis. durasi Usia Dini 2×1,5 menit) per kategori atau
+// per golongan umur. RulesetID kosong mengembalikan kategori ke ruleset kejuaraan.
+func (s *CategoryService) AssignRulesets(competitionID string, items []domain.CategoryRulesetAssignment) (int64, error) {
+	if competitionID == "" || len(items) == 0 {
+		return 0, domain.ErrInvalidInput
+	}
+	for i := range items {
+		it := &items[i]
+		if (it.AgeGroup == "") == (it.CategoryID == "") {
+			return 0, fmt.Errorf("%w: isi salah satu dari age_group atau category_id", domain.ErrInvalidInput)
+		}
+		if it.AgeGroup != "" && !domain.ValidAgeGroup(it.AgeGroup) {
+			return 0, fmt.Errorf("%w: age_group '%s' tidak dikenal", domain.ErrInvalidInput, it.AgeGroup)
+		}
+		if it.RulesetID != nil && *it.RulesetID == "" {
+			it.RulesetID = nil
+		}
+		if err := s.checkRuleset(it.RulesetID); err != nil {
+			return 0, err
+		}
+	}
+	a, ok := s.repo.(CategoryRulesetAssigner)
+	if !ok {
+		return 0, errors.New("category repository does not support ruleset assignment")
+	}
+	return a.AssignRulesets(competitionID, items)
 }

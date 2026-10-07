@@ -159,6 +159,14 @@ type Category struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+// CategoryRulesetAssignment menetapkan ruleset khusus untuk satu kategori (CategoryID) atau
+// seluruh kategori satu golongan umur (AgeGroup). RulesetID nil = ikut ruleset kejuaraan.
+type CategoryRulesetAssignment struct {
+	AgeGroup   string  `json:"age_group,omitempty"`
+	CategoryID string  `json:"category_id,omitempty"`
+	RulesetID  *string `json:"ruleset_id"`
+}
+
 type Ruleset struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`

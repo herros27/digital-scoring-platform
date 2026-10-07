@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/herros27/digital-scoring/internal/domain"
 )
@@ -117,4 +118,57 @@ func (s *CategoryStore) DeleteAllByCompetition(competitionID string) (int64, err
 	}
 	n, _ := res.RowsAffected()
 	return n, tx.Commit()
+}
+
+// RulesetIDForSlot ruleset khusus kategori yang memiliki slot bagan ini ("" = ikut kejuaraan).
+func (s *CategoryStore) RulesetIDForSlot(slotID string) (string, error) {
+	var id sql.NullString
+	err := s.DB.QueryRow(`
+		SELECT c.ruleset_id::text FROM bracket_slots b
+		JOIN categories c ON c.id = b.category_id
+		WHERE b.id = $1`, slotID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return id.String, err
+}
+
+// AssignRulesets menetapkan ruleset khusus per kategori / per golongan umur dalam satu transaksi.
+// Ditolak (ErrConflict) bila kategori yang terdampak sudah punya partai berjalan/selesai.
+func (s *CategoryStore) AssignRulesets(competitionID string, items []domain.CategoryRulesetAssignment) (int64, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var affected int64
+	for _, it := range items {
+		col, val := "age_group", it.AgeGroup
+		if it.CategoryID != "" {
+			col, val = "id", it.CategoryID
+		}
+		var started int
+		if err := tx.QueryRow(`
+			SELECT COUNT(*) FROM matches m
+			JOIN bracket_slots b ON b.id = m.bracket_slot_id
+			JOIN categories c ON c.id = b.category_id
+			WHERE c.competition_id = $1 AND m.status <> 'idle' AND c.`+col+` = $2`, competitionID, val).Scan(&started); err != nil {
+			return 0, err
+		}
+		if started > 0 {
+			return 0, domain.ErrConflict
+		}
+		var rid any
+		if it.RulesetID != nil && *it.RulesetID != "" {
+			rid = *it.RulesetID
+		}
+		res, err := tx.Exec(`UPDATE categories SET ruleset_id = $1 WHERE competition_id = $2 AND `+col+` = $3`, rid, competitionID, val)
+		if err != nil {
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		affected += n
+	}
+	return affected, tx.Commit()
 }

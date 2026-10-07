@@ -29,17 +29,18 @@ type RulesetResolver interface {
 }
 
 type MatchService struct {
-	mu              sync.RWMutex
-	matchRepo       MatchRepository
-	compRepo        CompetitionRepository
-	hubManager      *hub.Manager
-	eventStore      *store.MatchEventStore
-	scoreStore      *store.MatchScoreStore
-	matchStore      *store.MatchStore
-	bracketStore    orchestrator.BracketAdvancer
-	rulesetResolver RulesetResolver
-	arenaStore      *store.ArenaStore
-	runtimeStore    *store.MatchRuntimeStore
+	mu               sync.RWMutex
+	matchRepo        MatchRepository
+	compRepo         CompetitionRepository
+	hubManager       *hub.Manager
+	eventStore       *store.MatchEventStore
+	scoreStore       *store.MatchScoreStore
+	matchStore       *store.MatchStore
+	bracketStore     orchestrator.BracketAdvancer
+	rulesetResolver  RulesetResolver
+	categoryRulesets CategoryRulesetLookup
+	arenaStore       *store.ArenaStore
+	runtimeStore     *store.MatchRuntimeStore
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
@@ -87,6 +88,16 @@ func (s *MatchService) ArenaName(arenaID string) string {
 
 // SetArenaStore memungkinkan daftar scoreboard publik menampilkan nama gelanggang.
 func (s *MatchService) SetArenaStore(a *store.ArenaStore) { s.arenaStore = a }
+
+// CategoryRulesetLookup mencari ruleset khusus kategori dari slot bagan sebuah partai.
+type CategoryRulesetLookup interface {
+	RulesetIDForSlot(slotID string) (string, error)
+}
+
+// SetCategoryRulesetLookup mengaktifkan ruleset khusus per kategori (menimpa ruleset kejuaraan).
+func (s *MatchService) SetCategoryRulesetLookup(l CategoryRulesetLookup) {
+	s.categoryRulesets = l
+}
 
 func (s *MatchService) SetRulesetResolver(resolver RulesetResolver) {
 	s.rulesetResolver = resolver
@@ -222,11 +233,19 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	// Jika rulesetPath kosong, coba ambil ruleset_id dari competition
 	if rulesetPath == "" && s.matchRepo != nil && s.compRepo != nil {
 		if m, errMatch := s.matchRepo.GetByID(matchID); errMatch == nil && m != nil {
-			if comp, errComp := s.compRepo.GetByID(m.CompetitionID); errComp == nil && comp != nil {
-				if comp.RulesetID != nil && *comp.RulesetID != "" {
-					rulesetPath = *comp.RulesetID
-				} else if comp.RulesetName != "" {
-					rulesetPath = comp.RulesetName
+			// Prioritas: ruleset khusus kategori (mis. durasi Usia Dini), lalu ruleset kejuaraan.
+			if m.BracketSlotID != "" && s.categoryRulesets != nil {
+				if rid, errCat := s.categoryRulesets.RulesetIDForSlot(m.BracketSlotID); errCat == nil && rid != "" {
+					rulesetPath = rid
+				}
+			}
+			if rulesetPath == "" {
+				if comp, errComp := s.compRepo.GetByID(m.CompetitionID); errComp == nil && comp != nil {
+					if comp.RulesetID != nil && *comp.RulesetID != "" {
+						rulesetPath = *comp.RulesetID
+					} else if comp.RulesetName != "" {
+						rulesetPath = comp.RulesetName
+					}
 				}
 			}
 		}

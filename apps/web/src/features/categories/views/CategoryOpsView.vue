@@ -2,8 +2,12 @@
 import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
+import { useRulesetsQuery, useSaveRulesetMutation } from '@/features/rulesets/api/rulesetQueries'
+import { useCompetitionQuery } from '@/features/competitions/api/competitionQueries'
+import type { RulesetDTO } from '@/features/rulesets/types'
 import {
   useCategoriesQuery,
+  useAssignRulesetsMutation,
   useCreateCategoryMutation,
   useResetCategoriesMutation,
   useSeedPresetsMutation,
@@ -68,6 +72,152 @@ const activeStandard = computed<PresetStandard | null>(() => {
 const availableStandards = computed<PresetStandard[]>(() =>
   activeStandard.value ? [activeStandard.value] : ['ipsi', 'persilat_2026'],
 )
+
+// ---------- Ruleset (durasi/jumlah babak) per golongan umur ----------
+const { data: rawRulesets } = useRulesetsQuery()
+const { data: competition } = useCompetitionQuery(activeCompId)
+const saveRulesetMutation = useSaveRulesetMutation()
+const assignMutation = useAssignRulesetsMutation(activeCompId)
+const rulesetList = computed(() => rawRulesets.value ?? [])
+const rulesetById = computed(() => new Map(rulesetList.value.map((r) => [r.id, r])))
+
+const fmtMinutes = (sec: number) => String(Math.round((sec / 60) * 10) / 10).replace('.', ',')
+const rulesetDuration = (r?: RulesetDTO) =>
+  r ? `${r.scoring.total_rounds} babak × ${fmtMinutes(r.scoring.round_duration)} mnt` : ''
+const categoryDuration = (c: Category) =>
+  c.ruleset_id ? rulesetDuration(rulesetById.value.get(c.ruleset_id)) : ''
+
+/** Ruleset kejuaraan (dipakai kategori yang tidak punya ruleset khusus). */
+const competitionRuleset = computed(() => {
+  const c = competition.value
+  if (!c) return undefined
+  return (
+    rulesetList.value.find((r) => r.id === c.ruleset_id) ??
+    rulesetList.value.find((r) => r.name === c.ruleset_name) ??
+    rulesetList.value.find(
+      (r) => r.name.split(' ')[0].toLowerCase() === c.ruleset_name?.toLowerCase(),
+    )
+  )
+})
+
+const isRulesetOpen = ref(false)
+const MIXED = '__mixed__'
+const rulesetChoice = ref<Record<string, string>>({})
+
+/** Golongan umur yang punya kategori, berurutan sesuai standar aktif. */
+const rulesetGroups = computed(() => {
+  const std = activeStandard.value ?? 'ipsi'
+  return AGE_BANDS[std]
+    .map((b) => ({
+      code: b.code,
+      label: b.label,
+      count: categories.value.filter((c) => (c.age_group ?? 'dewasa') === b.code).length,
+    }))
+    .filter((g) => g.count > 0)
+})
+
+/** Nilai ruleset saat ini untuk satu golongan ('' = ikut kejuaraan, MIXED = beragam). */
+function currentRulesetOf(code: string): string {
+  const ids = new Set(
+    categories.value
+      .filter((c) => (c.age_group ?? 'dewasa') === code)
+      .map((c) => c.ruleset_id ?? ''),
+  )
+  return ids.size === 1 ? [...ids][0] : MIXED
+}
+
+function openRulesetDialog() {
+  const choice: Record<string, string> = {}
+  for (const g of rulesetGroups.value) choice[g.code] = currentRulesetOf(g.code)
+  rulesetChoice.value = choice
+  isRulesetOpen.value = true
+}
+
+const pendingAssignments = computed(() =>
+  rulesetGroups.value
+    .filter((g) => {
+      const v = rulesetChoice.value[g.code]
+      return v !== undefined && v !== MIXED && v !== currentRulesetOf(g.code)
+    })
+    .map((g) => ({ age_group: g.code, ruleset_id: rulesetChoice.value[g.code] || null })),
+)
+
+// Pintasan sesuai regulasi: durasi golongan usia muda berbeda dari golongan di atasnya.
+const durationPreset = computed(() =>
+  (activeStandard.value ?? 'ipsi') === 'persilat_2026'
+    ? {
+        label: 'Singa / Macan / Pre-Teen: 3 babak × 1,5 menit',
+        rounds: 3,
+        seconds: 90,
+        suffix: 'Usia Muda',
+        groups: ['singa', 'macan', 'pre_teen'],
+      }
+    : {
+        label: 'Usia Dini 1 & 2: 2 babak × 1,5 menit',
+        rounds: 2,
+        seconds: 90,
+        suffix: 'Usia Dini',
+        groups: ['usia_dini_1', 'usia_dini_2'],
+      },
+)
+const presetApplicableGroups = computed(() =>
+  rulesetGroups.value.filter((g) => durationPreset.value.groups.includes(g.code)),
+)
+
+async function applyDurationPreset() {
+  const base = competitionRuleset.value ?? rulesetList.value.find((r) => r.status === 'active')
+  if (!base) {
+    showToast('Ruleset Belum Ada', 'Pilih ruleset kejuaraan terlebih dahulu.', 'danger')
+    return
+  }
+  const dp = durationPreset.value
+  const name = `${base.name} — ${dp.suffix} (${dp.rounds}×${fmtMinutes(dp.seconds)} mnt)`
+  try {
+    let target = rulesetList.value.find((r) => r.name === name)
+    if (!target) {
+      target = await saveRulesetMutation.mutateAsync({
+        payload: {
+          name,
+          version: '1.0',
+          status: 'active',
+          scoring: { ...base.scoring, total_rounds: dp.rounds, round_duration: dp.seconds },
+        },
+      })
+    }
+    const next = { ...rulesetChoice.value }
+    for (const g of presetApplicableGroups.value) next[g.code] = target.id
+    rulesetChoice.value = next
+    showToast(
+      'Ruleset Siap',
+      `${name} dipilih untuk golongan terkait. Klik Simpan untuk menerapkan.`,
+      'info',
+    )
+  } catch (err) {
+    showToast(
+      'Gagal Membuat Ruleset',
+      getErrorMessage(err, 'Ruleset varian tidak dapat dibuat.'),
+      'danger',
+    )
+  }
+}
+
+async function saveRulesetAssignments() {
+  if (pendingAssignments.value.length === 0) {
+    isRulesetOpen.value = false
+    return
+  }
+  try {
+    const res = await assignMutation.mutateAsync(pendingAssignments.value)
+    isRulesetOpen.value = false
+    showToast('Ruleset Diterapkan', `${res.updated} kategori diperbarui.`, 'success')
+  } catch (err) {
+    showToast(
+      'Gagal Menerapkan',
+      getErrorMessage(err, 'Ruleset kategori tidak dapat diubah.'),
+      'danger',
+    )
+  }
+}
 
 const isResetOpen = ref(false)
 async function handleResetCategories() {
@@ -518,6 +668,10 @@ function handleCategoryClick(cat: Category) {
           Terapkan Standar {{ std === 'ipsi' ? 'PB IPSI' : 'PERSILAT 2026' }}
         </AppButton>
 
+        <AppButton v-if="activeStandard" variant="secondary" size="sm" @click="openRulesetDialog">
+          Durasi per Golongan
+        </AppButton>
+
         <AppButton
           v-if="activeStandard"
           variant="secondary"
@@ -796,6 +950,9 @@ function handleCategoryClick(cat: Category) {
             <span class="cat-badge-rule font-mono">{{
               (cat.preset_standard ?? 'ipsi') === 'persilat_2026' ? 'PERSILAT 2026' : 'PB IPSI'
             }}</span>
+            <span v-if="categoryDuration(cat)" class="cat-badge-rule font-mono">{{
+              categoryDuration(cat)
+            }}</span>
             <span v-if="cat.bracket_mode === 'pemasalan_4'" class="cat-badge-rule font-mono"
               >PEMASALAN</span
             >
@@ -854,6 +1011,104 @@ function handleCategoryClick(cat: Category) {
           </button>
         </footer>
       </article>
+    </div>
+
+    <!-- Ruleset / Durasi per Golongan Dialog -->
+    <div
+      v-if="isRulesetOpen"
+      class="cat-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ruleset-title"
+      @click.self="isRulesetOpen = false"
+    >
+      <div class="cat-modal cat-modal--compact">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">ATURAN PERTANDINGAN</div>
+            <h3 id="ruleset-title" class="cat-modal__title">Durasi & Babak per Golongan</h3>
+          </div>
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isRulesetOpen = false">
+            ✕
+          </button>
+        </header>
+        <div class="cat-modal__body cat-modal__body--compact">
+          <p class="cat-form-help">
+            Secara default semua kategori mengikuti ruleset kejuaraan
+            <strong>{{
+              competitionRuleset
+                ? `${competitionRuleset.name} (${rulesetDuration(competitionRuleset)})`
+                : '—'
+            }}</strong
+            >. Pilih ruleset lain untuk golongan tertentu, misalnya durasi lebih pendek untuk usia
+            dini.
+          </p>
+
+          <div v-if="presetApplicableGroups.length" class="cat-ruleset-preset">
+            <span class="font-mono">Sesuai regulasi — {{ durationPreset.label }}</span>
+            <AppButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              :loading="saveRulesetMutation.isPending.value"
+              @click="applyDurationPreset"
+            >
+              Pilih untuk golongan ini
+            </AppButton>
+          </div>
+
+          <ul class="cat-ruleset-list">
+            <li v-for="g in rulesetGroups" :key="g.code" class="cat-ruleset-row">
+              <label :for="`rs-${g.code}`" class="cat-ruleset-label">
+                <strong>{{ g.label }}</strong>
+                <span class="cat-sub font-mono">{{ g.count }} kelas</span>
+              </label>
+              <select
+                :id="`rs-${g.code}`"
+                v-model="rulesetChoice[g.code]"
+                class="cat-form-select font-mono"
+              >
+                <option v-if="rulesetChoice[g.code] === MIXED" :value="MIXED" disabled>
+                  (beragam)
+                </option>
+                <option value="">
+                  Ikut kejuaraan{{
+                    competitionRuleset ? ` — ${rulesetDuration(competitionRuleset)}` : ''
+                  }}
+                </option>
+                <option
+                  v-for="r in rulesetList.filter((x) => x.status === 'active')"
+                  :key="r.id"
+                  :value="r.id"
+                >
+                  {{ r.name }} — {{ rulesetDuration(r) }}
+                </option>
+              </select>
+            </li>
+          </ul>
+          <span class="cat-form-help"
+            >Tidak dapat diubah untuk golongan yang sudah punya pertandingan berjalan atau
+            selesai.</span
+          >
+
+          <footer class="cat-modal__footer font-mono">
+            <span class="cat-sub">{{ pendingAssignments.length }} golongan diubah</span>
+            <AppButton type="button" variant="secondary" size="md" @click="isRulesetOpen = false">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="emerald"
+              size="md"
+              :loading="assignMutation.isPending.value"
+              :disabled="pendingAssignments.length === 0"
+              @click="saveRulesetAssignments"
+            >
+              Simpan
+            </AppButton>
+          </footer>
+        </div>
+      </div>
     </div>
 
     <!-- Reset Kategori Dialog -->
@@ -2334,5 +2589,40 @@ function handleCategoryClick(cat: Category) {
   padding: 0 12px 8px 34px;
   font-size: 0.66rem;
   opacity: 0.65;
+}
+.cat-ruleset-preset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border-card, #334155);
+  border-radius: 8px;
+  font-size: 0.72rem;
+}
+.cat-ruleset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cat-ruleset-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.cat-ruleset-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+}
+@media (max-width: 520px) {
+  .cat-ruleset-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

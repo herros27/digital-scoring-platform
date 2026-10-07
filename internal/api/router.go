@@ -40,10 +40,14 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
 	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
 	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo)
-	categoryService := service.NewCategoryService(categoryRepo)
+	categoryService := service.NewCategoryService(categoryRepo).WithRulesetLookup(func(id string) bool {
+		rs, err := rulesetRepo.GetByID(id)
+		return err == nil && rs != nil
+	})
 	athleteService := service.NewAthleteService(athleteRepo).WithCategoryRepo(categoryRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
 	matchService.SetRulesetResolver(rulesetService)
+	matchService.SetCategoryRulesetLookup(categoryRepo)
 	matchService.SetArenaStore(arenaRepo)
 	matchService.SetRuntimeStore(&store.MatchRuntimeStore{DB: db})
 	if n, err := matchService.RestoreActiveMatches(); err != nil {
@@ -141,6 +145,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("POST /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories/{id}", categoryH.Get)
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Reset)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 
 	// Athletes & Participants
 	protected.Handle("POST /api/v1/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.Create)))

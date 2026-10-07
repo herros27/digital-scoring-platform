@@ -110,3 +110,30 @@ func (h *CategoryHandler) Reset(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, map[string]any{"competition_id": compID, "deleted": n})
 }
+
+// PUT /api/v1/competitions/{comp_id}/categories/ruleset
+// Body: {"assignments":[{"age_group":"usia_dini_2","ruleset_id":"<uuid>"}, {"category_id":"<uuid>","ruleset_id":null}]}
+// Menetapkan ruleset khusus per golongan umur / kategori; ruleset_id null = ikut ruleset kejuaraan.
+func (h *CategoryHandler) AssignRulesets(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	var req struct {
+		Assignments []domain.CategoryRulesetAssignment `json:"assignments" validate:"required,min=1"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	n, err := h.Service.AssignRulesets(compID, req.Assignments)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrConflict):
+			Fail(w, http.StatusConflict, "CONFLICT", "ruleset kategori tidak dapat diganti karena sudah ada pertandingan yang berjalan atau selesai", nil)
+		case errors.Is(err, domain.ErrInvalidInput):
+			Fail(w, http.StatusBadRequest, "INVALID_INPUT", strings.TrimPrefix(err.Error(), domain.ErrInvalidInput.Error()+": "), nil)
+		default:
+			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		}
+		return
+	}
+	Ok(w, map[string]any{"competition_id": compID, "updated": n})
+}

@@ -282,3 +282,53 @@ func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 		t.Fatalf("orchestrator is nil")
 	}
 }
+
+type fakeCategoryRulesets map[string]string // slotID -> rulesetID
+
+func (f fakeCategoryRulesets) RulesetIDForSlot(slotID string) (string, error) { return f[slotID], nil }
+
+// Ruleset khusus kategori (mis. Usia Dini 2 babak x 1,5 menit) menimpa ruleset kejuaraan;
+// partai tanpa ruleset kategori tetap memakai ruleset kejuaraan.
+func TestMatchService_CategoryRulesetOverridesCompetition(t *testing.T) {
+	repo := newMemoryRulesetRepo()
+	rulesetSvc := service.NewRulesetService(repo)
+
+	mk := func(name, version string, rounds, dur int) *domain.Ruleset {
+		r, err := rulesetSvc.CreateRuleset(service.CreateRulesetInput{
+			Name: name, Version: version,
+			Scoring: rules.ScoringRule{TechniquePoints: 1, KnockdownPoints: 2, RoundDuration: dur, BreakDuration: 60, TotalRounds: rounds},
+		})
+		if err != nil {
+			t.Fatalf("CreateRuleset %s: %v", name, err)
+		}
+		return r
+	}
+	standard := mk("Standar 3x2", "1.0", 3, 120)
+	usiaDini := mk("Usia Dini 2x1,5", "2.0", 2, 90)
+
+	matchRepo := newMockMatchRepo()
+	compRepo := &mockCompRepoWithRuleset{comps: map[string]*domain.Competition{
+		"comp-1": {ID: "comp-1", Name: "Kejurda", RulesetID: &standard.ID},
+	}}
+	matchRepo.matches["m-ud"] = &store.Match{ID: "m-ud", CompetitionID: "comp-1", BracketSlotID: "slot-ud", Status: "idle"}
+	matchRepo.matches["m-dw"] = &store.Match{ID: "m-dw", CompetitionID: "comp-1", BracketSlotID: "slot-dw", Status: "idle"}
+
+	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil, nil)
+	svc.SetRulesetResolver(rulesetSvc)
+	svc.SetCategoryRulesetLookup(fakeCategoryRulesets{"slot-ud": usiaDini.ID}) // slot-dw: tanpa override
+
+	check := func(matchID, arena, wantName string, wantRounds, wantDurMs int) {
+		t.Helper()
+		if err := svc.LoadMatchToArena(matchID, arena, ""); err != nil {
+			t.Fatalf("load %s: %v", matchID, err)
+		}
+		orch, _ := svc.GetOrchestrator(matchID)
+		snap := orch.Snapshot()
+		if snap["ruleset_name"] != wantName || snap["total_rounds"] != wantRounds || snap["round_duration_ms"] != int64(wantDurMs) {
+			t.Errorf("%s: ruleset=%v rounds=%v duration=%v, want %s/%d/%d",
+				matchID, snap["ruleset_name"], snap["total_rounds"], snap["round_duration_ms"], wantName, wantRounds, wantDurMs)
+		}
+	}
+	check("m-ud", "arena-1", "Usia Dini 2x1,5", 2, 90000)
+	check("m-dw", "arena-2", "Standar 3x2", 3, 120000)
+}

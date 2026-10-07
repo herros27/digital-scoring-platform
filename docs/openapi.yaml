@@ -712,6 +712,57 @@ paths:
         '409':
           description: Masih ada peserta terdaftar pada kategori; reset ditolak.
 
+  /api/v1/competitions/{comp_id}/categories/ruleset:
+    put:
+      summary: Tetapkan Ruleset Khusus per Golongan Umur / Kategori (Admin / Dewan)
+      description: |
+        Ruleset khusus kategori menimpa ruleset kejuaraan untuk partai pada kategori tersebut
+        (mis. Usia Dini 2 babak × 1,5 menit, sedangkan golongan lain tetap 3 babak × 2 menit).
+        `ruleset_id: null` mengembalikan ke ruleset kejuaraan. Ditolak 409 bila kategori yang
+        terdampak sudah punya partai berjalan/selesai.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignments]
+              properties:
+                assignments:
+                  type: array
+                  items:
+                    type: object
+                    description: Isi tepat satu dari `age_group` atau `category_id`.
+                    properties:
+                      age_group:
+                        type: string
+                        example: usia_dini_2
+                      category_id:
+                        type: string
+                        format: uuid
+                      ruleset_id:
+                        type: string
+                        format: uuid
+                        nullable: true
+      responses:
+        '200':
+          description: Jumlah kategori yang diperbarui (`updated`).
+        '400':
+          description: Ruleset tidak ditemukan / pemilih tidak valid.
+        '409':
+          description: Sudah ada pertandingan yang berjalan atau selesai pada kategori terdampak.
+
   /api/v1/competitions/{comp_id}/categories/{id}:
     get:
       summary: Detail Kategori Pertandingan

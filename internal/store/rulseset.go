@@ -124,7 +124,11 @@ func (s *MatchStore) UpdateState(id, status string, round int) error {
 
 // CompetitionsUsing nama kejuaraan yang memakai ruleset ini (lewat ruleset_id).
 func (s *RulesetStore) CompetitionsUsing(id string) ([]string, error) {
-	rows, err := s.DB.Query(`SELECT name FROM competitions WHERE ruleset_id = $1 ORDER BY name`, id)
+	rows, err := s.DB.Query(`
+		SELECT name FROM competitions WHERE ruleset_id = $1
+		UNION
+		SELECT DISTINCT comp.name FROM categories k JOIN competitions comp ON comp.id = k.competition_id WHERE k.ruleset_id = $1
+		ORDER BY name`, id)
 	if err != nil {
 		return nil, err
 	}
