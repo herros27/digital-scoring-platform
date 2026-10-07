@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/api/error'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
   useCompetitionAthletesQuery,
@@ -8,6 +8,14 @@ import {
   useRegisterToCompetitionMutation,
 } from '../api/athleteQueries'
 import { createAthleteSchema } from '../types/athlete.schema'
+import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import { useCompetitionQuery } from '@/features/competitions/api/competitionQueries'
+import {
+  ageGroupForAge,
+  ageGroupLabel,
+  ageOn,
+  isEligible,
+} from '@/features/categories/lib/ageGroups'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -37,7 +45,17 @@ const {
 } = useCompetitionAthletesQuery(activeCompId)
 const { data: rawContingents } = useContingentsQuery()
 
+const { data: rawCategories } = useCategoriesQuery(activeCompId)
+const { data: competition } = useCompetitionQuery(activeCompId)
+const categories = computed(() => rawCategories.value || [])
+
 const registerMutation = useRegisterToCompetitionMutation(activeCompId)
+
+// Tanggal acuan umur = hari pertama kejuaraan (fallback hari ini).
+const ageReferenceDate = computed(() => {
+  const d = competition.value?.start_date
+  return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(0, 10) : new Date()
+})
 
 const athletes = computed(() => rawAthletes.value || [])
 const contingents = computed(() => rawContingents.value || [])
@@ -69,27 +87,67 @@ function showToast(
 // Modal Form State (Register New Athlete)
 const isModalOpen = ref(false)
 const formErrors = ref<Record<string, string>>({})
-const formState = ref<{
+interface AthleteFormState {
   name: string
   gender: 'male' | 'female' | 'putra' | 'putri'
   team: string
-  weight_class: string
-}>({
+  birth_date: string
+  nik: string
+  category_id: string
+}
+const emptyForm = (team = ''): AthleteFormState => ({
   name: '',
   gender: 'male',
-  team: '',
-  weight_class: 'A',
+  team,
+  birth_date: '',
+  nik: '',
+  category_id: '',
+})
+const formState = ref<AthleteFormState>(emptyForm())
+
+// Usia & golongan umur dihitung otomatis (standar IPSI) dari tanggal lahir.
+const formAge = computed(() =>
+  formState.value.birth_date ? ageOn(formState.value.birth_date, ageReferenceDate.value) : null,
+)
+const formAgeGroupLabel = computed(() => {
+  if (formAge.value === null) return null
+  const g = ageGroupForAge(formAge.value, 'ipsi')
+  return g ? ageGroupLabel(g, 'ipsi') : null
+})
+
+// Dropdown hanya menampilkan kelas yang sah untuk gender + umur atlet.
+const eligibleCategories = computed(() => {
+  if (!formState.value.birth_date || formAge.value === null) return []
+  return categories.value
+    .filter((c) =>
+      isEligible(
+        { gender: formState.value.gender, birth_date: formState.value.birth_date },
+        c,
+        ageReferenceDate.value,
+      ),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+})
+
+// Reset pilihan kelas bila tidak lagi sah setelah gender / tanggal lahir berubah.
+watch(eligibleCategories, (list) => {
+  if (formState.value.category_id && !list.some((c) => c.id === formState.value.category_id)) {
+    formState.value.category_id = ''
+  }
 })
 
 function openCreateModal() {
-  formState.value = {
-    name: '',
-    gender: 'male',
-    team: contingents.value.length > 0 ? contingents.value[0].name : '',
-    weight_class: 'A',
-  }
+  formState.value = emptyForm(contingents.value.length > 0 ? contingents.value[0].name : '')
   formErrors.value = {}
   isModalOpen.value = true
+}
+
+function athleteAgeLabel(birthDate?: string): string {
+  if (!birthDate) return 'Tanggal lahir belum diisi'
+  const age = ageOn(birthDate, ageReferenceDate.value)
+  if (age === null) return birthDate
+  const g = ageGroupForAge(age, 'ipsi')
+  return `${age} th · ${g ? ageGroupLabel(g, 'ipsi') : 'di luar golongan'}`
 }
 
 async function handleSubmitAthlete() {
@@ -98,14 +156,24 @@ async function handleSubmitAthlete() {
     name: formState.value.name,
     gender: formState.value.gender,
     team: formState.value.team,
+    birth_date: formState.value.birth_date,
+    nik: formState.value.nik.trim() || undefined,
   })
 
+  const errors: Record<string, string> = {}
   if (!parseResult.success) {
-    const errors: Record<string, string> = {}
     for (const issue of parseResult.error.issues) {
       const field = issue.path[0] as string
       if (!errors[field]) errors[field] = issue.message
     }
+  }
+  if (formAge.value !== null && formAge.value < 0) {
+    errors.birth_date = 'Tanggal lahir tidak boleh di masa depan'
+  }
+  if (!formState.value.category_id) {
+    errors.category_id = 'Pilih kategori yang sesuai umur & jenis kelamin atlet'
+  }
+  if (Object.keys(errors).length > 0) {
     formErrors.value = errors
     return
   }
@@ -116,7 +184,9 @@ async function handleSubmitAthlete() {
       name: formState.value.name.trim(),
       gender: formState.value.gender,
       team: formState.value.team.trim(),
-      weight_class: formState.value.weight_class.trim().toUpperCase(),
+      birth_date: formState.value.birth_date,
+      nik: formState.value.nik.trim() || undefined,
+      category_id: formState.value.category_id,
     })
 
     isModalOpen.value = false
@@ -541,6 +611,7 @@ function isMaleGender(gender: string): boolean {
         <!-- Card Content -->
         <div class="atl-card__content">
           <h3 class="atl-card__title">{{ athlete.name }}</h3>
+          <p class="atl-card__age font-mono">{{ athleteAgeLabel(athlete.birth_date) }}</p>
 
           <div class="atl-card__team-box font-mono">
             <span class="atl-team-label">PERGURUAN / KONTINGEN:</span>
@@ -674,28 +745,81 @@ function isMaleGender(gender: string): boolean {
             <span v-if="formErrors.team" class="atl-form-error">{{ formErrors.team }}</span>
           </div>
 
-          <!-- Weight Class -->
+          <!-- Tanggal Lahir & NIK -->
           <div class="atl-form-group">
-            <label for="atl-weight-class-input" class="atl-form-label font-mono">
-              KELAS TANDING (IPSI 2023) <span class="atl-req">*</span>
+            <label for="atl-birth-input" class="atl-form-label font-mono">
+              TANGGAL LAHIR <span class="atl-req">*</span>
+            </label>
+            <input
+              id="atl-birth-input"
+              v-model="formState.birth_date"
+              type="date"
+              class="atl-form-input font-mono"
+              :class="{ 'atl-form-input--error': formErrors.birth_date }"
+              required
+            />
+            <span v-if="formErrors.birth_date" class="atl-form-error">{{
+              formErrors.birth_date
+            }}</span>
+            <span v-else-if="formAge !== null" class="atl-form-help">
+              Usia {{ formAge }} tahun
+              <template v-if="formAgeGroupLabel">· golongan {{ formAgeGroupLabel }}</template>
+              <template v-else>· di luar golongan umur standar</template>
+            </span>
+          </div>
+
+          <div class="atl-form-group">
+            <label for="atl-nik-input" class="atl-form-label font-mono">
+              NIK (KK / KIA / AKTA KELAHIRAN)
+            </label>
+            <input
+              id="atl-nik-input"
+              v-model="formState.nik"
+              type="text"
+              inputmode="numeric"
+              maxlength="50"
+              class="atl-form-input font-mono"
+              :class="{ 'atl-form-input--error': formErrors.nik }"
+              placeholder="NIK pada Kartu Keluarga / KIA / Akta Kelahiran"
+            />
+            <span v-if="formErrors.nik" class="atl-form-error">{{ formErrors.nik }}</span>
+          </div>
+
+          <!-- Kategori (kelas sah berdasarkan umur & gender) -->
+          <div class="atl-form-group">
+            <label for="atl-category-input" class="atl-form-label font-mono">
+              KATEGORI TANDING <span class="atl-req">*</span>
             </label>
             <select
-              id="atl-weight-class-input"
-              v-model="formState.weight_class"
+              id="atl-category-input"
+              v-model="formState.category_id"
               class="atl-form-select font-mono"
+              :class="{ 'atl-form-input--error': formErrors.category_id }"
+              :disabled="eligibleCategories.length === 0"
             >
-              <option value="A">Kelas A (45–50 Kg)</option>
-              <option value="B">Kelas B (50–55 Kg)</option>
-              <option value="C">Kelas C (55–60 Kg)</option>
-              <option value="D">Kelas D (60–65 Kg)</option>
-              <option value="E">Kelas E (65–70 Kg)</option>
-              <option value="F">Kelas F (70–75 Kg)</option>
-              <option value="G">Kelas G (75–80 Kg)</option>
-              <option value="H">Kelas H (80–85 Kg)</option>
-              <option value="I">Kelas I (85–90 Kg)</option>
-              <option value="J">Kelas J (90–95 Kg)</option>
-              <option value="OPEN">Kelas Bebas</option>
+              <option value="">
+                {{
+                  !formState.birth_date
+                    ? '— Isi tanggal lahir terlebih dahulu —'
+                    : eligibleCategories.length === 0
+                      ? '— Tidak ada kategori yang sah —'
+                      : '— Pilih kategori —'
+                }}
+              </option>
+              <option v-for="c in eligibleCategories" :key="c.id" :value="c.id">
+                {{ c.name }}
+              </option>
             </select>
+            <span v-if="formErrors.category_id" class="atl-form-error">{{
+              formErrors.category_id
+            }}</span>
+            <span
+              v-else-if="formState.birth_date && eligibleCategories.length === 0"
+              class="atl-form-help"
+            >
+              Belum ada kategori untuk golongan umur / jenis kelamin ini. Buat atau terapkan
+              standar kategori terlebih dahulu di menu Kategori.
+            </span>
           </div>
 
           <footer class="atl-modal__footer font-mono">
@@ -1493,5 +1617,16 @@ function isMaleGender(gender: string): boolean {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+.atl-card__age {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.atl-form-help {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
 }
 </style>

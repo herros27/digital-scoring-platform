@@ -100,10 +100,18 @@ export function useVerifyParticipantMutation(compId: Ref<string>) {
     mutationFn: ({
       participantId,
       status,
+      actual_weight,
+      docs_verified,
     }: {
       participantId: string
       status: 'verified' | 'rejected'
-    }) => athleteService.verifyParticipant(compId.value, participantId, status),
+      actual_weight?: number
+      docs_verified?: Record<string, boolean>
+    }) =>
+      athleteService.verifyParticipant(compId.value, participantId, status, {
+        actual_weight,
+        docs_verified,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
       queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })

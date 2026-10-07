@@ -81,9 +81,10 @@ export const athleteService = {
     compId: string,
     participantId: string,
     status: 'verified' | 'rejected',
+    extra?: { actual_weight?: number; docs_verified?: Record<string, boolean> },
   ): Promise<VerifyParticipantResult> {
     const url = ENDPOINTS.ATHLETES.VERIFY_PARTICIPANT(compId, participantId)
-    const res = await http.put<VerifyParticipantResult>(url, { status })
+    const res = await http.put<VerifyParticipantResult>(url, { status, ...extra })
     return res.data
   },
 

@@ -12,6 +12,7 @@ export interface ParticipantDTO {
   weight_class: string
   gender: string
   registration_status: string
+  category_id?: string
   created_at: string
 }
 
@@ -23,6 +24,7 @@ export interface BracketSlotRecord {
   gender: string
   round: number
   slot_index: number
+  category_id?: string | null
   participant_id: string | null
   is_bye: boolean
   winner_id: string | null
@@ -30,8 +32,10 @@ export interface BracketSlotRecord {
 }
 
 export interface GenerateBracketPayload {
-  weight_class: string
-  gender: Gender
+  /** Bagan terisolasi per kategori: kelas bobot, gender & mode bagan diambil dari kategori. */
+  category_id?: string
+  weight_class?: string
+  gender?: Gender
   participant_ids?: string[]
 }
 
@@ -39,6 +43,13 @@ export const bracketService = {
   /**
    * GET /api/v1/competitions/{comp_id}/brackets?weight_class=...&gender=...
    */
+  async getBracketTreeByCategory(compId: string, categoryId: string): Promise<BracketSlotRecord[]> {
+    const res = await http.get<BracketSlotRecord[]>(
+      `${ENDPOINTS.BRACKETS.TREE(compId)}?category_id=${encodeURIComponent(categoryId)}`,
+    )
+    return res.data
+  },
+
   async getBracketTree(
     compId: string,
     weightClass: string,
