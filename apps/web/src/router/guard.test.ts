@@ -53,8 +53,8 @@ describe('router guard', () => {
     expect((await visit('/referee')).path).toBe('/judge')
   })
 
-  it('/admin/pins ditolak untuk kontingen', async () => {
-    login('contingent')
+  it('/admin/pins diarahkan ke /ops?tab=pin', async () => {
+    login('admin')
     expect((await visit('/admin/pins')).path).toBe('/ops')
   })
 

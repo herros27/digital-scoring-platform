@@ -60,23 +60,19 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    redirect: '/admin/competitions',
-  },
-  {
-    path: '/admin/pins',
-    name: 'admin-pins',
-    component: () => import('../views/admin/DevicePinManager.vue'),
-    meta: { requiresAuth: true, allowedRoles: ['admin', 'dewan'], layout: 'AdminLayout' },
+    redirect: '/ops?tab=kompetisi',
   },
   {
     path: '/admin/competitions',
-    name: 'admin-competitions',
-    component: () => import('../features/competitions/views/CompetitionsView.vue'),
-    meta: { requiresAuth: true, allowedRoles: ['admin', 'dewan'], layout: 'AdminLayout' },
+    redirect: '/ops?tab=kompetisi',
+  },
+  {
+    path: '/admin/pins',
+    redirect: '/ops?tab=pin',
   },
   {
     path: '/competitions',
-    redirect: '/admin/competitions',
+    redirect: '/ops?tab=kompetisi',
   },
 ]
 

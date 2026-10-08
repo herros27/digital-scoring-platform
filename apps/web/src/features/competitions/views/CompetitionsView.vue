@@ -89,7 +89,7 @@ const formState = ref({
 // Ruleset dari database (dikelola di tab Regulasi); kejuaraan menyimpan id + namanya
 const { data: rulesetData, isLoading: rulesetsLoading } = useRulesetsQuery()
 const rulesetOptions = computed<RulesetDTO[]>(() => {
-  const all = rulesetData.value ?? []
+  const all = Array.isArray(rulesetData.value) ? rulesetData.value : []
   return all.filter((r) => r.status === 'active' || r.id === formState.value.ruleset_id)
 })
 function chooseRuleset(r: RulesetDTO) {
@@ -98,7 +98,7 @@ function chooseRuleset(r: RulesetDTO) {
 }
 /** Kejuaraan lama hanya menyimpan nama ("ipsi"): cocokkan dengan ruleset yang namanya diawali kata itu. */
 function findRulesetByName(name: string): RulesetDTO | undefined {
-  const all = rulesetData.value ?? []
+  const all = Array.isArray(rulesetData.value) ? rulesetData.value : []
   return (
     all.find((r) => r.name === name) ??
     all.find((r) => r.name.split(' ')[0].toLowerCase() === name.toLowerCase())
@@ -174,9 +174,10 @@ function openCreateModal() {
     ruleset_name: '',
     ruleset_id: '',
   }
+  const rulesets = Array.isArray(rulesetData.value) ? rulesetData.value : []
   const initial =
-    (rulesetData.value ?? []).find((r) => r.status === 'active' && r.name.startsWith('IPSI')) ??
-    (rulesetData.value ?? []).find((r) => r.status === 'active')
+    rulesets.find((r) => r.status === 'active' && r.name.startsWith('IPSI')) ??
+    rulesets.find((r) => r.status === 'active')
   if (initial) chooseRuleset(initial)
   formErrors.value = {}
   isFormModalOpen.value = true
