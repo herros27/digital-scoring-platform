@@ -72,7 +72,7 @@ func TestCache_HandlerWrapper(t *testing.T) {
 		val := atomic.AddInt64(&counter, 1)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`{"count":%d}`, val)))
+		fmt.Fprintf(w, `{"count":%d}`, val)
 	}
 
 	cachedHandler := c.Handler(500*time.Millisecond, handlerFunc)
