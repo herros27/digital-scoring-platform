@@ -8,7 +8,7 @@ import (
 	"github.com/herros27/digital-scoring/internal/rules"
 	"time"
 
-	"github.com/herros27/digital-scoring/internal/auth"
+	// "github.com/herros27/digital-scoring/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -361,7 +361,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		summary.Matches++
 	}
 
-	// 11. Judge & Referee PINs (Valid for 365 days)
+	// 11. Judge & Referee PINs (Dinonaktifkan: PIN tidak di-seed dari database, di-generate langsung dari UI/web)
+	/*
 	// Gelanggang A PINs: Wasit=11110001, Juri 1=123001, Juri 2=123002, Juri 3=123003
 	// Gelanggang B PINs: Wasit=22220001, Juri 1=234001, Juri 2=234002, Juri 3=234003
 	pinsToSeed := []struct {
@@ -410,6 +411,7 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		}
 		summary.JudgePins++
 	}
+	*/
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
