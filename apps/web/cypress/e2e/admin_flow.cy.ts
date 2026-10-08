@@ -1,185 +1,97 @@
-describe('Admin Flow - Competition & Tournament Operations', () => {
+import { ADMIN } from '../support/accounts'
+
+// Alur admin sungguhan di atas data seed (tanpa mock). Tes ini hanya MEMBACA/menavigasi,
+// tidak menekan aksi destruktif (mis. "Generate Ulang Semua PIN") agar PIN seed tetap valid
+// untuk tes lain.
+describe('Admin - operasi kejuaraan', () => {
   beforeEach(() => {
-    // 1. Fallback default interceptor untuk semua API
-    cy.intercept('GET', '**/api/v1/**', {
-      statusCode: 200,
-      body: { success: true, data: [] },
+    cy.loginAs(ADMIN)
+    cy.visit('/ops?tab=kompetisi')
+    cy.location('pathname').should('eq', '/ops')
+  })
+
+  const tabs: Array<{ menu: string; heading: string }> = [
+    { menu: 'Kompetisi', heading: 'MANAJEMEN KEJUARAAN' },
+    { menu: 'Gelanggang', heading: 'OPERASIONAL GELANGGANG' },
+    { menu: 'Kategori Tanding', heading: 'KATEGORI TANDING' },
+    { menu: 'Data Atlet', heading: 'KONTINGEN & DATA ATLET' },
+    { menu: 'Verifikasi Peserta', heading: 'VERIFIKASI & TIMBANG BADAN' },
+    { menu: 'Jadwal Pertandingan', heading: 'JADWAL PERTANDINGAN' },
+    { menu: 'Bagan Pertandingan', heading: 'BAGAN PERTANDINGAN' },
+    { menu: 'Perangkat & PIN', heading: 'PERANGKAT & PIN JURI' },
+    { menu: 'Regulasi & Ruleset', heading: 'REGULASI & RULESET' },
+    { menu: 'Laporan & Ekspor', heading: 'LAPORAN & EKSPOR DATA' },
+  ]
+
+  tabs.forEach(({ menu, heading }) => {
+    it(`menu "${menu}" terbuka dan memuat halamannya dari backend`, () => {
+      cy.get('aside button.ops-nav__item').contains(menu).click()
+      cy.get('h1.ops-topbar__heading').should('contain.text', heading)
+      cy.get('.ops-nav__item--active').should('contain.text', menu)
     })
-
-    // 2. Mock Auth Login
-    cy.intercept('POST', '**/api/v1/auth/login', {
-      statusCode: 200,
-      body: {
-        success: true,
-        data: {
-          token: 'valid-test-jwt-token',
-          user: {
-            id: 'admin-1',
-            name: 'Administrator Utama',
-            email: 'admin@silat.id',
-            role: 'admin',
-          },
-        },
-      },
-    }).as('loginReq')
-
-    // 3. Mock Rulesets List
-    cy.intercept('GET', /\/api\/v1\/rulesets(\?.*)?$/, {
-      statusCode: 200,
-      body: {
-        success: true,
-        data: [
-          {
-            id: 'ruleset-ipsi-2024',
-            name: 'IPSI 2024 v2024.1',
-            version: '2024.1',
-            status: 'active',
-            rounds: 3,
-            round_duration_seconds: 120,
-          },
-        ],
-      },
-    }).as('getRulesets')
-
-    // 4. Mock Competitions List
-    cy.intercept('GET', /\/api\/v1\/competitions(\?.*)?$/, {
-      statusCode: 200,
-      body: {
-        success: true,
-        data: [
-          {
-            id: 'b26d7145-d341-4795-ac58-bff86d13cbf8',
-            name: 'Kejuaraan Nasional Pencak Silat Menpora 2026',
-            location: 'GOR POPKI Cibubur, Jakarta Timur',
-            start_date: '2026-10-10',
-            end_date: '2026-10-15',
-            ruleset_name: 'IPSI 2024',
-            status: 'active',
-          },
-        ],
-        pagination: {
-          page: 1,
-          limit: 20,
-          total: 1,
-        },
-      },
-    }).as('getCompetitions')
-
-    // 5. Mock Arenas
-    cy.intercept('GET', /\/api\/v1\/competitions\/[^/]+\/arenas(\?.*)?$/, {
-      statusCode: 200,
-      body: {
-        success: true,
-        data: [
-          { id: 'arena-a', name: 'Gelanggang A' },
-          { id: 'arena-b', name: 'Gelanggang B' },
-        ],
-      },
-    }).as('getArenas')
-
-    // 6. Mock Categories
-    cy.intercept('GET', /\/api\/v1\/competitions\/[^/]+\/categories(\?.*)?$/, {
-      statusCode: 200,
-      body: {
-        success: true,
-        data: [
-          {
-            id: 'cat-1',
-            name: 'Tanding Dewasa Putra - Kelas A (45 - 50 Kg)',
-            gender: 'male',
-            weight_class: 'A',
-            age_group: 'dewasa',
-          },
-        ],
-      },
-    }).as('getCategories')
-
-    // 7. Mock PINs
-    cy.intercept('GET', /\/api\/v1\/auth\/pins(\?.*)?$/, {
-      statusCode: 200,
-      body: {
-        success: true,
-        data: [
-          { id: 'pin-1', seat_number: 1, role: 'judge', pin: '123456' },
-          { id: 'pin-2', seat_number: 2, role: 'judge', pin: '234567' },
-          { id: 'pin-w', seat_number: 0, role: 'wasit', pin: '345678' },
-        ],
-      },
-    }).as('getPins')
-
-    // 8. Mock Create Competition
-    cy.intercept('POST', /\/api\/v1\/competitions$/, {
-      statusCode: 201,
-      body: {
-        success: true,
-        data: {
-          id: 'comp-12345678',
-          name: 'KEJURNAS PENCAK SILAT DEWASA PIALA PRESIDEN 2026',
-          location: 'Padepokan Pencak Silat TMII, Jakarta Timur',
-          start_date: '2026-10-08',
-          end_date: '2026-10-15',
-          ruleset_name: 'IPSI 2024 v2024.1',
-          ruleset_id: 'ruleset-ipsi-2024',
-          status: 'draft',
-        },
-      },
-    }).as('createComp')
-
-    // Login via UI
-    cy.visit('/login')
-    cy.get('button.demo-chip').contains(/Admin Pertandingan/i).click()
-    cy.get('button[type="submit"]').contains(/Masuk ke Akun/i).click()
-    cy.wait('@loginReq')
-    cy.url().should('include', '/ops')
   })
 
-  it('bisa membuka panel operations dan berpindah ke tab Kategori Tanding', () => {
+  it('daftar kompetisi menampilkan kejuaraan hasil seed', () => {
+    cy.intercept('GET', '**/api/v1/competitions*').as('getCompetitions')
+    cy.reload()
+    cy.wait('@getCompetitions').its('response.statusCode').should('eq', 200)
+    // kejuaraan tampil sebagai <option> di dropdown; <option> tidak dihitung "visible" oleh Cypress
+    cy.contains('option', /Menpora/i).should('exist')
+  })
+
+  it('tab Kategori Tanding menyediakan aksi manajemen kategori', () => {
     cy.get('aside button.ops-nav__item').contains('Kategori Tanding').click()
-
-    // Verifikasi Header berganti ke KATEGORI TANDING
-    cy.contains('h1, h2', /KATEGORI TANDING/i).should('be.visible')
-
-    // Verifikasi elemen aksi manajemen kategori tersedia
-    cy.get('button').contains(/Tambah Kategori/i).should('be.visible')
-    cy.get('button').contains(/Terapkan Standar PB IPSI/i).should('be.visible')
+    cy.contains('button', /Tambah Kategori/i).should('be.visible')
+    cy.contains('button', /Terapkan Standar PB IPSI/i).should('be.visible')
   })
 
-  it('bisa berpindah ke tab Bagan Pertandingan dan melihat bagan turnamen', () => {
+  it('tab Kategori Tanding: dialog Tambah Kategori bisa dibuka dan ditutup tanpa menyimpan', () => {
+    cy.get('aside button.ops-nav__item').contains('Kategori Tanding').click()
+    cy.contains('button', /Tambah Kategori/i).click()
+    cy.contains('Tambah Kategori Tanding').should('be.visible')
+    cy.get('body').type('{esc}')
+  })
+
+  it('tab Perangkat & PIN menampilkan kontrol akses dan format juri', () => {
+    cy.get('aside button.ops-nav__item').contains('Perangkat & PIN').click()
+    cy.contains(/KONTROL AKSES TABLET GELANGGANG/i).should('be.visible')
+    cy.contains('button', /Generate Ulang Semua PIN/i).should('be.visible')
+    cy.contains('button', /Buat PIN Kustom/i).should('be.visible')
+    cy.get('button.format-btn')
+      .contains(/5 JURI/i)
+      .should('be.visible')
+    cy.get('button.format-btn')
+      .contains(/3 JURI/i)
+      .should('be.visible')
+  })
+
+  it('tab Perangkat & PIN: berganti format juri ke 3 lalu kembali ke 5', () => {
+    cy.get('aside button.ops-nav__item').contains('Perangkat & PIN').click()
+    cy.get('button.format-btn')
+      .contains(/3 JURI/i)
+      .click()
+    cy.get('button.format-btn')
+      .contains(/3 JURI/i)
+      .should('have.class', 'format-btn--active')
+    cy.get('button.format-btn')
+      .contains(/5 JURI/i)
+      .click()
+    cy.get('button.format-btn')
+      .contains(/5 JURI/i)
+      .should('have.class', 'format-btn--active')
+  })
+
+  it('tab Bagan Pertandingan menampilkan filter kategori', () => {
     cy.get('aside button.ops-nav__item').contains('Bagan Pertandingan').click()
-
-    // Verifikasi Header berganti ke BAGAN PERTANDINGAN
-    cy.contains('h1, h2', /BAGAN PERTANDINGAN/i).should('be.visible')
-
-    // Verifikasi filter kategori & kontrol bagan aktif
+    cy.contains(/BAGAN PERTANDINGAN TURNAMEN/i).should('be.visible')
     cy.contains(/KATEGORI & KELAS TANDING/i).should('be.visible')
     cy.get('select.filter-select').should('be.visible')
   })
 
-  it('bisa membuka menu Perangkat & PIN dan melihat manajemen PIN juri', () => {
-    cy.get('aside button.ops-nav__item').contains('Perangkat & PIN').click()
-
-    // Verifikasi Header dan Banner Manajemen PIN aktif
-    cy.contains('h1, h2', /PERANGKAT & PIN JURI|MANAJEMEN PERANGKAT/i).should('be.visible')
-    cy.contains(/KONTROL AKSES TABLET GELANGGANG/i).should('be.visible')
-
-    // Verifikasi Tombol Aksi Utama
-    cy.get('button').contains(/Generate Ulang Semua PIN/i).should('be.visible')
-    cy.get('button').contains(/Buat PIN Kustom/i).should('be.visible')
-
-    // Verifikasi Kontrol Format Juri
-    cy.get('button.format-btn').contains(/5 JURI/i).should('be.visible')
-    cy.get('button.format-btn').contains(/3 JURI/i).should('be.visible')
-  })
-
-  it('bisa berganti format juri pada manajemen PIN', () => {
-    cy.get('aside button.ops-nav__item').contains('Perangkat & PIN').click()
-
-    // Ganti format juri ke 3 Juri
-    cy.get('button.format-btn').contains(/3 JURI/i).click()
-    cy.get('button.format-btn').contains(/3 JURI/i).should('have.class', 'format-btn--active')
-
-    // Kembalikan ke format 5 Juri
-    cy.get('button.format-btn').contains(/5 JURI/i).click()
-    cy.get('button.format-btn').contains(/5 JURI/i).should('have.class', 'format-btn--active')
+  it('refresh halaman tidak mengeluarkan admin dari sesi', () => {
+    cy.get('aside button.ops-nav__item').contains('Kategori Tanding').click()
+    cy.reload()
+    cy.location('pathname').should('eq', '/ops')
+    cy.get('h1.ops-topbar__heading').should('be.visible')
   })
 })
