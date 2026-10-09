@@ -39,7 +39,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	compService := service.NewCompetitionService(compRepo)
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
 	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
-	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo)
+	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo).WithCategoryArenas(categoryRepo)
 	categoryService := service.NewCategoryService(categoryRepo).WithRulesetLookup(func(id string) bool {
 		rs, err := rulesetRepo.GetByID(id)
 		return err == nil && rs != nil
@@ -165,6 +165,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Reset)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Update)))
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Delete)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/home-arena", adminOrDewan(http.HandlerFunc(categoryH.SetHomeArena)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock", adminOrDewan(http.HandlerFunc(categoryH.SetBracketLock)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 

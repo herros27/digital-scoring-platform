@@ -78,6 +78,7 @@ func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 	m1 := &store.Match{
 		ID:            "match-1",
 		CompetitionID: "comp-1",
+		ArenaID:       "arena-1",
 		AthleteRedID:  "athlete-red",
 		AthleteBlueID: "athlete-blue",
 	}
@@ -94,6 +95,7 @@ func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 	m2 := &store.Match{
 		ID:            "match-2",
 		CompetitionID: "comp-1",
+		ArenaID:       "arena-1",
 		AthleteRedID:  "athlete-red-2",
 		AthleteBlueID: "athlete-blue-2",
 	}
@@ -147,5 +149,26 @@ func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 	}
 	if scoresDetail.MatchID != "match-1" {
 		t.Fatalf("expected MatchID 'match-1', got %s", scoresDetail.MatchID)
+	}
+}
+
+// Wasit hanya boleh memuat partai yang dijadwalkan di gelanggangnya; partai tanpa gelanggang juga ditolak.
+func TestMatchService_LoadOnlyInScheduledArena(t *testing.T) {
+	matchRepo := newMockMatchRepo()
+	svc := service.NewMatchService(matchRepo, &mockCompRepo{}, hub.NewManager(), nil, nil, nil, nil)
+	_ = svc.CreateMatch(&store.Match{ID: "m-a", CompetitionID: "c", ArenaID: "arena-a", AthleteRedID: "r", AthleteBlueID: "b"})
+	_ = svc.CreateMatch(&store.Match{ID: "m-none", CompetitionID: "c", AthleteRedID: "r", AthleteBlueID: "b"})
+
+	if err := svc.LoadMatchToArena("m-a", "arena-b", "ipsi"); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("memuat partai gelanggang lain harus ditolak (ErrForbidden), dapat: %v", err)
+	}
+	if err := svc.LoadMatchToArena("m-none", "arena-a", "ipsi"); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("partai tanpa gelanggang harus ditolak, dapat: %v", err)
+	}
+	if got, _ := matchRepo.GetByID("m-a"); got.ArenaID != "arena-a" {
+		t.Errorf("gelanggang partai tidak boleh berubah: %s", got.ArenaID)
+	}
+	if err := svc.LoadMatchToArena("m-a", "arena-a", "ipsi"); err != nil {
+		t.Fatalf("memuat di gelanggang yang dijadwalkan harus berhasil: %v", err)
 	}
 }

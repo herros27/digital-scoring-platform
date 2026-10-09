@@ -133,3 +133,16 @@ export function useSetBracketLockMutation(competitionId: Ref<string>) {
       queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) }),
   })
 }
+
+/** Ubah gelanggang asal kategori; daftar kategori dan partai dimuat ulang karena partai idle ikut pindah. */
+export function useSetHomeArenaMutation(competitionId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { categoryId: string; arenaId: string }) =>
+      categoryService.setHomeArena(competitionId.value, vars.categoryId, vars.arenaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) })
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
+    },
+  })
+}

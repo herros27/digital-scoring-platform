@@ -82,6 +82,17 @@ export const categoryService = {
   },
 
   /**
+   * PUT /api/v1/competitions/{comp_id}/categories/{id}/home-arena
+   * Tetapkan gelanggang asal kategori (partai yang belum dimuat ikut pindah; 409 bila sudah ada yang berjalan).
+   */
+  async setHomeArena(competitionId: string, id: string, arenaId: string): Promise<Category> {
+    const res = await http.put<Category>(ENDPOINTS.CATEGORIES.HOME_ARENA(competitionId, id), {
+      arena_id: arenaId,
+    })
+    return res.data
+  },
+
+  /**
    * PUT /api/v1/competitions/{comp_id}/categories/ruleset
    * Tetapkan ruleset khusus (durasi/jumlah babak) per golongan umur atau kategori.
    * ruleset_id null = ikut ruleset kejuaraan. Ditolak 409 bila sudah ada partai berjalan.

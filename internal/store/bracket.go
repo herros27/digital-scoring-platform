@@ -201,8 +201,15 @@ func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
 				checkMatchQuery := `SELECT id FROM matches WHERE competition_id = $1 AND bracket_slot_id = $2 LIMIT 1`
 				errCheck := s.DB.QueryRow(checkMatchQuery, parentSlot.CompetitionID, redSlot.ID).Scan(&existingMatchID)
 				if errCheck == sql.ErrNoRows {
+					// Partai babak lanjutan memakai gelanggang asal kategori (sama dengan babak sebelumnya); gelanggang
+					// pertama menurut nama hanya untuk bagan lama tanpa kategori.
 					var arenaID sql.NullString
-					_ = s.DB.QueryRow(`SELECT id FROM arenas WHERE competition_id = $1 ORDER BY name ASC LIMIT 1`, parentSlot.CompetitionID).Scan(&arenaID)
+					if parentSlot.CategoryID != nil && *parentSlot.CategoryID != "" {
+						_ = s.DB.QueryRow(`SELECT home_arena_id FROM categories WHERE id = $1`, *parentSlot.CategoryID).Scan(&arenaID)
+					}
+					if !arenaID.Valid {
+						_ = s.DB.QueryRow(`SELECT id FROM arenas WHERE competition_id = $1 ORDER BY name ASC, id ASC LIMIT 1`, parentSlot.CompetitionID).Scan(&arenaID)
+					}
 
 					insertMatchQuery := `
 						INSERT INTO matches (competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status)

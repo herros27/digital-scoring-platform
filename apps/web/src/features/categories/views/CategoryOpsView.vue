@@ -13,7 +13,9 @@ import {
   useResetCategoriesMutation,
   useUpdateCategoryMutation,
   useSeedPresetsMutation,
+  useSetHomeArenaMutation,
 } from '../api/categoryQueries'
+import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import {
   BRACKET_MODE_LABELS,
   createCategorySchema,
@@ -64,6 +66,24 @@ const seedMutation = useSeedPresetsMutation(activeCompId)
 const resetMutation = useResetCategoriesMutation(activeCompId)
 const updateMutation = useUpdateCategoryMutation(activeCompId)
 const deleteMutation = useDeleteCategoryMutation(activeCompId)
+const homeArenaMutation = useSetHomeArenaMutation(activeCompId)
+const { data: rawArenas } = useArenasQuery(activeCompId)
+const arenaOptions = computed(() => rawArenas.value ?? [])
+
+async function changeHomeArena(cat: Category, arenaId: string) {
+  if (!arenaId || arenaId === cat.home_arena_id) return
+  try {
+    await homeArenaMutation.mutateAsync({ categoryId: cat.id, arenaId })
+    const name = arenaOptions.value.find((a) => a.id === arenaId)?.name ?? 'gelanggang'
+    showToast('Gelanggang Asal Diubah', `${cat.name} kini dimainkan di ${name}.`, 'success')
+  } catch (err) {
+    showToast(
+      'Gagal Mengubah Gelanggang',
+      getErrorMessage(err, 'Gelanggang asal tidak dapat diubah.'),
+      'danger',
+    )
+  }
+}
 
 const categories = computed(() => rawCategories.value || [])
 
@@ -1043,6 +1063,21 @@ function handleCategoryClick(cat: Category) {
               >
             </div>
           </div>
+        </div>
+
+        <div class="cat-card__arena font-mono">
+          <label :for="`home-arena-${cat.id}`" class="cat-spec-label">GELANGGANG ASAL</label>
+          <select
+            :id="`home-arena-${cat.id}`"
+            class="cat-arena-select"
+            data-test="category-home-arena"
+            :value="cat.home_arena_id ?? ''"
+            :disabled="homeArenaMutation.isPending.value || !arenaOptions.length"
+            @change="changeHomeArena(cat, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="" disabled>Otomatis saat bagan dibuat</option>
+            <option v-for="a in arenaOptions" :key="a.id" :value="a.id">{{ a.name }}</option>
+          </select>
         </div>
 
         <!-- Card Footer: Direct Bracket Action -->
@@ -2799,5 +2834,23 @@ function handleCategoryClick(cat: Category) {
   .cat-ruleset-row {
     grid-template-columns: 1fr;
   }
+}
+.cat-card__arena {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 18px 12px;
+}
+.cat-arena-select {
+  min-width: 0;
+  max-width: 60%;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.75rem;
 }
 </style>

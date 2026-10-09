@@ -64,6 +64,8 @@ export interface Category {
   bracket_mode?: BracketMode
   /** Draw bagan dikunci panitia (disimpan di server): bagan tidak bisa diacak ulang */
   bracket_locked?: boolean
+  /** Gelanggang asal: semua partai kategori dimainkan di sini. Kosong sampai bagan pertama dibuat atau dipilih panitia. */
+  home_arena_id?: string | null
   bracket_locked_at?: string
   created_at: string
   // UI extended metadata

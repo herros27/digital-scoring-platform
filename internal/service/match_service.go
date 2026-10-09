@@ -239,6 +239,17 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// 0. Partai hanya boleh dimuat di gelanggang tempat ia dijadwalkan. Tanpa ini wasit gelanggang lain bisa "menarik"
+	// partai dan memindahkannya diam-diam. Perpindahan resmi lewat gelanggang asal kategori.
+	if s.matchRepo != nil {
+		if m, err := s.matchRepo.GetByID(matchID); err == nil && m != nil && m.ArenaID != arenaID {
+			if m.ArenaID == "" {
+				return fmt.Errorf("%w: partai ini belum punya gelanggang", domain.ErrForbidden)
+			}
+			return fmt.Errorf("%w: partai ini dijadwalkan di gelanggang lain", domain.ErrForbidden)
+		}
+	}
+
 	// 1. Cek apakah match sudah aktif di arena
 	if existing, ok := s.activeOrchestrators[matchID]; ok && existing.IsActive() {
 		return errors.New("match already loaded to arena")

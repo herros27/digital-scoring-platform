@@ -231,6 +231,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/competitions/{comp_id}/categories` | Admin, Dewan | Tambah kategori baru (nama, gender, min/max weight) |
 | GET | `/api/v1/competitions/{comp_id}/categories/{id}` | JWT | Detail kategori |
 | PUT | `/api/v1/competitions/{comp_id}/categories/{id}` | Admin, Dewan | Ubah satu kategori (setelah ada peserta hanya nama yang boleh berubah; standar tidak dapat diubah) |
+| PUT | `/api/v1/competitions/{comp_id}/categories/{id}/home-arena` | Admin, Dewan | Ubah gelanggang asal kategori (semua partai kategori dimainkan di sana; otomatis terisi saat bagan dibuat; 409 bila sudah ada partai berjalan) |
 | DELETE | `/api/v1/competitions/{comp_id}/categories/{id}` | Admin, Dewan | Hapus satu kategori (409 bila masih ada peserta atau partai yang sudah berjalan) |
 
 ### 4. Athletes & Participants
@@ -274,7 +275,7 @@ GET http://localhost:8080/docs/openapi.yaml
 ### 7. Bracket & Tournament
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v1/competitions/{comp_id}/brackets/generate` | Admin, Dewan | Generate bagan turnamen sistem gugur (hanya peserta `verified`) |
+| POST | `/api/v1/competitions/{comp_id}/brackets/generate` | Admin, Dewan | Generate bagan turnamen sistem gugur (hanya peserta `verified`). Wajib ada gelanggang; kategori diberi gelanggang asal otomatis (beban paling ringan) dan semua partainya ikut gelanggang itu |
 | GET | `/api/v1/competitions/{comp_id}/brackets` | JWT | Ambil struktur pohon bagan (`?weight_class=&gender=`) |
 
 ### 8. Contingents & Officials Management

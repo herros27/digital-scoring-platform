@@ -748,6 +748,50 @@ paths:
         '409':
           description: Masih ada peserta terdaftar pada kategori; reset ditolak.
 
+  /api/v1/competitions/{comp_id}/categories/{id}/home-arena:
+    put:
+      summary: Ubah gelanggang asal sebuah kategori
+      description: |
+        Semua partai satu kategori (termasuk semifinal dan final) dimainkan di gelanggang asalnya. Gelanggang asal diisi
+        otomatis saat bagan pertama dibuat: gelanggang dengan sisa partai paling sedikit, seri ke nama paling awal, dan
+        tidak berubah saat bagan diacak ulang. Endpoint ini mengubahnya oleh panitia; partai `idle` kategori itu ikut
+        pindah. `409` bila ada partai kategori yang sudah dimuat/berjalan/selesai di gelanggang lain; `404` bila
+        gelanggang bukan milik kejuaraan. Hanya admin/dewan.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [arena_id]
+              properties:
+                arena_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Kategori dengan `home_arena_id` terbaru
+        '404':
+          description: Kategori atau gelanggang tidak ditemukan pada kejuaraan ini
+        '409':
+          description: Partai kategori sudah dimuat atau berjalan
   /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock:
     put:
       summary: Kunci / buka draw bagan sebuah kategori
@@ -1720,6 +1764,8 @@ paths:
       description: |
         Menginisialisasi Match Orchestrator, Rules Engine, Timer, dan mengubah status match menjadi READY.
         Jika arena sedang aktif menjalankan pertandingan lain, akan mengembalikan error 409 ARENA_BUSY.
+        Partai hanya boleh dimuat di gelanggang tempat ia dijadwalkan (gelanggang asal kategorinya); selain itu
+        (atau partai tanpa gelanggang) ditolak `403 FORBIDDEN`.
       tags:
         - Match
       security:

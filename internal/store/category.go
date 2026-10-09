@@ -12,7 +12,7 @@ type CategoryStore struct {
 	DB *sql.DB
 }
 
-const categoryColumns = `id, competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight, bracket_mode, bracket_locked_at, created_at`
+const categoryColumns = `id, competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight, bracket_mode, bracket_locked_at, home_arena_id, created_at`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -22,9 +22,15 @@ func scanCategory(row rowScanner, c *Category) error {
 	var minW, maxW sql.NullFloat64
 	var weightClass sql.NullString
 	var lockedAt sql.NullTime
+	var homeArena sql.NullString
 	if err := row.Scan(&c.ID, &c.CompetitionID, &c.Name, &c.Gender, &weightClass, &c.RulesetID,
-		&c.AgeGroup, &c.PresetStandard, &minW, &maxW, &c.BracketMode, &lockedAt, &c.CreatedAt); err != nil {
+		&c.AgeGroup, &c.PresetStandard, &minW, &maxW, &c.BracketMode, &lockedAt, &homeArena, &c.CreatedAt); err != nil {
 		return err
+	}
+	c.HomeArenaID = nil
+	if homeArena.Valid {
+		v := homeArena.String
+		c.HomeArenaID = &v
 	}
 	c.BracketLockedAt, c.BracketLocked = nil, lockedAt.Valid
 	if lockedAt.Valid {
@@ -267,4 +273,69 @@ func (s *CategoryStore) Delete(competitionID, id string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// SetHomeArena menetapkan gelanggang asal kategori dan memindahkan partai kategori yang belum berjalan (idle) ke sana.
+// Ditolak (ErrConflict) bila ada partai kategori yang sudah dimuat, berjalan, atau selesai: gelanggang asal harus tetap.
+// ErrNotFound bila kategori atau gelanggang bukan milik kejuaraan itu.
+func (s *CategoryStore) SetHomeArena(competitionID, categoryID, arenaID string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var ok int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM categories c JOIN arenas a ON a.competition_id = c.competition_id
+		WHERE c.id = $1 AND c.competition_id = $2 AND a.id = $3`, categoryID, competitionID, arenaID).Scan(&ok); err != nil {
+		return err
+	}
+	if ok == 0 {
+		return domain.ErrNotFound
+	}
+	var started int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM matches m JOIN bracket_slots b ON b.id = m.bracket_slot_id
+		WHERE b.category_id = $1 AND m.status <> 'idle' AND m.arena_id IS DISTINCT FROM $2::uuid`, categoryID, arenaID).Scan(&started); err != nil {
+		return err
+	}
+	if started > 0 {
+		return fmt.Errorf("%w: partai kategori ini sudah dimuat atau berjalan di gelanggang lain; gelanggang asal tidak dapat diubah", domain.ErrConflict)
+	}
+	if _, err := tx.Exec(`UPDATE categories SET home_arena_id = $2 WHERE id = $1`, categoryID, arenaID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE matches m SET arena_id = $2 FROM bracket_slots b
+		WHERE m.bracket_slot_id = b.id AND b.category_id = $1 AND m.status = 'idle'`, categoryID, arenaID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ArenaLoads perkiraan sisa partai per gelanggang dari kategori yang sudah punya gelanggang asal (peserta sah dikurangi
+// satu, dikurangi partai yang sudah selesai). exceptCategoryID dikecualikan (kategori yang sedang dibuat ulang).
+func (s *CategoryStore) ArenaLoads(competitionID, exceptCategoryID string) (map[string]int, error) {
+	rows, err := s.DB.Query(`
+		SELECT c.home_arena_id,
+		       COALESCE(SUM(GREATEST(
+		         (SELECT COUNT(*) FROM participants p
+		           WHERE p.category_id = c.id AND p.registration_status NOT IN ('pending', 'rejected', 'overweight', 'underweight')) - 1
+		         - (SELECT COUNT(*) FROM matches m JOIN bracket_slots b ON b.id = m.bracket_slot_id
+		             WHERE b.category_id = c.id AND m.status = 'finished'), 0)), 0)
+		FROM categories c
+		WHERE c.competition_id = $1 AND c.home_arena_id IS NOT NULL AND c.id::text <> $2
+		GROUP BY c.home_arena_id`, competitionID, exceptCategoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
 }

@@ -176,6 +176,10 @@ func (h *MatchHandler) LoadArena(w http.ResponseWriter, r *http.Request) {
 			Fail(w, http.StatusConflict, "ARENA_BUSY", err.Error(), nil)
 			return
 		}
+		if errors.Is(err, domain.ErrForbidden) {
+			Fail(w, http.StatusForbidden, "FORBIDDEN", strings.TrimPrefix(err.Error(), domain.ErrForbidden.Error()+": "), nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}

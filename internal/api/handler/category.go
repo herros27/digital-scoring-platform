@@ -190,6 +190,24 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	Ok(w, cat)
 }
 
+// PUT /api/v1/competitions/{comp_id}/categories/{id}/home-arena
+// Mengubah gelanggang asal kategori. Partai kategori yang belum dimuat ikut pindah; 409 bila sudah ada yang berjalan.
+func (h *CategoryHandler) SetHomeArena(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ArenaID string `json:"arena_id" validate:"required"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	cat, err := h.Service.SetHomeArena(r.PathValue("comp_id"), r.PathValue("id"), req.ArenaID)
+	if err != nil {
+		failCategory(w, err)
+		return
+	}
+	Ok(w, cat)
+}
+
 // DELETE /api/v1/competitions/{comp_id}/categories/{id}
 // Menghapus satu kategori. 409 bila masih ada peserta atau partainya sudah berjalan/selesai.
 func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {

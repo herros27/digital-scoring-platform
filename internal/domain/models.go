@@ -159,6 +159,8 @@ type Category struct {
 	MinWeight      *float64 `json:"min_weight,omitempty"`
 	MaxWeight      *float64 `json:"max_weight,omitempty"`
 	BracketMode    string   `json:"bracket_mode"`
+	// HomeArenaID gelanggang asal: semua partai kategori ini dimainkan di sana. Nil sampai bagan pertama dibuat.
+	HomeArenaID *string `json:"home_arena_id,omitempty"`
 	// BracketLockedAt bukan nil bila draw bagan kategori ini dikunci panitia: bagan tidak boleh diacak ulang.
 	BracketLockedAt *time.Time `json:"bracket_locked_at,omitempty"`
 	BracketLocked   bool       `json:"bracket_locked"`

@@ -88,6 +88,7 @@ func TestAutomaticBracketAdvancement(t *testing.T) {
 	match := &store.Match{
 		ID:            "match-bracket-1",
 		CompetitionID: "comp-1",
+		ArenaID:       "arena-bracket",
 		BracketSlotID: "slot-round1-A",
 		AthleteRedID:  "athlete-101",
 		AthleteBlueID: "athlete-102",

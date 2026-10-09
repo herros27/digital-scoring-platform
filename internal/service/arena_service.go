@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -128,6 +129,17 @@ func (s *ArenaService) DeleteArena(id string) error {
 	}
 	if arena == nil {
 		return domain.ErrNotFound
+	}
+	// Gelanggang yang sudah menjadi gelanggang asal kategori atau punya partai tidak boleh dihapus: partai akan kehilangan
+	// gelanggang dan tidak muncul di antrean wasit mana pun.
+	if u, ok := s.arenaRepo.(interface{ InUse(id string) (bool, error) }); ok {
+		used, err := u.InUse(id)
+		if err != nil {
+			return err
+		}
+		if used {
+			return fmt.Errorf("%w: gelanggang sudah dipakai kategori atau partai dan tidak dapat dihapus", domain.ErrConflict)
+		}
 	}
 	return s.arenaRepo.Delete(id)
 }

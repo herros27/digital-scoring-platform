@@ -286,3 +286,30 @@ func (s *CategoryService) DeleteCategory(competitionID, id string) error {
 	}
 	return ed.Delete(competitionID, id)
 }
+
+// CategoryHomeArenaSetter kemampuan opsional repo kategori untuk menetapkan gelanggang asal.
+type CategoryHomeArenaSetter interface {
+	SetHomeArena(competitionID, categoryID, arenaID string) error
+}
+
+// SetHomeArena mengubah gelanggang asal kategori (semua partai kategori ikut pindah selama belum dimuat/berjalan).
+func (s *CategoryService) SetHomeArena(competitionID, categoryID, arenaID string) (*domain.Category, error) {
+	if competitionID == "" || categoryID == "" || arenaID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	setter, ok := s.repo.(CategoryHomeArenaSetter)
+	if !ok {
+		return nil, errors.New("category repository does not support home arena")
+	}
+	cat, err := s.repo.GetByID(categoryID)
+	if err != nil {
+		return nil, err
+	}
+	if cat == nil || cat.CompetitionID != competitionID {
+		return nil, domain.ErrNotFound
+	}
+	if err := setter.SetHomeArena(competitionID, categoryID, arenaID); err != nil {
+		return nil, err
+	}
+	return s.repo.GetByID(categoryID)
+}

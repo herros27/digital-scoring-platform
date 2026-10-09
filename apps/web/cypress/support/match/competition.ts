@@ -82,7 +82,15 @@ export async function playMatch(
   opts: { untilTimeout?: boolean; arena?: ArenaKey } = {},
 ): Promise<{ result: Json; devices: Devices }> {
   const match = { id: matchId, redId: '', blueId: '', redName: '', blueName: '' }
-  const arena = opts.arena ?? 'main'
+  // Partai hanya boleh dimuat di gelanggang tempat ia dijadwalkan (gelanggang asal kategori): ikuti data server.
+  let arena: ArenaKey = opts.arena ?? 'main'
+  if (!opts.arena) {
+    const rec = await must<Json>(
+      'partai',
+      api('GET', `/competitions/${kit.competitionId}/matches/${matchId}`, kit.adminToken),
+    )
+    arena = rec.arena_id === kit.otherArenaId ? 'other' : 'main'
+  }
   const token = kit.crew(arena).wasit.token // wasit PIN terikat ke gelanggangnya
   const devices = await kit.openDevices({ arena })
   try {

@@ -43,7 +43,7 @@ test('referee gelanggang utama melihat bagan kategori lintas gelanggang, partain
   // dua partai babak 1 di dua gelanggang + final: seluruh pohon tampil, bukan hanya gelanggang ini
   expect(await cards.count()).toBe(3)
   await expect(page.locator('.t-arena-tag', { hasText: 'GELANGGANG UTAMA' })).not.toHaveCount(0)
-  await expect(page.locator('.t-arena-tag', { hasText: 'GELANGGANG LAIN' })).not.toHaveCount(0)
+  await expect(page.locator('.t-arena-tag', { hasText: 'GELANGGANG UTAMA 2' })).not.toHaveCount(0)
   // hanya partai gelanggang referee yang bertepi biru
   await expect(page.locator('.t-match-card--own-arena')).toHaveCount(1)
   await expect(page.locator('.t-match-card--own-arena .t-arena-tag')).toHaveText('GELANGGANG UTAMA')

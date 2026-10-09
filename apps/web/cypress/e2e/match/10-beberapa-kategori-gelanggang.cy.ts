@@ -20,8 +20,8 @@ const DOCS_FEMALE = { identity: true, health: true, pregnancy: true }
 /**
  * Dua kategori (Putra dan Putri) yang berjalan BERSAMAAN di dua gelanggang, masing-masing dengan wasit dan 3 juri
  * sendiri, dengan kontingen yang sama di kedua kategori. Memastikan bagan tiap kategori terisolasi, dua partai
- * berlangsung serentak tanpa saling mengganggu, partai dapat berpindah gelanggang antar babak (semifinal di satu
- * gelanggang, final di gelanggang lain), dan medali kontingen dijumlah dari kedua kategori.
+ * berlangsung serentak tanpa saling mengganggu, semua partai satu kategori (semifinal dan final) tetap di gelanggang
+ * asal kategori itu, dan medali kontingen dijumlah dari kedua kategori.
  */
 describe('Dua kategori di dua gelanggang berjalan bersamaan', { retries: 0 }, () => {
   let kit: MatchKit
@@ -74,6 +74,13 @@ describe('Dua kategori di dua gelanggang berjalan bersamaan', { retries: 0 }, ()
       }
       const matches = await listMatches(kit)
       expect(matches, '2 semifinal per kategori').to.have.length(4)
+      // gelanggang asal otomatis: kategori pertama di gelanggang utama, kedua di gelanggang yang masih kosong
+      const arenaOf = async (cat: string) => {
+        const ids = new Set((await bracketSlots(kit, cat)).map((s) => s.id))
+        return new Set(matches.filter((m) => ids.has(m.bracket_slot_id)).map((m) => m.arena_id))
+      }
+      expect([...(await arenaOf(putraId))]).to.deep.eq([kit.crew('main').arenaId])
+      expect([...(await arenaOf(putriId))]).to.deep.eq([kit.crew('other').arenaId])
       const slotsPutra = new Set((await bracketSlots(kit, putraId)).map((s) => s.id))
       const ofPutra = matches.filter((m) => slotsPutra.has(m.bracket_slot_id))
       expect(ofPutra).to.have.length(2)
@@ -113,11 +120,11 @@ describe('Dua kategori di dua gelanggang berjalan bersamaan', { retries: 0 }, ()
       expect(idle, 'satu final per kategori').to.have.length(2)
     }, LONG))
 
-  it('3. final bertukar gelanggang (Putra di gelanggang lain, Putri di gelanggang utama) dan juga serentak', () =>
+  it('3. final tetap di gelanggang asal kategori (Putra di utama, Putri di gelanggang lain) dan juga serentak', () =>
     runAsync(async () => {
       const [a, b] = await Promise.all([
-        playBracketToEnd(kit, { categoryId: putraId, arena: 'other', maxPasses: 1 }),
-        playBracketToEnd(kit, { categoryId: putriId, arena: 'main', maxPasses: 1 }),
+        playBracketToEnd(kit, { categoryId: putraId, arena: 'main', maxPasses: 1 }),
+        playBracketToEnd(kit, { categoryId: putriId, arena: 'other', maxPasses: 1 }),
       ])
       expect(a).to.have.length(1)
       expect(b).to.have.length(1)
@@ -125,8 +132,8 @@ describe('Dua kategori di dua gelanggang berjalan bersamaan', { retries: 0 }, ()
       const all = await listMatches(kit)
       expect(all).to.have.length(6)
       expect(all.every((m) => m.status === 'finished')).to.eq(true)
-      expect(all.find((m) => m.id === a[0].id)!.arena_id).to.eq(kit.crew('other').arenaId)
-      expect(all.find((m) => m.id === b[0].id)!.arena_id).to.eq(kit.crew('main').arenaId)
+      expect(all.find((m) => m.id === a[0].id)!.arena_id).to.eq(kit.crew('main').arenaId)
+      expect(all.find((m) => m.id === b[0].id)!.arena_id).to.eq(kit.crew('other').arenaId)
     }, LONG))
 
   it('4. masing-masing kategori punya juara sendiri di bagannya', () =>

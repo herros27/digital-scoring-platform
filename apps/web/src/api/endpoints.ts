@@ -45,6 +45,8 @@ export const ENDPOINTS = {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/categories`,
     CREATE: (compId: string) => `/api/v1/competitions/${compId}/categories`,
     RESET: (compId: string) => `/api/v1/competitions/${compId}/categories`,
+    HOME_ARENA: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/categories/${id}/home-arena`,
     BRACKET_LOCK: (compId: string, id: string) =>
       `/api/v1/competitions/${compId}/categories/${id}/bracket-lock`,
     ASSIGN_RULESETS: (compId: string) => `/api/v1/competitions/${compId}/categories/ruleset`,

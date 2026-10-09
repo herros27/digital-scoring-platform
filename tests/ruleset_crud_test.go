@@ -310,8 +310,8 @@ func TestMatchService_CategoryRulesetOverridesCompetition(t *testing.T) {
 	compRepo := &mockCompRepoWithRuleset{comps: map[string]*domain.Competition{
 		"comp-1": {ID: "comp-1", Name: "Kejurda", RulesetID: &standard.ID},
 	}}
-	matchRepo.matches["m-ud"] = &store.Match{ID: "m-ud", CompetitionID: "comp-1", BracketSlotID: "slot-ud", Status: "idle"}
-	matchRepo.matches["m-dw"] = &store.Match{ID: "m-dw", CompetitionID: "comp-1", BracketSlotID: "slot-dw", Status: "idle"}
+	matchRepo.matches["m-ud"] = &store.Match{ID: "m-ud", CompetitionID: "comp-1", ArenaID: "arena-1", BracketSlotID: "slot-ud", Status: "idle"}
+	matchRepo.matches["m-dw"] = &store.Match{ID: "m-dw", CompetitionID: "comp-1", ArenaID: "arena-2", BracketSlotID: "slot-dw", Status: "idle"}
 
 	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil, nil)
 	svc.SetRulesetResolver(rulesetSvc)

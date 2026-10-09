@@ -188,7 +188,7 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
   )
   const other = await must(
     'buat gelanggang lain',
-    api('POST', `/competitions/${comp.id}/arenas`, adminToken, { name: 'Gelanggang Lain' }),
+    api('POST', `/competitions/${comp.id}/arenas`, adminToken, { name: 'Gelanggang Utama 2' }),
   )
   const ruleset = await must(
     'buat ruleset uji',
