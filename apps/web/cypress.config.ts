@@ -14,7 +14,7 @@ export default defineConfig({
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.ts',
     // spec pemulihan restart hanya berjalan bila lingkungan menyediakan perintah restart backend
-    env: { E2E_RESTART: Boolean(process.env.E2E_RESTART_CMD) },
+    expose: { E2E_RESTART: Boolean(process.env.E2E_RESTART_CMD) },
     setupNodeEvents(on) {
       // Cache token API di proses Node supaya seluruh spec dalam satu run hanya login sekali per
       // akun (endpoint login dibatasi 10 request/menit). Tidak ada state yang disimpan ke disk.
