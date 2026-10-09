@@ -13,7 +13,7 @@ type AthleteStore struct {
 	DB *sql.DB
 }
 
-// athleteColumns membaca contingent_id ('' bila atlet didaftarkan admin) dan birth_date sebagai teks YYYY-MM-DD (” untuk data lama tanpa tanggal lahir).
+// athleteColumns membaca contingent_id (” bila atlet didaftarkan admin) dan birth_date sebagai teks YYYY-MM-DD (” untuk data lama tanpa tanggal lahir).
 const athleteColumns = `id, name, gender, team, COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''), COALESCE(nik, ''), COALESCE(contingent_id::text, ''), created_at`
 
 func scanAthlete(row rowScanner, a *Athlete) error {
