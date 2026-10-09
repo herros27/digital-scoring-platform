@@ -13,6 +13,7 @@ membatalkannya di `after`, sehingga data seed tidak tersentuh dan hasil umur sel
 | `05-matriks-hak-akses`                | anonim / kontingen / dewan / admin x endpoint kategori-registrasi-verifikasi-bagan                                                             |
 | `07-isolasi-data-kontingen`           | kontingen hanya melihat peserta/atlet/profil miliknya + statusnya; tidak bisa mendaftarkan atlet kontingen lain                                |
 | `08-bagan-publik`                     | bagan terbuka tanpa login hanya saat kejuaraan aktif; whitelist field + tanpa NIK/tanggal lahir; halaman `/bagan` (daftar, filter, buka bagan) |
+| `09-bagan-ops-kategori`               | menu Bagan Pertandingan (admin): dropdown kategori terisi otomatis, bagan milik kategori tampil, state kosong untuk kategori tanpa bagan       |
 | `06-alur-lengkap-registrasi-ke-bagan` | skenario berurutan kontingen -> verifikasi -> bagan -> tampilan publik + UI meja verifikasi                                                    |
 
 ## Menjalankan

@@ -88,8 +88,10 @@ const { data: rawArenas } = useArenasQuery(activeCompId)
 const { data: rawParticipants } = useParticipantsQuery(activeCompId)
 const { data: rawMatches, refetch: refetchMatches } = useMatchesQuery(activeCompId)
 
-// Selected category & weight class
-const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
+// Selected category & weight class. Kosong sampai daftar kategori dimuat; lalu otomatis menunjuk kategori
+// pertama yang benar-benar ada (lihat watch(categoryOptions) di bawah), bukan teks tetap yang bisa tidak
+// cocok dengan nama kategori sehingga dropdown kosong dan halaman jatuh ke bagan lama tanpa kategori.
+const selectedCategory = ref('')
 
 interface CategoryOption {
   /** id kategori resmi; kosong untuk kelas turunan dari peserta lama tanpa kategori */
@@ -159,6 +161,20 @@ const categoryOptions = computed<CategoryOption[]>(() => {
   })
 })
 
+// Pilihan awal & pemulihan: bila pilihan sekarang tidak ada di daftar (awal muat, ganti kejuaraan, kategori
+// dihapus/di-reset), pilih opsi pertama supaya dropdown tidak pernah kosong dan bagan yang tampil selalu
+// milik sebuah kategori.
+watch(
+  categoryOptions,
+  (options) => {
+    if (options.length === 0) return
+    if (!options.some((o) => o.name === selectedCategory.value)) {
+      selectedCategory.value = options[0].name
+    }
+  },
+  { immediate: true },
+)
+
 // Opsi dikelompokkan per golongan umur + gender untuk <optgroup>
 const categoryOptionGroups = computed(() => {
   const groups: { label: string; options: CategoryOption[] }[] = []
@@ -194,7 +210,11 @@ const currentCategoryId = computed(() => parsedClass.value.categoryId)
 // Real Bracket Tree Query — bagan terisolasi per kategori; fallback per kelas bobot untuk data lama
 const legacyBracket = useBracketTreeQuery(
   activeCompId,
-  computed(() => (currentCategoryId.value ? '' : currentWeightClass.value)),
+  // Jalur lama (per kelas bobot) hanya untuk opsi turunan tanpa kategori resmi, dan baru setelah ada pilihan:
+  // sebelum daftar kategori dimuat, tidak ada permintaan bagan sama sekali (hindari kilasan bagan lama).
+  computed(() =>
+    currentCategoryId.value || !selectedCategory.value ? '' : currentWeightClass.value,
+  ),
   currentGender,
 )
 const categoryBracket = useCategoryBracketTreeQuery(activeCompId, currentCategoryId)

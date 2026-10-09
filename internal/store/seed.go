@@ -254,6 +254,13 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		{AthleteName: "Hendra Setiawan", SeedNumber: 4, ContingentMail: "perisaidiri@contingent.id"},
 	}
 
+	// Kategori resmi tempat peserta & bagan seed ditautkan (bagan terisolasi per category_id).
+	var seedCategoryID string
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND name = $2 LIMIT 1`,
+		compID, "Tanding Dewasa Putra - Kelas A (45-50 Kg)").Scan(&seedCategoryID); err != nil {
+		return nil, fmt.Errorf("failed to load seed category: %w", err)
+	}
+
 	participantIDs := make(map[string]string)
 	for _, p := range participantsSeed {
 		athID := athleteIDs[p.AthleteName]
@@ -262,14 +269,18 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		err = tx.QueryRowContext(ctx, `SELECT id FROM participants WHERE competition_id = $1 AND athlete_id = $2 LIMIT 1`, compID, athID).Scan(&partID)
 		if err == sql.ErrNoRows {
 			err = tx.QueryRowContext(ctx, `
-				INSERT INTO participants (competition_id, name, weight_class, gender, athlete_id, seed, registration_status, contingent_id)
-				VALUES ($1, $2, 'A', 'male', $3, $4, 'verified', $5)
-				RETURNING id`, compID, p.AthleteName, athID, p.SeedNumber, cID).Scan(&partID)
+				INSERT INTO participants (competition_id, name, weight_class, gender, athlete_id, seed, registration_status, contingent_id, category_id)
+				VALUES ($1, $2, 'A', 'male', $3, $4, 'verified', $5, $6)
+				RETURNING id`, compID, p.AthleteName, athID, p.SeedNumber, cID, seedCategoryID).Scan(&partID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert participant %s: %w", p.AthleteName, err)
 			}
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to query participant %s: %w", p.AthleteName, err)
+		}
+		// Seed lama (sebelum kategori) bisa tersisa tanpa category_id: tautkan tanpa mengubah data lain.
+		if _, err = tx.ExecContext(ctx, `UPDATE participants SET category_id = $1 WHERE id = $2 AND category_id IS NULL`, seedCategoryID, partID); err != nil {
+			return nil, fmt.Errorf("failed to link participant %s to category: %w", p.AthleteName, err)
 		}
 		participantIDs[p.AthleteName] = partID
 		summary.Participants++
@@ -284,9 +295,9 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		compID).Scan(&finalSlotID)
 	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, is_bye, next_slot_id)
-			VALUES ($1, 'A', 'male', 2, 1, false, NULL)
-			RETURNING id`, compID).Scan(&finalSlotID)
+			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, is_bye, next_slot_id, category_id)
+			VALUES ($1, 'A', 'male', 2, 1, false, NULL, $2)
+			RETURNING id`, compID, seedCategoryID).Scan(&finalSlotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert final bracket slot: %w", err)
 		}
@@ -301,9 +312,9 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		compID).Scan(&semi1SlotID)
 	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id)
-			VALUES ($1, 'A', 'male', 1, 1, $2, false, $3)
-			RETURNING id`, compID, p1ID, finalSlotID).Scan(&semi1SlotID)
+			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id, category_id)
+			VALUES ($1, 'A', 'male', 1, 1, $2, false, $3, $4)
+			RETURNING id`, compID, p1ID, finalSlotID, seedCategoryID).Scan(&semi1SlotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert semi 1 bracket slot: %w", err)
 		}
@@ -318,12 +329,18 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		compID).Scan(&semi2SlotID)
 	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id)
-			VALUES ($1, 'A', 'male', 1, 2, $2, false, $3)
-			RETURNING id`, compID, p3ID, finalSlotID).Scan(&semi2SlotID)
+			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id, category_id)
+			VALUES ($1, 'A', 'male', 1, 2, $2, false, $3, $4)
+			RETURNING id`, compID, p3ID, finalSlotID, seedCategoryID).Scan(&semi2SlotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert semi 2 bracket slot: %w", err)
 		}
+	}
+
+	// Bagan seed lama tanpa category_id ikut ditautkan ke kategorinya.
+	if _, err = tx.ExecContext(ctx, `UPDATE bracket_slots SET category_id = $1
+		WHERE competition_id = $2 AND weight_class = 'A' AND gender = 'male' AND category_id IS NULL`, seedCategoryID, compID); err != nil {
+		return nil, fmt.Errorf("failed to link seed bracket to category: %w", err)
 	}
 
 	// 10. Matches
