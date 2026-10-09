@@ -692,6 +692,8 @@ const isLiveMatch = (status?: string) => status === 'running' || status === 'pau
 
 // Current selected or queued match for bottom dock
 const selectedBracketMatch = ref<MatchCard | null>(null)
+// Mobile dock collapse state (collapsed by default on mobile to prevent blocking tournament bracket)
+const isDockCollapsed = ref(true)
 
 function handleSelectBracketMatch(match: MatchCard) {
   selectedBracketMatch.value = match
@@ -1346,6 +1348,8 @@ function handleLoadToMat1() {
             activeNav === 'atlet' ||
             activeNav === 'verifikasi' ||
             activeNav === 'jadwal',
+          'ops-content-scroll--bagan-collapsed': activeNav === 'bagan' && isDockCollapsed,
+          'ops-content-scroll--bagan-expanded': activeNav === 'bagan' && !isDockCollapsed,
         }"
       >
         <!-- TAB KOMPETISI -->
@@ -1684,78 +1688,108 @@ function handleLoadToMat1() {
       </div>
 
       <!-- BOTTOM STICKY QUICK-ACTION / COMMAND DOCK -->
-      <footer v-if="activeNav === 'bagan'" class="ops-dock">
-        <div class="ops-dock__match-info">
-          <div class="ops-dock__athlete-icon">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#DC2626"
-              stroke-width="2.2"
-            >
-              <circle cx="12" cy="5" r="3" />
-              <path d="M6.5 9 12 14l5.5-5" />
-              <path d="M12 14v8" />
-              <path d="M9 22h6" />
-            </svg>
-          </div>
-          <div>
-            <div class="ops-dock__sub font-mono">
-              <span>PARTAI ANTRIAN BERIKUTNYA</span>
-              <span class="ops-bullet">•</span>
-              <span>{{ selectedCategory }}</span>
-            </div>
-            <div class="ops-dock__match-title">
-              {{
-                queuedMatch
-                  ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})`
-                  : 'Belum ada antrian partai aktif'
-              }}
-            </div>
-          </div>
-        </div>
-
-        <div class="ops-dock__actions font-mono">
-          <button class="ops-dock-btn-dark font-mono" @click="handlePanggilAtlet">
-            Panggil Atlet
-          </button>
-          <AppButton variant="emerald" size="md" @click="handleLoadToMat1">
-            <template #icon>
+      <footer
+        v-if="activeNav === 'bagan'"
+        class="ops-dock"
+        :class="{ 'ops-dock--collapsed': isDockCollapsed }"
+      >
+        <div class="ops-dock__header" @click="isDockCollapsed = !isDockCollapsed">
+          <div class="ops-dock__match-info">
+            <div class="ops-dock__athlete-icon">
               <svg
-                width="18"
-                height="18"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+                stroke="#DC2626"
+                stroke-width="2.2"
               >
-                <polygon points="5 3 19 12 5 21 5 3" />
+                <circle cx="12" cy="5" r="3" />
+                <path d="M6.5 9 12 14l5.5-5" />
+                <path d="M12 14v8" />
+                <path d="M9 22h6" />
               </svg>
-            </template>
-            Kirim ke Gelanggang
-          </AppButton>
-        </div>
-
-        <div class="ops-dock__legal font-mono">
-          <div class="ops-legal-texts">
-            <div class="legal-label">LEGALITAS BAGAN PERTANDINGAN</div>
-            <div class="legal-officials">DELEGET TEKNIK & KETUA PERTANDINGAN</div>
-            <div class="legal-hash">HASH-DRAW: {{ drawHash }}</div>
+            </div>
+            <div class="ops-dock__texts">
+              <div class="ops-dock__sub font-mono">
+                <span>PARTAI ANTRIAN BERIKUTNYA</span>
+                <span class="ops-bullet">•</span>
+                <span class="ops-dock__cat-text">{{ selectedCategory }}</span>
+              </div>
+              <div class="ops-dock__match-title">
+                {{
+                  queuedMatch
+                    ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})`
+                    : 'Belum ada antrian partai aktif'
+                }}
+              </div>
+            </div>
           </div>
-          <div class="legal-shield">
+
+          <button
+            type="button"
+            class="ops-dock__toggle-btn font-mono"
+            :aria-expanded="!isDockCollapsed"
+            :title="isDockCollapsed ? 'Buka kontrol partai' : 'Sembunyikan panel'"
+            @click.stop="isDockCollapsed = !isDockCollapsed"
+          >
+            <span>{{ isDockCollapsed ? 'Aksi' : 'Tutup' }}</span>
             <svg
-              width="22"
-              height="22"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#10B981"
-              stroke-width="2.2"
+              stroke="currentColor"
+              stroke-width="2.4"
+              class="ops-dock__toggle-icon"
+              :class="{ 'ops-dock__toggle-icon--expanded': !isDockCollapsed }"
             >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <polyline points="9 12 11 14 15 10" />
+              <polyline points="18 15 12 9 6 15" />
             </svg>
+          </button>
+        </div>
+
+        <div class="ops-dock__body">
+          <div class="ops-dock__actions font-mono">
+            <button class="ops-dock-btn-dark font-mono" @click="handlePanggilAtlet">
+              Panggil Atlet
+            </button>
+            <AppButton variant="emerald" size="md" @click="handleLoadToMat1">
+              <template #icon>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              </template>
+              Kirim ke Gelanggang
+            </AppButton>
+          </div>
+
+          <div class="ops-dock__legal font-mono">
+            <div class="ops-legal-texts">
+              <div class="legal-label">LEGALITAS BAGAN PERTANDINGAN</div>
+              <div class="legal-officials">DELEGET TEKNIK & KETUA PERTANDINGAN</div>
+              <div class="legal-hash">HASH-DRAW: {{ drawHash }}</div>
+            </div>
+            <div class="legal-shield">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#10B981"
+                stroke-width="2.2"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
           </div>
         </div>
       </footer>
@@ -2631,6 +2665,21 @@ function handleLoadToMat1() {
   z-index: 30;
 }
 
+.ops-dock__header {
+  display: flex;
+  align-items: center;
+}
+
+.ops-dock__toggle-btn {
+  display: none;
+}
+
+.ops-dock__body {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
 .ops-dock__match-info {
   display: flex;
   align-items: center;
@@ -2951,45 +3000,125 @@ function handleLoadToMat1() {
   .ops-content-scroll--pin {
     padding-bottom: max(32px, env(safe-area-inset-bottom));
   }
+  .ops-content-scroll--bagan-collapsed {
+    padding-bottom: max(60px, calc(52px + env(safe-area-inset-bottom)));
+  }
+  .ops-content-scroll--bagan-expanded {
+    padding-bottom: max(220px, calc(200px + env(safe-area-inset-bottom)));
+  }
   .ops-dock {
     height: auto;
     flex-direction: column;
     align-items: stretch;
-    padding: 12px 14px;
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
-    gap: 10px;
+    padding: 10px 14px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 0;
+    transition: padding 0.2s ease;
+  }
+  .ops-dock--collapsed {
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .ops-dock--collapsed .ops-dock__body {
+    display: none;
+  }
+  .ops-dock__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+    cursor: pointer;
   }
   .ops-dock__match-info {
-    gap: 10px;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
   }
   .ops-dock__athlete-icon {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     flex-shrink: 0;
   }
+  .ops-dock__texts {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+  .ops-dock__sub {
+    font-size: 0.625rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ops-dock__cat-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .ops-dock__match-title {
-    font-size: 0.8125rem;
-    line-height: 1.35;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ops-dock__toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 9px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    color: #cbd5e1;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .ops-dock__toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+  }
+  .ops-dock__toggle-icon {
+    transition: transform 0.2s ease;
+  }
+  .ops-dock__toggle-icon--expanded {
+    transform: rotate(180deg);
+  }
+  .ops-dock__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
   }
   .ops-dock__actions {
     width: 100%;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
   .ops-dock__actions > button,
   .ops-dock__actions > :deep(button) {
-    flex: 1 1 50%;
+    width: 100%;
     justify-content: center;
+    font-size: 0.75rem;
+    padding: 8px 10px;
   }
   .ops-dock__legal {
     justify-content: space-between;
     text-align: left;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 6px;
   }
   .legal-shield {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
   }
 }
 
@@ -3008,13 +3137,6 @@ function handleLoadToMat1() {
   }
   .metric-block--progress {
     grid-column: span 1;
-  }
-  .ops-dock__actions {
-    flex-direction: column;
-  }
-  .ops-dock__actions > button,
-  .ops-dock__actions > :deep(button) {
-    width: 100%;
   }
 }
 
