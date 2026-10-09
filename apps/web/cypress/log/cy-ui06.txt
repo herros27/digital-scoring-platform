@@ -1,0 +1,161 @@
+
+> web@0.0.0 cypress:run
+> cross-env ELECTRON_EXTRA_LAUNCH_ARGS="--no-sandbox --disable-gpu --disable-software-rasterizer" cypress run --spec cypress/e2e/match/ui-06-*
+
+
+Warning: We failed to trash the existing run results.
+
+This error will not affect or change the exit code.
+
+Error: Command failed: C:\Users\kemzz\AppData\Local\Cypress\Cache\16.1.1\Cypress\resources\app\node_modules\trash\lib\windows-trash.exe D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi
+
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at ChildProcess.exithandler (node:child_process:417:12)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1124:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+
+====================================================================================================
+
+  (Run Starting)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Cypress:        16.1.1                                                                         Γöé
+  Γöé Browser:        Electron 146 (headless) (deprecated)                                           Γöé
+  Γöé Node Version:   v24.19.0 (C:\Users\kemzz\AppData\Local\fnm_multishells\4984_1791556989695\node Γöé
+  Γöé                 .exe)                                                                          Γöé
+  Γöé Specs:          1 found (ui-06-konsol-wasit.cy.ts)                                             Γöé
+  Γöé Searched:       D:\Freelance\DigitalScoring\apps\web\cypress\e2e\match\ui-06-*                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+Warning: The Electron browser is deprecated as a test browser and will be removed in a future version of Cypress.
+
+Switch to Chrome or another installed browser to avoid a breaking change when you upgrade.
+
+Read more about supported browsers: https://on.cypress.io/launching-browsers
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ui-06-konsol-wasit.cy.ts                                                        (1 of 1)
+
+
+  Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+    ΓêÜ menampilkan partai yang dimuat, atlet, dan kehadiran tiga juri (6568ms)
+    (Attempt 1 of 2) MULAI RONDE di layar memulai partai di server: seluruh juri menerima round_1 dengan tenggat yang sama
+    1) MULAI RONDE di layar memulai partai di server: seluruh juri menerima round_1 dengan tenggat yang sama
+    (Attempt 1 of 2) JEDA lalu LANJUTKAN di layar: juri menerima timer berhenti kemudian berjalan lagi
+    2) JEDA lalu LANJUTKAN di layar: juri menerima timer berhenti kemudian berjalan lagi
+    (Attempt 1 of 2) poin konsensus dari juri tampil pada skor sudut dan SELESAIKAN menutup partai untuk semua perangkat
+    3) poin konsensus dari juri tampil pada skor sudut dan SELESAIKAN menutup partai untuk semua perangkat
+    (Attempt 1 of 2) partai yang dimulai pihak lain lebih dulu: konsol ikut berubah tanpa aksi, dan MULAI tidak bisa dipakai lagi
+    4) partai yang dimulai pihak lain lebih dulu: konsol ikut berubah tanpa aksi, dan MULAI tidak bisa dipakai lagi
+    (Attempt 1 of 2) wasit gelanggang lain melihat konsol kosong: tidak ada partai dari gelanggang ini
+    5) wasit gelanggang lain melihat konsol kosong: tidak ada partai dari gelanggang ini
+    ΓêÜ akses halaman: juri tidak dapat membuka konsol wasit (3247ms)
+
+
+  2 passing (3m)
+  5 failing
+
+  1) Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+       MULAI RONDE di layar memulai partai di server: seluruh juri menerima round_1 dengan tenggat yang sama:
+     AssertionError: Timed out retrying after 10000ms: Expected to find content: 'SISTEM ONLINE' but never did.
+      at openConsole (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:44:53)
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:62:4)
+
+  2) Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+       JEDA lalu LANJUTKAN di layar: juri menerima timer berhenti kemudian berjalan lagi:
+     AssertionError: Timed out retrying after 10000ms: Expected to find content: 'SISTEM ONLINE' but never did.
+      at openConsole (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:44:53)
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:98:4)
+
+  3) Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+       poin konsensus dari juri tampil pada skor sudut dan SELESAIKAN menutup partai untuk semua perangkat:
+     AssertionError: Timed out retrying after 10000ms: Expected to find content: 'SISTEM ONLINE' but never did.
+      at openConsole (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:44:53)
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:140:4)
+
+  4) Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+       partai yang dimulai pihak lain lebih dulu: konsol ikut berubah tanpa aksi, dan MULAI tidak bisa dipakai lagi:
+     AssertionError: Timed out retrying after 10000ms: Expected to find content: 'SISTEM ONLINE' but never did.
+      at openConsole (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:44:53)
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:193:4)
+
+  5) Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+       wasit gelanggang lain melihat konsol kosong: tidak ada partai dari gelanggang ini:
+     AssertionError: Timed out retrying after 10000ms: Expected to find content: 'SISTEM ONLINE' but never did.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-06-konsol-wasit.cy.ts:210:53)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        7                                                                                Γöé
+  Γöé Passing:      2                                                                                Γöé
+  Γöé Failing:      5                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  10                                                                               Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     2 minutes, 30 seconds                                                            Γöé
+  Γöé Spec Ran:     ui-06-konsol-wasit.cy.ts                                                         Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- MULAI RONDE di l               
+     ayar memulai partai di server seluruh juri menerima round_1 dengan tenggat yang                
+     sama (failed).png                                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- MULAI RONDE di l               
+     ayar memulai partai di server seluruh juri menerima round_1 dengan tenggat yang                
+     sama (failed) (attempt 2).png                                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- JEDA lalu LANJUT               
+     KAN di layar juri menerima timer berhenti kemudian berjalan lagi (failed).png                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- JEDA lalu LANJUT               
+     KAN di layar juri menerima timer berhenti kemudian berjalan lagi (failed) (attem               
+     pt 2).png                                                                                      
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- poin konsensus d               
+     ari juri tampil pada skor sudut dan SELESAIKAN menutup partai untuk semua perang               
+     kat (failed).png                                                                               
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- poin konsensus d               
+     ari juri tampil pada skor sudut dan SELESAIKAN menutup partai untuk semua perang               
+     kat (failed) (attempt 2).png                                                                   
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- partai yang dimu               
+     lai pihak lain lebih dulu konsol ikut berubah tanpa aksi, dan MULAI tidak bisa d               
+     ipakai lagi (failed).png                                                                       
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- partai yang dimu               
+     lai pihak lain lebih dulu konsol ikut berubah tanpa aksi, dan MULAI tidak bisa d               
+     ipakai lagi (failed) (attempt 2).png                                                           
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- wasit gelanggang               
+      lain melihat konsol kosong tidak ada partai dari gelanggang ini (failed).png                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-06-konsol-wasit.cy.t     (1280x720)
+     s\Konsol wasit (UI) - memulai dan mengendalikan pertandingan -- wasit gelanggang               
+      lain melihat konsol kosong tidak ada partai dari gelanggang ini (failed) (attem               
+     pt 2).png                                                                                      
+
+
+====================================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé ├ù  ui-06-konsol-wasit.cy.ts                 02:30        7        2        5        -        - Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+    ├ù  1 of 1 failed (100%)                     02:30        7        2        5        -        -  
+

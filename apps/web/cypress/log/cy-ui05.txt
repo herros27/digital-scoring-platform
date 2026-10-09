@@ -1,0 +1,265 @@
+
+> web@0.0.0 cypress:run
+> cross-env ELECTRON_EXTRA_LAUNCH_ARGS="--no-sandbox --disable-gpu --disable-software-rasterizer" cypress run --spec cypress/e2e/match/ui-05-*
+
+
+Warning: We failed to trash the existing run results.
+
+This error will not affect or change the exit code.
+
+Error: Command failed: C:\Users\kemzz\AppData\Local\Cypress\Cache\16.1.1\Cypress\resources\app\node_modules\trash\lib\windows-trash.exe D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi
+
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at ChildProcess.exithandler (node:child_process:417:12)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1124:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+
+====================================================================================================
+
+  (Run Starting)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Cypress:        16.1.1                                                                         Γöé
+  Γöé Browser:        Electron 146 (headless) (deprecated)                                           Γöé
+  Γöé Node Version:   v24.19.0 (C:\Users\kemzz\AppData\Local\fnm_multishells\4984_1791556989695\node Γöé
+  Γöé                 .exe)                                                                          Γöé
+  Γöé Specs:          1 found (ui-05-layar-juri.cy.ts)                                               Γöé
+  Γöé Searched:       D:\Freelance\DigitalScoring\apps\web\cypress\e2e\match\ui-05-*                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+Warning: The Electron browser is deprecated as a test browser and will be removed in a future version of Cypress.
+
+Switch to Chrome or another installed browser to avoid a breaking change when you upgrade.
+
+Read more about supported browsers: https://on.cypress.io/launching-browsers
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ui-05-layar-juri.cy.ts                                                          (1 of 1)
+
+
+  Layar juri (UI) - sinkronisasi realtime per kursi
+    juri kursi 1
+      ΓêÜ menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload (9022ms)
+      (Attempt 1 of 2) tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat
+      1) tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat
+      (Attempt 1 of 2) wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda
+      2) wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda
+    juri kursi 2
+      (Attempt 1 of 2) menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload
+      3) menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload
+      (Attempt 1 of 2) tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat
+      4) tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat
+      (Attempt 1 of 2) wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda
+      5) wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda
+    juri kursi 3
+      (Attempt 1 of 2) menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload
+      6) menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload
+      (Attempt 1 of 2) tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat
+      7) tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat
+      (Attempt 1 of 2) wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda
+      8) wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda
+    dijeda dan BATAL
+      (Attempt 1 of 2) saat wasit menjeda: tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol aktif lagi
+      9) saat wasit menjeda: tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol aktif lagi
+      (Attempt 1 of 2) BATAL menarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan pesan, bukan diam
+      10) BATAL menarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan pesan, bukan diam
+    koneksi dan akses
+      (Attempt 1 of 2) wasit melihat tablet juri yang terbuka online di meja pengawas (kehadiran perangkat)
+      11) wasit melihat tablet juri yang terbuka online di meja pengawas (kehadiran perangkat)
+      ΓêÜ tablet juri tanpa sesi diarahkan ke login PIN, dan wasit tidak dapat membuka layar juri (3007ms)
+
+
+  2 passing (5m)
+  11 failing
+
+  1) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 1
+         tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:106:57)
+
+  2) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 1
+         wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:156:57)
+
+  3) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 2
+         menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:51:57)
+
+  4) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 2
+         tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:106:57)
+
+  5) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 2
+         wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:156:57)
+
+  6) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 3
+         menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:51:57)
+
+  7) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 3
+         tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:106:57)
+
+  8) Layar juri (UI) - sinkronisasi realtime per kursi
+       juri kursi 3
+         wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:156:57)
+
+  9) Layar juri (UI) - sinkronisasi realtime per kursi
+       dijeda dan BATAL
+         saat wasit menjeda: tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol aktif lagi:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-round-badge`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:181:55)
+
+  10) Layar juri (UI) - sinkronisasi realtime per kursi
+       dijeda dan BATAL
+         BATAL menarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan pesan, bukan diam:
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-round-badge`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:198:55)
+
+  11) Layar juri (UI) - sinkronisasi realtime per kursi
+       koneksi dan akses
+         wasit melihat tablet juri yang terbuka online di meja pengawas (kehadiran perangkat):
+     AssertionError: Timed out retrying after 10000ms: Expected to find element: `.judge-online-pill`, but never found it.
+      at Context.eval (webpack://web/./cypress/e2e/match/ui-05-layar-juri.cy.ts:227:55)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        13                                                                               Γöé
+  Γöé Passing:      2                                                                                Γöé
+  Γöé Failing:      11                                                                               Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  22                                                                               Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     5 minutes, 14 seconds                                                            Γöé
+  Γöé Spec Ran:     ui-05-layar-juri.cy.ts                                                           Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 1 -- tap juri di               
+      layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar               
+      terkunci saat istirahat (failed).png                                                          
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 1 -- tap juri di               
+      layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar               
+      terkunci saat istirahat (failed) (attempt 2).png                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 1 -- wasit menye               
+     lesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (failed).p               
+     ng                                                                                             
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 1 -- wasit menye               
+     lesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (failed) (               
+     attempt 2).png                                                                                 
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 2 -- menampilkan               
+      identitas, atlet, dan status partai dari server, lalu mengikuti startjedalanjut               
+      tanpa reload (failed).png                                                                     
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 2 -- menampilkan               
+      identitas, atlet, dan status partai dari server, lalu mengikuti startjedalanjut               
+      tanpa reload (failed) (attempt 2).png                                                         
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 2 -- tap juri di               
+      layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar               
+      terkunci saat istirahat (failed).png                                                          
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 2 -- tap juri di               
+      layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar               
+      terkunci saat istirahat (failed) (attempt 2).png                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 2 -- wasit menye               
+     lesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (failed).p               
+     ng                                                                                             
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 2 -- wasit menye               
+     lesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (failed) (               
+     attempt 2).png                                                                                 
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 3 -- menampilkan               
+      identitas, atlet, dan status partai dari server, lalu mengikuti startjedalanjut               
+      tanpa reload (failed).png                                                                     
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 3 -- menampilkan               
+      identitas, atlet, dan status partai dari server, lalu mengikuti startjedalanjut               
+      tanpa reload (failed) (attempt 2).png                                                         
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 3 -- tap juri di               
+      layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar               
+      terkunci saat istirahat (failed).png                                                          
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 3 -- tap juri di               
+      layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar               
+      terkunci saat istirahat (failed) (attempt 2).png                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 3 -- wasit menye               
+     lesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (failed).p               
+     ng                                                                                             
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- juri kursi 3 -- wasit menye               
+     lesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (failed) (               
+     attempt 2).png                                                                                 
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- dijeda dan BATAL -- saat wa               
+     sit menjeda tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol                
+     aktif lagi (failed).png                                                                        
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- dijeda dan BATAL -- saat wa               
+     sit menjeda tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol                
+     aktif lagi (failed) (attempt 2).png                                                            
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- dijeda dan BATAL -- BATAL m               
+     enarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan p               
+     esan, bukan diam (failed).png                                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- dijeda dan BATAL -- BATAL m               
+     enarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan p               
+     esan, bukan diam (failed) (attempt 2).png                                                      
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- koneksi dan akses -- wasit                
+     melihat tablet juri yang terbuka online di meja pengawas (kehadiran perangkat) (               
+     failed).png                                                                                    
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ui-05-layar-juri.cy.ts\     (1280x720)
+     Layar juri (UI) - sinkronisasi realtime per kursi -- koneksi dan akses -- wasit                
+     melihat tablet juri yang terbuka online di meja pengawas (kehadiran perangkat) (               
+     failed) (attempt 2).png                                                                        
+
+
+====================================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé ├ù  ui-05-layar-juri.cy.ts                   05:14       13        2       11        -        - Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+    ├ù  1 of 1 failed (100%)                     05:14       13        2       11        -        -  
+
