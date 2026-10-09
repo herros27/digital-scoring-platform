@@ -24,6 +24,11 @@ type CategoryBracketRepository interface {
 	DeleteByCategoryID(competitionID, categoryID string) error
 }
 
+// CategoryBracketSummarizer adalah kemampuan opsional repo bagan untuk meringkas bagan per kategori.
+type CategoryBracketSummarizer interface {
+	ListCategorySummaries(competitionID string) ([]store.CategoryBracketSummary, error)
+}
+
 type MatchCreatorRepository interface {
 	Create(m *store.Match) error
 }
@@ -194,4 +199,13 @@ func (s *BracketService) AdvanceWinner(currentSlotID, winnerID string) error {
 
 	// Jika tidak ada next_slot_id, berarti ini adalah babak Final (Juara 1)
 	return nil
+}
+
+// ListCategoryBracketSummaries meringkas semua bagan kategori pada satu kejuaraan (untuk daftar bagan publik).
+func (s *BracketService) ListCategoryBracketSummaries(competitionID string) ([]store.CategoryBracketSummary, error) {
+	sm, ok := s.repo.(CategoryBracketSummarizer)
+	if !ok {
+		return nil, errors.New("bracket repository does not support category summaries")
+	}
+	return sm.ListCategorySummaries(competitionID)
 }

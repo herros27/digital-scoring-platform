@@ -19,6 +19,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false, layout: 'KioskLayout' },
   },
   {
+    path: '/bagan',
+    name: 'bagan-list',
+    component: () => import('../views/bagan/BaganListView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
+    path: '/bagan/:comp_id/:category_id',
+    name: 'bagan',
+    component: () => import('../views/bagan/BaganView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/judge',
     name: 'judge',
     component: () => import('../views/judge/JudgeScoringView.vue'),

@@ -66,9 +66,15 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 		Lockout:   auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
 		ClientKey: ClientIP,
 	}
-	compH := &handler.CompetitionHandler{Service: compService}
+	compH := &handler.CompetitionHandler{Service: compService, Cache: appCache}
 	arenaH := &handler.ArenaHandler{Service: arenaService}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
+	publicBracketH := &handler.PublicBracketHandler{
+		Competitions: compService,
+		Categories:   categoryService,
+		Brackets:     bracketService,
+		Participants: athleteService,
+	}
 	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo, Matches: matchService}
 	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, CategoryService: categoryService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
@@ -106,6 +112,13 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	mux.HandleFunc("GET /api/v1/live/arenas", liveH.Arenas)
 	mux.HandleFunc("GET /api/v1/live/schedule", liveH.Schedule)
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
+
+	// === Bagan publik (penonton, tanpa login) ===
+	// Hanya kejuaraan berstatus active, hanya nama+kontingen atlet. Respons identik untuk semua pemanggil,
+	// jadi aman di-cache; kunci memuat comp_id sehingga ikut dibersihkan InvalidateCompetition.
+	mux.HandleFunc("GET /api/v1/public/competitions", appCache.Handler(10*time.Second, publicBracketH.ListCompetitions))
+	mux.HandleFunc("GET /api/v1/public/competitions/{comp_id}/brackets", appCache.Handler(10*time.Second, publicBracketH.ListBrackets))
+	mux.HandleFunc("GET /api/v1/public/competitions/{comp_id}/brackets/{category_id}", appCache.Handler(10*time.Second, publicBracketH.GetBracket))
 
 	// === Public cached tournament views (Otter in-memory cache) ===
 	// ponytail: 10s TTL absorbs high-concurrency bursts from spectators & contingents during tournaments.

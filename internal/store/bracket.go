@@ -266,3 +266,38 @@ func (s *BracketStore) DeleteByCategoryID(competitionID, categoryID string) erro
 	_, err := s.DB.Exec(`DELETE FROM bracket_slots WHERE competition_id = $1 AND category_id = $2`, competitionID, categoryID)
 	return err
 }
+
+// CategoryBracketSummary ringkasan satu bagan kategori untuk daftar bagan publik.
+type CategoryBracketSummary struct {
+	CategoryID   string
+	Participants int  // peserta nyata di ronde 1 (tanpa bye)
+	Rounds       int  // jumlah ronde
+	Completed    bool // babak final sudah punya pemenang
+}
+
+// ListCategorySummaries meringkas semua bagan berbasis kategori pada satu kejuaraan dalam satu query.
+// Slot final adalah slot tanpa next_slot_id.
+func (s *BracketStore) ListCategorySummaries(competitionID string) ([]CategoryBracketSummary, error) {
+	rows, err := s.DB.Query(`
+		SELECT category_id::text,
+		       COUNT(*) FILTER (WHERE round = 1 AND participant_id IS NOT NULL),
+		       MAX(round),
+		       COALESCE(BOOL_OR(winner_id IS NOT NULL) FILTER (WHERE next_slot_id IS NULL), false)
+		FROM bracket_slots
+		WHERE competition_id = $1 AND category_id IS NOT NULL
+		GROUP BY category_id`, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []CategoryBracketSummary{}
+	for rows.Next() {
+		var c CategoryBracketSummary
+		if err := rows.Scan(&c.CategoryID, &c.Participants, &c.Rounds, &c.Completed); err != nil {
+			return nil, err
+		}
+		list = append(list, c)
+	}
+	return list, rows.Err()
+}

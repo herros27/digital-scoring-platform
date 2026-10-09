@@ -3,6 +3,14 @@
  * 100% Complete Mapping matching OpenAPI 3.0 Documentation (docs/openapi.yaml)
  */
 export const ENDPOINTS = {
+  // Bagan publik (penonton, tanpa login) — hanya kejuaraan aktif, hanya nama & kontingen atlet
+  PUBLIC: {
+    COMPETITIONS: '/api/v1/public/competitions',
+    BRACKETS: (compId: string) => `/api/v1/public/competitions/${compId}/brackets`,
+    BRACKET: (compId: string, categoryId: string) =>
+      `/api/v1/public/competitions/${compId}/brackets/${categoryId}`,
+  },
+
   // Authentication
   AUTH: {
     OFFICIAL_LOGIN: '/api/v1/auth/login',

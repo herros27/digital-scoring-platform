@@ -2435,6 +2435,127 @@ paths:
                         red_total: { type: integer }
                         blue_total: { type: integer }
 
+  /api/v1/public/competitions:
+    get:
+      summary: Kejuaraan Aktif untuk Bagan Publik (Publik)
+      description: |
+        Daftar kejuaraan berstatus `active`. Tanpa login. Dipakai halaman `/bagan`. Kejuaraan draft,
+        paused, finished, atau cancelled tidak ditampilkan. Di-cache 10 detik dan dibersihkan saat status berubah.
+      tags:
+        - Public Bracket
+      responses:
+        '200':
+          description: Daftar kejuaraan aktif (kosong bila tidak ada)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        location: { type: string }
+                        start_date: { type: string, example: '2026-06-01' }
+                        end_date: { type: string, example: '2026-06-03' }
+
+  /api/v1/public/competitions/{comp_id}/brackets:
+    get:
+      summary: Daftar Bagan per Kategori (Publik)
+      description: |
+        Satu entri per kategori yang sudah dibuat bagannya. Kategori tanpa bagan tidak muncul.
+        Hanya untuk kejuaraan `active`; selain itu `404` (sengaja sama dengan "tidak ada" agar kejuaraan
+        draft tidak terdeteksi).
+      tags:
+        - Public Bracket
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Daftar bagan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicBracketSummary'
+        '404':
+          description: Kejuaraan tidak ada atau belum/tidak lagi aktif
+
+  /api/v1/public/competitions/{comp_id}/brackets/{category_id}:
+    get:
+      summary: Bagan Lengkap satu Kategori (Publik)
+      description: |
+        Slot bagan beserta nama dan kontingen atlet. **Hanya** field yang tercantum di skema ini yang
+        dikembalikan: tidak ada NIK, tanggal lahir, berat badan, berkas, maupun ID atlet/peserta.
+        `is_winner` menandai slot yang memenangkan partainya. `404` bila kejuaraan tidak aktif, kategori
+        bukan milik kejuaraan itu, atau kategori belum punya bagan.
+      tags:
+        - Public Bracket
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: category_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Bagan kategori
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      competition:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          name: { type: string }
+                          location: { type: string }
+                          start_date: { type: string }
+                          end_date: { type: string }
+                      category:
+                        $ref: '#/components/schemas/PublicBracketSummary'
+                      slots:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string, format: uuid }
+                            round: { type: integer }
+                            slot_index: { type: integer }
+                            is_bye: { type: boolean }
+                            next_slot_id: { type: string, format: uuid, nullable: true }
+                            is_winner: { type: boolean }
+                            participant:
+                              nullable: true
+                              type: object
+                              properties:
+                                name: { type: string }
+                                team: { type: string }
+        '404':
+          description: Bagan tidak ditemukan atau belum dibuka untuk umum
+
   /api/v1/live/schedule:
     get:
       summary: Jadwal Partai Berikutnya per Gelanggang (Publik)
@@ -2823,6 +2944,17 @@ components:
       description: Token JWT yang dihasilkan dari login PIN atau admin auth
 
   schemas:
+    PublicBracketSummary:
+      type: object
+      properties:
+        category_id: { type: string, format: uuid }
+        name: { type: string }
+        gender: { type: string }
+        age_group: { type: string }
+        weight_class: { type: string }
+        participants: { type: integer, description: Peserta nyata di ronde 1 (tanpa bye) }
+        rounds: { type: integer }
+        completed: { type: boolean, description: Babak final sudah punya pemenang }
     ErrorResponse:
       type: object
       required: [success, error]

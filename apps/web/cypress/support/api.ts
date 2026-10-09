@@ -317,3 +317,90 @@ export function birthDateForAge(age: number, edge: 'mid' | 'birthday' | 'eve' = 
   // 15 Januari: ulang tahun tahun ini sudah lewat pada tanggal acuan (1 Juni)
   return toIso(new Date(Date.UTC(ref.getUTCFullYear() - age, 0, 15)))
 }
+
+// ---------------------------------------------------------------------------------------------
+// Kejuaraan aktif & bagan siap pakai
+// ---------------------------------------------------------------------------------------------
+
+export const activateCompetition = (token: string, compId: string) =>
+  apiCall<{ status: string }>('PUT', `/competitions/${compId}/activate`, token)
+
+export const pauseCompetition = (token: string, compId: string) =>
+  apiCall<{ status: string }>('POST', `/competitions/${compId}/pause`, token)
+
+export interface SeedBracketInput {
+  name: string
+  gender?: 'male' | 'female'
+  ageGroup?: string
+  /** Usia atlet (tahun) pada REF_DATE; harus berada dalam golongan umur. */
+  age?: number
+  athletes?: number
+  /** Awalan nama atlet; hasil: `<prefix> 1`, `<prefix> 2`, ... dengan kontingen `Klub <prefix> n`. */
+  prefix?: string
+}
+
+export interface SeededBracket {
+  category: Category
+  /** Nama atlet yang masuk bagan (untuk di-assert di UI/API). */
+  athleteNames: string[]
+  /** NIK & tanggal lahir yang TIDAK boleh muncul di respons publik. */
+  secrets: string[]
+}
+
+/**
+ * Buat satu kategori, daftarkan + verifikasi `athletes` atlet, lalu generate bagannya.
+ * Semua atlet diberi NIK dan tanggal lahir khas supaya kebocorannya mudah dideteksi.
+ */
+export function seedBracket(
+  token: string,
+  compId: string,
+  input: SeedBracketInput,
+): Cypress.Chainable<SeededBracket> {
+  const gender = input.gender ?? 'male'
+  const ageGroup = input.ageGroup ?? 'dewasa'
+  const age = input.age ?? 25
+  const count = input.athletes ?? 3
+  const prefix = input.prefix ?? input.name
+  const docs =
+    gender === 'female' && (ageGroup === 'remaja' || ageGroup === 'dewasa')
+      ? DOCS_FEMALE_SENIOR
+      : DOCS_BASE
+
+  seq += 1
+  return createCategory(token, compId, {
+    name: input.name,
+    gender,
+    weight_class: `B${Date.now().toString(36)}${seq}`,
+    age_group: ageGroup,
+  }).then((category) => {
+    const athleteNames: string[] = []
+    const secrets: string[] = []
+    for (let i = 1; i <= count; i += 1) {
+      const name = `${prefix} ${i}`
+      const nik = `99${String(seq).padStart(4, '0')}${String(i).padStart(10, '0')}`
+      const birth = birthDateForAge(age)
+      athleteNames.push(name)
+      secrets.push(nik)
+      registerAthlete(token, compId, {
+        name,
+        gender,
+        team: `Klub ${prefix} ${i}`,
+        nik,
+        birth_date: birth,
+        category_id: category.id,
+      }).then(({ participantId }) =>
+        verifyParticipantRaw(token, compId, participantId, {
+          status: 'verified',
+          docs_verified: { ...docs },
+        })
+          .its('body.data.status')
+          .should('eq', 'verified'),
+      )
+    }
+    return generateBracketRaw(token, compId, { category_id: category.id }).then((res) => {
+      expect(res.status, `generate bagan "${input.name}"`).to.eq(201)
+      secrets.push(birthDateForAge(age))
+      return { category, athleteNames, secrets }
+    })
+  })
+}

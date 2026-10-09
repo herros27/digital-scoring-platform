@@ -99,6 +99,10 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
       </header>
 
+      <router-link to="/bagan" class="sbl__bagan font-mono" data-test="link-bagan">
+        LIHAT BAGAN PERTANDINGAN →
+      </router-link>
+
       <h2 class="sbl__title font-mono">SEDANG BERLANGSUNG</h2>
       <p class="sbl__hint font-mono">
         Pilih gelanggang untuk membuka papan skor. Diperbarui otomatis.
@@ -196,6 +200,25 @@ onBeforeUnmount(() => clearInterval(timer))
 .sbl__inner {
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.sbl__bagan {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 4px 0 8px;
+  padding: 0 16px;
+  border: 1px solid #1d4ed8;
+  border-radius: 10px;
+  background: #0f1a30;
+  color: #93c5fd;
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+.sbl__bagan:hover,
+.sbl__bagan:focus-visible {
+  border-color: #3b82f6;
+  color: #fff;
 }
 
 .sbl__head {
