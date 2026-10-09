@@ -208,6 +208,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/auth/judge-login` | Public | Login juri/wasit hanya dengan `{ "pin" }` (6 digit juri, 8 digit wasit) → JWT (claims: `role`, `arena_id`, `competition_id`, `seat_number`) |
 | POST | `/api/v1/auth/contingent/register` | Public | Registrasi akun manajer kontingen baru |
 | POST | `/api/v1/auth/contingent/login` | Public | Login akun kontingen via email & password → JWT (`role: contingent`) |
+| POST | `/api/v1/auth/change-password` | JWT (petugas / kontingen) | Ganti password sendiri `{ current_password, new_password }` (min. 8 karakter; password lama salah dijawab 400) |
 | POST | `/api/v1/auth/create-pin` | Admin, Dewan | Generate PIN acak/custom untuk juri gelanggang tertentu |
 
 ### 2. Competition
@@ -228,6 +229,8 @@ GET http://localhost:8080/docs/openapi.yaml
 | GET | `/api/v1/competitions/{comp_id}/categories` | JWT | List kategori kelas tanding kompetisi |
 | POST | `/api/v1/competitions/{comp_id}/categories` | Admin, Dewan | Tambah kategori baru (nama, gender, min/max weight) |
 | GET | `/api/v1/competitions/{comp_id}/categories/{id}` | JWT | Detail kategori |
+| PUT | `/api/v1/competitions/{comp_id}/categories/{id}` | Admin, Dewan | Ubah satu kategori (setelah ada peserta hanya nama yang boleh berubah; standar tidak dapat diubah) |
+| DELETE | `/api/v1/competitions/{comp_id}/categories/{id}` | Admin, Dewan | Hapus satu kategori (409 bila masih ada peserta atau partai yang sudah berjalan) |
 
 ### 4. Athletes & Participants
 | Method | Path | Auth | Description |
@@ -239,6 +242,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/competitions/{comp_id}/athletes` | Admin, Dewan, Contingent | Daftarkan atlet ke kompetisi (auto status: `pending` jika kontingen) |
 | GET | `/api/v1/competitions/{comp_id}/participants` | JWT | List peserta kompetisi (`?status=pending/verified/rejected`) |
 | PUT | `/api/v1/competitions/{comp_id}/participants/{id}/verify` | Admin, Dewan | Verifikasi/tolak peserta (meja timbang / verifikasi berkas) |
+| DELETE | `/api/v1/competitions/{comp_id}/participants/{id}` | Admin, Dewan, Kontingen | Batal daftar peserta (kontingen: miliknya yang belum diverifikasi; 409 bila sudah masuk bagan/partai) |
 
 ### 5. Arena
 | Method | Path | Auth | Description |
@@ -277,11 +281,13 @@ GET http://localhost:8080/docs/openapi.yaml
 |--------|------|------|-------------|
 | GET | `/api/v1/contingents` | Admin, Dewan | List semua kontingen yang terdaftar |
 | GET | `/api/v1/contingents/{id}` | JWT | Detail profil kontingen |
+| PUT | `/api/v1/contingents/{id}/password` | Admin, Dewan | Reset password manajer kontingen (lupa password) |
 | GET | `/api/v1/officials` | Admin, Dewan | List akun panitia/wasit/operator |
 | POST | `/api/v1/officials` | Admin, Dewan | Buat akun official baru |
 | GET | `/api/v1/officials/{id}` | Admin, Dewan | Detail akun official |
 | PUT | `/api/v1/officials/{id}` | Admin, Dewan | Perbarui akun official |
-| DELETE | `/api/v1/officials/{id}` | Admin, Dewan | Hapus akun official |
+| DELETE | `/api/v1/officials/{id}` | Admin, Dewan | Hapus akun official (akun sendiri dan admin terakhir tidak dapat dihapus; Dewan tidak dapat menghapus Admin/Dewan) |
+| PUT | `/api/v1/officials/{id}/password` | Admin, Dewan | Reset password akun official (Dewan hanya Wasit/Operator) |
 
 ### 9. Rulesets
 | Method | Path | Auth | Description |
@@ -425,7 +431,7 @@ Seed (`SEED_DATA=true`) membuat akun demo berpassword lemah (`DemoPass_2026`, `D
 
 1. Isi `ADMIN_EMAIL`, `ADMIN_PASSWORD` (minimal 8 karakter), dan opsional `ADMIN_NAME` di `.env.prod`, dan biarkan `SEED_DATA=false`.
 2. Saat backend start dan belum ada satu pun admin, akun itu dibuat. Aman diulang di setiap restart: bila sudah ada admin, tidak melakukan apa pun dan tidak menimpa password yang sudah diganti. Konfigurasi yang salah (email/password tidak lengkap, password pendek) menghentikan start dengan pesan jelas.
-3. Masuk sebagai admin, buka menu **Akun Petugas** di ruang operasi: tambah Dewan Juri, Wasit, dan Operator, ubah peran, reset password, atau hapus akun. Setiap petugas dapat mengganti password sendiri lewat ikon kunci di pojok kiri bawah. Setelah admin pertama masuk, hapus `ADMIN_PASSWORD` dari `.env.prod`.
+3. Masuk sebagai admin, buka menu **Akun Petugas** di ruang operasi: tambah Dewan Juri, Wasit, dan Operator, ubah peran, reset password, atau hapus akun. Tab **Manajer Kontingen** di menu yang sama mereset password manajer kontingen yang lupa. Setiap pengguna (petugas maupun manajer kontingen) dapat mengganti password sendiri lewat ikon kunci di pojok kiri bawah. Setelah admin pertama masuk, hapus `ADMIN_PASSWORD` dari `.env.prod`.
 
 Aturan wewenang: **Admin** mengelola semua akun. **Dewan Juri** hanya mengelola Wasit dan Operator (tidak dapat membuat, mengubah, menghapus, atau mereset Admin dan Dewan). Akun sendiri dan admin terakhir tidak dapat dihapus, dan admin terakhir tidak dapat diturunkan perannya. Password baru minimal 8 karakter. Reset password tidak mencabut sesi yang sedang berjalan (token berlaku 24 jam).
 

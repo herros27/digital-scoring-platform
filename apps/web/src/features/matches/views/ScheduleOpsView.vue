@@ -15,12 +15,16 @@ import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useAuthStore } from '@/stores/auth'
 import type { MatchDTO } from '../api/matchService'
+import CreateMatchDialog from '../components/CreateMatchDialog.vue'
+import MatchScoreDialog from '../components/MatchScoreDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
 const canControlMatch = computed(() => ['admin', 'dewan', 'wasit'].includes(authStore.role || ''))
+// Server hanya mengizinkan admin/dewan membuat partai manual.
+const canCreateMatch = computed(() => authStore.isAdminOrDewan)
 
 const props = withDefaults(
   defineProps<{
@@ -167,6 +171,18 @@ async function handleFinishMatch(m: MatchDTO) {
   }
 }
 
+// Tambah partai manual & rincian skor
+const isCreateOpen = ref(false)
+const scoreMatch = ref<MatchDTO | null>(null)
+
+function handleMatchCreated() {
+  showToast(
+    'Partai Dibuat',
+    'Partai manual ditambahkan ke jadwal dan siap dimuat ke gelanggang.',
+    'success',
+  )
+}
+
 // External Links
 function openScoreboard(arenaId?: string) {
   const url = arenaId ? `/scoreboard/${arenaId}` : '/scoreboard'
@@ -304,6 +320,15 @@ const filteredMatches = computed(() => {
             </svg>
           </template>
           Segarkan Jadwal
+        </AppButton>
+        <AppButton
+          v-if="canCreateMatch"
+          variant="emerald"
+          size="sm"
+          data-test="match-add"
+          @click="isCreateOpen = true"
+        >
+          Tambah Partai
         </AppButton>
       </div>
     </header>
@@ -701,6 +726,15 @@ const filteredMatches = computed(() => {
             <button
               type="button"
               class="sch-link-btn"
+              title="Lihat skor per babak dan riwayat kejadian"
+              data-test="match-scores"
+              @click="scoreMatch = m"
+            >
+              Rincian Skor
+            </button>
+            <button
+              type="button"
+              class="sch-link-btn"
               title="Buka Scoreboard Gelanggang"
               @click="openScoreboard(m.arena_id)"
             >
@@ -719,6 +753,25 @@ const filteredMatches = computed(() => {
         </footer>
       </article>
     </div>
+
+    <CreateMatchDialog
+      :open="isCreateOpen"
+      :competition-id="activeCompId"
+      :participants="participants"
+      :arenas="arenas"
+      @close="isCreateOpen = false"
+      @created="handleMatchCreated"
+    />
+
+    <MatchScoreDialog
+      :open="!!scoreMatch"
+      :competition-id="activeCompId"
+      :match="scoreMatch"
+      :red-name="participantMap[scoreMatch?.athlete_red_id ?? '']?.name || 'Pesilat Merah'"
+      :blue-name="participantMap[scoreMatch?.athlete_blue_id ?? '']?.name || 'Pesilat Biru'"
+      :arena-name="arenaMap[scoreMatch?.arena_id ?? '']"
+      @close="scoreMatch = null"
+    />
   </div>
 </template>
 

@@ -46,6 +46,13 @@ export function useResetPasswordMutation() {
   })
 }
 
+export function useResetContingentPasswordMutation() {
+  return useMutation({
+    mutationFn: (v: { id: string; password: string }) =>
+      officialService.resetContingentPassword(v.id, v.password),
+  })
+}
+
 export function useChangeOwnPasswordMutation() {
   return useMutation({
     mutationFn: (v: { current: string; next: string }) =>

@@ -58,6 +58,8 @@ export const ENDPOINTS = {
     BY_COMPETITION: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     REGISTER_TO_COMP: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     PARTICIPANTS: (compId: string) => `/api/v1/competitions/${compId}/participants`,
+    PARTICIPANT: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}`,
     VERIFY_PARTICIPANT: (compId: string, id: string) =>
       `/api/v1/competitions/${compId}/participants/${id}/verify`,
   },
@@ -66,6 +68,7 @@ export const ENDPOINTS = {
   CONTINGENTS: {
     LIST: '/api/v1/contingents',
     DETAIL: (id: string) => `/api/v1/contingents/${id}`,
+    PASSWORD: (id: string) => `/api/v1/contingents/${id}/password`,
   },
 
   // Arenas

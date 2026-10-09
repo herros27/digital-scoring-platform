@@ -1158,7 +1158,7 @@ function handleLoadToMat1() {
           </div>
         </div>
         <button
-          v-if="!isContingent && authStore.isAuthenticated"
+          v-if="authStore.isAuthenticated"
           class="ops-logout-btn ops-logout-btn--key"
           title="Ganti Password Saya"
           aria-label="Ganti Password Saya"

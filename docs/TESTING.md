@@ -14,15 +14,15 @@ temuan) dan `README.md` akar (daftar tes Go).
 
 ## Ringkasan suite
 
-| Suite                                                    | Butuh                              | Perintah                               | Dari folder |
-| -------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ----------- |
-| Go (unit + integrasi)                                    | Postgres                           | `go test -count=1 ./...`               | akar repo   |
-| Frontend unit (vitest)                                   | -                                  | `npm test`                             | `apps/web`  |
-| Tipe + lint                                              | -                                  | `npm run typecheck` dan `npm run lint` | `apps/web`  |
-| Alur partai headless (spec 01-12)                        | backend + Vite                     | `npm run test:match-flow`              | `apps/web`  |
-| Playwright (4 layar, kompetisi penuh, TV, panitia, akun) | backend + Vite                     | `npm run test:pw`                      | `apps/web`  |
-| Playwright PWA                                           | backend (build + preview otomatis) | `npm run test:pw:pwa`                  | `apps/web`  |
-| Cypress (spec `ui-*` dan admin)                          | backend + Vite + binary Cypress    | `npm run cypress:run`                  | `apps/web`  |
+| Suite                                                                  | Butuh                              | Perintah                               | Dari folder |
+| ---------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ----------- |
+| Go (unit + integrasi)                                                  | Postgres                           | `go test -count=1 ./...`               | akar repo   |
+| Frontend unit (vitest)                                                 | -                                  | `npm test`                             | `apps/web`  |
+| Tipe + lint                                                            | -                                  | `npm run typecheck` dan `npm run lint` | `apps/web`  |
+| Alur partai headless (spec 01-12)                                      | backend + Vite                     | `npm run test:match-flow`              | `apps/web`  |
+| Playwright (4 layar, kompetisi penuh, TV, panitia, akun, administrasi) | backend + Vite                     | `npm run test:pw`                      | `apps/web`  |
+| Playwright PWA                                                         | backend (build + preview otomatis) | `npm run test:pw:pwa`                  | `apps/web`  |
+| Cypress (spec `ui-*` dan admin)                                        | backend + Vite + binary Cypress    | `npm run cypress:run`                  | `apps/web`  |
 
 Tes Go yang memakai database akan dilewati bila Postgres tidak ada (`TEST_DB_URL` untuk database lain).
 

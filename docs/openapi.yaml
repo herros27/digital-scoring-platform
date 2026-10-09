@@ -831,6 +831,95 @@ paths:
       responses:
         '200':
           description: Detail kategori pertandingan
+    put:
+      summary: Ubah Satu Kategori (Admin / Dewan)
+      description: |
+        Mengubah nama, gender, kelas/batas bobot, golongan umur, dan mode bagan. Ruleset dan kunci bagan punya endpoint
+        sendiri. Standar (`preset_standard`) tidak dapat diubah (gunakan reset kategori). **Setelah ada peserta
+        terdaftar, hanya nama yang boleh berubah** (409 bila atribut lain berbeda).
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, gender, weight_class]
+              properties:
+                name:
+                  type: string
+                gender:
+                  type: string
+                  enum: [male, female, putra, putri]
+                weight_class:
+                  type: string
+                age_group:
+                  type: string
+                preset_standard:
+                  type: string
+                  description: Boleh dikirim, tetapi harus sama dengan standar kategori saat ini.
+                min_weight:
+                  type: number
+                  nullable: true
+                max_weight:
+                  type: number
+                  nullable: true
+                bracket_mode:
+                  type: string
+      responses:
+        '200':
+          description: Kategori diperbarui
+        '400':
+          description: Data tidak valid (mis. bobot minimal melebihi maksimal)
+        '404':
+          description: Kategori bukan milik kejuaraan ini
+        '409':
+          description: Standar berbeda, atau kategori sudah punya peserta dan atribut selain nama diubah
+    delete:
+      summary: Hapus Satu Kategori (Admin / Dewan)
+      description: |
+        Menghapus kategori beserta slot bagannya (partai idle yang terhubung ikut dihapus). Ditolak 409 bila masih ada
+        peserta pada kategori atau partainya sudah berjalan/selesai.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kategori dihapus
+        '404':
+          description: Kategori bukan milik kejuaraan ini
+        '409':
+          description: Masih ada peserta atau partai yang sudah berjalan
 
   # -------------------------------------------------------
   # ATHLETES & PARTICIPANTS
@@ -1078,6 +1167,42 @@ paths:
         '200':
           description: Daftar peserta kompetisi
 
+  /api/v1/competitions/{comp_id}/participants/{id}:
+    delete:
+      summary: Batal Daftar Peserta dari Kejuaraan (Admin / Dewan / Manajer Kontingen)
+      description: |
+        Mengeluarkan peserta dari kejuaraan (data atlet tetap tersimpan dan dapat didaftarkan lagi).
+        - **Admin/Dewan**: peserta mana pun yang belum masuk bagan atau partai (409 bila sudah; ubah status menjadi
+          `rejected`, lalu buat ulang bagan kategorinya).
+        - **Manajer kontingen**: hanya peserta kontingennya sendiri yang belum `verified` (403 bila sudah diverifikasi;
+          peserta kontingen lain dijawab 404).
+      tags:
+        - Athletes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pendaftaran dibatalkan
+        '403':
+          description: Kontingen mencoba membatalkan peserta yang sudah diverifikasi
+        '404':
+          description: Peserta tidak ditemukan pada kejuaraan ini (atau bukan milik kontingen pemanggil)
+        '409':
+          description: Peserta sudah masuk bagan atau partai
+
   /api/v1/competitions/{comp_id}/participants/{id}/verify:
     put:
       summary: Verifikasi Pendaftaran Atlet oleh Admin / Dewan (Timbang Badan & Berkas)
@@ -1165,6 +1290,43 @@ paths:
       responses:
         '200':
           description: Detail data kontingen
+
+  /api/v1/contingents/{id}/password:
+    put:
+      summary: Reset Password Manajer Kontingen (Admin / Dewan)
+      description: |
+        Menetapkan password baru tanpa password lama (manajer lupa password). Sesi yang sedang berjalan tetap berlaku
+        sampai habis masa berlakunya. Manajer mengganti password sendiri lewat `POST /api/v1/auth/change-password`.
+      tags:
+        - Contingent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password diganti
+        '400':
+          description: Password kurang dari 8 karakter
+        '404':
+          description: Kontingen tidak ditemukan
 
   # -------------------------------------------------------
   # ARENAS
@@ -1453,6 +1615,10 @@ paths:
                     $ref: '#/components/schemas/Pagination'
     post:
       summary: Buat Partai Pertandingan Baru (Admin / Dewan)
+      description: |
+        Membuat partai manual di luar bagan (eksibisi atau partai tambahan). Kedua peserta wajib ada pada kejuaraan ini,
+        berstatus `verified`, dan berbeda; `arena_id` (opsional) harus gelanggang kejuaraan ini. Pelanggaran dijawab
+        **400** dengan pesan yang menjelaskan sudut mana yang bermasalah.
       tags:
         - Match
       security:
@@ -2515,7 +2681,7 @@ paths:
     post:
       summary: Ganti Password Sendiri (Petugas)
       description: |
-        Admin, dewan, wasit, atau operator mengganti password miliknya. Password lama salah dijawab **400** (bukan 401)
+        Admin, dewan, wasit, operator, atau manajer kontingen mengganti password miliknya (peran pada token menentukan akun). Password lama salah dijawab **400** (bukan 401)
         supaya klien tidak mengira sesi berakhir.
       tags:
         - Authentication

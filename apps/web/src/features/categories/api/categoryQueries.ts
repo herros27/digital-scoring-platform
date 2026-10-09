@@ -70,6 +70,31 @@ export function useSeedPresetsMutation(competitionId: Ref<string>) {
   })
 }
 
+/** Ubah satu kategori; daftar kategori dan bagan dimuat ulang. */
+export function useUpdateCategoryMutation(competitionId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string; payload: CreateCategoryFormValues }) =>
+      categoryService.updateCategory(competitionId.value, vars.id, vars.payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}
+
+/** Hapus satu kategori beserta slot bagannya. */
+export function useDeleteCategoryMutation(competitionId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => categoryService.deleteCategory(competitionId.value, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}
+
 /**
  * Reset all categories of a competition (switch PB IPSI <-> PERSILAT 2026)
  */

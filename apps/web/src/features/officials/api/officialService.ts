@@ -27,6 +27,10 @@ export const officialService = {
   async resetPassword(id: string, password: string): Promise<void> {
     await http.put<unknown>(ENDPOINTS.OFFICIALS.PASSWORD(id), { password })
   },
+  /** Admin/dewan mereset password manajer kontingen (lupa password) tanpa password lama. */
+  async resetContingentPassword(id: string, password: string): Promise<void> {
+    await http.put<unknown>(ENDPOINTS.CONTINGENTS.PASSWORD(id), { password })
+  },
   /** Mengganti password sendiri; password lama wajib benar. */
   async changeOwnPassword(current_password: string, new_password: string): Promise<void> {
     await http.post<unknown>(ENDPOINTS.AUTH.CHANGE_PASSWORD, { current_password, new_password })

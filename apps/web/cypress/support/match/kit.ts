@@ -267,7 +267,17 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
           'daftar peserta',
           api('GET', `/competitions/${comp.id}/participants`, adminToken),
         )
-        ids.push(parts.find((p: Json) => p.athlete_id === reg.athlete_id).id)
+        const participantId: string = parts.find((p: Json) => p.athlete_id === reg.athlete_id).id
+        // server hanya menerima partai antar peserta terverifikasi
+        await must(
+          `verifikasi ${n}`,
+          api('PUT', `/competitions/${comp.id}/participants/${participantId}/verify`, adminToken, {
+            status: 'verified',
+            actual_weight: 60,
+            docs_verified: { identity: true, health: true },
+          }),
+        )
+        ids.push(participantId)
         names.push(name)
       }
       const m = await must(

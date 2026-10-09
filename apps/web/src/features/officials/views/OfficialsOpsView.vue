@@ -12,6 +12,7 @@ import {
 } from '../api/officialQueries'
 import { assignableRoles, canManageRole, isSelf } from '../lib/permissions'
 import ChangeOwnPasswordDialog from '../components/ChangeOwnPasswordDialog.vue'
+import ContingentAccountsPanel from '../components/ContingentAccountsPanel.vue'
 import {
   createOfficialSchema,
   resetPasswordSchema,
@@ -33,6 +34,9 @@ const me = computed(() => ({
   email: authStore.session?.email,
 }))
 const roleOptions = computed(() => assignableRoles(myRole.value))
+
+// Dua kelompok akun: petugas (email + peran) dan manajer kontingen (mendaftar sendiri).
+const tab = ref<'petugas' | 'kontingen'>('petugas')
 
 const search = ref('')
 const officials = computed(() => {
@@ -214,97 +218,135 @@ const formatDate = (iso: string) => (iso ? dateFmt.format(new Date(iso)) : '-')
         >
           Ganti Password Saya
         </AppButton>
-        <AppButton variant="emerald" size="sm" data-test="official-add" @click="openCreate">
+        <AppButton
+          v-if="tab === 'petugas'"
+          variant="emerald"
+          size="sm"
+          data-test="official-add"
+          @click="openCreate"
+        >
           Tambah Petugas
         </AppButton>
       </div>
     </header>
 
-    <div class="off-toolbar">
-      <input
-        v-model="search"
-        type="search"
-        class="off-search font-mono"
-        placeholder="Cari nama, email, atau peran…"
-        aria-label="Cari petugas"
-        data-test="official-search"
-      />
-      <span class="off-count font-mono" data-test="official-count">
-        {{ officials.length }} AKUN
-      </span>
-    </div>
+    <nav class="off-tabs font-mono" role="tablist" aria-label="Jenis akun">
+      <button
+        type="button"
+        role="tab"
+        class="off-tab"
+        :class="{ 'off-tab--active': tab === 'petugas' }"
+        :aria-selected="tab === 'petugas'"
+        data-test="tab-petugas"
+        @click="tab = 'petugas'"
+      >
+        Petugas Pertandingan
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="off-tab"
+        :class="{ 'off-tab--active': tab === 'kontingen' }"
+        :aria-selected="tab === 'kontingen'"
+        data-test="tab-kontingen"
+        @click="tab = 'kontingen'"
+      >
+        Manajer Kontingen
+      </button>
+    </nav>
 
-    <div v-if="isLoading" class="off-state font-mono">Memuat akun petugas…</div>
-    <div v-else-if="error" class="off-state off-state--error" role="alert">
-      {{ getErrorMessage(error, 'Gagal memuat akun petugas') }}
-      <AppButton variant="secondary" size="sm" @click="() => refetch()">Coba Lagi</AppButton>
-    </div>
-    <div v-else-if="officials.length === 0" class="off-state font-mono">
-      Tidak ada akun yang cocok.
-    </div>
+    <ContingentAccountsPanel
+      v-if="tab === 'kontingen'"
+      @toast="(title, message) => showToast(title, message)"
+    />
 
-    <div v-else class="off-table-wrap">
-      <table class="off-table">
-        <thead>
-          <tr class="font-mono">
-            <th>NAMA</th>
-            <th>EMAIL</th>
-            <th>PERAN</th>
-            <th>DIBUAT</th>
-            <th class="off-th-actions">AKSI</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="o in officials" :key="o.id" data-test="official-row" :data-email="o.email">
-            <td class="off-name">
-              {{ o.name }}
-              <span v-if="isSelf(me, o)" class="off-self font-mono">ANDA</span>
-            </td>
-            <td class="font-mono">{{ o.email }}</td>
-            <td>
-              <span class="off-role font-mono" :class="`off-role--${o.role}`">
-                {{ ROLE_LABELS[o.role] ?? o.role }}
-              </span>
-            </td>
-            <td class="font-mono">{{ formatDate(o.created_at) }}</td>
-            <td class="off-actions">
-              <template v-if="canManageRole(myRole, o.role)">
-                <AppButton
-                  variant="secondary"
-                  size="sm"
-                  :aria-label="`Ubah ${o.name}`"
-                  data-test="official-edit"
-                  @click="openEdit(o)"
-                >
-                  Ubah
-                </AppButton>
-                <AppButton
-                  variant="secondary"
-                  size="sm"
-                  :aria-label="`Reset password ${o.name}`"
-                  data-test="official-reset"
-                  @click="openReset(o)"
-                >
-                  Reset Password
-                </AppButton>
-                <AppButton
-                  variant="danger"
-                  size="sm"
-                  :disabled="isSelf(me, o)"
-                  :title="isSelf(me, o) ? 'Akun sendiri tidak dapat dihapus' : ''"
-                  :aria-label="`Hapus ${o.name}`"
-                  data-test="official-delete"
-                  @click="openDelete(o)"
-                >
-                  Hapus
-                </AppButton>
-              </template>
-              <span v-else class="off-locked font-mono">Hanya Admin</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-if="tab === 'petugas'">
+      <div class="off-toolbar">
+        <input
+          v-model="search"
+          type="search"
+          class="off-search font-mono"
+          placeholder="Cari nama, email, atau peran…"
+          aria-label="Cari petugas"
+          data-test="official-search"
+        />
+        <span class="off-count font-mono" data-test="official-count">
+          {{ officials.length }} AKUN
+        </span>
+      </div>
+
+      <div v-if="isLoading" class="off-state font-mono">Memuat akun petugas…</div>
+      <div v-else-if="error" class="off-state off-state--error" role="alert">
+        {{ getErrorMessage(error, 'Gagal memuat akun petugas') }}
+        <AppButton variant="secondary" size="sm" @click="() => refetch()">Coba Lagi</AppButton>
+      </div>
+      <div v-else-if="officials.length === 0" class="off-state font-mono">
+        Tidak ada akun yang cocok.
+      </div>
+
+      <div v-else class="off-table-wrap">
+        <table class="off-table">
+          <thead>
+            <tr class="font-mono">
+              <th>NAMA</th>
+              <th>EMAIL</th>
+              <th>PERAN</th>
+              <th>DIBUAT</th>
+              <th class="off-th-actions">AKSI</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="o in officials" :key="o.id" data-test="official-row" :data-email="o.email">
+              <td class="off-name">
+                {{ o.name }}
+                <span v-if="isSelf(me, o)" class="off-self font-mono">ANDA</span>
+              </td>
+              <td class="font-mono">{{ o.email }}</td>
+              <td>
+                <span class="off-role font-mono" :class="`off-role--${o.role}`">
+                  {{ ROLE_LABELS[o.role] ?? o.role }}
+                </span>
+              </td>
+              <td class="font-mono">{{ formatDate(o.created_at) }}</td>
+              <td class="off-actions">
+                <template v-if="canManageRole(myRole, o.role)">
+                  <AppButton
+                    variant="secondary"
+                    size="sm"
+                    :aria-label="`Ubah ${o.name}`"
+                    data-test="official-edit"
+                    @click="openEdit(o)"
+                  >
+                    Ubah
+                  </AppButton>
+                  <AppButton
+                    variant="secondary"
+                    size="sm"
+                    :aria-label="`Reset password ${o.name}`"
+                    data-test="official-reset"
+                    @click="openReset(o)"
+                  >
+                    Reset Password
+                  </AppButton>
+                  <AppButton
+                    variant="danger"
+                    size="sm"
+                    :disabled="isSelf(me, o)"
+                    :title="isSelf(me, o) ? 'Akun sendiri tidak dapat dihapus' : ''"
+                    :aria-label="`Hapus ${o.name}`"
+                    data-test="official-delete"
+                    @click="openDelete(o)"
+                  >
+                    Hapus
+                  </AppButton>
+                </template>
+                <span v-else class="off-locked font-mono">Hanya Admin</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <!-- Tambah / ubah -->
     <div
@@ -536,6 +578,29 @@ const formatDate = (iso: string) => (iso ? dateFmt.format(new Date(iso)) : '-')
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.off-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-card, #334155);
+}
+.off-tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-neutral-400, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.off-tab:hover {
+  color: #fff;
+}
+.off-tab--active {
+  color: var(--color-emerald-400, #34d399);
+  border-bottom-color: var(--color-emerald-400, #34d399);
 }
 .off-toolbar {
   display: flex;
