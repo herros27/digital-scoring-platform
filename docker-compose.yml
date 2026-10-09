@@ -6,7 +6,7 @@ services:
     container_name: scoring-backend
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${PORT:-8080}:8080"
     # Berkas .env.prod WAJIB ada (cp .env.example .env.prod, lalu isi JWT_SECRET dll.): compose berhenti bila
     # tidak ditemukan. Seluruh isinya menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...).
     # Jalankan selalu dengan:  docker compose --env-file .env.prod up -d --build
