@@ -180,7 +180,8 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
   Skrip dapat dicoba sendiri tanpa tes: `powershell -File scripts\restart-backend.ps1` / `scripts/restart-backend.sh`.
   Bila backend berjalan di Docker, tambahkan `-Container scoring-backend` (PowerShell) atau `CONTAINER=scoring-backend`
   (bash): skrip hanya me-restart kontainer itu lalu menunggu health, tanpa membangun atau mematikan proses lokal.
-  Jangan jalankan mode lokal saat backend ada di Docker: ia akan mematikan penerus port Docker di 8080.
+  Mode lokal menolak berjalan (kode keluar 1) bila port backend dipakai proses yang bukan backend, mis. penerus port
+  Docker Desktop; ia tidak akan mematikannya.
 
 ## Temuan yang belum diubah
 

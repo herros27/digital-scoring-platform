@@ -64,7 +64,20 @@ function Stop-Backend {
     if ($old -match '^\d+$') { Stop-Process -Id ([int]$old) -Force -ErrorAction SilentlyContinue }
     Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
   }
-  foreach ($p in Get-ListenerPids) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
+  # Hanya matikan proses yang memang backend (server.exe dari skrip ini, atau hasil `go run`). Pendengar lain, mis. penerus
+  # port Docker Desktop (com.docker.backend) bila backend ada di kontainer, TIDAK boleh dimatikan: itu mematikan Docker.
+  $foreign = @()
+  foreach ($p in Get-ListenerPids) {
+    $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
+    if (-not $proc) { continue }
+    if ($proc.ProcessName -in @('server', 'main', 'go')) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
+    else { $foreign += "$($proc.ProcessName) (PID $p)" }
+  }
+  if ($foreign.Count -gt 0) {
+    Write-Host "[restart-backend] port $Port dipakai proses lain: $($foreign -join ', '). Tidak dimatikan." -ForegroundColor Red
+    Write-Host '[restart-backend] Bila backend berjalan di Docker, pakai: -Container <nama kontainer> (mis. scoring-backend).' -ForegroundColor Red
+    exit 1
+  }
   for ($i = 0; $i -lt 50; $i++) { # tunggu port bebas (maks 5 dtk)
     if ((Get-ListenerPids).Count -eq 0) { return }
     Start-Sleep -Milliseconds 100

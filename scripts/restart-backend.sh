@@ -39,12 +39,20 @@ stop_backend() {
     [ -n "$old" ] && kill "$old" 2>/dev/null || true
     rm -f "$PID_FILE"
   fi
-  for p in $(listener_pids); do kill "$p" 2>/dev/null || true; done
+  # Hanya matikan proses backend (server / go run). Pendengar lain, mis. docker-proxy bila backend ada di kontainer,
+  # tidak boleh dimatikan: pakai CONTAINER=<nama> untuk backend di Docker.
+  for p in $(listener_pids); do
+    name="$(ps -o comm= -p "$p" 2>/dev/null | tr -d ' ')"
+    case "$name" in
+      server|main|go|"") kill "$p" 2>/dev/null || true ;;
+      *) echo "[restart-backend] port $PORT dipakai proses lain: $name (PID $p). Tidak dimatikan. Backend di Docker? Pakai CONTAINER=<nama>." >&2; exit 1 ;;
+    esac
+  done
   for _ in $(seq 1 50); do # tunggu port bebas (maks 5 dtk), lalu paksa
     [ -z "$(listener_pids)" ] && return 0
     sleep 0.1
   done
-  for p in $(listener_pids); do kill -9 "$p" 2>/dev/null || true; done
+  for p in $(listener_pids); do kill -9 "$p" 2>/dev/null || true; done # tersisa hanya proses yang lolos pemeriksaan di atas
   sleep 0.5
 }
 
