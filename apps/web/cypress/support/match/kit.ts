@@ -23,6 +23,8 @@ export interface KitOptions {
   consensusWindowMs?: number
   /** Buat juga PIN wasit untuk gelanggang lain (hanya dipakai uji otorisasi lintas gelanggang). */
   outsideWasit?: boolean
+  /** Lengkapi gelanggang kedua dengan wasit dan semua juri (kursi 1..judges) agar partai dapat dimainkan di sana. */
+  otherArenaCrew?: boolean
 }
 
 export interface MatchRef {
@@ -53,14 +55,33 @@ export interface MatchKit {
   totalRounds: number
   /** Membuat partai idle baru (dua peserta terverifikasi) untuk gelanggang utama. */
   createMatch(): Promise<MatchRef>
-  /** Memuat partai ke gelanggang sebagai wasit (ruleset kit). */
-  loadMatch(match: MatchRef, token?: string): Promise<ApiResult>
+  /** Awak (wasit + juri) satu gelanggang. `other` hanya lengkap bila opsi otherArenaCrew diberikan. */
+  crew(arena: ArenaKey): Crew
+  /** Membuat kategori tambahan di kejuaraan kit; mengembalikan id kategori. */
+  createCategory(def: CategoryDef): Promise<string>
+  /** Memuat partai ke gelanggang sebagai wasit (ruleset kit); bawaan gelanggang utama. */
+  loadMatch(match: MatchRef, token?: string, arena?: ArenaKey): Promise<ApiResult>
   /** Perintah kontrol partai via REST sebagai wasit (atau token lain). */
   control(match: MatchRef, action: string, body?: object, token?: string): Promise<ApiResult>
   /** Membuka soket wasit + semua juri di gelanggang utama. */
-  openDevices(opts?: { skipSeats?: number[] }): Promise<Devices>
+  openDevices(opts?: { skipSeats?: number[]; arena?: ArenaKey }): Promise<Devices>
   /** Membatalkan semua partai yang dibuat kit lalu kejuaraan dan ruleset (aman dipanggil berulang). */
   teardown(): Promise<void>
+}
+
+export type ArenaKey = 'main' | 'other'
+
+export interface Crew {
+  arenaId: string
+  wasit: Session
+  judges: Session[]
+}
+
+export interface CategoryDef {
+  name: string
+  gender: 'male' | 'female'
+  weight_class: string
+  age_group: string
 }
 
 export interface Devices {
@@ -189,9 +210,16 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
     judges.push(await pinSession(adminToken, comp.id, arena.id, 'juri', seat))
   }
   const outsideJudge = await pinSession(adminToken, comp.id, other.id, 'juri', 1)
-  const outsideWasit = options.outsideWasit
+  const needOtherWasit = options.outsideWasit || options.otherArenaCrew
+  const outsideWasit = needOtherWasit
     ? await pinSession(adminToken, comp.id, other.id, 'wasit', 0)
     : outsideJudge
+  const otherJudges: Session[] = [outsideJudge]
+  if (options.otherArenaCrew) {
+    for (let seat = 2; seat <= opt.judges; seat += 1) {
+      otherJudges.push(await pinSession(adminToken, comp.id, other.id, 'juri', seat))
+    }
+  }
 
   const createdMatches: string[] = []
   const kit: MatchKit = {
@@ -243,9 +271,23 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
       return { id: m.id, redId: ids[0], blueId: ids[1], redName: names[0], blueName: names[1] }
     },
 
-    loadMatch(match, token = wasit.token) {
+    crew(key) {
+      return key === 'main'
+        ? { arenaId: arena.id, wasit, judges }
+        : { arenaId: other.id, wasit: outsideWasit, judges: otherJudges }
+    },
+
+    async createCategory(def) {
+      const c = await must(
+        `buat kategori ${def.name}`,
+        api('POST', `/competitions/${comp.id}/categories`, adminToken, def),
+      )
+      return c.id
+    },
+
+    loadMatch(match, token = wasit.token, key = 'main') {
       return api('POST', `/competitions/${comp.id}/matches/${match.id}/load-arena`, token, {
-        arena_id: arena.id,
+        arena_id: key === 'main' ? arena.id : other.id,
         ruleset_path: ruleset.id,
       })
     },
@@ -256,11 +298,12 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
 
     async openDevices(opts = {}) {
       const skip = new Set(opts.skipSeats ?? [])
-      const w = await ArenaSocket.open(arena.id, wasit.token, 'wasit')
+      const crew = kit.crew(opts.arena ?? 'main')
+      const w = await ArenaSocket.open(crew.arenaId, crew.wasit.token, 'wasit')
       const js: ArenaSocket[] = []
-      for (const j of judges) {
+      for (const j of crew.judges) {
         if (!skip.has(j.seat ?? 0))
-          js.push(await ArenaSocket.open(arena.id, j.token, `juri-${j.seat}`))
+          js.push(await ArenaSocket.open(crew.arenaId, j.token, `juri-${j.seat}`))
       }
       // pastikan semua perangkat sudah terdaftar di hub sebelum tes mengirim perintah
       await sleep(150)

@@ -69,6 +69,14 @@ func (s *MatchStore) GetByID(id string) (*Match, error) {
 	return m, nil
 }
 
+// SetArena memindahkan partai ke gelanggang tempat ia dimuat. Partai dibuat dengan gelanggang bergilir saat bagan
+// dibentuk, sedangkan panitia boleh memainkannya di gelanggang mana pun; tanpa ini antrean per gelanggang dan nomor
+// partai di scoreboard tetap menunjuk gelanggang lama.
+func (s *MatchStore) SetArena(matchID, arenaID string) error {
+	_, err := s.DB.Exec(`UPDATE matches SET arena_id = $2 WHERE id = $1`, matchID, arenaID)
+	return err
+}
+
 func (s *MatchStore) UpdateStatus(id, status string) error {
 	// started_at diisi sekali saat partai mulai berjalan (tidak ditimpa bila dilanjutkan/dipulihkan).
 	_, err := s.DB.Exec(`UPDATE matches
