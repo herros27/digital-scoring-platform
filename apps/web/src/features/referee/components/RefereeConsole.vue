@@ -115,7 +115,12 @@ function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') confirmRequest.value = null
     return
   }
-  if (e.key === 'Escape' && isSidebarOpen.value && typeof window !== 'undefined' && window.innerWidth <= 1024) {
+  if (
+    e.key === 'Escape' &&
+    isSidebarOpen.value &&
+    typeof window !== 'undefined' &&
+    window.innerWidth <= 1024
+  ) {
     isSidebarOpen.value = false
     return
   }
@@ -220,11 +225,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
     <!-- Backdrop for mobile/tablet drawer -->
     <transition name="ref-fade">
-      <div
-        v-if="isSidebarOpen"
-        class="ref-sidebar-backdrop"
-        @click="closeSidebar"
-      />
+      <div v-if="isSidebarOpen" class="ref-sidebar-backdrop" @click="closeSidebar" />
     </transition>
 
     <div class="ref-main-content">
@@ -252,7 +253,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
             </svg>
           </button>
           <div class="ref-topbar__titles">
-            <span class="ref-top-series font-mono">PERSILAT DIGITAL ARENA &bull; MEJA PENGAWAS</span>
+            <span class="ref-top-series font-mono"
+              >PERSILAT DIGITAL ARENA &bull; MEJA PENGAWAS</span
+            >
             <div class="ref-top-headline">
               <h1 class="ref-top-title">{{ arenaTitle }} - MEJA PERTANDINGAN</h1>
               <span class="ref-status-badge font-mono">

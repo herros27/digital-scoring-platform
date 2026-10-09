@@ -87,29 +87,6 @@ export function buildQueue(
   })
 }
 
-export interface BracketCategory {
-  key: string
-  label: string
-  weightClass: string
-  gender: string
-}
-
-/** Kategori (kelas + jenis kelamin) yang punya peserta, untuk memilih bagan yang ditampilkan. */
-export function bracketCategories(participants: ParticipantDTO[]): BracketCategory[] {
-  const seen = new Map<string, BracketCategory>()
-  for (const p of participants) {
-    if (!p.weight_class) continue
-    const gender = p.gender === 'putri' ? 'female' : p.gender === 'putra' ? 'male' : p.gender
-    const key = `${gender}:${p.weight_class}`
-    if (!seen.has(key)) {
-      seen.set(key, { key, label: classLabel(p), weightClass: p.weight_class, gender })
-    }
-  }
-  return [...seen.values()].sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { numeric: true }),
-  )
-}
-
 export interface BracketRound {
   round: number
   slots: Array<BracketSlotRecord & { competitor: Competitor | null }>

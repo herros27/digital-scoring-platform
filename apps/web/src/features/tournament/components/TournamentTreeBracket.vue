@@ -21,6 +21,8 @@ export interface MatchCard {
   metaRight?: string
   isLive?: boolean
   canLoad?: boolean
+  /** Partai milik gelanggang yang sedang dibuka (dipakai meja referee untuk menyorot partainya). */
+  isOwnArena?: boolean
 }
 
 export interface BracketRoundDisplay {
@@ -414,6 +416,7 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
                     :class="{
                       't-match-card--selected': selectedMatchId === match.id,
                       't-match-card--live': match.isLive,
+                      't-match-card--own-arena': match.isOwnArena,
                       't-match-card--clickable': !readOnly,
                     }"
                     @click="onMatchClick(match, round)"
@@ -942,6 +945,13 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   z-index: 2;
+}
+
+.t-match-card--own-arena {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.25),
+    0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .t-match-card--clickable {
