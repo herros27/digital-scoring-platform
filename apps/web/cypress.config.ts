@@ -4,7 +4,7 @@ import { defineConfig } from 'cypress'
 
 export default defineConfig({
   e2e: {
-    baseUrl: process.env.CYPRESS_BASE_URL ?? 'http://localhost:5173',
+    baseUrl: process.env.E2E_BASE_URL ?? 'http://localhost:5173',
     viewportWidth: 1920,
     viewportHeight: 1080,
     video: false,
