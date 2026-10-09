@@ -267,7 +267,8 @@ func (s *OfficialService) ChangeOwnPassword(id, current, newPassword string) err
 	}
 	_, hash, err := s.repo.GetByEmail(o.Email)
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(hash), []byte(current)) != nil {
-		return fmt.Errorf("%w: password lama salah", domain.ErrUnauthorized)
+		// 400, bukan 401: klien menganggap 401 sebagai sesi berakhir dan mengeluarkan pengguna
+		return fmt.Errorf("%w: password lama salah", domain.ErrInvalidInput)
 	}
 	if current == newPassword {
 		return fmt.Errorf("%w: password baru harus berbeda dari yang lama", domain.ErrInvalidInput)

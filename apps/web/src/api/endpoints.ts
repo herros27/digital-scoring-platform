@@ -19,6 +19,7 @@ export const ENDPOINTS = {
     CONTINGENT_REGISTER: '/api/v1/auth/contingent/register',
     CONTINGENT_LOGIN: '/api/v1/auth/contingent/login',
     LOGOUT: '/api/v1/auth/logout',
+    CHANGE_PASSWORD: '/api/v1/auth/change-password',
     CREATE_PIN: '/api/v1/auth/create-pin',
     PINS: '/api/v1/auth/pins',
   },
@@ -129,6 +130,7 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/api/v1/officials/${id}`,
     UPDATE: (id: string) => `/api/v1/officials/${id}`,
     DELETE: (id: string) => `/api/v1/officials/${id}`,
+    PASSWORD: (id: string) => `/api/v1/officials/${id}/password`,
   },
 
   // Reports

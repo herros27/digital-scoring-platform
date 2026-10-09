@@ -10,6 +10,8 @@ export interface AuthSession {
   competitionId?: string
   name?: string
   email?: string
+  /** ID akun resmi (admin/dewan/wasit/operator); kosong untuk juri PIN dan kontingen. */
+  userId?: string
   contingentId?: string
 }
 

@@ -151,7 +151,7 @@ func TestOfficialService_ChangeOwnPassword(t *testing.T) {
 	svc, repo := newOfficialSvc(t)
 	seedOfficial(t, repo, "op", "op@silat.id", "operator", "mock_pass_old")
 
-	if err := svc.ChangeOwnPassword("op", "salah-salah", "mock_pass_reset"); !errors.Is(err, domain.ErrUnauthorized) {
+	if err := svc.ChangeOwnPassword("op", "salah-salah", "mock_pass_reset"); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Errorf("password lama salah: %v", err)
 	}
 	if err := svc.ChangeOwnPassword("op", "mock_pass_old", "pendek"); !errors.Is(err, domain.ErrInvalidInput) {
@@ -277,8 +277,8 @@ func TestOfficialHandler_StatusMapping(t *testing.T) {
 	if c := do(h.ResetPassword, officialReq("PUT", "/officials/adm/password", `{"password":"mock_pass_reset"}`, "d", "dewan"), "adm"); c != http.StatusForbidden {
 		t.Errorf("dewan mereset admin: %d, want 403", c)
 	}
-	if c := do(h.ChangePassword, officialReq("POST", "/auth/change-password", `{"current_password":"salah","new_password":"mock_pass_reset"}`, "ws", "wasit"), ""); c != http.StatusUnauthorized {
-		t.Errorf("password lama salah: %d, want 401", c)
+	if c := do(h.ChangePassword, officialReq("POST", "/auth/change-password", `{"current_password":"salah","new_password":"mock_pass_reset"}`, "ws", "wasit"), ""); c != http.StatusBadRequest {
+		t.Errorf("password lama salah: %d, want 400 (bukan 401: klien akan keluar dari sesi)", c)
 	}
 	if c := do(h.ChangePassword, officialReq("POST", "/auth/change-password", `{"current_password":"mock_pass_reset","new_password":"mock_pass_newer"}`, "ws", "wasit"), ""); c != http.StatusOK {
 		t.Errorf("ganti password: %d, want 200", c)
@@ -296,7 +296,7 @@ func TestOfficialStore_PasswordDanHitungPeran(t *testing.T) {
 	if err != nil || db.Ping() != nil {
 		t.Skip("database tidak tersedia; tes store petugas dilewati")
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() }) // didaftarkan lebih dulu agar berjalan SETELAH cleanup penghapusan akun di bawah
 	if err := store.RunMigrations(db); err != nil {
 		t.Fatalf("migrasi: %v", err)
 	}

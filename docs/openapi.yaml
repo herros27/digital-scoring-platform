@@ -2358,13 +2358,19 @@ paths:
                   example: "operator1@silat.id"
                 password:
                   type: string
-                  example: "mock_secret_1"
+                  minLength: 8
+                  example: "secret-123"
                 role:
                   type: string
                   enum: [admin, dewan, operator, wasit]
                   default: operator
                   example: "operator"
+                  description: Dewan hanya boleh membuat wasit, operator, dan juri; admin dan dewan hanya dapat dibuat Admin.
       responses:
+        '403':
+          description: Peran pemanggil tidak boleh membuat akun berperan tersebut
+        '409':
+          description: Email sudah dipakai
         '201':
           description: Akun petugas berhasil dibuat
           content:
@@ -2447,6 +2453,7 @@ paths:
                     $ref: '#/components/schemas/Official'
     delete:
       summary: Hapus Akun Petugas / Operator (Admin / Dewan)
+      description: Akun sendiri dan admin terakhir tidak dapat dihapus (409). Dewan tidak boleh menghapus admin atau dewan (403).
       tags:
         - Officials
       security:
@@ -2465,6 +2472,75 @@ paths:
   # -------------------------------------------------------
   # REPORTING, STATISTICS & EXPORT
   # -------------------------------------------------------
+  /api/v1/officials/{id}/password:
+    put:
+      summary: Reset Password Akun Petugas Lain (Admin / Dewan)
+      description: |
+        Mengganti password akun lain tanpa password lama (lupa password). Admin dapat mereset semua akun; Dewan hanya
+        wasit, operator, dan juri. Sesi (token) yang sedang berjalan tetap berlaku sampai habis masa berlakunya.
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password diganti
+        '400':
+          description: Password kurang dari 8 karakter
+        '403':
+          description: Peran pemanggil tidak boleh mereset akun ini
+        '404':
+          description: Akun tidak ditemukan
+
+  /api/v1/auth/change-password:
+    post:
+      summary: Ganti Password Sendiri (Petugas)
+      description: |
+        Admin, dewan, wasit, atau operator mengganti password miliknya. Password lama salah dijawab **400** (bukan 401)
+        supaya klien tidak mengira sesi berakhir.
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password diganti
+        '400':
+          description: Password lama salah, password baru kurang dari 8 karakter, atau sama dengan yang lama
+
   /api/v1/competitions/{comp_id}/report/summary:
     get:
       summary: Ringkasan Metrik & Statistik Kompetisi

@@ -95,6 +95,22 @@ func TestEnvExample_ListsEveryConfigVariable(t *testing.T) {
 			t.Errorf(".env.example tidak memuat %s", key)
 		}
 	}
+	// variabel opsional boleh tampil sebagai contoh yang dikomentari
+	for _, key := range []string{"ADMIN_EMAIL", "ADMIN_PASSWORD", "ADMIN_NAME"} {
+		if !regexp.MustCompile(`(?m)^#?` + key + `=`).Match(data) {
+			t.Errorf(".env.example tidak memuat %s", key)
+		}
+	}
+}
+
+func TestLoad_AdminBootstrapVariables(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "ketua@lomba.id")
+	t.Setenv("ADMIN_PASSWORD", "test_pass_valid_1")
+	t.Setenv("ADMIN_NAME", "Ketua Panitia")
+	cfg := Load("tidak-ada.env")
+	if cfg.AdminEmail != "ketua@lomba.id" || cfg.AdminPassword != "test_pass_valid_1" || cfg.AdminName != "Ketua Panitia" {
+		t.Errorf("admin bootstrap tidak terbaca: %+v", cfg)
+	}
 }
 
 func TestValidate_ProductionRejectsWeakJWTSecret(t *testing.T) {
