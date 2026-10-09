@@ -116,3 +116,27 @@ func TestParseBirthDate(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestAgeCheck(t *testing.T) {
+	ref := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name, birth, group, preset, want string
+	}{
+		{"sesuai dewasa", "2000-01-15", AgeDewasa, PresetIPSI, ""},
+		{"batas bawah dewasa (genap 18 di hari acuan)", "2008-06-01", AgeDewasa, PresetIPSI, ""},
+		{"sehari sebelum 18 masih remaja", "2008-06-02", AgeDewasa, PresetIPSI, AgeCheckMismatch},
+		{"remaja untuk kategori dewasa", "2010-01-01", AgeDewasa, PresetIPSI, AgeCheckMismatch},
+		{"tanggal lahir kosong", "", AgeDewasa, PresetIPSI, AgeCheckMissing},
+		{"format salah dianggap belum diisi", "01/01/2000", AgeDewasa, PresetIPSI, AgeCheckMissing},
+		{"kategori tanpa golongan umur dilewati", "", "", PresetIPSI, ""},
+		{"persilat: usia 14 = remaja", "2012-01-01", AgeRemaja, PresetPersilat26, ""},
+		{"ipsi: usia 14 = pra remaja, bukan remaja", "2012-01-01", AgeRemaja, PresetIPSI, AgeCheckMismatch},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := AgeCheck(tc.birth, tc.group, tc.preset, ref); got != tc.want {
+				t.Fatalf("AgeCheck(%q,%q,%q) = %q, want %q", tc.birth, tc.group, tc.preset, got, tc.want)
+			}
+		})
+	}
+}

@@ -62,6 +62,18 @@ export const athleteService = {
   },
 
   /**
+   * PUT /api/v1/athletes/{id} — melengkapi/memperbaiki tanggal lahir (YYYY-MM-DD) dan/atau NIK.
+   * Manajer kontingen hanya boleh mengubah atlet miliknya.
+   */
+  async updateAthleteProfile(
+    id: string,
+    payload: { birth_date?: string; nik?: string },
+  ): Promise<Athlete> {
+    const res = await http.put<Athlete>(ENDPOINTS.ATHLETES.DETAIL(id), payload)
+    return res.data
+  },
+
+  /**
    * 5. GET /api/v1/competitions/{comp_id}/participants
    */
   async getParticipants(compId: string, status?: string): Promise<Participant[]> {

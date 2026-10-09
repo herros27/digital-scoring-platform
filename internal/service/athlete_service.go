@@ -216,6 +216,8 @@ type VerifyInput struct {
 	Status       string
 	ActualWeight *float64
 	Docs         map[string]bool
+	// Ref tanggal acuan umur (hari pertama kejuaraan); nol = hari ini.
+	Ref time.Time
 }
 
 // VerifyResult hasil akhir verifikasi (status bisa berbeda dari yang diminta bila bobot tidak sah).
@@ -261,6 +263,16 @@ func (s *AthleteService) VerifyParticipantDetailed(participantID string, in Veri
 		if err != nil {
 			return nil, err
 		}
+		ref := in.Ref
+		if ref.IsZero() {
+			ref = time.Now()
+		}
+		switch domain.AgeCheck(part.BirthDate, cat.AgeGroup, cat.PresetStandard, ref) {
+		case domain.AgeCheckMissing:
+			return nil, errors.New("tanggal lahir atlet belum diisi; lengkapi dahulu untuk memastikan golongan umur")
+		case domain.AgeCheckMismatch:
+			return nil, errors.New("usia atlet tidak sesuai golongan umur kategori; periksa tanggal lahir atau pindahkan ke kategori yang tepat")
+		}
 		if missing := domain.MissingDocs(cat.AgeGroup, part.Gender, docs); len(missing) > 0 {
 			return nil, errors.New("berkas belum lengkap: " + strings.Join(missing, ", "))
 		}
@@ -283,4 +295,39 @@ func (s *AthleteService) VerifyParticipantDetailed(participantID string, in Veri
 		return nil, err
 	}
 	return result, nil
+}
+
+// AthleteProfileUpdater kemampuan opsional repo atlet untuk melengkapi tanggal lahir/NIK.
+type AthleteProfileUpdater interface {
+	UpdateProfile(id string, birthDate, nik *string) error
+}
+
+// UpdateAthleteProfile melengkapi/memperbaiki tanggal lahir dan NIK atlet (field nil tidak diubah).
+// Dipakai untuk data lama yang belum punya tanggal lahir agar golongan umur bisa diperiksa.
+func (s *AthleteService) UpdateAthleteProfile(id string, birthDate, nik *string) (*domain.Athlete, error) {
+	if id == "" || (birthDate == nil && nik == nil) {
+		return nil, domain.ErrInvalidInput
+	}
+	if birthDate != nil {
+		v := strings.TrimSpace(*birthDate)
+		if _, err := domain.ParseBirthDate(v); err != nil {
+			return nil, err
+		}
+		birthDate = &v
+	}
+	if nik != nil {
+		v := strings.TrimSpace(*nik)
+		if len(v) > 50 {
+			return nil, errors.New("nik must be at most 50 characters")
+		}
+		nik = &v
+	}
+	up, ok := s.repo.(AthleteProfileUpdater)
+	if !ok {
+		return nil, errors.New("athlete repository does not support profile updates")
+	}
+	if err := up.UpdateProfile(id, birthDate, nik); err != nil {
+		return nil, err
+	}
+	return s.GetAthleteByID(id)
 }

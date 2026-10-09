@@ -148,6 +148,7 @@ const participantSelect = `
 		       COALESCE(p.category_id::text, ''),
 		       COALESCE(cat.name, ''),
 		       COALESCE(cat.age_group, ''),
+		       COALESCE(cat.preset_standard, ''),
 		       COALESCE(to_char(a.birth_date, 'YYYY-MM-DD'), ''),
 		       COALESCE(a.nik, ''),
 		       p.actual_weight,
@@ -163,7 +164,7 @@ func scanParticipant(row rowScanner, part *Participant) error {
 	var docs []byte
 	if err := row.Scan(&part.ID, &part.CompetitionID, &part.AthleteID, &part.ContingentID,
 		&part.Name, &part.Club, &part.WeightClass, &part.Gender, &part.RegistrationStatus,
-		&part.CategoryID, &part.CategoryName, &part.AgeGroup, &part.BirthDate, &part.NIK,
+		&part.CategoryID, &part.CategoryName, &part.AgeGroup, &part.PresetStandard, &part.BirthDate, &part.NIK,
 		&weight, &docs, &part.CreatedAt); err != nil {
 		return err
 	}
@@ -258,4 +259,24 @@ func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error
 		list = append(list, a)
 	}
 	return list, rows.Err()
+}
+
+// UpdateProfile memperbarui tanggal lahir dan/atau NIK atlet; field nil tidak diubah. NIK "" menghapus NIK.
+func (s *AthleteStore) UpdateProfile(id string, birthDate, nik *string) error {
+	res, err := s.DB.Exec(`
+		UPDATE athletes
+		SET birth_date = CASE WHEN $2::text IS NULL THEN birth_date ELSE NULLIF($2::text, '')::date END,
+		    nik        = CASE WHEN $3::text IS NULL THEN nik ELSE NULLIF($3::text, '') END
+		WHERE id = $1`, id, birthDate, nik)
+	if err != nil {
+		return mapLookupErr(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
 }

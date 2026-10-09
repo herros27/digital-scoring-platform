@@ -2,7 +2,11 @@
 import { getErrorMessage } from '@/api/error'
 import { ref, reactive, computed, watch } from 'vue'
 import { AppButton } from '@/components/ui'
-import { useParticipantsQuery, useVerifyParticipantMutation } from '../api/athleteQueries'
+import {
+  useParticipantsQuery,
+  useUpdateAthleteProfileMutation,
+  useVerifyParticipantMutation,
+} from '../api/athleteQueries'
 import type { Participant } from '../types/athlete.schema'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import type { Category } from '@/features/categories/types/category.schema'
@@ -35,6 +39,7 @@ const {
   refetch,
 } = useParticipantsQuery(activeCompId)
 const verifyMutation = useVerifyParticipantMutation(activeCompId)
+const profileMutation = useUpdateAthleteProfileMutation(activeCompId)
 
 const participants = computed(() => rawParticipants.value || [])
 
@@ -114,7 +119,44 @@ function checklistOf(p: Participant) {
   return docChecklist(p.age_group, p.gender, standard)
 }
 
+// ---- Tinjauan umur: tanggal lahir belum diisi / tidak sesuai golongan (umumnya peserta lama) ----
+const birthDraft = reactive<Record<string, string>>({})
+const savingBirthId = ref<string | null>(null)
+
+function ageReviewMessage(p: Participant): string | null {
+  if (p.age_check === 'missing_birth_date') {
+    return 'Tanggal lahir belum diisi, sehingga golongan umur tidak dapat dipastikan.'
+  }
+  if (p.age_check === 'age_mismatch') {
+    return `Usia atlet tidak sesuai golongan ${ageGroupLabel(p.age_group)}. Periksa tanggal lahir atau pindahkan ke kategori yang tepat.`
+  }
+  return null
+}
+
+async function saveBirthDate(p: Participant) {
+  const value = (birthDraft[p.id] ?? '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    showToast(
+      'Tanggal Lahir Tidak Valid',
+      'Pilih tanggal lahir lengkap (hari, bulan, tahun).',
+      'danger',
+    )
+    return
+  }
+  savingBirthId.value = p.id
+  try {
+    await profileMutation.mutateAsync({ athleteId: p.athlete_id, birth_date: value })
+    delete birthDraft[p.id]
+    showToast('Tanggal Lahir Disimpan', `${p.name}: golongan umur diperiksa ulang.`, 'success')
+  } catch (err) {
+    showToast('Gagal Menyimpan', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
+  } finally {
+    savingBirthId.value = null
+  }
+}
+
 function approveBlocker(p: Participant): string | null {
+  if (p.age_check && p.category_id) return ageReviewMessage(p)
   const missing = p.category_id ? missingDocs(p.age_group, p.gender, deskOf(p).docs) : []
   if (missing.length > 0) return `Berkas wajib belum lengkap (${missing.length})`
   if (categoryHasWeightBounds(p) && parsedWeight(p) === null) return 'Isi hasil timbang badan'
@@ -666,6 +708,34 @@ function formatDate(iso: string): string {
               <span class="verif-spec-sub tabular-nums">{{ formatDate(part.created_at) }}</span>
             </div>
           </div>
+
+          <!-- Tinjauan umur (data lama tanpa tanggal lahir / usia tidak sesuai golongan) -->
+          <section
+            v-if="part.age_check"
+            class="verif-age font-mono"
+            :data-test="`age-review-${part.age_check}`"
+          >
+            <p class="verif-age__msg">⚠ {{ ageReviewMessage(part) }}</p>
+            <div class="verif-age__row">
+              <label class="verif-age__label" :for="`birth-${part.id}`">TANGGAL LAHIR</label>
+              <input
+                :id="`birth-${part.id}`"
+                v-model="birthDraft[part.id]"
+                type="date"
+                class="verif-age__input"
+                :max="new Date().toISOString().slice(0, 10)"
+              />
+              <AppButton
+                variant="secondary"
+                size="sm"
+                :loading="savingBirthId === part.id"
+                :disabled="!birthDraft[part.id]"
+                @click="saveBirthDate(part)"
+              >
+                Simpan
+              </AppButton>
+            </div>
+          </section>
 
           <!-- Meja Timbang & Screening Berkas -->
           <section v-if="needsDesk(part)" class="verif-desk font-mono">
@@ -1645,6 +1715,40 @@ function formatDate(iso: string): string {
   align-items: flex-start;
   gap: 8px;
   cursor: pointer;
+}
+.verif-age {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.08);
+  font-size: 0.75rem;
+}
+.verif-age__msg {
+  margin: 0;
+  color: var(--color-amber-500, #f59e0b);
+}
+.verif-age__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.verif-age__label {
+  color: var(--color-slate-400, #94a3b8);
+  letter-spacing: 0.06em;
+}
+.verif-age__input {
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card, #334155);
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 .verif-desk__blocker {
   margin: 0;

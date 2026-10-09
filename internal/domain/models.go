@@ -22,23 +22,26 @@ type Arena struct {
 }
 
 type Participant struct {
-	ID                 string          `json:"id"`
-	CompetitionID      string          `json:"competition_id"`
-	AthleteID          string          `json:"athlete_id,omitempty"`
-	ContingentID       string          `json:"contingent_id,omitempty"`
-	Name               string          `json:"name,omitempty"`
-	Club               string          `json:"club,omitempty"`
-	WeightClass        string          `json:"weight_class"`
-	Gender             string          `json:"gender"`
-	RegistrationStatus string          `json:"registration_status"`
-	CategoryID         string          `json:"category_id,omitempty"`
-	CategoryName       string          `json:"category_name,omitempty"`
-	AgeGroup           string          `json:"age_group,omitempty"`
-	BirthDate          string          `json:"birth_date,omitempty"`
-	NIK                string          `json:"nik,omitempty"`
-	ActualWeight       *float64        `json:"actual_weight,omitempty"`
-	DocsVerified       map[string]bool `json:"docs_verified,omitempty"`
-	CreatedAt          time.Time       `json:"created_at"`
+	ID                 string `json:"id"`
+	CompetitionID      string `json:"competition_id"`
+	AthleteID          string `json:"athlete_id,omitempty"`
+	ContingentID       string `json:"contingent_id,omitempty"`
+	Name               string `json:"name,omitempty"`
+	Club               string `json:"club,omitempty"`
+	WeightClass        string `json:"weight_class"`
+	Gender             string `json:"gender"`
+	RegistrationStatus string `json:"registration_status"`
+	CategoryID         string `json:"category_id,omitempty"`
+	CategoryName       string `json:"category_name,omitempty"`
+	AgeGroup           string `json:"age_group,omitempty"`
+	PresetStandard     string `json:"-"`
+	// AgeCheck hasil pemeriksaan umur vs golongan kategori (lihat AgeCheck); kosong bila sesuai.
+	AgeCheck     string          `json:"age_check,omitempty"`
+	BirthDate    string          `json:"birth_date,omitempty"`
+	NIK          string          `json:"nik,omitempty"`
+	ActualWeight *float64        `json:"actual_weight,omitempty"`
+	DocsVerified map[string]bool `json:"docs_verified,omitempty"`
+	CreatedAt    time.Time       `json:"created_at"`
 }
 
 type Match struct {

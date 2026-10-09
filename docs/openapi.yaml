@@ -894,6 +894,44 @@ paths:
       responses:
         '200':
           description: Detail data atlet
+    put:
+      summary: Lengkapi / Perbaiki Tanggal Lahir & NIK Atlet
+      description: |
+        Mengisi tanggal lahir (`YYYY-MM-DD`, tidak boleh di masa depan) dan/atau NIK (maks. 50 karakter);
+        field yang tidak dikirim tidak diubah. Dipakai untuk data lama yang belum punya tanggal lahir atau
+        salah ketik, agar golongan umur bisa diperiksa (lihat `age_check` pada daftar peserta).
+        Peran: admin/dewan (semua atlet) dan contingent (hanya atlet miliknya; selain itu `404`).
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                birth_date:
+                  type: string
+                  example: '1998-03-12'
+                nik:
+                  type: string
+                  maxLength: 50
+      responses:
+        '200':
+          description: Data atlet terbaru
+        '400':
+          description: Tanggal lahir tidak valid / body kosong / NIK terlalu panjang
+        '404':
+          description: Atlet tidak ditemukan (atau bukan milik kontingen pemanggil)
 
   /api/v1/competitions/{comp_id}/athletes:
     get:
@@ -973,7 +1011,7 @@ paths:
 
   /api/v1/competitions/{comp_id}/participants:
     get:
-      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected/overweight/underweight). Peran contingent hanya menerima peserta yang ia daftarkan sendiri
+      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected/overweight/underweight). Peran contingent hanya menerima peserta yang ia daftarkan sendiri. Peserta berkategori diberi `age_check` (`missing_birth_date` | `age_mismatch`) bila umurnya belum bisa dipastikan/tidak sesuai golongan; verifikasi `verified` ditolak (400) selama tanda itu ada
       tags:
         - Athlete
       security:

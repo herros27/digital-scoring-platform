@@ -34,7 +34,27 @@ func (f *fakeAthleteRepo) GetParticipantByID(id string) (*domain.Participant, er
 	if !ok {
 		return nil, sql.ErrNoRows
 	}
+	// seperti join ke tabel atlet di store sungguhan: tanggal lahir ikut terbaca
+	if a := f.athletes[p.AthleteID]; a != nil && p.BirthDate == "" {
+		cp := *p
+		cp.BirthDate = a.BirthDate
+		return &cp, nil
+	}
 	return p, nil
+}
+
+func (f *fakeAthleteRepo) UpdateProfile(id string, birthDate, nik *string) error {
+	a, ok := f.athletes[id]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if birthDate != nil {
+		a.BirthDate = *birthDate
+	}
+	if nik != nil {
+		a.NIK = *nik
+	}
+	return nil
 }
 func (f *fakeAthleteRepo) SaveVerification(id, status string, w *float64, docs map[string]bool) error {
 	f.saved[id] = status
@@ -179,5 +199,66 @@ func TestCreateCategory_OneStandardPerCompetition(t *testing.T) {
 	}
 	if _, err := svc.ResetCategories("c1"); err == nil {
 		t.Fatal("mock repo has no reset support, expected error")
+	}
+}
+
+func TestVerifyBlockedWhenBirthDateMissingOrAgeMismatch(t *testing.T) {
+	svc, ar := setup()
+	docs := map[string]bool{domain.DocIdentity: true, domain.DocHealth: true}
+	ref := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+
+	// peserta lama: atlet tanpa tanggal lahir
+	ar.athletes["legacy"] = &domain.Athlete{ID: "legacy", Name: "Lama", Gender: "male"}
+	ar.parts["p1"] = &domain.Participant{ID: "p1", AthleteID: "legacy", CategoryID: "cat-sd", Gender: "male"}
+	_, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
+	if err == nil || !strings.Contains(err.Error(), "tanggal lahir") {
+		t.Fatalf("tanpa tanggal lahir harus ditolak, got %v", err)
+	}
+
+	// melengkapi tanggal lahir yang cocok golongan Usia Dini 2 -> lolos
+	if _, err := svc.UpdateAthleteProfile("legacy", sp("2016-05-01"), nil); err != nil {
+		t.Fatal(err)
+	}
+	res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
+	if err != nil || res.Status != "verified" {
+		t.Fatalf("setelah dilengkapi harus lolos, got %v %v", res, err)
+	}
+
+	// tanggal lahir yang salah (dewasa) untuk kategori Usia Dini 2 -> ditolak
+	if _, err := svc.UpdateAthleteProfile("legacy", sp("1990-01-01"), nil); err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
+	if err == nil || !strings.Contains(err.Error(), "tidak sesuai golongan umur") {
+		t.Fatalf("usia tidak sesuai harus ditolak, got %v", err)
+	}
+
+	// penolakan tidak diblokir pemeriksaan umur
+	if res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "rejected", Ref: ref}); err != nil || res.Status != "rejected" {
+		t.Fatalf("rejected harus tetap bisa, got %v %v", res, err)
+	}
+}
+
+func sp(s string) *string { return &s }
+
+func TestUpdateAthleteProfileValidation(t *testing.T) {
+	svc, ar := setup()
+	if _, err := svc.UpdateAthleteProfile("kid", nil, nil); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatalf("tanpa field harus ErrInvalidInput, got %v", err)
+	}
+	for _, bad := range []string{"01/01/2000", "2099-01-01", "bukan-tanggal"} {
+		if _, err := svc.UpdateAthleteProfile("kid", sp(bad), nil); err == nil {
+			t.Fatalf("birth_date %q seharusnya ditolak", bad)
+		}
+	}
+	if _, err := svc.UpdateAthleteProfile("kid", nil, sp(strings.Repeat("9", 51))); err == nil {
+		t.Fatal("nik > 50 karakter harus ditolak")
+	}
+	if _, err := svc.UpdateAthleteProfile("tidak-ada", sp("2000-01-01"), nil); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("atlet tidak ada harus ErrNotFound, got %v", err)
+	}
+	got, err := svc.UpdateAthleteProfile("kid", sp(" 2016-06-01 "), sp("3201"))
+	if err != nil || got.BirthDate != "2016-06-01" || ar.athletes["kid"].NIK != "3201" {
+		t.Fatalf("pembaruan valid gagal: %v %+v", err, got)
 	}
 }

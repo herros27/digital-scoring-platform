@@ -193,33 +193,46 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		{Name: "Tanding Dewasa Putri - Kelas F (70-75 Kg)", Gender: "female", WeightClass: "F"},
 	}
 	for _, cat := range categories {
+		// Tabel Dewasa PB IPSI: kelas A = 45-50 kg, B = 50-55, ... (lebar 5 kg), batas inklusif seperti preset UI.
+		minW := 45 + 5*float64(cat.WeightClass[0]-'A')
+		maxW := minW + 5
 		var catID string
 		err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND name = $2 LIMIT 1`, compID, cat.Name).Scan(&catID)
 		if err == sql.ErrNoRows {
 			_, err = tx.ExecContext(ctx, `
-				INSERT INTO categories (competition_id, name, gender, weight_class, ruleset_id)
-				VALUES ($1, $2, $3, $4, $5)`,
-				compID, cat.Name, cat.Gender, cat.WeightClass, rulesetIPSIID)
+				INSERT INTO categories (competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight)
+				VALUES ($1, $2, $3, $4, $5, 'dewasa', 'ipsi', $6, $7)`,
+				compID, cat.Name, cat.Gender, cat.WeightClass, rulesetIPSIID, minW, maxW)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert category %s: %w", cat.Name, err)
 			}
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to query category %s: %w", cat.Name, err)
+		} else if _, err = tx.ExecContext(ctx, `
+			UPDATE categories SET min_weight = $2, max_weight = $3
+			WHERE id = $1 AND min_weight IS NULL AND max_weight IS NULL`, catID, minW, maxW); err != nil {
+			// Seed lama membuat kategori tanpa batas bobot; lengkapi tanpa menimpa batas yang sudah diisi.
+			return nil, fmt.Errorf("failed to set weight bounds for %s: %w", cat.Name, err)
 		}
 	}
 
 	// 7. Athletes
+	// Tanggal lahir contoh berada di golongan Dewasa (18-35 th) pada tanggal kejuaraan mana pun yang wajar,
+	// sehingga lolos pemeriksaan umur kategori Dewasa.
 	athletesSeed := []struct {
 		Name           string
 		Gender         string
 		ContingentMail string
+		BirthDate      string
 	}{
-		{Name: "Eko Prasetyo", Gender: "male", ContingentMail: "tapaksuci@contingent.id"},
-		{Name: "Fajar Nugroho", Gender: "male", ContingentMail: "psht@contingent.id"},
-		{Name: "Gilang Ramadhan", Gender: "male", ContingentMail: "merpatiputih@contingent.id"},
-		{Name: "Hendra Setiawan", Gender: "male", ContingentMail: "perisaidiri@contingent.id"},
-		{Name: "Ilham Maulana", Gender: "male", ContingentMail: "tapaksuci@contingent.id"},
-		{Name: "Joko Susilo", Gender: "male", ContingentMail: "psht@contingent.id"},
-		{Name: "Siti Rahmawati", Gender: "female", ContingentMail: "merpatiputih@contingent.id"},
-		{Name: "Dewi Sartika", Gender: "female", ContingentMail: "perisaidiri@contingent.id"},
+		{Name: "Eko Prasetyo", Gender: "male", ContingentMail: "tapaksuci@contingent.id", BirthDate: "1998-03-12"},
+		{Name: "Fajar Nugroho", Gender: "male", ContingentMail: "psht@contingent.id", BirthDate: "1997-07-21"},
+		{Name: "Gilang Ramadhan", Gender: "male", ContingentMail: "merpatiputih@contingent.id", BirthDate: "1999-11-02"},
+		{Name: "Hendra Setiawan", Gender: "male", ContingentMail: "perisaidiri@contingent.id", BirthDate: "1996-05-30"},
+		{Name: "Ilham Maulana", Gender: "male", ContingentMail: "tapaksuci@contingent.id", BirthDate: "2000-01-15"},
+		{Name: "Joko Susilo", Gender: "male", ContingentMail: "psht@contingent.id", BirthDate: "1995-09-09"},
+		{Name: "Siti Rahmawati", Gender: "female", ContingentMail: "merpatiputih@contingent.id", BirthDate: "1998-12-01"},
+		{Name: "Dewi Sartika", Gender: "female", ContingentMail: "perisaidiri@contingent.id", BirthDate: "1999-04-18"},
 	}
 
 	athleteIDs := make(map[string]string)
@@ -229,14 +242,17 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		err = tx.QueryRowContext(ctx, `SELECT id FROM athletes WHERE name = $1 AND contingent_id = $2 LIMIT 1`, ath.Name, cID).Scan(&aID)
 		if err == sql.ErrNoRows {
 			err = tx.QueryRowContext(ctx, `
-				INSERT INTO athletes (name, gender, team, contingent_id)
-				VALUES ($1, $2, (SELECT name FROM contingents WHERE id = $3), $3)
-				RETURNING id`, ath.Name, ath.Gender, cID).Scan(&aID)
+				INSERT INTO athletes (name, gender, team, contingent_id, birth_date)
+				VALUES ($1, $2, (SELECT name FROM contingents WHERE id = $3), $3, $4::date)
+				RETURNING id`, ath.Name, ath.Gender, cID, ath.BirthDate).Scan(&aID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert athlete %s: %w", ath.Name, err)
 			}
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to query athlete %s: %w", ath.Name, err)
+		} else if _, err = tx.ExecContext(ctx, `UPDATE athletes SET birth_date = $2::date WHERE id = $1 AND birth_date IS NULL`, aID, ath.BirthDate); err != nil {
+			// Seed lama membuat atlet tanpa tanggal lahir; lengkapi tanpa menimpa yang sudah diisi.
+			return nil, fmt.Errorf("failed to set birth date for %s: %w", ath.Name, err)
 		}
 		athleteIDs[ath.Name] = aID
 		summary.Athletes++

@@ -94,6 +94,26 @@ export function useRegisterToCompetitionMutation(compId: Ref<string>) {
 /**
  * Verify / Reject participant mutation
  */
+/** Lengkapi/perbaiki tanggal lahir atlet lalu muat ulang daftar peserta (flag umur dihitung server). */
+export function useUpdateAthleteProfileMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      athleteId,
+      birth_date,
+      nik,
+    }: {
+      athleteId: string
+      birth_date?: string
+      nik?: string
+    }) => athleteService.updateAthleteProfile(athleteId, { birth_date, nik }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
+      queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+    },
+  })
+}
+
 export function useVerifyParticipantMutation(compId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({

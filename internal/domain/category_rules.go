@@ -226,3 +226,28 @@ func CheckEligibility(a *Athlete, c *Category, ref time.Time) error {
 	}
 	return nil
 }
+
+// Hasil pemeriksaan umur peserta terhadap golongan umur kategorinya (participants[].age_check).
+const (
+	// AgeCheckMissing tanggal lahir atlet belum diisi/tidak valid sehingga golongan umur tak bisa dipastikan
+	// (umumnya peserta lama dari sebelum kategori berbasis umur).
+	AgeCheckMissing = "missing_birth_date"
+	// AgeCheckMismatch usia pada tanggal acuan tidak masuk golongan umur kategori.
+	AgeCheckMismatch = "age_mismatch"
+)
+
+// AgeCheck memeriksa apakah tanggal lahir (YYYY-MM-DD) sesuai golongan umur kategori pada tanggal acuan.
+// Mengembalikan "" bila sesuai atau kategori tidak berbasis umur; selain itu AgeCheckMissing/AgeCheckMismatch.
+func AgeCheck(birthDate, ageGroup, preset string, ref time.Time) string {
+	if ageGroup == "" {
+		return ""
+	}
+	birth, err := ParseBirthDate(birthDate)
+	if err != nil {
+		return AgeCheckMissing
+	}
+	if AgeGroupForAge(AgeAt(birth, ref), preset) != ageGroup {
+		return AgeCheckMismatch
+	}
+	return ""
+}

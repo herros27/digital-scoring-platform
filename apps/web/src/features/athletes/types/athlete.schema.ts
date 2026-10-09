@@ -74,6 +74,11 @@ export interface Participant {
   age_group?: string
   birth_date?: string
   nik?: string
+  /**
+   * Pemeriksaan umur vs golongan kategori (server): `missing_birth_date` = tanggal lahir belum diisi
+   * (umumnya peserta lama), `age_mismatch` = usia tidak masuk golongan. Kosong bila sesuai.
+   */
+  age_check?: 'missing_birth_date' | 'age_mismatch'
   actual_weight?: number | null
   docs_verified?: Record<string, boolean>
   created_at: string

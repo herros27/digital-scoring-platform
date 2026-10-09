@@ -54,6 +54,7 @@ export interface Participant {
   weight_class: string
   docs_verified?: Record<string, boolean>
   actual_weight?: number
+  age_check?: 'missing_birth_date' | 'age_mismatch'
 }
 export interface Registration {
   athlete_id: string
@@ -255,6 +256,18 @@ export function registerAthlete(
     })
   })
 }
+
+export const updateAthleteProfile = (
+  token: string | null,
+  athleteId: string,
+  body: { birth_date?: string; nik?: string },
+) =>
+  apiCall<{ id: string; birth_date?: string; nik?: string }>(
+    'PUT',
+    `/athletes/${athleteId}`,
+    token,
+    body,
+  )
 
 export const listParticipants = (token: string | null, compId: string, status?: string) =>
   call<Participant[]>(

@@ -234,6 +234,7 @@ func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Reques
 		Status:       req.Status,
 		ActualWeight: req.ActualWeight,
 		Docs:         req.DocsVerified,
+		Ref:          h.ageReferenceDate(compID),
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -267,6 +268,11 @@ func (h *AthleteHandler) ListParticipants(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
+	}
+	// Tandai peserta berkategori yang umurnya belum bisa dipastikan/tidak sesuai golongan (data lama).
+	ref := h.ageReferenceDate(compID)
+	for i := range list {
+		list[i].AgeCheck = domain.AgeCheck(list[i].BirthDate, list[i].AgeGroup, list[i].PresetStandard, ref)
 	}
 	// Manajer kontingen hanya melihat peserta yang ia daftarkan beserta status verifikasinya.
 	if scope, restricted := contingentScope(r); restricted {
@@ -304,4 +310,40 @@ func (h *AthleteHandler) ListByCompetition(w http.ResponseWriter, r *http.Reques
 		list = own
 	}
 	Ok(w, list)
+}
+
+// PUT /api/v1/athletes/{id}
+// Melengkapi/memperbaiki tanggal lahir dan NIK atlet (field yang tidak dikirim tidak diubah). Manajer
+// kontingen hanya boleh mengubah atlet miliknya sendiri.
+func (h *AthleteHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req struct {
+		BirthDate *string `json:"birth_date"`
+		NIK       *string `json:"nik" validate:"omitempty,max=50"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	if req.BirthDate == nil && req.NIK == nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "birth_date atau nik wajib diisi", nil)
+		return
+	}
+	if scope, restricted := contingentScope(r); restricted {
+		existing, err := h.Service.GetAthleteByID(id)
+		if err != nil || scope == "" || existing.ContingentID != scope {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", domain.ErrNotFound.Error(), nil)
+			return
+		}
+	}
+	updated, err := h.Service.UpdateAthleteProfile(id, req.BirthDate, req.NIK)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+			return
+		}
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	Ok(w, updated)
 }

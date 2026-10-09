@@ -216,3 +216,89 @@ func TestListAthletesByCompetitionScopedToContingent(t *testing.T) {
 		})
 	}
 }
+
+func (f *scopeRepo) UpdateProfile(id string, birthDate, nik *string) error {
+	a, ok := f.athletes[id]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if birthDate != nil {
+		a.BirthDate = *birthDate
+	}
+	if nik != nil {
+		a.NIK = *nik
+	}
+	return nil
+}
+
+func TestUpdateProfileOwnershipAndValidation(t *testing.T) {
+	h, repo := newScopeHandler()
+	put := func(role, id, athleteID, body string) int {
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/athletes/"+athleteID, bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.SetPathValue("id", athleteID)
+		rec := httptest.NewRecorder()
+		h.UpdateProfile(rec, asRole(req, role, id))
+		return rec.Code
+	}
+	if c := put("contingent", "k1", "a-own", `{"birth_date":"2000-02-03"}`); c != http.StatusOK {
+		t.Fatalf("atlet sendiri = %d, want 200", c)
+	}
+	if got := repo.athletes["a-own"].BirthDate; got != "2000-02-03" {
+		t.Fatalf("birth_date tersimpan = %q", got)
+	}
+	if c := put("contingent", "k1", "a-other", `{"birth_date":"2000-02-03"}`); c != http.StatusNotFound {
+		t.Fatalf("atlet kontingen lain = %d, want 404", c)
+	}
+	if repo.athletes["a-other"].BirthDate != "" {
+		t.Fatal("atlet kontingen lain tidak boleh berubah")
+	}
+	if c := put("admin", "", "a-other", `{"birth_date":"2000-02-03","nik":"3201"}`); c != http.StatusOK {
+		t.Fatalf("admin = %d, want 200", c)
+	}
+	if c := put("admin", "", "a-own", `{}`); c != http.StatusBadRequest {
+		t.Fatalf("body kosong = %d, want 400", c)
+	}
+	if c := put("admin", "", "a-own", `{"birth_date":"31-12-2000"}`); c != http.StatusBadRequest {
+		t.Fatalf("format tanggal salah = %d, want 400", c)
+	}
+	if c := put("admin", "", "a-own", `{"birth_date":"2099-01-01"}`); c != http.StatusBadRequest {
+		t.Fatalf("tanggal masa depan = %d, want 400", c)
+	}
+	if c := put("admin", "", "tidak-ada", `{"birth_date":"2000-02-03"}`); c != http.StatusNotFound {
+		t.Fatalf("atlet tidak ada = %d, want 404", c)
+	}
+}
+
+func TestListParticipantsFlagsAgeCheck(t *testing.T) {
+	h, repo := newScopeHandler()
+	repo.parts = []domain.Participant{
+		{ID: "ok", ContingentID: "k1", AgeGroup: domain.AgeDewasa, PresetStandard: domain.PresetIPSI, BirthDate: "2000-01-01"},
+		{ID: "kosong", ContingentID: "k1", AgeGroup: domain.AgeDewasa, PresetStandard: domain.PresetIPSI},
+		{ID: "salah", ContingentID: "k1", AgeGroup: domain.AgeDewasa, PresetStandard: domain.PresetIPSI, BirthDate: "2015-01-01"},
+		{ID: "tanpa-kategori", ContingentID: "k1"},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/competitions/c1/participants", nil)
+	req.SetPathValue("comp_id", "c1")
+	rec := httptest.NewRecorder()
+	h.ListParticipants(rec, asRole(req, "admin", ""))
+
+	var body struct{ Data []domain.Participant }
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, p := range body.Data {
+		got[p.ID] = p.AgeCheck
+	}
+	want := map[string]string{"ok": "", "kosong": domain.AgeCheckMissing, "salah": domain.AgeCheckMismatch, "tanpa-kategori": ""}
+	for id, w := range want {
+		if got[id] != w {
+			t.Fatalf("age_check[%s] = %q, want %q", id, got[id], w)
+		}
+	}
+	// field internal tidak ikut keluar
+	if bytes.Contains(rec.Body.Bytes(), []byte("preset_standard")) {
+		t.Fatal("preset_standard tidak boleh muncul di respons")
+	}
+}
