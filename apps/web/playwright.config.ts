@@ -17,6 +17,8 @@ const zoom = Number(process.env.PW_ZOOM ?? 0.5)
 export default defineConfig({
   testDir: './playwright',
   testMatch: '**/*.spec.ts',
+  // uji PWA butuh build produksi + vite preview: dijalankan terpisah (npm run test:pw:pwa)
+  testIgnore: '**/pwa.spec.ts',
   // Semua tes berbagi satu backend/gelanggang: jalan berurutan, tiap tes membuat partainya sendiri
   fullyParallel: false,
   workers: 1,

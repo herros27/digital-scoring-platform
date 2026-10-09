@@ -33,16 +33,22 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 
 ## Cakupan
 
-| Spec                            | Isi                                                                                                                                                                                                       |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `01-wasit-kontrol-pertandingan` | load-arena, start, status partai di DB, timer (jalan/beku/lanjut/koreksi/`timer_sync`), pergantian ronde otomatis, selesai otomatis, seri → keputusan wasit, finish/cancel/outcome, sanksi, sinyal, audit |
-| `02-juri-sinkronisasi-realtime` | tiap kursi 1–3: snapshot identik, urutan `state_change` identik, hitung mundur konsisten, konsensus (2 dari 3), jendela 3 dtk, suara ganda, input di luar waktu, hak akses WS juri, audit                 |
-| `03-otorisasi-role`             | matriks REST (wasit/dewan/admin vs juri/operator/kontingen/anon/gelanggang lain), skor REST hanya juri atas identitas token, handshake WS, perintah WS per role                                           |
-| `04-ketahanan-dan-kasus-tepi`   | gagal memulai, ARENA_BUSY, reschedule, balapan (5× start, 3× finish), aksi berulang, putus/sambung ulang (juri, wasit, semua perangkat, tablet kembar), pesan rusak, konsistensi dengan endpoint publik   |
-| `05-format-5-juri`              | konsensus 3-dari-5: kelima juri online, progres 1→2→3, kombinasi juri mana pun, sudut berbeda tidak digabung, di luar window tidak digabung                                                               |
-| `06-pemulihan-restart-server`   | restart backend di tengah partai: skor/babak bertahan, jam dijeda, skor ditolak sampai wasit melanjutkan, partai selesai normal (perlu `E2E_RESTART_CMD`)                                                 |
-| `ui-05-layar-juri`              | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                             |
-| `ui-06-konsol-wasit`            | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                  |
+| Spec                              | Isi                                                                                                                                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-wasit-kontrol-pertandingan`   | load-arena, start, status partai di DB, timer (jalan/beku/lanjut/koreksi/`timer_sync`), pergantian ronde otomatis, selesai otomatis, seri → keputusan wasit, finish/cancel/outcome, sanksi, sinyal, audit                         |
+| `02-juri-sinkronisasi-realtime`   | tiap kursi 1–3: snapshot identik, urutan `state_change` identik, hitung mundur konsisten, konsensus (2 dari 3), jendela 3 dtk, suara ganda, input di luar waktu, hak akses WS juri, audit                                         |
+| `03-otorisasi-role`               | matriks REST (wasit/dewan/admin vs juri/operator/kontingen/anon/gelanggang lain), skor REST hanya juri atas identitas token, handshake WS, perintah WS per role                                                                   |
+| `04-ketahanan-dan-kasus-tepi`     | gagal memulai, ARENA_BUSY, reschedule, balapan (5× start, 3× finish), aksi berulang, putus/sambung ulang (juri, wasit, semua perangkat, tablet kembar), pesan rusak, konsistensi dengan endpoint publik                           |
+| `05-format-5-juri`                | konsensus 3-dari-5: kelima juri online, progres 1→2→3, kombinasi juri mana pun, sudut berbeda tidak digabung, di luar window tidak digabung                                                                                       |
+| `06-pemulihan-restart-server`     | restart backend di tengah partai: skor/babak bertahan, jam dijeda, skor ditolak sampai wasit melanjutkan, partai selesai normal (perlu `E2E_RESTART_CMD`)                                                                         |
+| `07-kompetisi-penuh`              | satu kompetisi dari pendaftaran sampai juara: 4 atlet/3 kontingen → verifikasi → bagan → bagan publik (tersembunyi sebelum aktif) → 2 semifinal → final otomatis → final dua babak habis waktu → juara di bagan → klasemen medali |
+| `08-kompetisi-8-peserta`          | bagan 8 peserta (perempat → semi → final) dimainkan penuh; partai berikutnya terbentuk otomatis; medali hanya final dan semifinal                                                                                                 |
+| `09-kompetisi-bye`                | 3, 5, 6, 7, 9, 12 peserta (BYE) dimainkan sampai juara: tidak ada pasangan BYE lawan BYE, total partai N-1, medali sesuai struktur                                                                                                |
+| `12-kunci-draw-bagan`             | kunci draw tersimpan di server, generate ditolak 409 walau lewat API, hanya admin/dewan, kunci tidak menghalangi pertandingan, bagan yang sudah dimainkan tidak bisa dibentuk ulang                                               |
+| `11-pembatas-login-pin`           | pelindung tebak-PIN berlapis: tablet terkunci sendiri, IP bersama tetap bisa login, ganti ID tidak menembus, login sah tidak menghapus hitungan IP                                                                                |
+| `10-beberapa-kategori-gelanggang` | dua kategori (Putra/Putri) di dua gelanggang SERENTAK dengan wasit + 3 juri masing-masing; bagan terisolasi; final bertukar gelanggang; medali kontingen dijumlah dari kedua kategori; dua bagan publik terpisah                  |
+| `ui-05-layar-juri`                | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                                                     |
+| `ui-06-konsol-wasit`              | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                                          |
 
 ## Cacat yang ditemukan tes ini dan sudah diperbaiki
 
@@ -68,7 +74,45 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
    (lampu konsensus turun/padam di semua tablet), menarik sudut yang **terakhir ditekan** (bukan selalu merah),
    dan bila tidak ada yang bisa ditarik server membalas `UNDO_NOT_POSSIBLE` yang tampil di layar. Poin yang
    sudah terkonfirmasi tidak dapat dibatalkan dari tablet (itu wewenang wasit).
-10. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+10. **Klasemen medali salah** (ditemukan spec 07): setiap pemenang partai dihitung emas dan setiap yang kalah perak
+    (4 peserta menghasilkan 3 emas + 3 perak), tanpa perunggu, dan semua masuk tim "Umum" karena partai menyimpan ID
+    peserta sedangkan penghitungan mencari ID atlet. Kini medali diturunkan dari struktur bagan: juara emas, finalis perak,
+    dua yang kalah di semifinal perunggu, perempat final tanpa medali, dan tim diambil dari atlet milik peserta.
+11. **Bagan macet bila peserta bukan pangkat dua** (ditemukan spec 09): slot BYE ditaruh berurutan di ujung, sehingga pada
+    5, 6, 9, 12 peserta dst. ada pasangan BYE lawan BYE dan pemenang pasangan di sebelahnya tidak pernah mendapat lawan
+    (kompetisi tidak bisa selesai). Kini BYE disebar satu per pasangan mengikuti urutan seeding standar (seed teratas
+    mendapat BYE), dan partai babak ≥2 yang kedua pesertanya sudah terisi sejak awal (sesama pemegang BYE) dibuat saat
+    bagan dibentuk. Dicakup tes unit untuk 2–40 peserta.
+12. **Partai tidak berpindah gelanggang saat dimuat** (ditemukan spec 10): `load-arena` hanya membuat orkestrator, sedangkan
+    `matches.arena_id` tetap gelanggang bergilir saat bagan dibentuk. Antrean per gelanggang dan nomor partai di scoreboard
+    menunjuk gelanggang yang salah bila partai dimainkan di gelanggang lain. Kini `arena_id` ikut diperbarui.
+13. **Scoreboard selalu menampilkan 3 babak** (ditemukan scoreboard-tv.spec): partai 2 babak (mis. Usia Dini) menampilkan
+    "BABAK 3 MENUNGGU" yang tidak pernah terjadi. Kini jumlah babak mengikuti `total_rounds` ruleset dari server.
+14. **Jeda dari panitia tidak bisa dilanjutkan di Jadwal** (ditemukan panitia-ui.spec): halaman Jadwal menampilkan tombol
+    Lanjutkan hanya bila status partai `paused`, padahal server tidak pernah menyimpannya (jeda hanya menghentikan jam).
+    Kini jeda menyimpan `paused`, lanjut mengembalikan `running`, dan partai yang dipulihkan setelah restart tercatat
+    `paused`. UI menghitung `paused` sebagai live.
+15. **Label tombol kunci draw membingungkan** (laporan pengguna): saat terkunci tertulis "Kunci Draw (Locked)" dan saat
+    terbuka "Buka Kunci", jadi status tidak terbaca. Kini tombol menampilkan status ("Draw Terkunci" / "Draw Terbuka"),
+    ikon gembok yang berbeda, dan tooltip aksinya.
+16. **Data perangkat di tab "Perangkat & PIN" dan header dikarang** (laporan pengguna): model tablet, latensi
+    (12 + 3×kursi ms), baterai (96 − 4×kursi %), "5 JURY CONNECTED", "SERVER SYNC: 100%", "TELEMETRY LIVE 12ms", dan tombol
+    Ping yang hanya menampilkan toast. Kini memakai kehadiran WebSocket nyata lewat `GET …/arenas/{id}/presence`
+    (ONLINE/OFFLINE per kursi, jumlah juri online, status server dan latensi dari polling itu sendiri); model dan baterai
+    dihapus karena server tidak mengetahuinya; Ping menjadi "Cek" koneksi sesungguhnya.
+17. **Satu juri salah PIN mengunci semua tablet di IP yang sama**: lockout 5x per IP dan batas 10 login/menit per IP
+    (menghitung login berhasil juga) membuat beberapa tablet yang berbagi satu IP (router, Docker Desktop) saling
+    memblokir, dan login berhasil mereset hitungan IP sehingga penyerang dengan satu PIN sah bisa menebak tanpa batas.
+    Kini pelindung tebak-PIN tiga lapis (`auth.PinGuard`): per perangkat (ID acak tablet, header `X-Device-Id`) 5x, per IP
+    25x, global 200x per 15 menit; hanya PIN salah yang dihitung dan login berhasil hanya mereset hitungan perangkat.
+    Batas laju PIN menjadi 1/dtk (burst 60) hanya untuk banjir permintaan. Spec `11-pembatas-login-pin`.
+18. **Kunci draw hanya state di browser** (ditemukan panitia-ui.spec): `isLocked` adalah `ref` di halaman, jadi tidak
+    tersimpan (kembali terkunci/terbuka saat dimuat ulang atau dibuka dari perangkat lain) dan tidak ditegakkan:
+    `brackets/generate` tetap mengacak ulang bagan resmi. Kini kunci per kategori disimpan di server
+    (`PUT …/categories/{id}/bracket-lock`, kolom `bracket_locked_at`), `generate` ditolak `409 BRACKET_LOCKED` walau
+    dipanggil langsung lewat API, dan bagan yang sudah mulai dimainkan juga tidak bisa dibentuk ulang
+    (`409 BRACKET_IN_PROGRESS`: mengacak ulang memutus partai selesai dari slotnya). Spec `12-kunci-draw-bagan`.
+19. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
@@ -88,6 +132,23 @@ npx playwright test -g "BATAL"     # pilih tes lewat nama
 npx playwright show-report         # laporan HTML (trace tersimpan bila tes gagal)
 ```
 
+`playwright/kompetisi-penuh-ui.spec.ts` memainkan SATU kompetisi penuh lewat layar: panitia login lewat form, mengaktifkan
+kejuaraan lewat tombol + dialog, penonton membuka `/bagan` di browser (bagan tersembunyi sebelum aktif, lalu tampil dan
+berisi keempat atlet), tiga partai (2 semifinal + final otomatis) dimainkan dengan konsol wasit + 3 layar juri sungguhan,
+lalu halaman publik menampilkan juara. Penyiapan data dan "muat partai ke gelanggang" memakai API.
+
+Spec Playwright lain (semua UI sungguhan):
+
+- `scoreboard-tv.spec.ts`: layar TV publik (daftar "Sedang Berlangsung", identitas dan jumlah babak sesuai ruleset, timer,
+  poin juri realtime, sanksi/potongan, jeda, sinyal dokter, layar pemenang).
+- `sanksi-hasil-khusus.spec.ts`: sanksi dari konsol wasit (Binaan/Teguran/DQ, batalkan sanksi) dan hasil khusus
+  (KO/TKO/WO/Undur diri) beserta dampaknya ke bagan (pemenang maju) dan medali.
+- `panitia-ui.spec.ts`: ruang operasi panitia: bagan (kunci draw, generate, acak ulang), jadwal (muat, mulai, jeda,
+  lanjut, selesaikan, filter gelanggang), dan PIN (PIN kustom, login tablet, Reset PIN).
+
+> Login dibatasi 10 kali per menit per IP. Menjalankan beberapa suite berturut-turut dengan cepat bisa memunculkan
+> "too many requests" di langkah login; tunggu semenit lalu ulangi.
+
 Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaan Playwright), `PW_ZOOM`, `PW_SLOWMO`.
 
 ## Spesifik lingkungan
@@ -97,10 +158,37 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
   `E2E_RESTART_CMD` diset** (perintah shell yang me-restart backend dan baru kembali saat server siap, dengan
   env/DB yang sama). Tanpa itu spec dilewati. Cypress menjalankannya lewat `cy.task('server:restart')`.
 
-  ```bash
-  E2E_RESTART_CMD="./scripts/restart-backend.sh" npx cypress run --spec "cypress/e2e/match/06-*"
-  E2E_RESTART_CMD="./scripts/restart-backend.sh" npm run test:match-flow -- 06
+  Skrip siap pakai ada di `scripts/` (database harus sudah hidup; skrip membangun `bin/server`, mematikan apa pun
+  yang mendengarkan port backend, menyalakan ulang di latar belakang dengan `.env` akar repo, dan baru selesai saat
+  `/api/v1/health` menjawab; gagal = kode keluar 1 + log terakhir; log di `bin/backend.log`). Opsi: `PORT`,
+  `TIMEOUT_SEC`, `NO_BUILD=1` (bash) atau `-Port`, `-TimeoutSec`, `-NoBuild` (PowerShell).
+
+  Windows (PowerShell, dari `apps/web`):
+
+  ```powershell
+  $env:E2E_RESTART_CMD = 'powershell -NoProfile -ExecutionPolicy Bypass -File ..\..\scripts\restart-backend.ps1'
+  npm run test:match-flow -- 06
+  # atau lewat Cypress:  npx cypress run --spec "cypress/e2e/match/06-*"
   ```
+
+  Linux/macOS (dari `apps/web`):
+
+  ```bash
+  E2E_RESTART_CMD="$PWD/../../scripts/restart-backend.sh" npm run test:match-flow -- 06
+  ```
+
+  Skrip dapat dicoba sendiri tanpa tes: `powershell -File scripts\restart-backend.ps1` / `scripts/restart-backend.sh`.
+  Bila backend berjalan di Docker, pakai `E2E_RESTART_CMD="docker compose restart app"` (nama layanan sesuai
+  `docker-compose.yml`; pastikan perintahnya menunggu sampai siap).
+
+## Temuan yang belum diubah
+
+- **Pesan galat kurang jelas**: "Muat ke Gelanggang" pada kejuaraan tanpa ruleset menampilkan `ruleset '' not found`.
+- **`<label for="login-email">` menunjuk ke div pembungkus** (komponen `AppInput` menaruh `id` di pembungkus, bukan di
+  `input`), sehingga klik label tidak memfokuskan kolom.
+- **Dropdown kejuaraan di ruang operasi memuat semua kejuaraan termasuk yang CANCELLED**, sehingga daftar membengkak.
+- Dock bagan "Kirim ke Gelanggang" memuat ke gelanggang partai itu (sudah benar); tombol Jadwal "Mulai Partai" selalu
+  terlihat walau partai belum dimuat (ditolak dengan pesan "Gagal Memulai").
 
 ## Perilaku yang dicatat
 

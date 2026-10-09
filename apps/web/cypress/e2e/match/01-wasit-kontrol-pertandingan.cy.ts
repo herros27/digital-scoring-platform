@@ -180,6 +180,8 @@ describe('Wasit - kontrol pertandingan', () => {
         await sleep(900)
         expect((await snapshot(devices.judges[1])).timer_remaining_ms).to.eq(frozen)
         expect((await snapshot(devices.judges[1])).timer_running).to.eq(false)
+        // daftar partai (UI panitia) membaca status dari database: jeda harus tercatat "paused"
+        expect((await matchRecord(kit, match.id)).status).to.eq('paused')
 
         const since2 = devices.all.map((s) => s.mark())
         expect((await kit.control(match, 'resume')).status).to.eq(200)
@@ -188,6 +190,7 @@ describe('Wasit - kontrol pertandingan', () => {
         )
         const p = resumed[0].payload
         expect(within(p.timer_ends_at_ms - p.server_time_ms, frozen, 400)).to.eq(true)
+        expect((await matchRecord(kit, match.id)).status).to.eq('running')
         resumed
           .slice(1)
           .forEach((m) => expect(m.payload.timer_ends_at_ms).to.eq(p.timer_ends_at_ms))

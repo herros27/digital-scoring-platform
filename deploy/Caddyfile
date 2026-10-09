@@ -1,0 +1,28 @@
+# HTTPS untuk Digital Scoring (PWA wajib HTTPS). Dipakai oleh layanan `caddy` (docker compose --profile https).
+# Semua pengaturan dari .env.prod:
+#   SITE_ADDRESS   domain atau IP yang dibuka tablet, mis. silat.contoh.id  atau  192.168.1.10
+#   TLS_DIRECTIVE  kosong  -> sertifikat Let's Encrypt otomatis (domain publik)
+#                  "tls internal" -> CA internal Caddy (LAN tertutup / IP); root CA harus dipasang di tiap tablet
+{$SITE_ADDRESS} {
+	{$TLS_DIRECTIVE}
+
+	# Frontend + API + WebSocket semuanya lewat nginx (layanan `web`). Caddy meneruskan WebSocket otomatis dan
+	# mengirim X-Forwarded-For dengan IP klien asli; nginx memakainya (lihat set_real_ip_from di nginx.conf) agar
+	# pembatas percobaan login/PIN membedakan tiap tablet, bukan menganggap semuanya satu IP (kontainer Caddy).
+	reverse_proxy web:80
+}
+
+# HTTP biasa (port 80): satu-satunya jalan untuk mengunduh root CA di tablet SEBELUM tablet memercayai HTTPS (mode
+# `tls internal`). http://<SITE_ADDRESS>/root.crt mengunduh sertifikat publik CA (aman dibuka; kunci pribadinya tidak
+# pernah dilayani). Selain itu semua dialihkan ke HTTPS. Pada mode domain publik berkas itu tidak ada (404).
+http://{$SITE_ADDRESS} {
+	handle /root.crt {
+		root * /data/caddy/pki/authorities/local
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition `attachment; filename="silat-root-ca.crt"`
+		file_server
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}

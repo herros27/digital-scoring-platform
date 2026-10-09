@@ -9,6 +9,8 @@ import (
 
 type MatchReportRepository interface {
 	ListByCompetition(competitionID string) ([]store.Match, error)
+	// MedalPlacements medali per tim dari hasil bagan (juara, finalis, kalah semifinal).
+	MedalPlacements(competitionID string) ([]store.MedalPlacement, error)
 }
 
 type ReportService struct {
@@ -73,81 +75,54 @@ func (s *ReportService) GetSummary(competitionID string) (*domain.CompetitionSum
 	return summary, nil
 }
 
+// GetMedalStandings klasemen medali per tim dari hasil bagan: satu emas (juara), satu perak (finalis), dan perunggu
+// untuk tiap yang kalah di semifinal pada setiap kategori. Kemenangan di babak awal tidak memberi medali.
 func (s *ReportService) GetMedalStandings(competitionID string) ([]domain.MedalStanding, error) {
 	if competitionID == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	matches, err := s.matchRepo.ListByCompetition(competitionID)
+	placements, err := s.matchRepo.MedalPlacements(competitionID)
 	if err != nil {
 		return nil, err
 	}
 
-	athletes, _ := s.athleteRepo.List()
-	teamByAthlete := make(map[string]string)
-	for _, a := range athletes {
-		team := a.Team
-		if team == "" {
-			team = "Independen"
+	byTeam := make(map[string]*domain.MedalStanding)
+	for _, p := range placements {
+		t, ok := byTeam[p.Team]
+		if !ok {
+			t = &domain.MedalStanding{Team: p.Team}
+			byTeam[p.Team] = t
 		}
-		teamByAthlete[a.ID] = team
-	}
-
-	teamMedals := make(map[string]*domain.MedalStanding)
-	for _, m := range matches {
-		if m.Status != "finished" || m.WinnerID == "" {
+		switch p.Medal {
+		case "gold":
+			t.Gold++
+		case "silver":
+			t.Silver++
+		case "bronze":
+			t.Bronze++
+		default:
 			continue
 		}
-
-		winnerTeam := teamByAthlete[m.WinnerID]
-		if winnerTeam == "" {
-			winnerTeam = "Umum"
-		}
-
-		if _, ok := teamMedals[winnerTeam]; !ok {
-			teamMedals[winnerTeam] = &domain.MedalStanding{Team: winnerTeam}
-		}
-
-		// Winner gets a gold/win point
-		teamMedals[winnerTeam].Gold++
-		teamMedals[winnerTeam].Total++
-
-		// Runner-up (loser) gets silver
-		loserID := m.AthleteRedID
-		if m.WinnerID == m.AthleteRedID {
-			loserID = m.AthleteBlueID
-		}
-		if loserID != "" {
-			loserTeam := teamByAthlete[loserID]
-			if loserTeam == "" {
-				loserTeam = "Umum"
-			}
-			if _, ok := teamMedals[loserTeam]; !ok {
-				teamMedals[loserTeam] = &domain.MedalStanding{Team: loserTeam}
-			}
-			teamMedals[loserTeam].Silver++
-			teamMedals[loserTeam].Total++
-		}
+		t.Total++
 	}
 
-	var standings []domain.MedalStanding
-	for _, standing := range teamMedals {
-		standings = append(standings, *standing)
+	standings := make([]domain.MedalStanding, 0, len(byTeam))
+	for _, t := range byTeam {
+		standings = append(standings, *t)
 	}
-
 	sort.Slice(standings, func(i, j int) bool {
-		if standings[i].Gold != standings[j].Gold {
-			return standings[i].Gold > standings[j].Gold
+		a, b := standings[i], standings[j]
+		if a.Gold != b.Gold {
+			return a.Gold > b.Gold
 		}
-		if standings[i].Silver != standings[j].Silver {
-			return standings[i].Silver > standings[j].Silver
+		if a.Silver != b.Silver {
+			return a.Silver > b.Silver
 		}
-		return standings[i].Bronze > standings[j].Bronze
+		if a.Bronze != b.Bronze {
+			return a.Bronze > b.Bronze
+		}
+		return a.Team < b.Team
 	})
-
-	if standings == nil {
-		standings = []domain.MedalStanding{}
-	}
-
 	return standings, nil
 }
 

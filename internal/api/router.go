@@ -62,12 +62,13 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// handlers
 	authH := &handler.AuthHandler{
 		Pins: pinRepo,
-		// PIN salah 5x beruntun dalam 15 menit -> IP dikunci 15 menit (PIN 6-8 digit, login tanpa ID).
-		Lockout:   auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
-		ClientKey: ClientIP,
+		// Tebak-PIN dilindungi tiga lapis (perangkat 5x, IP 25x, global 200x per 15 menit): satu tablet yang salah PIN
+		// tidak mengunci tablet lain di IP yang sama (Docker Desktop/proxy), tetapi penebakan tetap terbatas.
+		Guard:    auth.NewPinGuard(auth.DefaultPinGuardConfig()),
+		ClientIP: ClientIP,
 	}
 	compH := &handler.CompetitionHandler{Service: compService, Cache: appCache}
-	arenaH := &handler.ArenaHandler{Service: arenaService}
+	arenaH := &handler.ArenaHandler{Service: arenaService, Hubs: hubManager}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
 	publicBracketH := &handler.PublicBracketHandler{
 		Competitions: compService,
@@ -99,12 +100,16 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// Rate limiters:
 	// Auth endpoints: 10 req/min, burst 10 per IP (brute force mitigation for PIN & password)
 	authLimiter := RateLimit(rate.Every(6*time.Second), 10)
+	// Login PIN: batas laju hanya untuk banjir permintaan (1/dtk, burst 60 per IP); perlindungan tebak-PIN yang
+	// sebenarnya ada di AuthHandler.Guard dan hanya menghitung PIN SALAH. Batas 10/menit sebelumnya menghitung login
+	// berhasil juga, sehingga banyak tablet di satu IP saling memblokir saat mulai bersamaan.
+	pinLimiter := RateLimit(rate.Every(time.Second), 60)
 	// Global: 60 req/sec, burst 100 per IP (DoS/flood protection)
 	globalLimiter := RateLimit(rate.Limit(60), 100)
 
 	// === Public endpoints (no auth) ===
-	mux.Handle("POST /api/v1/auth/judge-login", authLimiter(http.HandlerFunc(authH.JudgeLogin)))
-	mux.Handle("POST /api/v1/auth/pin", authLimiter(http.HandlerFunc(authH.JudgeLogin)))
+	mux.Handle("POST /api/v1/auth/judge-login", pinLimiter(http.HandlerFunc(authH.JudgeLogin)))
+	mux.Handle("POST /api/v1/auth/pin", pinLimiter(http.HandlerFunc(authH.JudgeLogin)))
 	mux.Handle("POST /api/v1/auth/login", authLimiter(http.HandlerFunc(officialH.Login)))
 	mux.Handle("POST /api/v1/auth/contingent/register", authLimiter(http.HandlerFunc(contingentH.Register)))
 	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
@@ -157,6 +162,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("POST /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories/{id}", categoryH.Get)
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Reset)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock", adminOrDewan(http.HandlerFunc(categoryH.SetBracketLock)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 
 	// Athletes & Participants
@@ -175,6 +181,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas", arenaH.List)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/arenas", adminOrDewan(http.HandlerFunc(arenaH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas/{id}", arenaH.Get)
+	protected.Handle("GET /api/v1/competitions/{comp_id}/arenas/{id}/presence", adminOrDewan(http.HandlerFunc(arenaH.Presence)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Update)))
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Delete)))
 

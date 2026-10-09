@@ -712,6 +712,51 @@ paths:
         '409':
           description: Masih ada peserta terdaftar pada kategori; reset ditolak.
 
+  /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock:
+    put:
+      summary: Kunci / buka draw bagan sebuah kategori
+      description: |
+        Draw yang dikunci disimpan di server dan ditegakkan: `POST /competitions/{comp_id}/brackets/generate` untuk
+        kategori itu ditolak `409 BRACKET_LOCKED` sampai dibuka lagi. Mengunci tidak menghalangi pertandingan berjalan.
+        Operasinya idempoten. Terlepas dari kunci, bagan yang sudah mulai dimainkan tidak bisa dibentuk ulang
+        (`409 BRACKET_IN_PROGRESS`). Hanya admin/dewan.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locked]
+              properties:
+                locked:
+                  type: boolean
+      responses:
+        '200':
+          description: Kategori dengan status kunci terbaru (`bracket_locked`, `bracket_locked_at`)
+        '400':
+          description: Field `locked` tidak ada
+        '403':
+          description: Bukan admin/dewan
+        '404':
+          description: Kategori tidak ditemukan pada kejuaraan ini
+
   /api/v1/competitions/{comp_id}/categories/ruleset:
     put:
       summary: Tetapkan Ruleset Khusus per Golongan Umur / Kategori (Admin / Dewan)
@@ -1168,6 +1213,60 @@ paths:
       responses:
         '201':
           description: Gelanggang berhasil ditambahkan
+
+  /api/v1/competitions/{comp_id}/arenas/{id}/presence:
+    get:
+      summary: Kehadiran perangkat di gelanggang (koneksi WebSocket yang hidup)
+      description: |
+        Perangkat yang BENAR-BENAR terhubung ke gelanggang saat ini: nomor kursi juri yang online, jumlah wasit,
+        scoreboard, dan admin. Gelanggang yang belum pernah dihubungi perangkat apa pun mengembalikan semua nol.
+        Dipakai ruang operasi (tab Perangkat & PIN dan header) dan disegarkan tiap beberapa detik. Hanya admin/dewan.
+      tags:
+        - Arena
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kehadiran perangkat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      arena_id:
+                        type: string
+                        format: uuid
+                      judge_seats:
+                        type: array
+                        description: Nomor kursi juri yang online, terurut
+                        items:
+                          type: integer
+                      referees:
+                        type: integer
+                      scoreboards:
+                        type: integer
+                      admins:
+                        type: integer
+        '404':
+          description: Gelanggang tidak ditemukan pada kejuaraan ini
 
   /api/v1/competitions/{comp_id}/arenas/{id}:
     get:

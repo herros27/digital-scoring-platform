@@ -37,6 +37,27 @@ services:
     depends_on:
       - app
 
+  # HTTPS (wajib untuk memasang PWA di tablet). Opsional: docker compose --env-file .env.prod --profile https up -d
+  # Petunjuk lengkap: docs/PWA.md. Port 80 dipakai Caddy (tantangan Let's Encrypt + pengalihan ke HTTPS), jadi
+  # pindahkan `web` ke loopback di .env.prod:  WEB_PORT=127.0.0.1:8081
+  caddy:
+    profiles: ["https"]
+    image: caddy:2-alpine
+    container_name: scoring-https
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost} # isi domain/IP di .env.prod; "localhost" hanya agar compose tetap valid
+      TLS_DIRECTIVE: ${TLS_DIRECTIVE:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # sertifikat dan root CA internal: simpan agar tidak diterbitkan ulang
+      - caddy_config:/config
+    depends_on:
+      - web
+
   postgres:
     image: postgres:16-alpine
     container_name: scoring-postgres
@@ -59,3 +80,5 @@ services:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

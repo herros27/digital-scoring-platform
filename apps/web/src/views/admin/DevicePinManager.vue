@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import { AppButton } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
-import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+import { useArenasQuery, useCompetitionPresence } from '@/features/arena/api/arenaQueries'
 
 interface Props {
   competitionId?: string
@@ -24,6 +24,8 @@ const compIdRef = computed(
 
 // Fetch real arenas
 const { data: remoteArenas, refetch: refetchArenas } = useArenasQuery(compIdRef)
+// Kehadiran SEBENARNYA (koneksi WebSocket hidup), disegarkan tiap 5 detik
+const { data: presence } = useCompetitionPresence(compIdRef)
 
 interface ArenaItem {
   id: string
@@ -124,11 +126,7 @@ export interface DeviceSeat {
   seatNumber: number
   role: 'judge' | 'wasit' | 'scoreboard' | 'dewan'
   label: string
-  deviceModel: string
   pin: string
-  status: 'online' | 'offline' | 'idle'
-  latencyMs: number
-  batteryPct: number
   expiresAt: string
 }
 
@@ -183,12 +181,7 @@ async function fetchPinsForArena(arenaId: string) {
         seatNumber: s,
         role: 'judge',
         label: `KURSI JURI ${s}`,
-        deviceModel:
-          s <= 3 ? 'SAMSUNG GALAXY TAB A9 • ANDROID PWA' : 'LENOVO TAB M10 • ANDROID PWA',
         pin: pinStr,
-        status: s <= 3 ? 'online' : 'idle',
-        latencyMs: 12 + s * 3,
-        batteryPct: 96 - s * 4,
         expiresAt: formatExpiry(found?.expires_at),
       })
     }
@@ -201,11 +194,7 @@ async function fetchPinsForArena(arenaId: string) {
       seatNumber: 0,
       role: 'wasit',
       label: 'MEJA PENGAWAS & WASIT',
-      deviceModel: 'LAPTOP WASIT PERSILAT • WEBSOCKET OPERATOR',
       pin: wasitPinStr,
-      status: 'online',
-      latencyMs: 8,
-      batteryPct: 100,
       expiresAt: formatExpiry(foundWasit?.expires_at),
     })
 
@@ -233,6 +222,16 @@ const currentSeats = computed(() => {
   if (!aid) return []
   return arenaData.value[aid] || []
 })
+
+/** Status nyata sebuah perangkat dari koneksi WebSocket; `unknown` bila server belum menjawab. */
+function seatStatus(seat: DeviceSeat): 'online' | 'offline' | 'unknown' {
+  const p = presence.value?.byArena[selectedArena.value]
+  if (!p) return 'unknown'
+  if (seat.role === 'judge') return p.judge_seats.includes(seat.seatNumber) ? 'online' : 'offline'
+  if (seat.role === 'wasit') return p.referees > 0 ? 'online' : 'offline'
+  return 'unknown'
+}
+const STATUS_LABEL = { online: 'ONLINE', offline: 'OFFLINE', unknown: '…' } as const
 
 function getSeatCount(arenaId: string): number {
   if (arenaDeviceCounts.value[arenaId] !== undefined) {
@@ -358,13 +357,20 @@ async function handleBatchGenerate() {
   }
 }
 
-// Ping / Test Device Vibrations
+// Cek koneksi perangkat berdasarkan kehadiran WebSocket yang sebenarnya (tidak mengirim sinyal palsu)
 function handlePingDevice(seat: DeviceSeat) {
-  showToast(
-    'Sinyal Uji Coba Terkirim',
-    `Mengirim sinyal getar (haptic ping) ke ${seat.label}...`,
-    'info',
-  )
+  const status = seatStatus(seat)
+  if (status === 'online') {
+    showToast('Perangkat Terhubung', `${seat.label} sedang terhubung ke server.`, 'success')
+  } else if (status === 'offline') {
+    showToast(
+      'Perangkat Belum Terhubung',
+      `${seat.label} belum terhubung. Minta petugas membuka tablet dan memasukkan PIN.`,
+      'warning',
+    )
+  } else {
+    showToast('Status Belum Diketahui', 'Menunggu jawaban server, coba lagi sebentar.', 'info')
+  }
 }
 
 // Print Slips Modal
@@ -578,17 +584,21 @@ async function handleSaveCustomPin() {
             <span
               class="seat-status-dot"
               :class="{
-                'seat-status-dot--online': seat.status === 'online',
-                'seat-status-dot--idle': seat.status === 'idle',
-                'seat-status-dot--offline': seat.status === 'offline',
+                'seat-status-dot--online': seatStatus(seat) === 'online',
+                'seat-status-dot--idle': seatStatus(seat) === 'unknown',
+                'seat-status-dot--offline': seatStatus(seat) === 'offline',
               }"
             />
             <span class="font-bold">{{ seat.label }}</span>
           </div>
 
           <div class="pin-device-meta">
-            <span v-if="seat.latencyMs" class="latency-tag">{{ seat.latencyMs }}ms</span>
-            <span v-if="seat.batteryPct" class="battery-tag">🔋 {{ seat.batteryPct }}%</span>
+            <span
+              class="latency-tag"
+              :class="{ 'latency-tag--off': seatStatus(seat) !== 'online' }"
+              data-test="seat-status"
+              >{{ STATUS_LABEL[seatStatus(seat)] }}</span
+            >
           </div>
         </div>
 
@@ -605,7 +615,15 @@ async function handleSaveCustomPin() {
             <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
             <line x1="12" x2="12" y1="18" y2="18" />
           </svg>
-          <span>{{ seat.deviceModel }}</span>
+          <span>{{
+            seatStatus(seat) === 'online'
+              ? seat.role === 'wasit'
+                ? 'KONSOL WASIT TERHUBUNG'
+                : 'TABLET TERHUBUNG'
+              : seat.role === 'wasit'
+                ? 'KONSOL WASIT BELUM TERHUBUNG'
+                : 'TABLET BELUM TERHUBUNG'
+          }}</span>
         </div>
 
         <!-- PIN Display Box -->
@@ -658,7 +676,7 @@ async function handleSaveCustomPin() {
           <button
             v-if="seat.role === 'judge'"
             class="card-action-btn"
-            title="Kirim Tes Getar / Ping"
+            title="Cek Koneksi Perangkat"
             @click="handlePingDevice(seat)"
           >
             <svg
@@ -672,7 +690,7 @@ async function handleSaveCustomPin() {
               <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
               <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
             </svg>
-            <span>Ping</span>
+            <span>Cek</span>
           </button>
 
           <button
@@ -1200,6 +1218,10 @@ async function handleSaveCustomPin() {
   font-size: 0.6875rem;
 }
 
+.latency-tag--off {
+  color: #94a3b8 !important;
+  background-color: rgba(148, 163, 184, 0.12) !important;
+}
 .latency-tag {
   color: #10b981;
   background-color: rgba(16, 185, 129, 0.1);

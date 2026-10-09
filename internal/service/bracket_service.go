@@ -19,6 +19,11 @@ type BracketRepository interface {
 }
 
 // CategoryBracketRepository adalah kemampuan opsional repo bagan untuk isolasi per category_id.
+// BracketProgressChecker kemampuan opsional repo bagan untuk mengetahui apakah bagan kategori sudah dimainkan.
+type BracketProgressChecker interface {
+	HasStartedMatches(competitionID, categoryID string) (bool, error)
+}
+
 type CategoryBracketRepository interface {
 	GetByCategoryID(competitionID, categoryID string) ([]store.BracketSlot, error)
 	DeleteByCategoryID(competitionID, categoryID string) error
@@ -121,37 +126,43 @@ func (s *BracketService) generate(competitionID, categoryID, weightClass, gender
 			arenas, _ = s.arenaRepo.ListByCompetition(competitionID)
 		}
 
-		// Filter dan urutkan slot Ronde 1
-		var round1Slots []store.BracketSlot
+		// Pasangkan slot yang bersebelahan (0 & 1, 2 & 3, ...) di tiap ronde. Ronde 1 selalu; ronde berikutnya hanya
+		// bila kedua slot sudah terisi sejak awal, yaitu peserta yang lolos BYE dan bertemu sesama pemegang BYE.
+		// Sisanya dibuat otomatis saat pemenang maju (BracketStore.AdvanceWinner).
+		byRound := map[int][]store.BracketSlot{}
 		for _, sl := range slots {
-			if sl.Round == 1 {
-				round1Slots = append(round1Slots, sl)
-			}
+			byRound[sl.Round] = append(byRound[sl.Round], sl)
 		}
-		sort.Slice(round1Slots, func(i, j int) bool {
-			return round1Slots[i].SlotIndex < round1Slots[j].SlotIndex
-		})
+		rounds := make([]int, 0, len(byRound))
+		for r := range byRound {
+			rounds = append(rounds, r)
+		}
+		sort.Ints(rounds)
 
-		// Pasangkan slot Ronde 1 (0 & 1, 2 & 3, ...)
 		matchCounter := 0
-		for i := 0; i+1 < len(round1Slots); i += 2 {
-			slotRed := round1Slots[i]
-			slotBlue := round1Slots[i+1]
-
-			// Partai valid jika kedua sudut memiliki peserta sah (bukan double BYE / salah satu BYE)
-			if slotRed.ParticipantID != nil && !slotRed.IsBye && slotBlue.ParticipantID != nil && !slotBlue.IsBye {
+		for _, r := range rounds {
+			list := byRound[r]
+			sort.Slice(list, func(i, j int) bool { return list[i].SlotIndex < list[j].SlotIndex })
+			for i := 0; i+1 < len(list); i += 2 {
+				slotRed, slotBlue := list[i], list[i+1]
+				if slotRed.SlotIndex^1 != slotBlue.SlotIndex {
+					continue
+				}
+				// Partai valid jika kedua sudut memiliki peserta sah (bukan BYE / kosong)
+				if slotRed.ParticipantID == nil || slotRed.IsBye || slotBlue.ParticipantID == nil || slotBlue.IsBye {
+					continue
+				}
 				var arenaID string
 				if len(arenas) > 0 {
 					arenaID = arenas[matchCounter%len(arenas)].ID
 				}
-
 				m := &store.Match{
 					CompetitionID: competitionID,
 					ArenaID:       arenaID,
 					BracketSlotID: slotRed.ID,
 					AthleteRedID:  *slotRed.ParticipantID,
 					AthleteBlueID: *slotBlue.ParticipantID,
-					CurrentRound:  1,
+					CurrentRound:  r,
 					Status:        "idle",
 				}
 				_ = s.matchRepo.Create(m)
@@ -208,4 +219,14 @@ func (s *BracketService) ListCategoryBracketSummaries(competitionID string) ([]s
 		return nil, errors.New("bracket repository does not support category summaries")
 	}
 	return sm.ListCategorySummaries(competitionID)
+}
+
+// CategoryBracketStarted true bila ada partai bagan kategori itu yang sudah dimulai/selesai/dibatalkan, sehingga
+// bagan tidak boleh dibentuk ulang.
+func (s *BracketService) CategoryBracketStarted(competitionID, categoryID string) (bool, error) {
+	pc, ok := s.repo.(BracketProgressChecker)
+	if !ok {
+		return false, nil
+	}
+	return pc.HasStartedMatches(competitionID, categoryID)
 }

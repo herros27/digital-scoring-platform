@@ -301,3 +301,15 @@ func (s *BracketStore) ListCategorySummaries(competitionID string) ([]CategoryBr
 	}
 	return list, rows.Err()
 }
+
+// HasStartedMatches true bila ada partai pada bagan kategori ini yang tidak lagi idle (berjalan, dijeda, selesai,
+// atau dibatalkan). Mengacak ulang bagan seperti itu akan memutus partai dari slotnya dan merusak hasil.
+func (s *BracketStore) HasStartedMatches(competitionID, categoryID string) (bool, error) {
+	var n int
+	err := s.DB.QueryRow(`
+		SELECT COUNT(*) FROM matches m
+		JOIN bracket_slots b ON b.id = m.bracket_slot_id
+		WHERE m.competition_id = $1 AND b.category_id = $2 AND m.status <> 'idle'`,
+		competitionID, categoryID).Scan(&n)
+	return n > 0, err
+}

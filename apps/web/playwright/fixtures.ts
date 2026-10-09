@@ -1,8 +1,21 @@
-import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test'
 import { adminToken } from '../cypress/support/match/auth.ts'
 import { must } from '../cypress/support/match/http.ts'
 import { buildKit } from '../cypress/support/match/kit.ts'
-import type { MatchKit, MatchRef, Session } from '../cypress/support/match/kit.ts'
+import type {
+  Devices as SocketDevices,
+  MatchKit,
+  MatchRef,
+  Session,
+} from '../cypress/support/match/kit.ts'
+import { confirmScore, snapshot } from '../cypress/support/match/helpers.ts'
+import type { Json } from '../cypress/support/match/http.ts'
 
 /** Empat perangkat pada satu partai: konsol wasit dan layar juri kursi 1-3. */
 export interface Devices {
@@ -14,7 +27,7 @@ export interface Devices {
   startViaApi(): Promise<void>
 }
 
-async function openAs(
+export async function openAs(
   context: BrowserContext,
   s: Session,
   path: string,
@@ -39,7 +52,142 @@ async function openAs(
   return page
 }
 
-export const test = base.extend<{ devices: Devices }, { kit: MatchKit }>({
+/** Konsol wasit + 3 layar juri (browser context terpisah) untuk gelanggang utama. */
+export interface Crew {
+  wasit: Page
+  juri: Page[]
+  close(): Promise<void>
+}
+
+/**
+ * Membuka konsol wasit dan layar juri kursi 1-3. Mode berjendela (--headed): tiap jendela menempati satu kuadran
+ * layar (grid 2x2). `redName` (bila diberikan) ditunggu muncul di konsol wasit sebagai tanda partai sudah dimuat.
+ */
+export async function openCrew(
+  browser: Browser,
+  kit: MatchKit,
+  opts: { baseURL: string | undefined; headed: boolean; redName?: string },
+): Promise<Crew> {
+  let index = 0
+  const tile = opts.headed
+    ? async (page: Page) => {
+        const slot = index++
+        try {
+          const { w, h } = await page.evaluate(() => ({
+            w: window.screen.availWidth,
+            h: window.screen.availHeight,
+          }))
+          const cdp = await page.context().newCDPSession(page)
+          const { windowId } = await cdp.send('Browser.getWindowForTarget')
+          await cdp.send('Browser.setWindowBounds', {
+            windowId,
+            bounds: {
+              left: (slot % 2) * Math.floor(w / 2),
+              top: Math.floor(slot / 2) * Math.floor(h / 2),
+              width: Math.floor(w / 2),
+              height: Math.floor(h / 2),
+              windowState: 'normal',
+            },
+          })
+        } catch {
+          // penataan jendela opsional
+        }
+      }
+    : undefined
+
+  const contexts: BrowserContext[] = []
+  const newContext = async () => {
+    const c = await browser.newContext({
+      baseURL: opts.baseURL,
+      viewport: opts.headed ? null : { width: 1280, height: 800 },
+    })
+    contexts.push(c)
+    return c
+  }
+
+  const wasit = await openAs(await newContext(), kit.wasit, '/referee', tile)
+  const juri: Page[] = []
+  for (const j of kit.judges) juri.push(await openAs(await newContext(), j, '/judge', tile))
+
+  if (opts.redName) {
+    await expect(wasit.locator('.ref-fighter-card--red .ref-fighter-name')).toHaveText(
+      opts.redName,
+      { timeout: 15_000 },
+    )
+  }
+  for (const p of juri) await expect(p.locator('.judge-online-pill')).toContainText('ONLINE')
+
+  return {
+    wasit,
+    juri,
+    close: async () => {
+      await Promise.all(contexts.map((c) => c.close().catch(() => undefined)))
+    },
+  }
+}
+
+/**
+ * Satu partai di gelanggang utama dengan konsol wasit (UI) + layar scoreboard publik (UI) + tiga juri lewat soket.
+ * Untuk tes yang fokus pada tampilan wasit/penonton dan butuh poin juri tanpa membuka tiga browser lagi.
+ */
+export interface Arena {
+  kit: MatchKit
+  match: MatchRef
+  wasit: Page
+  scoreboard: Page
+  sockets: SocketDevices
+  /** Memulai partai lewat REST dan menunggu konsol wasit menampilkan BERJALAN. */
+  start(): Promise<void>
+  /** Dua juri menekan teknik yang sama pada sudut itu (konsensus) dan menunggu poin terkonfirmasi. */
+  score(target: 'red' | 'blue', type?: string): Promise<void>
+  /** Ringkasan keadaan partai dari server (sync_response). */
+  state(): Promise<Json>
+}
+
+export const test = base.extend<{ devices: Devices; arena: Arena }, { kit: MatchKit }>({
+  arena: async ({ browser, kit, baseURL }, use) => {
+    const match = await kit.createMatch()
+    await must('load-arena', kit.loadMatch(match))
+    const sockets = await kit.openDevices()
+    const wctx = await browser.newContext({ baseURL, viewport: { width: 1600, height: 1000 } })
+    const wasit = await openAs(wctx, kit.wasit, '/referee', undefined)
+    const sctx = await browser.newContext({ baseURL, viewport: { width: 1600, height: 900 } })
+    const scoreboard = await sctx.newPage()
+    await scoreboard.goto(`/scoreboard/${kit.arenaId}`)
+    await expect(wasit.locator('.ref-fighter-card--red .ref-fighter-name')).toHaveText(
+      match.redName,
+      { timeout: 15_000 },
+    )
+    await expect(scoreboard.locator('.sb-athlete-name').first()).toHaveText(match.redName, {
+      timeout: 15_000,
+    })
+
+    await use({
+      kit,
+      match,
+      wasit,
+      scoreboard,
+      sockets,
+      async start() {
+        await must('start', kit.control(match, 'start'))
+        await expect(wasit.locator('.ref-chrono-round')).toContainText('BERJALAN')
+      },
+      async score(target, type = 'knockdown') {
+        const before = sockets.wasit.mark()
+        await confirmScore(sockets, target, type)
+        await sockets.wasit.waitFor('score_confirmed', {
+          since: before,
+          what: 'poin terkonfirmasi',
+        })
+      },
+      state: () => snapshot(sockets.wasit),
+    })
+
+    await sockets.closeAll()
+    await Promise.all([wctx.close(), sctx.close()])
+    await kit.control(match, 'cancel').catch(() => undefined)
+  },
+
   // Satu kejuaraan + ruleset + PIN untuk seluruh sesi tes (dibersihkan di akhir)
   kit: [
     // Playwright mewajibkan pola destrukturisasi (kosong) untuk fixture tanpa dependensi
@@ -62,54 +210,8 @@ export const test = base.extend<{ devices: Devices }, { kit: MatchKit }>({
     const headed = testInfo.project.use.headless === false
     const match = await kit.createMatch()
     await must('load-arena', kit.loadMatch(match))
-
-    let index = 0
-    // Mode berjendela: tiap jendela menempati satu kuadran layar (grid 2x2)
-    const tile = headed
-      ? async (page: Page) => {
-          const slot = index++
-          try {
-            const { w, h } = await page.evaluate(() => ({
-              w: window.screen.availWidth,
-              h: window.screen.availHeight,
-            }))
-            const cdp = await page.context().newCDPSession(page)
-            const { windowId } = await cdp.send('Browser.getWindowForTarget')
-            await cdp.send('Browser.setWindowBounds', {
-              windowId,
-              bounds: {
-                left: (slot % 2) * Math.floor(w / 2),
-                top: Math.floor(slot / 2) * Math.floor(h / 2),
-                width: Math.floor(w / 2),
-                height: Math.floor(h / 2),
-                windowState: 'normal',
-              },
-            })
-          } catch {
-            // penataan jendela opsional
-          }
-        }
-      : undefined
-
-    const contexts: BrowserContext[] = []
-    const newContext = async () => {
-      const c = await browser.newContext({
-        baseURL,
-        viewport: headed ? null : { width: 1280, height: 800 },
-      })
-      contexts.push(c)
-      return c
-    }
-
-    const wasit = await openAs(await newContext(), kit.wasit, '/referee', tile)
-    const juri: Page[] = []
-    for (const j of kit.judges) juri.push(await openAs(await newContext(), j, '/judge', tile))
-
-    await expect(wasit.locator('.ref-fighter-card--red .ref-fighter-name')).toHaveText(
-      match.redName,
-      { timeout: 15_000 },
-    )
-    for (const p of juri) await expect(p.locator('.judge-online-pill')).toContainText('ONLINE')
+    const crew = await openCrew(browser, kit, { baseURL, headed, redName: match.redName })
+    const { wasit, juri } = crew
 
     await use({
       kit,
@@ -123,7 +225,7 @@ export const test = base.extend<{ devices: Devices }, { kit: MatchKit }>({
       },
     })
 
-    await Promise.all(contexts.map((c) => c.close().catch(() => undefined)))
+    await crew.close()
     await kit.control(match, 'cancel').catch(() => undefined)
   },
 })

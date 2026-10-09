@@ -274,6 +274,11 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 		orch.SetRuntimeStore(s.runtimeStore)
 	}
 	s.activeOrchestrators[matchID] = orch
+	if s.matchStore != nil {
+		if err := s.matchStore.SetArena(matchID, arenaID); err != nil {
+			log.Printf("[match] gagal mencatat gelanggang partai %s: %v", matchID, err)
+		}
+	}
 	// beri tahu layar yang sudah tersambung (scoreboard, tablet, konsol) bahwa partai baru dimuat
 	orch.BroadcastSnapshot()
 	return nil

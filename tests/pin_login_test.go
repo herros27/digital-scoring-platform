@@ -180,9 +180,11 @@ func postJudgeLogin(h *handler.AuthHandler, body string) *httptest.ResponseRecor
 
 func newLoginHandler(pins *auth.PinStore) *handler.AuthHandler {
 	return &handler.AuthHandler{
-		Pins:      pins,
-		Lockout:   auth.NewAttemptLimiter(3, time.Minute, time.Minute),
-		ClientKey: func(r *http.Request) string { return r.RemoteAddr },
+		Pins: pins,
+		Guard: auth.NewPinGuard(auth.PinGuardConfig{
+			Window: time.Minute, DeviceMax: 3, DeviceLockout: time.Minute,
+			IPMax: 100, IPLockout: time.Minute, GlobalMax: 1000, GlobalLockout: time.Minute,
+		}),
 	}
 }
 
@@ -227,7 +229,7 @@ func TestJudgeLoginHandler_RejectsMalformedPIN(t *testing.T) {
 		}
 	}
 	// format salah tidak dihitung sebagai percobaan menebak
-	if locked, _ := h.Lockout.Check("10.0.0.7:5555"); locked {
+	if locked, _, _ := h.Guard.Check("10.0.0.7", ""); locked {
 		t.Error("input tidak valid tidak boleh mengunci klien")
 	}
 }
@@ -292,5 +294,45 @@ func TestCreatePINHandler_ConflictAndFormat(t *testing.T) {
 	rec := post(fmt.Sprintf(`{"competition_id":%q,"arena_id":%q,"role":"wasit"}`, comp, arenaA))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"pin":"`) {
 		t.Fatalf("PIN acak wasit: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func postJudgeLoginAs(h *handler.AuthHandler, device, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest("POST", "/api/v1/auth/judge-login", strings.NewReader(body))
+	req.RemoteAddr = "10.0.0.7:5555" // semua tablet berbagi satu IP (mis. Docker Desktop)
+	if device != "" {
+		req.Header.Set("X-Device-Id", device)
+	}
+	rec := httptest.NewRecorder()
+	h.JudgeLogin(rec, req)
+	return rec
+}
+
+// Tablet yang salah PIN berulang hanya mengunci dirinya sendiri; tablet lain di IP yang sama tetap bisa login.
+func TestJudgeLoginHandler_WrongPINsOnOneTabletDoNotLockOthersOnSameIP(t *testing.T) {
+	pins, comp, arenaA, _ := pinTestEnv(t)
+	h := newLoginHandler(pins) // ambang perangkat 3
+
+	good := uniquePIN(t, "judge")
+	if _, err := pins.CreatePINWithSeat(comp, arenaA, "juri", 3, good, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	wrong := `{"pin":"000001"}`
+	for i := 0; i < 3; i++ {
+		if rec := postJudgeLoginAs(h, "tablet-A-0001", wrong); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("PIN salah ke-%d -> %d, want 401", i+1, rec.Code)
+		}
+	}
+	rec := postJudgeLoginAs(h, "tablet-A-0001", `{"pin":"`+good+`"}`)
+	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("tablet A harus terkunci walau PIN benar: %d %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(rec.Body.String(), `"scope":"device"`) {
+		t.Errorf("respons harus menyebut lapisan penolak (device): %s", rec.Body)
+	}
+
+	// tablet B, IP yang sama, PIN benar: harus berhasil
+	if rec := postJudgeLoginAs(h, "tablet-B-0002", `{"pin":"`+good+`"}`); rec.Code != http.StatusOK {
+		t.Fatalf("tablet B ikut terkunci: %d %s", rec.Code, rec.Body)
 	}
 }

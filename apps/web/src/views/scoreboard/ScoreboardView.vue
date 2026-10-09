@@ -34,6 +34,10 @@ const roundScores = ref([
   { round: 3, red: 0, blue: 0, redPen: 0, bluePen: 0 },
 ])
 
+// Jumlah babak mengikuti ruleset pertandingan (mis. Usia Dini 2 babak), bukan selalu 3
+const totalRounds = ref(3)
+const visibleRounds = computed(() => roundScores.value.slice(0, totalRounds.value))
+
 // Total bersih = poin teknik dikurangi potongan hukuman (sama dengan red_total/blue_total server)
 const redTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.red - r.redPen, 0))
 const blueTotal = computed(() => roundScores.value.reduce((acc, r) => acc + r.blue - r.bluePen, 0))
@@ -49,7 +53,7 @@ const consensusStatus = computed(() => {
 
 // Chip status per babak, diturunkan dari babak aktif dan status pertandingan
 const roundChips = computed(() =>
-  [1, 2, 3].map((round) => {
+  Array.from({ length: totalRounds.value }, (_, i) => i + 1).map((round) => {
     if (matchStatus.value === 'finished' || round < currentRound.value) {
       return { round, kind: 'done' as const, label: 'SELESAI' }
     }
@@ -158,6 +162,9 @@ onMounted(async () => {
 
   // Listen to WebSocket broadcasts
   onMessage('sync_response', (payload) => {
+    if (payload.total_rounds && payload.total_rounds > 0) {
+      totalRounds.value = Math.min(payload.total_rounds, roundScores.value.length)
+    }
     // partai baru dimuat ke gelanggang ini: tutup tampilan pemenang lama dan muat ulang label
     if (payload.match_id && payload.match_id !== loadedMatchId) {
       if (loadedMatchId) showWinnerModal.value = false
@@ -467,7 +474,7 @@ onMounted(async () => {
         <!-- Round Score Breakdown (Babak 1, 2, 3) -->
         <div class="sb-breakdown-row">
           <div
-            v-for="r in roundScores"
+            v-for="r in visibleRounds"
             :key="r.round"
             class="sb-round-card"
             :class="{ 'sb-round-card--active-red': r.round === currentRound }"
@@ -560,7 +567,7 @@ onMounted(async () => {
         <!-- Round Score Breakdown (Babak 1, 2, 3) -->
         <div class="sb-breakdown-row">
           <div
-            v-for="r in roundScores"
+            v-for="r in visibleRounds"
             :key="r.round"
             class="sb-round-card"
             :class="{ 'sb-round-card--active-blue': r.round === currentRound }"
@@ -1599,5 +1606,4 @@ onMounted(async () => {
 .font-bold {
   font-weight: 700;
 }
-
 </style>

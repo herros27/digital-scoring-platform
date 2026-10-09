@@ -22,9 +22,12 @@ import {
   useGenerateBracketMutation,
 } from '@/features/tournament/api/bracketQueries'
 import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
-import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import {
+  useCategoriesQuery,
+  useSetBracketLockMutation,
+} from '@/features/categories/api/categoryQueries'
 import { AGE_BANDS, ageGroupLabel } from '@/features/categories/lib/ageGroups'
-import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+import { useArenasQuery, useCompetitionPresence } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useMatchesQuery } from '@/features/matches/api/matchQueries'
 import { useCompetitionsQuery } from '@/features/competitions/api/competitionQueries'
@@ -457,9 +460,18 @@ function handleProfileClick() {
 }
 
 // Draw & Locking State
-const isLocked = ref(true)
+// Kunci draw disimpan di SERVER per kategori (kolom bracket_locked); tombol hanya memintanya diubah.
+// Kelas turunan dari peserta lama tanpa kategori resmi tidak punya kunci.
+const lockMutation = useSetBracketLockMutation(activeCompId)
+const currentCategory = computed(() =>
+  (rawCategories.value || []).find((c) => c.id === currentCategoryId.value),
+)
+const isLocked = computed(() => currentCategory.value?.bracket_locked === true)
 const drawHash = ref('#IPSI-2025-CL-A-9941')
-const telemetryMs = ref(12)
+// Telemetri NYATA: latensi dari polling kehadiran ke server dan jumlah juri yang benar-benar terhubung
+const { data: presence, isError: serverUnreachable } = useCompetitionPresence(activeCompId)
+const telemetryMs = computed(() => (presence.value ? String(presence.value.rttMs) : '–'))
+const judgesOnline = computed(() => presence.value?.judgesOnline ?? 0)
 
 // Notification / Toast
 const toast = ref<{
@@ -586,20 +598,20 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
       id: `slot-${slotRed?.id || i}`,
       partaiNumber: pairIndex,
       arenaLabel: arenaLabel,
-      status: isFinished ? 'selesai' : matchedMatch?.status === 'running' ? 'live' : 'ready',
+      status: isFinished ? 'selesai' : isLiveMatch(matchedMatch?.status) ? 'live' : 'ready',
       statusBadge: isFinished
         ? 'SELESAI'
-        : matchedMatch?.status === 'running'
+        : isLiveMatch(matchedMatch?.status)
           ? 'LIVE'
           : hasRedBye || hasBlueBye
             ? 'BYE'
             : 'SIAP',
       statusVariant: isFinished
         ? 'neutral'
-        : matchedMatch?.status === 'running'
+        : isLiveMatch(matchedMatch?.status)
           ? 'emerald'
           : 'neutral',
-      isLive: matchedMatch?.status === 'running',
+      isLive: isLiveMatch(matchedMatch?.status),
       red: {
         name:
           redParticipant?.name ||
@@ -663,6 +675,9 @@ const bracketRounds = computed<BracketRoundDisplay[]>(() => {
   }
   return list
 })
+
+// Partai live = berjalan atau sedang dijeda (belum selesai)
+const isLiveMatch = (status?: string) => status === 'running' || status === 'paused'
 
 // Current selected or queued match for bottom dock
 const selectedBracketMatch = ref<MatchCard | null>(null)
@@ -735,7 +750,34 @@ function handleGenerateDraw() {
   }
 }
 
+async function applyLock(locked: boolean) {
+  try {
+    await lockMutation.mutateAsync({ categoryId: currentCategoryId.value, locked })
+    showToast(
+      locked ? 'Bagan Dikunci' : 'Kunci Dibuka',
+      locked
+        ? 'Susunan bagan resmi terkunci di server dan tidak bisa diacak ulang.'
+        : 'Bagan kini dapat diacak ulang.',
+      locked ? 'success' : 'info',
+    )
+  } catch (err) {
+    showToast(
+      'Gagal Mengubah Kunci',
+      getErrorMessage(err, 'Kunci draw tidak dapat diubah.'),
+      'warning',
+    )
+  }
+}
+
 function toggleLock() {
+  if (!currentCategoryId.value) {
+    showToast(
+      'Kunci Tidak Tersedia',
+      'Kunci draw hanya untuk kategori resmi. Kelas ini berasal dari peserta lama tanpa kategori.',
+      'info',
+    )
+    return
+  }
   if (isLocked.value) {
     modal.value = {
       show: true,
@@ -743,15 +785,13 @@ function toggleLock() {
       message: 'Membuka kunci memungkinkan perubahan susunan atlet oleh Delegasi Teknik.',
       confirmText: 'Buka Kunci',
       confirmVariant: 'danger',
-      action: () => {
-        isLocked.value = false
-        showToast('Kunci Dibuka', 'Bagan kini dapat disunting atau diacak ulang.', 'info')
+      action: async () => {
+        await applyLock(false)
         modal.value = null
       },
     }
   } else {
-    isLocked.value = true
-    showToast('Bagan Dikunci', 'Susunan bagan resmi terkunci dan tersertifikasi.', 'success')
+    void applyLock(true)
   }
 }
 
@@ -833,8 +873,10 @@ function handleLoadToMat1() {
         </div>
 
         <div class="ops-telemetry font-mono">
-          <span class="telemetry-dot" />
-          <span class="telemetry-text">TELEMETRY LIVE</span>
+          <span class="telemetry-dot" :class="{ 'telemetry-dot--down': serverUnreachable }" />
+          <span class="telemetry-text">{{
+            serverUnreachable ? 'TELEMETRI MATI' : 'TELEMETRI LIVE'
+          }}</span>
           <span class="telemetry-ping">{{ telemetryMs }}ms</span>
         </div>
       </div>
@@ -1192,7 +1234,7 @@ function handleLoadToMat1() {
         <div class="ops-topbar__system-pills font-mono">
           <div class="system-pill">
             <span class="system-pill__dot emerald" />
-            <span>SERVER SYNC: 100%</span>
+            <span>{{ serverUnreachable ? 'SERVER TERPUTUS' : 'SERVER ONLINE' }}</span>
           </div>
           <div class="system-pill">
             <svg
@@ -1207,7 +1249,7 @@ function handleLoadToMat1() {
               <path d="M4 4a16 16 0 0 1 16 16" />
               <circle cx="5" cy="19" r="1" />
             </svg>
-            <span>5 JURY CONNECTED</span>
+            <span data-test="juri-online">{{ judgesOnline }} JURI ONLINE</span>
           </div>
           <div
             class="ops-profile-badge"
@@ -1366,9 +1408,18 @@ function handleLoadToMat1() {
               <button
                 v-if="isAdminOrDewan"
                 class="ops-action-btn-dark font-mono"
+                :class="{ 'ops-action-btn-dark--unlocked': !isLocked }"
+                :title="
+                  isLocked
+                    ? 'Draw sedang TERKUNCI. Klik untuk membuka kunci.'
+                    : 'Draw sedang TERBUKA (bisa diacak ulang). Klik untuk mengunci.'
+                "
+                :aria-pressed="isLocked"
+                data-test="draw-lock"
                 @click="toggleLock"
               >
                 <svg
+                  v-if="isLocked"
                   width="15"
                   height="15"
                   viewBox="0 0 24 24"
@@ -1379,7 +1430,22 @@ function handleLoadToMat1() {
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                <span>{{ isLocked ? 'Kunci Draw (Locked)' : 'Buka Kunci' }}</span>
+                <svg
+                  v-else
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                </svg>
+                <span>{{ isLocked ? 'Draw Terkunci' : 'Draw Terbuka' }}</span>
+                <small class="ops-lock-hint">{{
+                  isLocked ? 'klik untuk buka' : 'klik untuk kunci'
+                }}</small>
               </button>
 
               <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
@@ -1477,7 +1543,7 @@ function handleLoadToMat1() {
             <div class="metric-block">
               <div class="metric-label">SEDANG TANDING</div>
               <div class="metric-val text-emerald-400">
-                {{ rawMatches?.filter((m) => m.status === 'running').length || 0 }}
+                {{ rawMatches?.filter((m) => isLiveMatch(m.status)).length || 0 }}
                 <span class="metric-unit">LIVE</span>
               </div>
             </div>
@@ -1842,6 +1908,10 @@ function handleLoadToMat1() {
   font-size: 0.6875rem;
 }
 
+.telemetry-dot--down {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px #ef4444 !important;
+}
 .telemetry-dot {
   width: 7px;
   height: 7px;
@@ -2252,6 +2322,17 @@ function handleLoadToMat1() {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.ops-action-btn-dark--unlocked {
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+.ops-lock-hint {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .ops-action-btn-dark:hover {

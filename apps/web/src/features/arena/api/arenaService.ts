@@ -1,6 +1,12 @@
 import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
-import type { Arena, LiveArena, LiveSchedule, LiveScoreboardSnapshot } from '../types/arena.schema'
+import type {
+  Arena,
+  ArenaPresence,
+  LiveArena,
+  LiveSchedule,
+  LiveScoreboardSnapshot,
+} from '../types/arena.schema'
 
 export const arenaService = {
   /**
@@ -10,6 +16,14 @@ export const arenaService = {
     if (!compId) return []
     const res = await http.get<Arena[]>(ENDPOINTS.ARENAS.LIST(compId))
     return res.data || []
+  },
+
+  /**
+   * GET /api/v1/competitions/{comp_id}/arenas/{id}/presence — perangkat yang sedang terhubung.
+   */
+  async getPresence(compId: string, id: string): Promise<ArenaPresence> {
+    const res = await http.get<ArenaPresence>(ENDPOINTS.ARENAS.PRESENCE(compId, id))
+    return res.data
   },
 
   /**

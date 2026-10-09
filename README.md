@@ -447,42 +447,18 @@ Tablet juri, konsol wasit, dan scoreboard tersambung ulang sendiri dan meminta s
 
 ## Deployment (Production)
 
-### VPS Topology
-```
-Internet → Cloudflare (DNS + DDoS) → Caddy (auto HTTPS, reverse proxy)
-  ├─ Go App :8080
-  ├─ PostgreSQL :5432 (local or managed)
-  └─ Static PWA files (judge, scoreboard, admin)
+### HTTPS dan PWA (tablet juri)
+
+Aplikasi (frontend + proxy API/WebSocket) disajikan nginx di layanan `web`. HTTPS **wajib** bila tablet memasang
+aplikasi sebagai PWA. Aktifkan Caddy dengan profil `https`:
+
+```bash
+# .env.prod: WEB_PORT=127.0.0.1:8081, SITE_ADDRESS=silat.contoh.id  (LAN tanpa domain: TLS_DIRECTIVE=tls internal)
+docker compose --env-file .env.prod --profile https up -d --build
 ```
 
-### Caddy Config (example)
-```caddyfile
-scoring.example.com {
-    encode gzip
-    
-    # API + WebSocket
-    handle /api/* /ws/* {
-        reverse_proxy localhost:8080
-    }
-    
-    # PWA Frontends
-    handle /judge/* {
-        root * /var/www/judge
-        try_files {path} /index.html
-        file_server
-    }
-    handle /scoreboard/* {
-        root * /var/www/scoreboard
-        try_files {path} /index.html
-        file_server
-    }
-    handle /admin/* {
-        root * /var/www/admin
-        try_files {path} /index.html
-        file_server
-    }
-}
-```
+Petunjuk lengkap (sertifikat Let's Encrypt vs CA internal, memasang root CA di tablet, cara memasang PWA, perilaku
+offline dan pembaruan): [`docs/PWA.md`](docs/PWA.md).
 
 ### Systemd Service
 ```ini

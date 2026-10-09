@@ -19,6 +19,42 @@ func nextPowerOfTwo(n int) int {
 	return p
 }
 
+// seedPositions urutan seed per posisi slot ronde 1 untuk bagan berukuran `size` (pangkat dua): 1 melawan size,
+// 2 melawan size-1, dan seterusnya, dengan seed teratas terpisah ke sisi bagan yang berbeda.
+func seedPositions(size int) []int {
+	seeds := []int{1}
+	for len(seeds) < size {
+		n := len(seeds) * 2
+		next := make([]int, 0, n)
+		for _, s := range seeds {
+			next = append(next, s, n+1-s)
+		}
+		seeds = next
+	}
+	return seeds
+}
+
+// round1Placement indeks peserta (0-based) untuk tiap slot ronde 1; -1 berarti BYE. Bila jumlah peserta pas pangkat
+// dua, urutan masukan dipertahankan. Bila tidak, slot BYE harus tersebar satu per pasangan: menaruhnya berurutan di
+// ujung membuat pasangan BYE lawan BYE, sehingga pemenang pasangan di sebelahnya tidak pernah mendapat lawan.
+func round1Placement(numParticipants, bracketSize int) []int {
+	out := make([]int, bracketSize)
+	if numParticipants == bracketSize {
+		for i := range out {
+			out[i] = i
+		}
+		return out
+	}
+	for i, seed := range seedPositions(bracketSize) {
+		if seed <= numParticipants {
+			out[i] = seed - 1
+		} else {
+			out[i] = -1
+		}
+	}
+	return out
+}
+
 // GenerateSlots menyusun struktur pohon bagan dari ronde 1 hingga Final
 func GenerateSlots(competitionID, weightClass, gender string, participantIDs []string) []store.BracketSlot {
 	numParticipants := len(participantIDs)
@@ -30,6 +66,7 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 	totalRounds := int(math.Log2(float64(bracketSize)))
 
 	var allSlots []store.BracketSlot
+	placement := round1Placement(numParticipants, bracketSize)
 
 	// Map untuk menyimpan slot per ronde agar mudah menghubungkan next_slot_id:
 	// key: "round:slot_index" -> generated UUID
@@ -72,8 +109,8 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 
 			// Khusus Ronde 1: Masukkan peserta & tentukan BYE
 			if r == 1 {
-				if i < numParticipants {
-					pID := participantIDs[i]
+				if placement[i] >= 0 {
+					pID := participantIDs[placement[i]]
 					slot.ParticipantID = &pID
 				} else {
 					// Slot kosong di ronde 1 dianggap BYE

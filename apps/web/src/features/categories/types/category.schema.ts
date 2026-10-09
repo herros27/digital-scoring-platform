@@ -62,6 +62,9 @@ export interface Category {
   min_weight?: number | null
   max_weight?: number | null
   bracket_mode?: BracketMode
+  /** Draw bagan dikunci panitia (disimpan di server): bagan tidak bisa diacak ulang */
+  bracket_locked?: boolean
+  bracket_locked_at?: string
   created_at: string
   // UI extended metadata
   quota?: number

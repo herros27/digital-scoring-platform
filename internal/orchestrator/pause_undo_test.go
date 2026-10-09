@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/herros27/digital-scoring/internal/hub"
+	"github.com/herros27/digital-scoring/internal/statemachine"
+	"github.com/herros27/digital-scoring/internal/store"
 )
 
 func progressCounts(msgs []hub.Message) []int {
@@ -87,5 +89,38 @@ func TestUndoDoesNotRevertConfirmedPoints(t *testing.T) {
 	}
 	if got := r.o.Snapshot()["red_total"]; got != 1 {
 		t.Fatalf("red_total = %v, want 1", got)
+	}
+}
+
+// statusRecorder MatchStore palsu yang mencatat urutan status yang disimpan.
+type statusRecorder struct{ statuses []string }
+
+func (s *statusRecorder) UpdateStatus(_, status string) error {
+	s.statuses = append(s.statuses, status)
+	return nil
+}
+func (s *statusRecorder) SetWinner(string, string) error       { return nil }
+func (s *statusRecorder) GetByID(string) (*store.Match, error) { return nil, nil }
+
+// Daftar partai di UI panitia membaca status dari database: jeda harus tersimpan sebagai "paused" (agar tombol
+// Lanjutkan muncul) dan kembali "running" saat dilanjutkan.
+func TestPauseAndResumePersistMatchStatus(t *testing.T) {
+	rec := &statusRecorder{}
+	h := hub.NewHub("arena-1")
+	o := New("match-1", "arena-1", statemachine.New("match-1"), customRuleset(), h, rec, nil, nil, nil)
+	referee, _ := hub.NewClient("ref-1", hub.RoleReferee, "arena-1")
+	h.Register(referee)
+
+	for _, action := range []string{"start", "pause", "resume"} {
+		o.handleMessage("arena-1", referee, hub.Message{Type: hub.MsgStateChange, Payload: map[string]any{"action": action}})
+	}
+	want := []string{"running", "paused", "running"}
+	if len(rec.statuses) != len(want) {
+		t.Fatalf("status tersimpan = %v, want %v", rec.statuses, want)
+	}
+	for i := range want {
+		if rec.statuses[i] != want[i] {
+			t.Fatalf("status tersimpan = %v, want %v", rec.statuses, want)
+		}
 	}
 }

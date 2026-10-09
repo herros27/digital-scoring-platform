@@ -15,6 +15,11 @@ type CategoryRepository interface {
 	ListByCompetition(competitionID string) ([]domain.Category, error)
 }
 
+// BracketLocker kemampuan opsional repo kategori untuk menyimpan kunci draw bagan.
+type BracketLocker interface {
+	SetBracketLock(competitionID, categoryID string, locked bool) (*domain.Category, error)
+}
+
 type CategoryService struct {
 	repo CategoryRepository
 	// rulesetExists opsional: memastikan ruleset khusus kategori benar-benar ada.
@@ -189,4 +194,17 @@ func (s *CategoryService) AssignRulesets(competitionID string, items []domain.Ca
 		return 0, errors.New("category repository does not support ruleset assignment")
 	}
 	return a.AssignRulesets(competitionID, items)
+}
+
+// SetBracketLock mengunci (locked=true) atau membuka draw bagan sebuah kategori. Bagan yang terkunci tidak bisa
+// diacak ulang sampai dibuka; operasinya idempoten.
+func (s *CategoryService) SetBracketLock(competitionID, categoryID string, locked bool) (*domain.Category, error) {
+	if competitionID == "" || categoryID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	bl, ok := s.repo.(BracketLocker)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	return bl.SetBracketLock(competitionID, categoryID, locked)
 }

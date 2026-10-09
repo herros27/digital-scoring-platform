@@ -150,7 +150,12 @@ func TestOfficialService_CRUDAndLogin(t *testing.T) {
 }
 
 type mockReportMatchRepo struct {
-	matches []store.Match
+	matches    []store.Match
+	placements []store.MedalPlacement
+}
+
+func (m *mockReportMatchRepo) MedalPlacements(string) ([]store.MedalPlacement, error) {
+	return m.placements, nil
 }
 
 func (m *mockReportMatchRepo) ListByCompetition(competitionID string) ([]store.Match, error) {
@@ -253,6 +258,11 @@ func TestReportService_SummaryAndMedalsAndExport(t *testing.T) {
 	_ = athleteRepo.Create(ath2)
 
 	matchRepo := &mockReportMatchRepo{
+		// hasil bagan: final dimenangkan Jatim atas Jabar, dua tim lain kalah di semifinal
+		placements: []store.MedalPlacement{
+			{Team: "Kontingen Jatim", Medal: "gold"},
+			{Team: "Kontingen Jabar", Medal: "silver"},
+		},
 		matches: []store.Match{
 			{
 				ID:            "m-1",
