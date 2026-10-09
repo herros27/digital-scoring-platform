@@ -158,10 +158,28 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
   `E2E_RESTART_CMD` diset** (perintah shell yang me-restart backend dan baru kembali saat server siap, dengan
   env/DB yang sama). Tanpa itu spec dilewati. Cypress menjalankannya lewat `cy.task('server:restart')`.
 
-  ```bash
-  E2E_RESTART_CMD="./scripts/restart-backend.sh" npx cypress run --spec "cypress/e2e/match/06-*"
-  E2E_RESTART_CMD="./scripts/restart-backend.sh" npm run test:match-flow -- 06
+  Skrip siap pakai ada di `scripts/` (database harus sudah hidup; skrip membangun `bin/server`, mematikan apa pun
+  yang mendengarkan port backend, menyalakan ulang di latar belakang dengan `.env` akar repo, dan baru selesai saat
+  `/api/v1/health` menjawab; gagal = kode keluar 1 + log terakhir; log di `bin/backend.log`). Opsi: `PORT`,
+  `TIMEOUT_SEC`, `NO_BUILD=1` (bash) atau `-Port`, `-TimeoutSec`, `-NoBuild` (PowerShell).
+
+  Windows (PowerShell, dari `apps/web`):
+
+  ```powershell
+  $env:E2E_RESTART_CMD = 'powershell -NoProfile -ExecutionPolicy Bypass -File ..\..\scripts\restart-backend.ps1'
+  npm run test:match-flow -- 06
+  # atau lewat Cypress:  npx cypress run --spec "cypress/e2e/match/06-*"
   ```
+
+  Linux/macOS (dari `apps/web`):
+
+  ```bash
+  E2E_RESTART_CMD="$PWD/../../scripts/restart-backend.sh" npm run test:match-flow -- 06
+  ```
+
+  Skrip dapat dicoba sendiri tanpa tes: `powershell -File scripts\restart-backend.ps1` / `scripts/restart-backend.sh`.
+  Bila backend berjalan di Docker, pakai `E2E_RESTART_CMD="docker compose restart app"` (nama layanan sesuai
+  `docker-compose.yml`; pastikan perintahnya menunggu sampai siap).
 
 ## Temuan yang belum diubah
 
