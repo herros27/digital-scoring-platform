@@ -26,8 +26,3 @@ npx cypress run --spec "cypress/e2e/ipsi/**"
 
 Token API di-cache lintas spec lewat `cy.task('tokenCache:*')` (login dibatasi 10/menit). Panggilan yang
 terkena rate limit global (429) dicoba ulang otomatis oleh `apiCall` di `support/api.ts`.
-
-## Cacat yang terdokumentasi (tes di-`skip`)
-
-- Mendaftarkan `athlete_id` yang sama dua kali ke satu kejuaraan menghasilkan dua peserta (201 dua kali).
-  Aktifkan `it.skip` di `02-registrasi-atlet` setelah backend mengembalikan 409.

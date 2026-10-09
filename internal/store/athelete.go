@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+
+	"github.com/herros27/digital-scoring/internal/domain"
 )
 
 // ---------- Athlete ----------
@@ -33,7 +35,7 @@ func (s *AthleteStore) GetByID(id string) (*Athlete, error) {
 	a := &Athlete{}
 	err := scanAthlete(s.DB.QueryRow(`SELECT `+athleteColumns+` FROM athletes WHERE id = $1`, id), a)
 	if err != nil {
-		return nil, err
+		return nil, mapLookupErr(err)
 	}
 	return a, nil
 }
@@ -101,7 +103,7 @@ func (s *AthleteStore) RegisterParticipantInCategory(competitionID, athleteID, c
 		INSERT INTO participants (competition_id, athlete_id, contingent_id, category_id, weight_class, gender, registration_status)
 		VALUES ($1, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7)`,
 		competitionID, athleteID, contingentID, categoryID, weightClass, gender, status)
-	return err
+	return mapParticipantInsertErr(err)
 }
 
 func (s *AthleteStore) RegisterParticipant(competitionID, athleteID, contingentID, weightClass, gender, status string) error {
@@ -111,25 +113,25 @@ func (s *AthleteStore) RegisterParticipant(competitionID, athleteID, contingentI
 	if contingentID != "" {
 		query := `INSERT INTO participants (competition_id, athlete_id, contingent_id, weight_class, gender, registration_status) VALUES ($1, $2, $3, $4, $5, $6)`
 		_, err := s.DB.Exec(query, competitionID, athleteID, contingentID, weightClass, gender, status)
-		return err
+		return mapParticipantInsertErr(err)
 	}
 	query := `INSERT INTO participants (competition_id, athlete_id, weight_class, gender, registration_status) VALUES ($1, $2, $3, $4, $5)`
 	_, err := s.DB.Exec(query, competitionID, athleteID, weightClass, gender, status)
-	return err
+	return mapParticipantInsertErr(err)
 }
 
 func (s *AthleteStore) UpdateParticipantStatus(participantID, status string) error {
 	query := `UPDATE participants SET registration_status = $1 WHERE id = $2`
 	res, err := s.DB.Exec(query, status, participantID)
 	if err != nil {
-		return err
+		return mapLookupErr(err)
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
 		return err
 	}
 	if rows == 0 {
-		return sql.ErrNoRows
+		return domain.ErrNotFound
 	}
 	return nil
 }
@@ -207,7 +209,7 @@ func (s *AthleteStore) ListParticipants(competitionID, status string) ([]Partici
 func (s *AthleteStore) GetParticipantByID(id string) (*Participant, error) {
 	part := &Participant{}
 	if err := scanParticipant(s.DB.QueryRow(participantSelect+` WHERE p.id = $1`, id), part); err != nil {
-		return nil, err
+		return nil, mapLookupErr(err)
 	}
 	return part, nil
 }
@@ -232,7 +234,7 @@ func (s *AthleteStore) SaveVerification(participantID, status string, actualWeig
 		return err
 	}
 	if n == 0 {
-		return sql.ErrNoRows
+		return domain.ErrNotFound
 	}
 	return nil
 }

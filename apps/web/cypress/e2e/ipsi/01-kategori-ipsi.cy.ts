@@ -271,9 +271,18 @@ describe('Kategori IPSI - isolasi antar kejuaraan & akses', () => {
     })
   })
 
-  it('mengambil kategori dengan id yang tidak ada ditolak tanpa 5xx', () => {
+  it('mengambil kategori dengan id yang tidak ada memberi 404 tanpa membocorkan pesan SQL', () => {
     getCategory(token, compA.id, '00000000-0000-4000-8000-000000000000').then((res) => {
-      expect(res.status).to.be.oneOf([400, 404])
+      expect(res.status).to.eq(404)
+      expect(res.body.error?.code).to.eq('NOT_FOUND')
+      expect(res.body.error?.message).to.not.match(/sql|rows in result/i)
+    })
+  })
+
+  it('id kategori berformat salah memberi 400 tanpa membocorkan pesan SQL', () => {
+    getCategory(token, compA.id, 'bukan-uuid').then((res) => {
+      expect(res.status).to.eq(400)
+      expect(res.body.error?.message).to.not.match(/sql|uuid|syntax/i)
     })
   })
 

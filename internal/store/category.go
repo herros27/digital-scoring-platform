@@ -56,7 +56,7 @@ func (s *CategoryStore) Create(c *Category) error {
 func (s *CategoryStore) GetByID(id string) (*Category, error) {
 	c := &Category{}
 	if err := scanCategory(s.DB.QueryRow(`SELECT `+categoryColumns+` FROM categories WHERE id = $1`, id), c); err != nil {
-		return nil, err
+		return nil, mapLookupErr(err)
 	}
 	return c, nil
 }

@@ -238,19 +238,21 @@ describe('Registrasi atlet - validasi input', () => {
     })
   })
 
-  // KNOWN DEFECT: POST /competitions/{id}/athletes dengan athlete_id yang sama dua kali
-  // saat ini menghasilkan DUA baris peserta (201 dua kali). Aktifkan kembali setelah backend
-  // menambahkan unique(competition_id, athlete_id) / mengembalikan 409.
-  it.skip('menolak mendaftarkan atlet yang sama dua kali ke kejuaraan yang sama (409)', () => {
+  it('menolak mendaftarkan atlet yang sama dua kali ke kejuaraan yang sama (409)', () => {
     registerAthleteRaw(token, comp.id, { ...base(), name: 'Ganda', category_id: male.id }).then(
       (first) => {
         expect(first.status).to.eq(201)
         registerAthleteRaw(token, comp.id, {
           athlete_id: first.body.data.athlete_id,
           category_id: male.id,
+        }).then((dup) => {
+          expect(dup.status).to.eq(409)
+          expect(dup.body.error?.code).to.eq('CONFLICT')
         })
-          .its('status')
-          .should('eq', 409)
+        listParticipants(token, comp.id).then((res) => {
+          const rows = res.body.data.filter((p) => p.athlete_id === first.body.data.athlete_id)
+          expect(rows, 'hanya satu baris peserta per atlet').to.have.length(1)
+        })
       },
     )
   })

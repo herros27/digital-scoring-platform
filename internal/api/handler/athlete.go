@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/auth"
@@ -146,12 +147,12 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 	if req.CategoryID != "" {
 		cat, err := h.Service.RegisterParticipantToCategory(compID, athleteID, contingentID, req.CategoryID, status, h.ageReferenceDate(compID))
 		if err != nil {
-			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+			failRegistration(w, err, http.StatusBadRequest, "BAD_REQUEST")
 			return
 		}
 		weightClass = cat.WeightClass
 	} else if err := h.Service.RegisterParticipant(compID, athleteID, contingentID, req.WeightClass, gender, status); err != nil {
-		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		failRegistration(w, err, http.StatusInternalServerError, "INTERNAL_ERROR")
 		return
 	}
 
@@ -168,6 +169,16 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 		"weight_class":   weightClass,
 		"status":         status,
 	})
+}
+
+// failRegistration memetakan error pendaftaran peserta: atlet yang sudah terdaftar menjadi 409,
+// lainnya memakai status bawaan pemanggil.
+func failRegistration(w http.ResponseWriter, err error, fallbackStatus int, fallbackCode string) {
+	if errors.Is(err, domain.ErrConflict) {
+		Fail(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), domain.ErrConflict.Error()+": "), nil)
+		return
+	}
+	Fail(w, fallbackStatus, fallbackCode, err.Error(), nil)
 }
 
 // PUT /api/v1/competitions/{comp_id}/participants/{id}/verify

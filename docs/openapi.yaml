@@ -968,6 +968,8 @@ paths:
       responses:
         '201':
           description: Atlet berhasil didaftarkan ke kompetisi
+        '409':
+          description: Atlet sudah terdaftar pada kejuaraan ini (satu atlet satu kali per kejuaraan)
 
   /api/v1/competitions/{comp_id}/participants:
     get:
