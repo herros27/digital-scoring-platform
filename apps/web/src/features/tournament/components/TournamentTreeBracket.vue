@@ -73,7 +73,10 @@ function handleKeyDown(e: KeyboardEvent) {
 // Pan & Zoom State (Figma/Miro Style Free Pan via Transform)
 const panX = ref<number>(0)
 const panY = ref<number>(0)
-const zoomLevel = ref<number>(1)
+// Di layar sempit mulai dengan bagan diperkecil agar lebih dari satu kolom terlihat
+const zoomLevel = ref<number>(
+  typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches ? 0.6 : 1,
+)
 const isDragging = ref<boolean>(false)
 const hasDragged = ref<boolean>(false)
 const dragStartX = ref<number>(0)
@@ -92,46 +95,53 @@ function zoomOut(step = 0.08) {
 }
 
 function resetZoom() {
-  zoomLevel.value = 1
+  zoomLevel.value =
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches ? 0.6 : 1
   panX.value = 0
   panY.value = 0
 }
 
-// Global Drag-to-Pan (Works everywhere in viewport)
-function handleMouseDown(e: MouseEvent) {
-  if (e.button !== 0 || !bracketViewport.value) return
+// Global Drag-to-Pan (mouse, pen, dan sentuh). Pada layar sentuh, geser vertikal diserahkan ke browser
+// (touch-action: pan-y) supaya halaman tetap bisa di-scroll; geser horizontal menggeser bagan.
+let dragPointerType = 'mouse'
+
+function handlePointerDown(e: PointerEvent) {
+  if ((e.pointerType === 'mouse' && e.button !== 0) || !bracketViewport.value) return
   const target = e.target as HTMLElement
   if (target.closest('button') || target.closest('input') || target.closest('select')) return
 
   isDragging.value = true
   hasDragged.value = false
+  dragPointerType = e.pointerType
   dragStartX.value = e.clientX
   dragStartY.value = e.clientY
   startPanX.value = panX.value
   startPanY.value = panY.value
 
-  window.addEventListener('mousemove', onGlobalMouseMove, { passive: false })
-  window.addEventListener('mouseup', onGlobalMouseUp)
+  window.addEventListener('pointermove', onGlobalPointerMove, { passive: false })
+  window.addEventListener('pointerup', onGlobalPointerUp)
+  window.addEventListener('pointercancel', onGlobalPointerUp)
 }
 
-function onGlobalMouseMove(e: MouseEvent) {
+function onGlobalPointerMove(e: PointerEvent) {
   if (!isDragging.value) return
   const dx = e.clientX - dragStartX.value
   const dy = e.clientY - dragStartY.value
 
   if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
     hasDragged.value = true
-    e.preventDefault()
+    if (e.cancelable) e.preventDefault()
   }
 
   panX.value = startPanX.value + dx
-  panY.value = startPanY.value + dy
+  if (dragPointerType !== 'touch') panY.value = startPanY.value + dy
 }
 
-function onGlobalMouseUp() {
+function onGlobalPointerUp() {
   isDragging.value = false
-  window.removeEventListener('mousemove', onGlobalMouseMove)
-  window.removeEventListener('mouseup', onGlobalMouseUp)
+  window.removeEventListener('pointermove', onGlobalPointerMove)
+  window.removeEventListener('pointerup', onGlobalPointerUp)
+  window.removeEventListener('pointercancel', onGlobalPointerUp)
 }
 
 // Ctrl + Scroll Zoom Handler
@@ -157,8 +167,7 @@ onBeforeUnmount(() => {
   if (bracketViewport.value) {
     bracketViewport.value.removeEventListener('wheel', handleWheel)
   }
-  window.removeEventListener('mousemove', onGlobalMouseMove)
-  window.removeEventListener('mouseup', onGlobalMouseUp)
+  onGlobalPointerUp()
   window.removeEventListener('keydown', handleKeyDown)
 })
 
@@ -230,7 +239,14 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
             :disabled="zoomLevel <= 0.4"
             @click="zoomOut()"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
               <line x1="8" y1="11" x2="14" y2="11" />
@@ -244,7 +260,14 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
             :disabled="zoomLevel >= 1.8"
             @click="zoomIn()"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
               <line x1="11" y1="8" x2="11" y2="14" />
@@ -265,14 +288,38 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
             type="button"
             class="t-btn-icon t-btn-icon--maximize"
             :class="{ 'is-active': isMaximized }"
-            :title="isMaximized ? 'Keluar dari Layar Penuh (Esc)' : 'Tampilkan Bagan Layar Penuh (Maximize)'"
+            :title="
+              isMaximized
+                ? 'Keluar dari Layar Penuh (Esc)'
+                : 'Tampilkan Bagan Layar Penuh (Maximize)'
+            "
             @click="toggleMaximize"
           >
-            <svg v-if="!isMaximized" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            <svg
+              v-if="!isMaximized"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+              />
             </svg>
-            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 14h6m0 0v6m0-6-7 7m17-11h-6m0 0V4m0 6 7-7m-7 17v-6m0 0h6m-6 0 7 7M10 4v6m0 0H4m6 0L3 3" />
+            <svg
+              v-else
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M4 14h6m0 0v6m0-6-7 7m17-11h-6m0 0V4m0 6 7-7m-7 17v-6m0 0h6m-6 0 7 7M10 4v6m0 0H4m6 0L3 3"
+              />
             </svg>
           </button>
         </div>
@@ -284,7 +331,7 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
       ref="bracketViewport"
       class="t-bracket-viewport"
       :class="{ 'is-dragging': isDragging }"
-      @mousedown="handleMouseDown"
+      @pointerdown="handlePointerDown"
     >
       <div
         class="t-bracket-canvas"
@@ -317,7 +364,9 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
                     class="t-fork-path"
                     :class="{
                       't-fork-path--live': getTopFeeder(rIdx, targetIdx)?.isLive,
-                      't-fork-path--winner': getTopFeeder(rIdx, targetIdx)?.red?.isWinner || getTopFeeder(rIdx, targetIdx)?.blue?.isWinner,
+                      't-fork-path--winner':
+                        getTopFeeder(rIdx, targetIdx)?.red?.isWinner ||
+                        getTopFeeder(rIdx, targetIdx)?.blue?.isWinner,
                     }"
                   />
                   <!-- Bottom Feeder Line (enters at 75% height, merges at 50% height) -->
@@ -327,7 +376,9 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
                     class="t-fork-path"
                     :class="{
                       't-fork-path--live': getBottomFeeder(rIdx, targetIdx)?.isLive,
-                      't-fork-path--winner': getBottomFeeder(rIdx, targetIdx)?.red?.isWinner || getBottomFeeder(rIdx, targetIdx)?.blue?.isWinner,
+                      't-fork-path--winner':
+                        getBottomFeeder(rIdx, targetIdx)?.red?.isWinner ||
+                        getBottomFeeder(rIdx, targetIdx)?.blue?.isWinner,
                     }"
                   />
                 </svg>
@@ -376,7 +427,13 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
                       </div>
                       <span
                         class="t-card-badge"
-                        :class="match.isLive ? 'emerald' : match.status === 'selesai' ? 'neutral' : 'ready'"
+                        :class="
+                          match.isLive
+                            ? 'emerald'
+                            : match.status === 'selesai'
+                              ? 'neutral'
+                              : 'ready'
+                        "
                       >
                         {{ match.statusBadge }}
                       </span>
@@ -438,7 +495,10 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
           <div class="t-connector-column">
             <div class="t-connector-column__spacer" />
             <div class="t-connector-slots">
-              <div class="t-connector-slot" :style="{ height: `${getSlotHeight(rounds.length - 1)}px` }">
+              <div
+                class="t-connector-slot"
+                :style="{ height: `${getSlotHeight(rounds.length - 1)}px` }"
+              >
                 <svg
                   class="t-fork-svg"
                   :viewBox="`0 0 48 ${getSlotHeight(rounds.length - 1)}`"
@@ -464,22 +524,36 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
             </div>
 
             <div class="t-slots-list">
-              <div class="t-match-slot" :style="{ height: `${getSlotHeight(rounds.length - 1)}px` }">
+              <div
+                class="t-match-slot"
+                :style="{ height: `${getSlotHeight(rounds.length - 1)}px` }"
+              >
                 <div class="t-card-wrapper">
                   <div class="t-champion-card font-mono" :class="champion.corner">
                     <div class="t-champion-trophy">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+                      <svg
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#f59e0b"
+                        stroke-width="2"
+                      >
                         <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
                         <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
                         <path d="M4 22h16" />
-                        <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34" />
+                        <path
+                          d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34"
+                        />
                         <path d="M6 4h12v5a6 6 0 0 1-12 0V4Z" />
                       </svg>
                     </div>
                     <div class="t-champion-label">MEDALI EMAS</div>
                     <div class="t-champion-name">{{ champion.name }}</div>
                     <div class="t-champion-club">{{ champion.contingent }}</div>
-                    <div class="t-champion-meta">PEMENANG PARTAI {{ String(champion.partai).padStart(2, '0') }}</div>
+                    <div class="t-champion-meta">
+                      PEMENANG PARTAI {{ String(champion.partai).padStart(2, '0') }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -503,6 +577,8 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   overflow: hidden;
+  /* Induk (.ops-content-scroll) adalah kolom flex berukuran tetap: tanpa ini bagan ikut menyusut hingga tinggi 0 */
+  flex-shrink: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   width: 100%;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -662,6 +738,7 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
   padding: 28px 36px 40px 36px;
   user-select: none;
   cursor: grab;
+  touch-action: pan-y;
   position: relative;
   min-height: 560px;
   background-color: #060b14;
@@ -831,7 +908,9 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
   stroke-width: 2px;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: stroke 0.2s ease, stroke-width 0.2s ease;
+  transition:
+    stroke 0.2s ease,
+    stroke-width 0.2s ease;
 }
 
 .t-fork-path--winner {
@@ -922,9 +1001,18 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
 }
 
 @keyframes t-pulse {
-  0% { transform: scale(0.95); opacity: 0.7; }
-  50% { transform: scale(1.3); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.7; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
 }
 
 .t-card-badge {
@@ -1121,5 +1209,20 @@ function getBottomFeeder(rIdx: number, targetIdx: number): MatchCard | null {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 6px;
   width: 100%;
+}
+
+/* Mobile bagan */
+@media (max-width: 640px) {
+  .t-bracket-viewport {
+    padding: 16px 12px 24px;
+    min-height: 420px;
+  }
+  .t-shortcut-hint {
+    display: none;
+  }
+  .t-bracket-toolbar {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+  }
 }
 </style>
