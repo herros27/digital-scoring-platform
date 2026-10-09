@@ -7,7 +7,7 @@
  * - Runner Node: `globalThis.__e2eRestart` dipasang oleh scripts/run-match-flow.ts.
  */
 type CypressGlobal = {
-  env: (k: string) => unknown
+  expose: (k: string) => unknown
 }
 type G = {
   Cypress?: CypressGlobal
@@ -18,7 +18,7 @@ type G = {
 const g = globalThis as unknown as G
 
 export function restartConfigured(): boolean {
-  return Boolean(g.Cypress?.env('E2E_RESTART') ?? g.__e2eRestart)
+  return Boolean(g.Cypress?.expose('E2E_RESTART') ?? g.__e2eRestart)
 }
 
 /** Satu langkah dalam rantai tes: di Cypress berupa perintah antrean, di Node berupa promise. */
