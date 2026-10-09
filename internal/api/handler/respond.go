@@ -127,9 +127,19 @@ func Bind(w http.ResponseWriter, r *http.Request, dst any) bool {
 	return true
 }
 
+// emptyIfNilSlice mengubah slice nil menjadi slice kosong agar daftar kosong terkirim sebagai [] (bukan null).
+// []byte dan json.RawMessage dibiarkan karena penyandiannya berbeda.
+func emptyIfNilSlice(data any) any {
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Slice && v.IsNil() && v.Type().Elem().Kind() != reflect.Uint8 {
+		return reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	}
+	return data
+}
+
 func Ok(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": data})
+	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": emptyIfNilSlice(data)})
 }
 
 func Fail(w http.ResponseWriter, status int, code, message string, details any) {
@@ -175,7 +185,7 @@ func OkPaged(w http.ResponseWriter, data any, page, limit, total int) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"success": true,
-		"data":    data,
+		"data":    emptyIfNilSlice(data),
 		"pagination": Pagination{
 			Page:  page,
 			Limit: limit,
