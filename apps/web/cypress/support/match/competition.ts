@@ -114,3 +114,36 @@ export async function playMatch(
     await devices.closeAll()
   }
 }
+
+export interface PlayedMatch {
+  id: string
+  round: number
+  winner: string
+  loser: string
+}
+
+/**
+ * Memainkan seluruh bagan sampai tidak ada partai idle tersisa (pemenang = sudut merah). Partai babak berikutnya
+ * terbentuk otomatis saat pemenang maju, jadi daftar partai dibaca ulang tiap putaran.
+ */
+export async function playBracketToEnd(kit: MatchKit, maxPasses = 12): Promise<PlayedMatch[]> {
+  const slots = await bracketSlots(kit)
+  const roundOf = (slotId: string) => slots.find((s) => s.id === slotId)?.round as number
+  const done = new Set<string>()
+  const played: PlayedMatch[] = []
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const idle = (await listMatches(kit)).filter((m) => m.status === 'idle' && !done.has(m.id))
+    if (idle.length === 0) break
+    for (const m of idle) {
+      await playMatch(kit, m.id, [{ target: 'red', type: 'knockdown' }])
+      done.add(m.id)
+      played.push({
+        id: m.id,
+        round: roundOf(m.bracket_slot_id),
+        winner: m.athlete_red_id,
+        loser: m.athlete_blue_id,
+      })
+    }
+  }
+  return played
+}

@@ -43,6 +43,7 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 | `06-pemulihan-restart-server`   | restart backend di tengah partai: skor/babak bertahan, jam dijeda, skor ditolak sampai wasit melanjutkan, partai selesai normal (perlu `E2E_RESTART_CMD`)                                                                         |
 | `07-kompetisi-penuh`            | satu kompetisi dari pendaftaran sampai juara: 4 atlet/3 kontingen → verifikasi → bagan → bagan publik (tersembunyi sebelum aktif) → 2 semifinal → final otomatis → final dua babak habis waktu → juara di bagan → klasemen medali |
 | `08-kompetisi-8-peserta`        | bagan 8 peserta (perempat → semi → final) dimainkan penuh; partai berikutnya terbentuk otomatis; medali hanya final dan semifinal                                                                                                 |
+| `09-kompetisi-bye`              | 3, 5, 6, 7, 9, 12 peserta (BYE) dimainkan sampai juara: tidak ada pasangan BYE lawan BYE, total partai N-1, medali sesuai struktur                                                                                                |
 | `ui-05-layar-juri`              | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                                                     |
 | `ui-06-konsol-wasit`            | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                                          |
 
@@ -74,7 +75,12 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
     (4 peserta menghasilkan 3 emas + 3 perak), tanpa perunggu, dan semua masuk tim "Umum" karena partai menyimpan ID
     peserta sedangkan penghitungan mencari ID atlet. Kini medali diturunkan dari struktur bagan: juara emas, finalis perak,
     dua yang kalah di semifinal perunggu, perempat final tanpa medali, dan tim diambil dari atlet milik peserta.
-11. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+11. **Bagan macet bila peserta bukan pangkat dua** (ditemukan spec 09): slot BYE ditaruh berurutan di ujung, sehingga pada
+    5, 6, 9, 12 peserta dst. ada pasangan BYE lawan BYE dan pemenang pasangan di sebelahnya tidak pernah mendapat lawan
+    (kompetisi tidak bisa selesai). Kini BYE disebar satu per pasangan mengikuti urutan seeding standar (seed teratas
+    mendapat BYE), dan partai babak ≥2 yang kedua pesertanya sudah terisi sejak awal (sesama pemegang BYE) dibuat saat
+    bagan dibentuk. Dicakup tes unit untuk 2–40 peserta.
+12. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
