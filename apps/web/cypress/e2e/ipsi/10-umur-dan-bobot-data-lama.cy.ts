@@ -225,10 +225,26 @@ describe('Kelengkapan data seed (kejuaraan Menpora)', () => {
     })
   })
 
+  // Hanya atlet bawaan seed (internal/store/seed.go). Atlet lain di kejuaraan ini bisa saja didaftarkan manual saat
+  // uji coba, dan datanya tidak boleh menggagalkan pengecekan kelengkapan seed.
+  const SEED_ATHLETES = [
+    'Eko Prasetyo',
+    'Fajar Nugroho',
+    'Gilang Ramadhan',
+    'Hendra Setiawan',
+    'Ilham Maulana',
+    'Joko Susilo',
+    'Siti Rahmawati',
+    'Dewi Sartika',
+  ]
+  const seedOnly = <T extends { name?: string }>(list: T[]) =>
+    list.filter((p) => SEED_ATHLETES.includes(p.name ?? ''))
+
   it('peserta seed bertanggal lahir dan tidak ada yang ditandai age_check', () => {
     listParticipants(admin, compId).then((res) => {
-      expect(res.body.data.length).to.be.greaterThan(0)
-      res.body.data.forEach((p) => {
+      const seeded = seedOnly(res.body.data)
+      expect(seeded.length, 'peserta seed ditemukan').to.be.greaterThan(0)
+      seeded.forEach((p) => {
         expect(p.birth_date, `${p.name} tanggal lahir`)
           .to.be.a('string')
           .and.have.length.greaterThan(0)
@@ -239,7 +255,7 @@ describe('Kelengkapan data seed (kejuaraan Menpora)', () => {
 
   it('peserta seed tertaut ke kategori (bukan bagan jalur lama)', () => {
     listParticipants(admin, compId).then((res) => {
-      res.body.data.forEach((p) =>
+      seedOnly(res.body.data).forEach((p) =>
         expect(p.category_id, `${p.name} category_id`).to.be.a('string').and.not.eq(''),
       )
     })
