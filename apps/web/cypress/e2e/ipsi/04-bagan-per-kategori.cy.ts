@@ -202,7 +202,11 @@ describe('Bagan per kategori', () => {
                 getBracket(token, comp.id, cat.id).then((res) => {
                   expect(res.status).to.eq(200)
                   res.body.data.forEach((s) => expect(s.category_id).to.eq(cat.id))
-                  return res.body.data.map((s) => s.participant_id).filter((p): p is string => !!p)
+                  // hanya ronde 1: pemenang bye sudah terisi di ronde berikutnya sehingga muncul dua kali di semua slot
+                  return res.body.data
+                    .filter((s) => s.round === 1)
+                    .map((s) => s.participant_id)
+                    .filter((p): p is string => !!p)
                 })
 
               placedIn(a).then((placed) => {

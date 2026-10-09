@@ -197,8 +197,16 @@ describe('Kelengkapan data seed (kejuaraan Menpora)', () => {
   before(() => {
     adminToken().then((t) => {
       admin = t
-      apiCall<Competition[]>('GET', '/competitions', t).then((res) => {
-        const seeded = res.body.data.find((c) => /menpora/i.test(c.name))
+      // daftar kejuaraan berhalaman (terbaru dulu, maks 100): kejuaraan seed paling lama sehingga bisa di halaman akhir
+      let seeded: Competition | undefined
+      const scan = (page: number) => {
+        apiCall<Competition[]>('GET', `/competitions?limit=100&page=${page}`, t).then((res) => {
+          seeded = res.body.data.find((c) => /menpora/i.test(c.name))
+          if (!seeded && res.body.data.length === 100 && page < 20) scan(page + 1)
+        })
+      }
+      scan(1)
+      cy.then(() => {
         expect(seeded, 'kejuaraan seed Menpora').to.not.equal(undefined)
         compId = seeded!.id
       })

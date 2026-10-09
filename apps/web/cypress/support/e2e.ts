@@ -11,3 +11,11 @@ before(() => {
     ).to.eq(200)
   })
 })
+
+// Build produksi (nginx/Docker) mendaftarkan service worker PWA. Setelah kunjungan pertama, halaman berikutnya disajikan
+// dari cache service worker sehingga tidak lewat proksi Cypress, dan tes UI setelah yang pertama gagal. Tes Cypress
+// tidak menguji PWA (itu tugas Playwright, `npm run test:pw:pwa`), jadi pendaftarannya dimatikan di sini.
+Cypress.on('window:before:load', (win) => {
+  const proto = win.Navigator.prototype as unknown as Record<string, unknown>
+  if ('serviceWorker' in proto) delete proto.serviceWorker
+})
