@@ -1464,6 +1464,15 @@ paths:
   /api/v1/competitions/{comp_id}/matches/{id}/start:
     post:
       summary: Mulai Pertandingan / Ronde (Admin / Dewan / Wasit)
+      description: |
+        Partai harus sudah dimuat ke gelanggang (`load-arena`). Status partai di database menjadi `running`
+        (`started_at` terisi). Memulai partai yang sudah berjalan, selesai, atau dibatalkan → 400
+        `INVALID_STATE_TRANSITION`.
+
+        **Pembatasan gelanggang (berlaku untuk semua aksi kontrol: load-arena, start, pause, resume, finish,
+        outcome, cancel, reschedule):** token PIN wasit terikat ke satu gelanggang dan hanya boleh mengontrol partai
+        di gelanggangnya (`403` bila berbeda), sama seperti handshake WebSocket. Login email admin/dewan/wasit tidak
+        terikat gelanggang.
       tags:
         - Match Lifecycle
       security:
@@ -1544,6 +1553,10 @@ paths:
         400 `TIE_NEEDS_DECISION` kecuali body menyertakan `winner` (keputusan manual; `method` menentukan dasar
         keputusan dan `result_type`: `referee_decision` bila kosong, atau `tiebreak_extra_round`,
         `tiebreak_lighter_weight`, `tiebreak_coin_toss`).
+
+        Partai yang **belum dimulai** (state `idle`) tidak dapat diselesaikan: 400 `INVALID_STATE_TRANSITION`.
+        Untuk WO/undur diri sebelum mulai gunakan `/outcome`; untuk membatalkan gunakan `/cancel`.
+        Penutupan partai menyiarkan `state_change` (`finished`, timer berhenti) lalu `match_result` ke semua perangkat.
       tags:
         - Match Lifecycle
       security:
@@ -1720,6 +1733,9 @@ paths:
         Mendukung header `Idempotency-Key` atau properti `event_id` / `idempotency_key` pada payload
         untuk mencegah duplikasi skor (accidental double tap / retry akibat network latency).
         Jika key sudah pernah diproses, server mengembalikan status 200 dengan `duplicate: true` tanpa menggandakan poin.
+
+        **Otorisasi:** hanya token PIN juri (`403` untuk peran lain). Identitas juri diambil dari token;
+        `judge_id` pada body diabaikan. Token harus milik gelanggang tempat partai dimuat (`403` bila berbeda).
       tags:
         - Match
       security:

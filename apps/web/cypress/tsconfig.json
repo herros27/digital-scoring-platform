@@ -6,7 +6,11 @@
     "moduleResolution": "bundler",
     "types": ["cypress", "node"],
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
   },
   "include": ["./**/*.ts"]
 }

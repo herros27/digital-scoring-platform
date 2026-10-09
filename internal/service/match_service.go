@@ -337,6 +337,24 @@ func (s *MatchService) GetOrchestrator(matchID string) (*orchestrator.Orchestrat
 	return o, nil
 }
 
+// ArenaForMatch gelanggang tempat partai berada: gelanggang orchestrator bila sedang dimuat, selain itu
+// gelanggang pada data partai. Kosong bila partai tidak diketahui. Dipakai untuk membatasi token PIN
+// (terikat satu gelanggang) agar tidak mengontrol partai di gelanggang lain.
+func (s *MatchService) ArenaForMatch(matchID string) string {
+	s.mu.RLock()
+	o, ok := s.activeOrchestrators[matchID]
+	s.mu.RUnlock()
+	if ok {
+		return o.GetArenaID()
+	}
+	if s.matchRepo != nil {
+		if m, err := s.matchRepo.GetByID(matchID); err == nil && m != nil {
+			return m.ArenaID
+		}
+	}
+	return ""
+}
+
 func (s *MatchService) StartMatch(matchID string) error {
 	o, err := s.GetOrchestrator(matchID)
 	if err != nil {

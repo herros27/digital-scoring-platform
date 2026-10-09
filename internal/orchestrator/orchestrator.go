@@ -231,6 +231,11 @@ func (o *Orchestrator) doStart() error {
 	}
 
 	o.recovered = false
+	// Status 'running' disimpan agar daftar partai, badge LIVE, dan penghitung "sedang tanding" di UI
+	// (yang membaca status dari database) benar; sebelumnya partai berjalan tetap tercatat 'idle'.
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, "running")
+	}
 	o.appendEvent("match_started", map[string]any{"round": o.sm.CurrentRoundNumber()}, "")
 	o.startRoundTimer()
 	o.broadcastState()
@@ -285,6 +290,12 @@ func (o *Orchestrator) doFinish(winner, method string) error {
 
 	if o.sm.IsFinished() {
 		return fmt.Errorf("match is already finished")
+	}
+	// Partai yang belum dimulai tidak boleh "diselesaikan": tanpa pertandingan tidak ada hasil, dan
+	// finalize() akan menetapkan pemenang, memajukan bagan, serta menyiarkan hasil sementara state
+	// machine tetap idle. WO/undur diri sebelum mulai memakai declare_outcome; batal memakai cancel.
+	if o.sm.Current() == statemachine.StateIdle {
+		return fmt.Errorf("cannot finish match in idle state: match has not started (use declare_outcome for walkover or cancel)")
 	}
 	if winner != "" {
 		if !validTarget(winner) {
@@ -571,7 +582,7 @@ func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
 	payload := o.snapshotLocked()
 	o.mu.Unlock()
 
-	o.h.SendToClient(client.ID, hub.Message{
+	o.h.SendToConn(client, hub.Message{
 		Type:    hub.MsgSyncResponse,
 		Payload: payload,
 	})
@@ -663,13 +674,14 @@ func (o *Orchestrator) onRoundExpired() {
 	roundNum := o.sm.CurrentRoundNumber()
 	o.sm.Transition(statemachine.EventRoundEnd)
 	o.appendEvent("round_ended", map[string]any{"round": roundNum}, "")
-	o.broadcastState()
 
-	// Setelah break, mulai ronde berikutnya otomatis
+	// Setelah break, mulai ronde berikutnya otomatis. Timer istirahat dibuat SEBELUM siaran agar
+	// state_change break_N membawa hitung mundur istirahat (sisa waktu + tenggat); bila disiarkan lebih
+	// dulu, semua layar menerima timer ronde yang sudah habis (0 dan tidak berjalan) sampai timer_sync berikutnya.
 	breakDur := time.Duration(o.ruleset.Scoring.BreakDuration) * time.Second
 	o.timer = o.newTimer(breakDur, o.onBreakExpired)
 	o.timer.Start()
-	o.persistLocked() // simpan lagi: siaran di atas terjadi sebelum timer istirahat dibuat
+	o.broadcastState()
 }
 
 func (o *Orchestrator) onBreakExpired() {
@@ -747,6 +759,10 @@ func (o *Orchestrator) finalize() {
 		"corner":      winnerCorner,
 		"result_type": resultType,
 	}
+	// Siarkan juga state_change "finished" (timer berhenti) sebelum hasil: layar juri hanya mengikuti
+	// state_change, jadi tanpa ini tablet juri tetap menampilkan "BERJALAN" dan tombol skor tetap aktif
+	// setelah partai ditutup.
+	o.broadcastState()
 	o.h.Broadcast(hub.Message{
 		Type: hub.MsgMatchResult,
 		Payload: map[string]any{
@@ -803,7 +819,7 @@ func (o *Orchestrator) broadcastScoreUpdate(round int) {
 }
 
 func (o *Orchestrator) sendError(client *hub.Client, code, message string) {
-	o.h.SendToClient(client.ID, hub.Message{
+	o.h.SendToConn(client, hub.Message{
 		Type: hub.MsgError,
 		Payload: map[string]string{
 			"code":    code,

@@ -70,7 +70,11 @@ func (s *MatchStore) GetByID(id string) (*Match, error) {
 }
 
 func (s *MatchStore) UpdateStatus(id, status string) error {
-	_, err := s.DB.Exec(`UPDATE matches SET status = $1 WHERE id = $2`, status, id)
+	// started_at diisi sekali saat partai mulai berjalan (tidak ditimpa bila dilanjutkan/dipulihkan).
+	_, err := s.DB.Exec(`UPDATE matches
+		SET status = $1::text,
+		    started_at = CASE WHEN $1::text = 'running' THEN COALESCE(started_at, NOW()) ELSE started_at END
+		WHERE id = $2`, status, id)
 	return err
 }
 

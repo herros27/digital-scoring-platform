@@ -191,7 +191,8 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/cancel", matchOperators(http.HandlerFunc(matchH.Cancel)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule", matchOperators(http.HandlerFunc(matchH.Reschedule)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.GetScores)
-	protected.HandleFunc("POST /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.SubmitScore)
+	// Skor REST hanya untuk juri (PIN); identitas diambil dari token (lihat MatchHandler.SubmitScore).
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/scores", RequireRole("judge")(http.HandlerFunc(matchH.SubmitScore)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/events", matchH.GetEvents)
 
 	// Rulesets

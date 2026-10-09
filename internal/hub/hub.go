@@ -178,7 +178,9 @@ func (h *Hub) SendToRole(role Role, msg Message) {
 	}
 }
 
-// Send ke client tertentu
+// SendToClient mengirim ke SEMUA koneksi dengan ID tersebut. Satu PIN dapat punya lebih dari satu koneksi
+// (tablet kembar, atau sambung ulang saat koneksi lama belum dibuang server), jadi berhenti di koneksi pertama
+// bisa menjatuhkan pesan ke koneksi mati. Untuk balasan atas sebuah permintaan pakai SendToConn.
 func (h *Hub) SendToClient(clientID string, msg Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -188,8 +190,21 @@ func (h *Hub) SendToClient(clientID string, msg Message) {
 			case client.send <- msg:
 			default:
 			}
-			return
 		}
+	}
+}
+
+// SendToConn membalas tepat ke koneksi yang meminta (mis. sync_response dan error), tidak ke koneksi lain
+// yang kebetulan memakai ID yang sama. Diabaikan bila koneksi itu sudah dilepas dari hub.
+func (h *Hub) SendToConn(c *Client, msg Message) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if !h.clients[c] {
+		return
+	}
+	select {
+	case c.send <- msg:
+	default:
 	}
 }
 

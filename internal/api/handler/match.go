@@ -22,6 +22,32 @@ type MatchHandler struct {
 	Cache      *cache.Cache
 }
 
+// arenaAllowed memastikan token PIN (terikat satu gelanggang) hanya mengontrol gelanggangnya sendiri,
+// sama seperti handshake WebSocket. Login email admin/dewan/wasit tidak terikat gelanggang dan boleh di mana saja.
+// Mengembalikan false setelah menulis respons 403.
+func arenaAllowed(w http.ResponseWriter, r *http.Request, arenaID string) bool {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil || claims.ArenaID == "" || claims.ArenaID == arenaID {
+		return true
+	}
+	Fail(w, http.StatusForbidden, "FORBIDDEN", "token terikat ke gelanggang lain", nil)
+	return false
+}
+
+// matchArenaAllowed seperti arenaAllowed untuk partai yang ditentukan oleh id pada path.
+func (h *MatchHandler) matchArenaAllowed(w http.ResponseWriter, r *http.Request, matchID string) bool {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil || claims.ArenaID == "" {
+		return true
+	}
+	// partai yang tidak diketahui dibiarkan lolos: handler memberi galat "tidak dimuat/tidak ditemukan" sendiri
+	arenaID := h.Service.ArenaForMatch(matchID)
+	if arenaID == "" {
+		return true
+	}
+	return arenaAllowed(w, r, arenaID)
+}
+
 // GET /api/v1/competitions/{comp_id}/matches?page=1&limit=20&status=running
 func (h *MatchHandler) List(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
@@ -134,6 +160,9 @@ func (h *MatchHandler) LoadArena(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !arenaAllowed(w, r, req.ArenaID) {
+		return
+	}
 	if err := h.Service.LoadMatchToArena(matchID, req.ArenaID, req.RulesetPath); err != nil {
 		if errors.Is(err, domain.ErrArenaBusy) {
 			Fail(w, http.StatusConflict, "ARENA_BUSY", err.Error(), nil)
@@ -153,6 +182,9 @@ func (h *MatchHandler) LoadArena(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/competitions/{comp_id}/matches/{id}/start
 func (h *MatchHandler) Start(w http.ResponseWriter, r *http.Request) {
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 	if err := h.Service.StartMatch(matchID); err != nil {
 		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
 		return
@@ -163,6 +195,9 @@ func (h *MatchHandler) Start(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/competitions/{comp_id}/matches/{id}/pause
 func (h *MatchHandler) Pause(w http.ResponseWriter, r *http.Request) {
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 	if err := h.Service.PauseMatch(matchID); err != nil {
 		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
 		return
@@ -173,6 +208,9 @@ func (h *MatchHandler) Pause(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/competitions/{comp_id}/matches/{id}/resume
 func (h *MatchHandler) Resume(w http.ResponseWriter, r *http.Request) {
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 	if err := h.Service.ResumeMatch(matchID); err != nil {
 		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
 		return
@@ -184,6 +222,9 @@ func (h *MatchHandler) Resume(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 
 	// Body opsional: {"winner":"red"|"blue"} = keputusan wasit (wajib bila skor seri)
 	var req struct {
@@ -217,6 +258,9 @@ func (h *MatchHandler) Finish(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Outcome(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 	var req struct {
 		Outcome string `json:"outcome" validate:"required,oneof=ko tko walkover withdrawal"`
 		Winner  string `json:"winner" validate:"required,oneof=red blue"`
@@ -240,6 +284,9 @@ func (h *MatchHandler) Outcome(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 	if err := h.Service.CancelMatch(matchID); err != nil {
 		Fail(w, http.StatusBadRequest, "INVALID_STATE_TRANSITION", err.Error(), nil)
 		return
@@ -254,6 +301,9 @@ func (h *MatchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 func (h *MatchHandler) Reschedule(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	matchID := r.PathValue("id")
+	if !h.matchArenaAllowed(w, r, matchID) {
+		return
+	}
 	if err := h.Service.RescheduleMatch(matchID); err != nil {
 		status, code := http.StatusBadRequest, "INVALID_STATE_TRANSITION"
 		if errors.Is(err, domain.ErrMatchNotFound) {
@@ -291,19 +341,40 @@ func (h *MatchHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/competitions/{comp_id}/matches/{id}/scores
+// Fallback REST untuk juri (WebSocket tetap jalur utama). Hanya token PIN juri (dijaga router) dan
+// identitas juri SELALU diambil dari token, bukan dari body: kalau tidak, siapa pun yang login bisa
+// mengirim suara atas nama juri lain dan mencapai konsensus. Token juga harus milik gelanggang tempat
+// partai ini dimuat, sama seperti aturan handshake WebSocket.
 func (h *MatchHandler) SubmitScore(w http.ResponseWriter, r *http.Request) {
 	matchID := r.PathValue("id")
 	idempotencyKey := r.Header.Get("Idempotency-Key")
 
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil || claims.Role != "judge" || claims.JudgePinID == "" {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "hanya juri yang boleh mengirim skor", nil)
+		return
+	}
+
 	var req struct {
 		EventID        string `json:"event_id"`
 		IdempotencyKey string `json:"idempotency_key"`
-		JudgeID        string `json:"judge_id" validate:"required"`
-		ScoreType      string `json:"score_type" validate:"required"`
-		Target         string `json:"target" validate:"required"`
+		// JudgeID diabaikan (dipertahankan agar klien lama tetap valid); identitas dari token.
+		JudgeID   string `json:"judge_id"`
+		ScoreType string `json:"score_type" validate:"required"`
+		Target    string `json:"target" validate:"required"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+
+	orch, err := h.Service.GetOrchestrator(matchID)
+	if err != nil {
+		Fail(w, http.StatusBadRequest, "SCORING_ERROR", err.Error(), nil)
+		return
+	}
+	if orch.GetArenaID() != claims.ArenaID {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "token juri bukan untuk gelanggang partai ini", nil)
 		return
 	}
 
@@ -315,9 +386,11 @@ func (h *MatchHandler) SubmitScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	input := consensus.JudgeInput{
-		JudgeID:   req.JudgeID,
-		ScoreType: consensus.ScoreType(req.ScoreType),
-		Target:    consensus.Target(req.Target),
+		JudgeID:    claims.JudgePinID,
+		Role:       consensus.RoleJudge,
+		SeatNumber: claims.SeatNumber,
+		ScoreType:  consensus.ScoreType(req.ScoreType),
+		Target:     consensus.Target(req.Target),
 	}
 
 	res, isDuplicate, err := h.Service.SubmitScoreInput(matchID, input, idempotencyKey)

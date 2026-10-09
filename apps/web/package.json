@@ -18,7 +18,8 @@
     "cypress:headed": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --headed",
     "cypress:record": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --record",
     "cypress:open:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress open --expose SLOW_MO=800",
-    "cypress:headed:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --headed --no-exit --expose SLOW_MO=800"
+    "cypress:headed:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --headed --no-exit --expose SLOW_MO=800",
+    "test:match-flow": "node cypress/scripts/run-match-flow.ts"
   },
   "dependencies": {
     "@tanstack/vue-query": "^5.104.1",
@@ -37,6 +38,7 @@
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.1",
+    "chai": "^6.3.0",
     "cross-env": "^10.1.0",
     "cypress": "^16.1.1",
     "eslint": "^10.12.0",
