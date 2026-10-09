@@ -52,6 +52,20 @@ npm run test:pw:pwa
 
 Lalu di akar repo: `go test -count=1 ./...`.
 
+## Variabel uji lewat `.env`
+
+Variabel berawalan `E2E_`, `PW_`, dan `CYPRESS_` otomatis dibaca dari `.env` **di akar repo** oleh `test:match-flow`,
+Playwright, dan Cypress (yang sudah diset di shell menang). Contoh:
+
+```
+E2E_BASE_URL=http://localhost
+E2E_RESTART_CMD=powershell -NoProfile -ExecutionPolicy Bypass -File ..\..\scripts\restart-backend.ps1 -Container scoring-backend
+PW_CHROMIUM=C:\path\ke\chrome.exe
+```
+
+Jangan taruh variabel ini di `.env.prod`: berkas itu menjadi environment kontainer backend, bukan untuk tes.
+Perintah `E2E_RESTART_CMD` memakai path relatif, jadi jalankan tes dari `apps/web`.
+
 ## Pilihan berguna
 
 - Satu spec headless: `npm run test:match-flow -- 03`

@@ -1,3 +1,4 @@
+import './cypress/scripts/load-env.mjs'
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'cypress'
 

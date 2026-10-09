@@ -11,6 +11,8 @@
  * Runner mengimplementasikan subset Mocha yang dipakai spec: describe/it/before/after/beforeEach/afterEach
  * (+ .skip/.only), dengan `expect` dari chai (sama seperti `expect` global Cypress).
  */
+import './load-env.mjs'
+
 import { readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'

@@ -1,3 +1,4 @@
+import './cypress/scripts/load-env.mjs'
 import { defineConfig } from '@playwright/test'
 
 /**
