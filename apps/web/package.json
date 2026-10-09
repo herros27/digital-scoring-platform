@@ -22,7 +22,8 @@
     "test:match-flow": "node cypress/scripts/run-match-flow.ts",
     "test:pw": "playwright test",
     "test:pw:ui": "playwright test --ui",
-    "test:pw:headed": "playwright test --headed"
+    "test:pw:headed": "playwright test --headed",
+    "test:pw:pwa": "playwright test -c playwright.pwa.config.ts"
   },
   "dependencies": {
     "@tanstack/vue-query": "^5.104.1",
@@ -54,8 +55,11 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.0",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.3",
     "vue-eslint-parser": "^10.4.1",
-    "vue-tsc": "^3.3.12"
+    "vue-tsc": "^3.3.12",
+    "workbox-build": "^7.4.1",
+    "workbox-window": "^7.4.1"
   }
 }

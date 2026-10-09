@@ -13,6 +13,7 @@
     "verbatimModuleSyntax": true
   },
   "include": [
+    "../playwright.pwa.config.ts",
     "./**/*.ts",
     "../playwright.config.ts",
     "../cypress/support/match/*.ts",

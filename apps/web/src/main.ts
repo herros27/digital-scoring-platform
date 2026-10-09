@@ -13,3 +13,9 @@ app.use(VueQueryPlugin, { queryClient })
 app.use(router)
 
 app.mount('#app')
+
+// PWA: cangkang aplikasi tersedia offline dan dapat dipasang ke layar utama tablet. Hanya pada build produksi dan
+// butuh konteks aman (HTTPS atau localhost). Versi baru menunggu sampai aplikasi ditutup, tidak memotong pertandingan.
+if (import.meta.env.PROD) {
+  void import('virtual:pwa-register').then(({ registerSW }) => registerSW({ immediate: true }))
+}
