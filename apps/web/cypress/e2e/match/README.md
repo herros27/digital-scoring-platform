@@ -77,7 +77,7 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 `playwright/tiga-juri-satu-wasit.ts` (`npm run test:pw-match`) membuka **4 browser context** (3 juri + wasit) dengan
 UI sungguhan, hal yang tidak mungkin dalam satu tes Cypress. Mencakup: semua online, MULAI di konsol wasit,
 tiga juri menekan tombol sama bersamaan (tepat 1 poin), satu suara menunggu lalu padam, BATAL, JEDA/LANJUT
-mengunci semua layar, dua juri bersamaan, dan SELESAIKAN. Tambahkan `PW_HEADED=1` untuk melihat 4 jendela tersusun grid 2×2 (`PW_SLOWMO`, `PW_HOLD`, `PW_SCREEN_W/H` opsional). Memakai `PW_CHROMIUM` bila Chromium bukan di
+mengunci semua layar, dua juri bersamaan, dan SELESAIKAN. Jalankan `npm run test:pw-match:headed` (atau tambahkan `PW_HEADED=1`) untuk melihat 4 jendela tersusun grid 2×2 (`PW_SLOWMO`, `PW_HOLD`, `PW_SCREEN_W/H` opsional). Memakai `PW_CHROMIUM` bila Chromium bukan di
 `/opt/pw-browsers`. Tes ini menemukan tombol skor juri masih aktif setelah SELESAI (kini terkunci kecuali saat berjalan).
 
 ## Spesifik lingkungan
