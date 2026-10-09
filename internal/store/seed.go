@@ -143,7 +143,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to query competition: %w", err)
 	} else {
-		_, _ = tx.ExecContext(ctx, `UPDATE competitions SET ruleset_id = $1, status = 'active' WHERE id = $2`, rulesetIPSIID, compID)
+		// ponytail: perbarui created_at saat re-seed agar kejuaraan seed selalu masuk halaman 1 (ORDER BY created_at DESC)
+		_, _ = tx.ExecContext(ctx, `UPDATE competitions SET ruleset_id = $1, status = 'active', created_at = CURRENT_TIMESTAMP WHERE id = $2`, rulesetIPSIID, compID)
 	}
 	summary.CompetitionID = compID
 
