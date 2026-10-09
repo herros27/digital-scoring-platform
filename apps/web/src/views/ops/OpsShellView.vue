@@ -24,7 +24,7 @@ import {
 import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import { AGE_BANDS, ageGroupLabel } from '@/features/categories/lib/ageGroups'
-import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+import { useArenasQuery, useCompetitionPresence } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useMatchesQuery } from '@/features/matches/api/matchQueries'
 import { useCompetitionsQuery } from '@/features/competitions/api/competitionQueries'
@@ -459,7 +459,10 @@ function handleProfileClick() {
 // Draw & Locking State
 const isLocked = ref(true)
 const drawHash = ref('#IPSI-2025-CL-A-9941')
-const telemetryMs = ref(12)
+// Telemetri NYATA: latensi dari polling kehadiran ke server dan jumlah juri yang benar-benar terhubung
+const { data: presence, isError: serverUnreachable } = useCompetitionPresence(activeCompId)
+const telemetryMs = computed(() => (presence.value ? String(presence.value.rttMs) : '–'))
+const judgesOnline = computed(() => presence.value?.judgesOnline ?? 0)
 
 // Notification / Toast
 const toast = ref<{
@@ -836,8 +839,10 @@ function handleLoadToMat1() {
         </div>
 
         <div class="ops-telemetry font-mono">
-          <span class="telemetry-dot" />
-          <span class="telemetry-text">TELEMETRY LIVE</span>
+          <span class="telemetry-dot" :class="{ 'telemetry-dot--down': serverUnreachable }" />
+          <span class="telemetry-text">{{
+            serverUnreachable ? 'TELEMETRI MATI' : 'TELEMETRI LIVE'
+          }}</span>
           <span class="telemetry-ping">{{ telemetryMs }}ms</span>
         </div>
       </div>
@@ -1195,7 +1200,7 @@ function handleLoadToMat1() {
         <div class="ops-topbar__system-pills font-mono">
           <div class="system-pill">
             <span class="system-pill__dot emerald" />
-            <span>SERVER SYNC: 100%</span>
+            <span>{{ serverUnreachable ? 'SERVER TERPUTUS' : 'SERVER ONLINE' }}</span>
           </div>
           <div class="system-pill">
             <svg
@@ -1210,7 +1215,7 @@ function handleLoadToMat1() {
               <path d="M4 4a16 16 0 0 1 16 16" />
               <circle cx="5" cy="19" r="1" />
             </svg>
-            <span>5 JURY CONNECTED</span>
+            <span data-test="juri-online">{{ judgesOnline }} JURI ONLINE</span>
           </div>
           <div
             class="ops-profile-badge"
@@ -1869,6 +1874,10 @@ function handleLoadToMat1() {
   font-size: 0.6875rem;
 }
 
+.telemetry-dot--down {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px #ef4444 !important;
+}
 .telemetry-dot {
   width: 7px;
   height: 7px;

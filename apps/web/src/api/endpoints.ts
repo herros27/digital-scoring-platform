@@ -71,6 +71,8 @@ export const ENDPOINTS = {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/arenas`,
     CREATE: (compId: string) => `/api/v1/competitions/${compId}/arenas`,
     DETAIL: (compId: string, id: string) => `/api/v1/competitions/${compId}/arenas/${id}`,
+    PRESENCE: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/arenas/${id}/presence`,
     UPDATE: (compId: string, id: string) => `/api/v1/competitions/${compId}/arenas/${id}`,
     DELETE: (compId: string, id: string) => `/api/v1/competitions/${compId}/arenas/${id}`,
   },

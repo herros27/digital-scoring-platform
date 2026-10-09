@@ -93,7 +93,12 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 15. **Label tombol kunci draw membingungkan** (laporan pengguna): saat terkunci tertulis "Kunci Draw (Locked)" dan saat
     terbuka "Buka Kunci", jadi status tidak terbaca. Kini tombol menampilkan status ("Draw Terkunci" / "Draw Terbuka"),
     ikon gembok yang berbeda, dan tooltip aksinya.
-16. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+16. **Data perangkat di tab "Perangkat & PIN" dan header dikarang** (laporan pengguna): model tablet, latensi
+    (12 + 3×kursi ms), baterai (96 − 4×kursi %), "5 JURY CONNECTED", "SERVER SYNC: 100%", "TELEMETRY LIVE 12ms", dan tombol
+    Ping yang hanya menampilkan toast. Kini memakai kehadiran WebSocket nyata lewat `GET …/arenas/{id}/presence`
+    (ONLINE/OFFLINE per kursi, jumlah juri online, status server dan latensi dari polling itu sendiri); model dan baterai
+    dihapus karena server tidak mengetahuinya; Ping menjadi "Cek" koneksi sesungguhnya.
+17. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
@@ -146,9 +151,6 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
 
 ## Temuan yang belum diubah
 
-- **Data perangkat di tab "Perangkat & PIN" dikarang**: model tablet ("Samsung Galaxy Tab A9"), latensi (12 + 3×kursi ms),
-  dan baterai (96 − 4×kursi %) di-hardcode; "5 JURY CONNECTED" di header juga statis. Panitia bisa mengira tablet
-  online/berbaterai padahal tidak. Sebaiknya memakai kehadiran WebSocket (`presence`) yang sudah ada atau disembunyikan.
 - **Kunci draw hanya state di browser** (`isLocked = ref(true)`): tidak tersimpan dan tidak ditegakkan server;
   endpoint `brackets/generate` tetap mengacak ulang walau layar "terkunci", dan kunci kembali terkunci saat halaman dimuat ulang.
 - **Pesan galat kurang jelas**: "Muat ke Gelanggang" pada kejuaraan tanpa ruleset menampilkan `ruleset '' not found`.

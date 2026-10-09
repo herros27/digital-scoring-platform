@@ -2,12 +2,51 @@ package handler
 
 import (
 	"net/http"
+	"sort"
 
+	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type ArenaHandler struct {
 	Service *service.ArenaService
+	// Hubs sumber kehadiran perangkat (WebSocket) per gelanggang; nil bila tidak tersedia (semua dianggap offline).
+	Hubs *hub.Manager
+}
+
+// arenaPresenceDTO kehadiran perangkat di satu gelanggang saat ini, dihitung dari koneksi WebSocket yang hidup.
+type arenaPresenceDTO struct {
+	ArenaID     string `json:"arena_id"`
+	JudgeSeats  []int  `json:"judge_seats"` // nomor kursi juri yang online, terurut
+	Referees    int    `json:"referees"`
+	Scoreboards int    `json:"scoreboards"`
+	Admins      int    `json:"admins"`
+}
+
+// GET /api/v1/competitions/{comp_id}/arenas/{id}/presence
+// Perangkat yang benar-benar terhubung ke gelanggang (juri per kursi, wasit, scoreboard, admin). Gelanggang tanpa hub
+// aktif (belum ada yang pernah terhubung) menghasilkan semua nol, bukan galat.
+func (h *ArenaHandler) Presence(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	arena, err := h.Service.GetArenaByID(id)
+	if err != nil || arena == nil || arena.CompetitionID != r.PathValue("comp_id") {
+		Fail(w, http.StatusNotFound, "NOT_FOUND", "gelanggang tidak ditemukan pada kejuaraan ini", nil)
+		return
+	}
+	out := arenaPresenceDTO{ArenaID: id, JudgeSeats: []int{}}
+	if h.Hubs != nil {
+		if hb, err := h.Hubs.Get(id); err == nil {
+			p := hb.Presence()
+			for seat, online := range p.JudgeSeats {
+				if online {
+					out.JudgeSeats = append(out.JudgeSeats, seat)
+				}
+			}
+			sort.Ints(out.JudgeSeats)
+			out.Referees, out.Scoreboards, out.Admins = p.Referees, p.Scoreboards, p.Admins
+		}
+	}
+	Ok(w, out)
 }
 
 // GET /api/v1/competitions/{comp_id}/arenas

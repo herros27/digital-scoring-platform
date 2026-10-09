@@ -67,7 +67,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 		ClientKey: ClientIP,
 	}
 	compH := &handler.CompetitionHandler{Service: compService, Cache: appCache}
-	arenaH := &handler.ArenaHandler{Service: arenaService}
+	arenaH := &handler.ArenaHandler{Service: arenaService, Hubs: hubManager}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
 	publicBracketH := &handler.PublicBracketHandler{
 		Competitions: compService,
@@ -175,6 +175,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas", arenaH.List)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/arenas", adminOrDewan(http.HandlerFunc(arenaH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas/{id}", arenaH.Get)
+	protected.Handle("GET /api/v1/competitions/{comp_id}/arenas/{id}/presence", adminOrDewan(http.HandlerFunc(arenaH.Presence)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Update)))
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Delete)))
 

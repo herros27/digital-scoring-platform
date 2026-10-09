@@ -253,12 +253,33 @@ test.describe('Panitia: bagan, jadwal, dan PIN', () => {
       timeout: 15_000,
     })
 
+    // status NYATA: belum ada tablet yang terhubung, jadi kartu OFFLINE dan header menunjukkan 0 juri online
+    const status = cardOf().locator('[data-test="seat-status"]')
+    await expect(status).toHaveText('OFFLINE', { timeout: 15_000 })
+    await expect(page.locator('[data-test="juri-online"]')).toHaveText('0 JURI ONLINE')
+    await expect(page.getByText('SERVER ONLINE')).toBeVisible()
+
     // tablet memakai PIN itu di keypad dan masuk sebagai juri kursi 4
     const tablet = await (await browser.newContext({ baseURL })).newPage()
     await loginWithPin(tablet, pin)
     await expect(tablet).toHaveURL(/\/judge(\?|$)/)
     await expect(tablet.locator('.judge-main-title')).toContainText('JURI 4')
+    await expect(tablet.locator('.judge-online-pill')).toContainText('ONLINE')
+
+    // kartu dan header beralih ONLINE sendiri (polling kehadiran 5 dtk), kursi lain tetap OFFLINE
+    await expect(status).toHaveText('ONLINE', { timeout: 20_000 })
+    await expect(page.locator('[data-test="juri-online"]')).toHaveText('1 JURI ONLINE')
+    await expect(
+      page
+        .locator('.pin-device-card')
+        .filter({ hasText: 'KURSI JURI 1' })
+        .locator('[data-test="seat-status"]'),
+    ).toHaveText('OFFLINE')
+
+    // tablet ditutup: kembali OFFLINE
     await tablet.context().close()
+    await expect(status).toHaveText('OFFLINE', { timeout: 20_000 })
+    await expect(page.locator('[data-test="juri-online"]')).toHaveText('0 JURI ONLINE')
 
     // Reset PIN mengganti PIN pada kartu itu dan PIN lama tidak berlaku lagi
     await expect(cardOf()).toContainText('KURSI JURI 4')
