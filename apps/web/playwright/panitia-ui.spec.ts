@@ -179,12 +179,12 @@ test.describe('Panitia: bagan, jadwal, dan PIN', () => {
     await expect(page.getByText('Antrean (2)', { exact: true })).toBeVisible()
     await expect(page.getByText('Live (0)', { exact: true })).toBeVisible()
 
-    // filter per gelanggang: hanya partai Gelanggang Utama yang tampil
-    await page
-      .locator('select')
-      .filter({ hasText: 'Semua Gelanggang' })
-      .selectOption({ label: 'Gelanggang Utama' })
-    await expect(page.getByRole('button', { name: 'Muat ke Gelanggang' })).toHaveCount(1)
+    // filter per gelanggang: semua partai satu kategori ada di gelanggang asalnya (Utama); gelanggang lain kosong
+    const arenaFilter = page.locator('select').filter({ hasText: 'Semua Gelanggang' })
+    await arenaFilter.selectOption({ label: 'Gelanggang Utama 2' })
+    await expect(page.getByRole('button', { name: 'Muat ke Gelanggang' })).toHaveCount(0)
+    await arenaFilter.selectOption({ label: 'Gelanggang Utama' })
+    await expect(page.getByRole('button', { name: 'Muat ke Gelanggang' })).toHaveCount(2)
     const arenas = await must(
       'gelanggang',
       api('GET', `/competitions/${kit.competitionId}/arenas`, adminTok),
