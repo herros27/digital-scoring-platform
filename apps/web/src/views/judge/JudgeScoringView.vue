@@ -58,6 +58,23 @@ const matchStatus = ref<MatchStatus>('idle')
 const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
 // Skor ditolak server saat istirahat; tombol dikunci agar juri tidak mengira input tercatat.
 const isBreak = computed(() => matchStatus.value === 'break')
+// Skor juga ditolak saat partai dijeda wasit; tombol dikunci dengan alasan yang sama.
+const isPaused = computed(() => matchStatus.value === 'paused')
+const scoringLocked = computed(() => isBreak.value || isPaused.value)
+
+// Pesan penolakan dari server (mis. skor saat dijeda, BATAL tanpa input yang bisa dibatalkan)
+const notice = ref('')
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+function showNotice(text: string) {
+  notice.value = text
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => (notice.value = ''), 4000)
+}
+const ERROR_TEXT: Record<string, string> = {
+  SCORING_NOT_ALLOWED: 'Skor tidak diterima: pertandingan sedang dijeda atau tidak berjalan.',
+  UNDO_NOT_POSSIBLE:
+    'Tidak ada input yang bisa dibatalkan (poin terkonfirmasi tidak dapat dibatalkan).',
+}
 
 // Daftar tombol teknik mengikuti ruleset pertandingan yang dimuat (nilai poin dari server)
 const techniques = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
@@ -95,6 +112,8 @@ interface TouchLog {
 const lastRedTouch = ref<TouchLog | null>(null)
 
 const lastBlueTouch = ref<TouchLog | null>(null)
+// Sudut yang terakhir disentuh: BATAL menarik input terakhir ini, bukan selalu merah.
+const lastTapTarget = ref<'red' | 'blue' | null>(null)
 
 // Nama atlet dari pertandingan yang sedang aktif di gelanggang ini (bila ada)
 async function loadAthleteNames() {
@@ -186,6 +205,8 @@ function handleScoreTap(target: 'red' | 'blue', technique: string, points: numbe
   const eventId = generateUUID()
   const idempotencyKey = eventId
 
+  lastTapTarget.value = target
+
   // 4. Update local feedback
   const log: TouchLog = {
     technique: label,
@@ -214,24 +235,22 @@ function handleScoreTap(target: 'red' | 'blue', technique: string, points: numbe
 // Undo (BATAL) last touch
 function handleCancelLast() {
   haptics.trigger([80, 50, 80])
-  let lastTarget: 'red' | 'blue' | null = null
-  if (lastRedTouch.value) {
-    lastTarget = 'red'
-    lastRedTouch.value = null
-  } else if (lastBlueTouch.value) {
-    lastTarget = 'blue'
-    lastBlueTouch.value = null
+  const lastTarget = lastTapTarget.value
+  if (!lastTarget) {
+    showNotice(ERROR_TEXT.UNDO_NOT_POSSIBLE)
+    return
   }
+  if (lastTarget === 'red') lastRedTouch.value = null
+  else lastBlueTouch.value = null
+  lastTapTarget.value = null
 
-  if (lastTarget) {
-    sendMessage('judge_input', {
-      event_id: generateUUID(),
-      idempotency_key: generateUUID(),
-      score_type: 'undo',
-      target: lastTarget,
-      round: currentRound.value,
-    })
-  }
+  sendMessage('judge_input', {
+    event_id: generateUUID(),
+    idempotency_key: generateUUID(),
+    score_type: 'undo',
+    target: lastTarget,
+    round: currentRound.value,
+  })
 }
 
 onMounted(() => {
@@ -262,6 +281,9 @@ onMounted(() => {
 
   onMessage('consensus_progress', (payload) => feedback.onProgress(payload))
   onMessage('score_confirmed', (payload) => feedback.onConfirmed(payload))
+  onMessage('error', (payload) =>
+    showNotice(ERROR_TEXT[payload.code] ?? payload.message ?? 'Perintah ditolak server.'),
+  )
 
   onMessage('state_change', (payload) => {
     matchStatus.value =
@@ -316,8 +338,7 @@ async function requestLandscapeFullscreen() {
       await document.documentElement.requestFullscreen()
     }
     const orient = screen.orientation as unknown as
-      | { lock?: (mode: string) => Promise<void> }
-      | undefined
+      { lock?: (mode: string) => Promise<void> } | undefined
     if (orient?.lock) {
       await orient.lock('landscape')
     }
@@ -409,6 +430,12 @@ onUnmounted(() => {
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <span>{{ timer.formattedTime.value }}</span>
+        </div>
+        <div v-if="isPaused" class="judge-break-note judge-paused-note font-mono">
+          Pertandingan dijeda wasit — skor tidak diterima
+        </div>
+        <div v-if="notice" class="judge-break-note judge-notice font-mono" role="alert">
+          {{ notice }}
         </div>
         <div v-if="isBreak" class="judge-break-note font-mono">
           Babak berikutnya dimulai otomatis dalam {{ timer.formattedTime.value }}
@@ -574,7 +601,7 @@ onUnmounted(() => {
             :key="tech.type"
             class="judge-btn judge-btn--red"
             :class="{ 'judge-btn--active': activeBtn === 'red-' + tech.type }"
-            :disabled="isBreak"
+            :disabled="scoringLocked"
             @click="handleScoreTap('red', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
@@ -698,7 +725,7 @@ onUnmounted(() => {
             :key="tech.type"
             class="judge-btn judge-btn--blue"
             :class="{ 'judge-btn--active': activeBtn === 'blue-' + tech.type }"
-            :disabled="isBreak"
+            :disabled="scoringLocked"
             @click="handleScoreTap('blue', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">

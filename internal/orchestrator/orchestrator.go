@@ -358,6 +358,21 @@ type judgeInputPayload struct {
 	Round          int    `json:"round"`
 }
 
+// scoringOpen nil bila skor juri boleh masuk: babak berjalan dan jam tidak sedang dijeda. Partai yang dijeda
+// (atau baru dipulihkan setelah restart) menolak input agar skor tidak masuk saat wasit menghentikan laga.
+func (o *Orchestrator) scoringOpen() error {
+	if !o.sm.IsInRound() {
+		return fmt.Errorf("scoring not allowed in state %s", o.sm.Current())
+	}
+	o.mu.Lock()
+	t := o.timer
+	o.mu.Unlock()
+	if t != nil && !t.IsRunning() {
+		return fmt.Errorf("pertandingan sedang dijeda")
+	}
+	return nil
+}
+
 func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	// hanya judge yang boleh submit skor
 	// if client.Role != hub.RoleJudge {
@@ -371,8 +386,8 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	}
 
 	// scoring hanya boleh di state ROUND
-	if !o.sm.IsInRound() {
-		o.sendError(client, "SCORING_NOT_ALLOWED", fmt.Sprintf("state is %s", o.sm.Current()))
+	if err := o.scoringOpen(); err != nil {
+		o.sendError(client, "SCORING_NOT_ALLOWED", err.Error())
 		return
 	}
 
@@ -408,6 +423,11 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 			}
 		}
 		o.mu.Unlock()
+	}
+
+	if p.ScoreType == undoScoreType {
+		o.handleUndo(client, p)
+		return
 	}
 
 	input := consensus.JudgeInput{
@@ -448,8 +468,11 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 
 // SubmitJudgeInput memungkinkan pengiriman scoring event via REST dengan idempotency key check
 func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyKey string) (*consensus.ConsensusResult, bool, error) {
-	if !o.sm.IsInRound() {
-		return nil, false, fmt.Errorf("scoring not allowed in state %s", o.sm.Current())
+	if err := o.scoringOpen(); err != nil {
+		return nil, false, err
+	}
+	if input.ScoreType == undoScoreType {
+		return nil, false, fmt.Errorf("pembatalan hanya tersedia lewat WebSocket tablet juri")
 	}
 	if !o.validScoreType(string(input.ScoreType)) {
 		return nil, false, fmt.Errorf("score_type %q tidak dikenal pada ruleset ini", input.ScoreType)
@@ -486,6 +509,45 @@ func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyK
 	}
 
 	return result, false, nil
+}
+
+const undoScoreType = "undo"
+
+// handleUndo membatalkan input juri ini yang masih menunggu juri lain (belum jadi poin) pada sudut tertentu.
+// Poin yang sudah terkonfirmasi tidak dibatalkan dari tablet; itu wewenang wasit. Tanpa input yang bisa
+// dibatalkan, juri mendapat UNDO_NOT_POSSIBLE agar tidak mengira pembatalan berhasil.
+func (o *Orchestrator) handleUndo(client *hub.Client, p judgeInputPayload) {
+	target := consensus.Target(p.Target)
+	if target != consensus.TargetRed && target != consensus.TargetBlue {
+		o.sendError(client, "BAD_PAYLOAD", "target pembatalan harus red atau blue")
+		return
+	}
+	retracted, ok := o.engine.Retract(client.ID, target, o.sm.CurrentRoundNumber())
+	if !ok {
+		o.sendError(client, "UNDO_NOT_POSSIBLE", "tidak ada input yang menunggu juri lain; poin terkonfirmasi tidak dapat dibatalkan dari tablet")
+		return
+	}
+	o.mu.Lock()
+	o.appendEvent("judge_undo", map[string]any{
+		"judge_id":    client.ID,
+		"seat_number": client.SeatNumber,
+		"score_type":  retracted.ScoreType,
+		"target":      retracted.Target,
+		"round":       retracted.Round,
+	}, client.ID)
+	o.mu.Unlock()
+	// count 0 memadamkan lampu konsensus di tablet; count>0 menurunkan hitungan juri yang tersisa
+	o.h.SendToRole(hub.RoleJudge, hub.Message{
+		Type: hub.MsgConsensusProgress,
+		Payload: map[string]any{
+			"target":     retracted.Target,
+			"score_type": retracted.ScoreType,
+			"round":      retracted.Round,
+			"count":      retracted.Remaining,
+			"needed":     o.engine.Majority(),
+			"window_ms":  o.engine.Window().Milliseconds(),
+		},
+	})
 }
 
 // notifyConsensusProgress memberi tahu tablet juri berapa juri yang sudah menekan teknik dan sudut

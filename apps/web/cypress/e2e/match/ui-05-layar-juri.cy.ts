@@ -165,6 +165,53 @@ describe('Layar juri (UI) - sinkronisasi realtime per kursi', () => {
     })
   }
 
+  describe('dijeda dan BATAL', () => {
+    beforeEach(() =>
+      runAsync(async () => {
+        const match = await kit.createMatch()
+        const devices = await kit.openDevices({ skipSeats: [1] })
+        await must('load-arena', kit.loadMatch(match))
+        await must('start', kit.control(match, 'start'))
+        a = { match, devices }
+      }),
+    )
+
+    it('saat wasit menjeda: tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol aktif lagi', () => {
+      cy.visitWithSession('/judge', kit.judges[0])
+      cy.get('.judge-round-badge', { timeout: 10000 }).should('contain.text', 'BERJALAN')
+      cy.get('.judge-btn--red').first().should('not.be.disabled')
+
+      cy.then(() => runAsync(async () => must('pause', kit.control(a!.match, 'pause'))))
+      cy.get('.judge-round-badge', { timeout: 8000 }).should('contain.text', 'DIJEDA')
+      cy.get('.judge-paused-note').should('be.visible')
+      cy.get('.judge-btn--red').each(($b) => expect($b).to.have.prop('disabled', true))
+      cy.get('.judge-btn--blue').each(($b) => expect($b).to.have.prop('disabled', true))
+
+      cy.then(() => runAsync(async () => must('resume', kit.control(a!.match, 'resume'))))
+      cy.get('.judge-round-badge', { timeout: 8000 }).should('contain.text', 'BERJALAN')
+      cy.get('.judge-paused-note').should('not.exist')
+      cy.get('.judge-btn--red').first().should('not.be.disabled')
+    })
+
+    it('BATAL menarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan pesan, bukan diam', () => {
+      cy.visitWithSession('/judge', kit.judges[0])
+      cy.get('.judge-round-badge', { timeout: 10000 }).should('contain.text', 'BERJALAN')
+
+      cy.get('.judge-btn--blue').first().click()
+      cy.get('[data-test="consensus-text-blue"]', { timeout: 5000 }).should(
+        'contain.text',
+        'MENUNGGU JURI LAIN',
+      )
+      cy.get('.judge-batal-btn').click()
+      cy.get('[data-test="consensus-text-blue"]', { timeout: 5000 }).should('not.exist')
+
+      cy.get('.judge-batal-btn').click()
+      cy.get('.judge-notice', { timeout: 5000 })
+        .should('be.visible')
+        .and('contain.text', 'dibatalkan')
+    })
+  })
+
   describe('koneksi dan akses', () => {
     beforeEach(() =>
       runAsync(async () => {

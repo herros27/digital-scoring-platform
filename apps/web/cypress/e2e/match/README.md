@@ -9,11 +9,11 @@ dan 3 juri), lalu perangkat dimainkan lewat WebSocket nyata atau layar aplikasi.
 | Lapisan             | Berkas                                                       | Fungsi                                                                         |
 | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | Driver (tanpa `cy`) | `support/match/http.ts`, `socket.ts`, `kit.ts`, `helpers.ts` | fetch + WebSocket + penyiapan data; sama persis di Cypress dan Node            |
-| Spec alur API/WS    | `01`–`04-*.cy.ts`                                            | memakai driver lewat `runAsync` (satu pembungkus per tes)                      |
+| Spec alur API/WS    | `01`–`06-*.cy.ts`                                            | memakai driver lewat `runAsync` (satu pembungkus per tes)                      |
 | Spec UI             | `ui-05`, `ui-06`                                             | layar juri & konsol wasit dengan perintah Cypress asli                         |
 | Perintah            | `visitWithSession` (`support/commands.ts`)                   | membuka halaman sebagai perangkat PIN tanpa login ulang (batas login 10/menit) |
 
-Spec alur (`01`–`04`) tidak memakai `cy.*`, sehingga **dapat dijalankan juga tanpa browser** lewat runner Node
+Spec alur (`01`–`06`) tidak memakai `cy.*`, sehingga **dapat dijalankan juga tanpa browser** lewat runner Node
 (`npm run test:match-flow`). Spec `ui-*` hanya berjalan di Cypress.
 
 ## Menjalankan
@@ -24,7 +24,7 @@ go run ./cmd/seed/main.go && go run ./cmd/server     # terminal 1 (root repo)
 npm run dev                                           # terminal 2 (apps/web)
 
 npx cypress run --spec "cypress/e2e/match/**"         # terminal 3: semua spec (butuh binary Cypress)
-npm run test:match-flow                               # alternatif headless tanpa browser (spec 01–04)
+npm run test:match-flow                               # alternatif headless tanpa browser (spec 01–06)
 npm run test:match-flow -- 03                         # satu spec
 ```
 
@@ -39,7 +39,9 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 | `02-juri-sinkronisasi-realtime` | tiap kursi 1–3: snapshot identik, urutan `state_change` identik, hitung mundur konsisten, konsensus (2 dari 3), jendela 3 dtk, suara ganda, input di luar waktu, hak akses WS juri, audit                 |
 | `03-otorisasi-role`             | matriks REST (wasit/dewan/admin vs juri/operator/kontingen/anon/gelanggang lain), skor REST hanya juri atas identitas token, handshake WS, perintah WS per role                                           |
 | `04-ketahanan-dan-kasus-tepi`   | gagal memulai, ARENA_BUSY, reschedule, balapan (5× start, 3× finish), aksi berulang, putus/sambung ulang (juri, wasit, semua perangkat, tablet kembar), pesan rusak, konsistensi dengan endpoint publik   |
-| `ui-05-layar-juri`              | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, layar terkunci saat istirahat, SELESAI                                                                       |
+| `05-format-5-juri`              | konsensus 3-dari-5: kelima juri online, progres 1→2→3, kombinasi juri mana pun, sudut berbeda tidak digabung, di luar window tidak digabung                                                               |
+| `06-pemulihan-restart-server`   | restart backend di tengah partai: skor/babak bertahan, jam dijeda, skor ditolak sampai wasit melanjutkan, partai selesai normal (perlu `E2E_RESTART_CMD`)                                                 |
+| `ui-05-layar-juri`              | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                             |
 | `ui-06-konsol-wasit`            | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                  |
 
 ## Cacat yang ditemukan tes ini dan sudah diperbaiki
@@ -58,9 +60,32 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 7. **Balasan `sync_response`/`error` dikirim ke koneksi pertama berID sama**: tablet juri yang tersambung ulang
    (atau tablet kembar) bisa tidak menerima snapshot. Kini membalas ke koneksi yang meminta.
 
-## Perilaku yang dicatat (belum diubah)
+8. **Skor juri diterima saat partai dijeda**: input (WebSocket dan REST) kini ditolak `SCORING_NOT_ALLOWED`
+   selama jam berhenti, termasuk partai yang baru dipulihkan setelah restart; tombol di layar juri terkunci
+   dengan keterangan "dijeda".
+9. **Tombol BATAL tidak berfungsi**: `score_type: "undo"` diproses seperti suara biasa lalu tak berefek, dan
+   layar juri tidak menampilkan penolakan. Kini BATAL menarik input juri itu yang masih menunggu juri lain
+   (lampu konsensus turun/padam di semua tablet), menarik sudut yang **terakhir ditekan** (bukan selalu merah),
+   dan bila tidak ada yang bisa ditarik server membalas `UNDO_NOT_POSSIBLE` yang tampil di layar. Poin yang
+   sudah terkonfirmasi tidak dapat dibatalkan dari tablet (itu wewenang wasit).
+10. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+    Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
+    (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
-- Skor juri tetap diterima saat partai **dijeda** (state tetap `round_N`); hanya istirahat/selesai yang menolak.
-- Tombol **BATAL** pada layar juri mengirim `score_type: "undo"` yang ditolak server (`BAD_PAYLOAD`) tanpa umpan balik di layar.
-- Tidak ada ping/pong WebSocket: koneksi mati bertahan sampai TCP menyerah.
-- Pemulihan setelah **restart server** diuji di tes Go (`internal/orchestrator/runtime_test.go`), bukan di E2E ini.
+## Spesifik lingkungan
+
+- `05-format-5-juri`: ruleset 5 juri, 3 harus sepakat (kit: `judges: 5, majority: 3`).
+- `06-pemulihan-restart-server`: mematikan dan menyalakan ulang backend sungguhan, sehingga **hanya berjalan bila
+  `E2E_RESTART_CMD` diset** (perintah shell yang me-restart backend dan baru kembali saat server siap, dengan
+  env/DB yang sama). Tanpa itu spec dilewati. Cypress menjalankannya lewat `cy.task('server:restart')`.
+
+  ```bash
+  E2E_RESTART_CMD="./scripts/restart-backend.sh" npx cypress run --spec "cypress/e2e/match/06-*"
+  E2E_RESTART_CMD="./scripts/restart-backend.sh" npm run test:match-flow -- 06
+  ```
+
+## Perilaku yang dicatat
+
+- Poin yang sudah terkonfirmasi hanya dikoreksi wasit (tidak ada pembatalan oleh juri).
+- Sisa waktu setelah restart dipulihkan dari simpanan terakhir, jadi bisa sedikit lebih besar daripada saat
+  server mati; jam tidak berjalan selama server mati (partai dipulihkan dalam keadaan dijeda).

@@ -190,6 +190,14 @@ if (files.length === 0) {
   process.exit(2)
 }
 
+// Hook restart server untuk spec pemulihan: dipasang hanya bila E2E_RESTART_CMD diberikan lingkungan
+if (process.env.E2E_RESTART_CMD) {
+  const { execSync } = await import('node:child_process')
+  ;(globalThis as { __e2eRestart?: () => Promise<void> }).__e2eRestart = async () => {
+    execSync(process.env.E2E_RESTART_CMD as string, { stdio: 'inherit', timeout: 120_000 })
+  }
+}
+
 const base = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173'
 const health = await fetch(`${base}/api/v1/health`).catch(() => null)
 if (!health?.ok) {

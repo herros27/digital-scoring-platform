@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'cypress'
 
 export default defineConfig({
@@ -11,11 +12,18 @@ export default defineConfig({
     retries: { runMode: 1, openMode: 0 },
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.ts',
+    // spec pemulihan restart hanya berjalan bila lingkungan menyediakan perintah restart backend
+    env: { E2E_RESTART: Boolean(process.env.E2E_RESTART_CMD) },
     setupNodeEvents(on) {
       // Cache token API di proses Node supaya seluruh spec dalam satu run hanya login sekali per
       // akun (endpoint login dibatasi 10 request/menit). Tidak ada state yang disimpan ke disk.
       const tokens = new Map<string, string>()
       on('task', {
+        'server:restart': () => {
+          if (!process.env.E2E_RESTART_CMD) throw new Error('E2E_RESTART_CMD tidak diset')
+          execSync(process.env.E2E_RESTART_CMD, { stdio: 'inherit', timeout: 120_000 })
+          return null
+        },
         'tokenCache:get': (key: string) => tokens.get(key) ?? null,
         'tokenCache:set': ({ key, token }: { key: string; token: string }) => {
           tokens.set(key, token)

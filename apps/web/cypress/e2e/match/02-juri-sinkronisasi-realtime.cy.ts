@@ -462,4 +462,115 @@ describe('Juri - sinkronisasi realtime lintas role', () => {
         expect(payload).to.include({ seat_number: 3, score_type: 'fall', target: 'blue', round: 1 })
       }))
   })
+  describe('skor saat dijeda dan pembatalan (BATAL)', () => {
+    const press = (sock: Json, target: 'red' | 'blue', type: string, key = nextKey('p')) =>
+      sock.send('judge_input', {
+        event_id: key,
+        idempotency_key: key,
+        score_type: type,
+        target,
+        round: 1,
+      })
+
+    it('partai dijeda: input juri ditolak SCORING_NOT_ALLOWED dan tidak masuk ke skor, lalu diterima lagi setelah dilanjutkan', () =>
+      runAsync(async () => {
+        const { match, devices } = a!
+        await must('start', kit.control(match, 'start'))
+        await waitState(devices.wasit, 'round_1')
+        await must('pause', kit.control(match, 'pause'))
+        await waitStateWhere(devices.judges[0], (p) => p.timer_running === false, 'dijeda')
+
+        const since = devices.judges.map((s) => s.mark())
+        press(devices.judges[0], 'red', 'technique')
+        press(devices.judges[1], 'red', 'technique')
+        const errors = await eachSocket(devices.judges.slice(0, 2), (s, i) =>
+          s.waitFor('error', { since: since[i], what: 'error SCORING_NOT_ALLOWED' }),
+        )
+        errors.forEach((m) => expect(m.payload.code).to.eq('SCORING_NOT_ALLOWED'))
+        await devices.wasit.expectNone('score_confirmed', 400)
+        expect((await snapshot(devices.wasit)).red_total).to.eq(0)
+
+        await must('resume', kit.control(match, 'resume'))
+        await waitStateWhere(devices.judges[0], (p) => p.timer_running === true, 'lanjut', 0)
+        const after = devices.all.map((s) => s.mark())
+        press(devices.judges[0], 'red', 'technique')
+        press(devices.judges[1], 'red', 'technique')
+        await eachSocket(devices.all, (s, i) =>
+          s.waitFor('score_confirmed', { since: after[i], what: 'score_confirmed setelah lanjut' }),
+        )
+        expect((await snapshot(devices.wasit)).red_total).to.eq(1)
+      }))
+
+    it('REST skor juri juga ditolak (409) saat dijeda', () =>
+      runAsync(async () => {
+        const { match, devices } = a!
+        await must('start', kit.control(match, 'start'))
+        await waitState(devices.wasit, 'round_1')
+        await must('pause', kit.control(match, 'pause'))
+        const res = await api(
+          'POST',
+          `/competitions/${kit.competitionId}/matches/${match.id}/scores`,
+          kit.judges[0].token,
+          { score_type: 'technique', target: 'red', idempotency_key: nextKey('rest') },
+        )
+        expect(res.status).to.be.oneOf([400, 409, 422])
+      }))
+
+    it('BATAL menarik input yang menunggu: lampu padam (count 0) dan juri lain sendirian tidak cukup untuk poin', () =>
+      runAsync(async () => {
+        const { match, devices } = a!
+        await must('start', kit.control(match, 'start'))
+        await waitState(devices.wasit, 'round_1')
+        const since = devices.judges.map((s) => s.mark())
+        press(devices.judges[0], 'red', 'technique')
+        await devices.judges[2].waitFor(
+          (m) => m.type === 'consensus_progress' && m.payload.count === 1,
+          { since: since[2], what: 'progres 1' },
+        )
+        press(devices.judges[0], 'red', 'undo')
+        await devices.judges[2].waitFor(
+          (m) => m.type === 'consensus_progress' && m.payload.count === 0,
+          { since: since[2], what: 'progres 0 setelah BATAL' },
+        )
+        press(devices.judges[1], 'red', 'technique')
+        await devices.wasit.expectNone('score_confirmed', 500)
+        expect((await snapshot(devices.wasit)).red_total).to.eq(0)
+      }))
+
+    it('BATAL tanpa input menunggu → UNDO_NOT_POSSIBLE (bukan diam); target tidak valid → BAD_PAYLOAD', () =>
+      runAsync(async () => {
+        const { match, devices } = a!
+        await must('start', kit.control(match, 'start'))
+        await waitState(devices.wasit, 'round_1')
+        const j = devices.judges[0]
+        let m = j.mark()
+        press(j, 'blue', 'undo')
+        expect(
+          (await j.waitFor('error', { since: m, what: 'UNDO_NOT_POSSIBLE' })).payload.code,
+        ).to.eq('UNDO_NOT_POSSIBLE')
+        m = j.mark()
+        press(j, 'ungu' as 'red', 'undo')
+        expect((await j.waitFor('error', { since: m, what: 'BAD_PAYLOAD' })).payload.code).to.eq(
+          'BAD_PAYLOAD',
+        )
+      }))
+
+    it('poin yang sudah terkonfirmasi tidak dapat dibatalkan juri (UNDO_NOT_POSSIBLE) dan skor tetap', () =>
+      runAsync(async () => {
+        const { match, devices } = a!
+        await must('start', kit.control(match, 'start'))
+        await waitState(devices.wasit, 'round_1')
+        const m0 = devices.wasit.mark()
+        press(devices.judges[0], 'red', 'knockdown')
+        press(devices.judges[1], 'red', 'knockdown')
+        await devices.wasit.waitFor('score_confirmed', { since: m0, what: 'score_confirmed' })
+        const m = devices.judges[0].mark()
+        press(devices.judges[0], 'red', 'undo')
+        expect(
+          (await devices.judges[0].waitFor('error', { since: m, what: 'UNDO_NOT_POSSIBLE' }))
+            .payload.code,
+        ).to.eq('UNDO_NOT_POSSIBLE')
+        expect((await snapshot(devices.wasit)).red_total).to.eq(2)
+      }))
+  })
 })

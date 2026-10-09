@@ -83,6 +83,37 @@ func (e *Engine) Submit(input JudgeInput) *ConsensusResult {
 	return res
 }
 
+// Retracted input yang ditarik kembali oleh juri.
+type Retracted struct {
+	ScoreType ScoreType
+	Target    Target
+	Round     int
+	Remaining int // juri lain yang masih menunggu dengan teknik dan sudut yang sama
+}
+
+// Retract menarik input terakhir juri pada sudut itu yang masih di dalam window dan belum menjadi poin.
+// false bila tidak ada yang bisa ditarik (sudah terkonfirmasi, kedaluwarsa, atau memang belum menekan).
+func (e *Engine) Retract(judgeID string, target Target, round int) (Retracted, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.cleanup()
+	for i := len(e.buffer) - 1; i >= 0; i-- {
+		in := e.buffer[i]
+		if in.JudgeID != judgeID || in.Target != target || in.Round != round {
+			continue
+		}
+		e.buffer = append(e.buffer[:i], e.buffer[i+1:]...)
+		remaining := 0
+		for _, other := range e.buffer {
+			if other.ScoreType == in.ScoreType && other.Target == in.Target && other.Round == in.Round {
+				remaining++
+			}
+		}
+		return Retracted{ScoreType: in.ScoreType, Target: in.Target, Round: in.Round, Remaining: remaining}, true
+	}
+	return Retracted{}, false
+}
+
 func (e *Engine) evaluate(latest JudgeInput) *ConsensusResult {
 	count := 0
 	for _, inp := range e.buffer {

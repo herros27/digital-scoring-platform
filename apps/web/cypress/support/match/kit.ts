@@ -18,6 +18,9 @@ export interface KitOptions {
   totalRounds?: number
   /** Jumlah juri yang dibuatkan PIN (kursi 1..n); bawaan 3 sesuai konsensus 2-dari-3. */
   judges?: number
+  /** Aturan konsensus ruleset; bawaan 2-dari-3 dalam 3 dtk. Jumlah PIN juri mengikuti `judges` di atas. */
+  majority?: number
+  consensusWindowMs?: number
   /** Buat juga PIN wasit untuk gelanggang lain (hanya dipakai uji otorisasi lintas gelanggang). */
   outsideWasit?: boolean
 }
@@ -69,7 +72,14 @@ let counter = 0
 const uid = () => `${Date.now().toString(36)}${(counter += 1)}`
 
 /** Skema skor ruleset uji: durasi singkat, tiga teknik, sanksi resmi, konsensus 2-dari-3 dalam 3 dtk. */
-function scoring(o: Required<Pick<KitOptions, 'roundSeconds' | 'breakSeconds' | 'totalRounds'>>) {
+function scoring(
+  o: Required<
+    Pick<
+      KitOptions,
+      'roundSeconds' | 'breakSeconds' | 'totalRounds' | 'judges' | 'majority' | 'consensusWindowMs'
+    >
+  >,
+) {
   return {
     technique_points: 1,
     knockdown_points: 2,
@@ -90,7 +100,7 @@ function scoring(o: Required<Pick<KitOptions, 'roundSeconds' | 'breakSeconds' | 
       { type: 'teguran_2', label: 'Teguran 2', points: 2 },
       { type: 'peringatan_3', label: 'Peringatan 3', points: 0, action: 'disqualify' },
     ],
-    consensus: { judges: 3, majority: 2, window_ms: 3000 },
+    consensus: { judges: o.judges, majority: o.majority, window_ms: o.consensusWindowMs },
   }
 }
 
@@ -135,6 +145,8 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
     breakSeconds: options.breakSeconds ?? 3,
     totalRounds: options.totalRounds ?? 2,
     judges: options.judges ?? 3,
+    majority: options.majority ?? 2,
+    consensusWindowMs: options.consensusWindowMs ?? 3000,
   }
   const tag = `E2E ${options.label} ${uid()}`
 
