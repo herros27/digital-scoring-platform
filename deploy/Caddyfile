@@ -11,3 +11,18 @@
 	# pembatas percobaan login/PIN membedakan tiap tablet, bukan menganggap semuanya satu IP (kontainer Caddy).
 	reverse_proxy web:80
 }
+
+# HTTP biasa (port 80): satu-satunya jalan untuk mengunduh root CA di tablet SEBELUM tablet memercayai HTTPS (mode
+# `tls internal`). http://<SITE_ADDRESS>/root.crt mengunduh sertifikat publik CA (aman dibuka; kunci pribadinya tidak
+# pernah dilayani). Selain itu semua dialihkan ke HTTPS. Pada mode domain publik berkas itu tidak ada (404).
+http://{$SITE_ADDRESS} {
+	handle /root.crt {
+		root * /data/caddy/pki/authorities/local
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition `attachment; filename="silat-root-ca.crt"`
+		file_server
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}

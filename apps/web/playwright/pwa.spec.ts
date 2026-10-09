@@ -57,6 +57,42 @@ test.describe('PWA', () => {
     expect((await page.request.get('/favicon.svg')).status()).toBe(200)
   })
 
+  test('tidak bergantung pada internet: semua permintaan satu asal dan font lokal termuat', async ({
+    page,
+    baseURL,
+  }) => {
+    const outside: string[] = []
+    page.on('request', (r) => {
+      const u = r.url()
+      if (
+        !u.startsWith('data:') &&
+        !u.startsWith('blob:') &&
+        new URL(u).origin !== new URL(baseURL!).origin
+      )
+        outside.push(u)
+    })
+    for (const path of ['/judge/login', '/scoreboard', '/bagan']) {
+      await page.goto(path)
+      await page.waitForLoadState('networkidle')
+    }
+    expect(outside, `permintaan ke luar: ${outside.join(', ')}`).toEqual([])
+
+    // font dimuat saat dipakai: kumpulkan dari beberapa halaman (login memakai sans, scoreboard memakai mono)
+    const loaded = new Set<string>()
+    for (const path of ['/judge/login', '/scoreboard']) {
+      await page.goto(path)
+      const fonts = await page.evaluate(async () => {
+        await document.fonts.ready
+        return [...document.fonts]
+          .filter((f) => f.status === 'loaded')
+          .map((f) => f.family.replace(/"/g, ''))
+      })
+      fonts.forEach((f) => loaded.add(f))
+    }
+    const fonts = [...loaded]
+    expect(fonts).toEqual(expect.arrayContaining(['Space Grotesk', 'JetBrains Mono']))
+  })
+
   test('service worker terdaftar dan aktif, dan Chrome menganggap aplikasi dapat dipasang (installable)', async ({
     page,
     context,

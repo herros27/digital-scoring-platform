@@ -3,7 +3,53 @@
 Digital Scoring dapat dipasang ke layar utama tablet/ponsel seperti aplikasi biasa: ikon sendiri, layar penuh tanpa
 bilah alamat, dan cangkang aplikasi (HTML/JS/CSS/ikon) tetap terbuka walau jaringan sedang putus.
 
-## Yang WAJIB: HTTPS
+## Rekomendasi untuk acara: server di laptop + router Wi-Fi (internet tidak pasti)
+
+Rancang untuk **skenario terburuk: tanpa internet**. Aplikasi sendiri tidak membutuhkan internet (font sudah di-host
+sendiri, tidak ada permintaan ke domain luar; diuji di `playwright/pwa.spec.ts`). Satu-satunya hal yang bergantung pada
+internet adalah sertifikat Let's Encrypt, jadi pakai **CA internal Caddy** dengan **IP tetap**:
+
+1. **IP tetap untuk laptop server.** Di router, buat *DHCP reservation* (atau set IP statis di laptop), mis. `192.168.1.10`.
+   Tablet mengetik alamat ini; bila IP berubah, alamat dan sertifikat tablet tidak cocok lagi.
+2. `.env.prod`:
+   ```
+   WEB_PORT=127.0.0.1:8081
+   SITE_ADDRESS=192.168.1.10
+   TLS_DIRECTIVE=tls internal
+   ```
+   lalu `docker compose --env-file .env.prod --profile https up -d --build`.
+3. **Pasang root CA di setiap tablet (sekali, sebelum hari-H):** buka `http://192.168.1.10/root.crt` di tablet (HTTP biasa,
+   hanya berkas ini yang dilayani tanpa HTTPS; sisanya dialihkan ke HTTPS).
+   - Android: berkas terunduh → Setelan → Keamanan → Enkripsi & kredensial → Instal sertifikat → **Sertifikat CA**
+     (pilih berkas `silat-root-ca.crt`; nama menu bervariasi menurut merek).
+   - iPad/iPhone: ketuk **Izinkan** untuk mengunduh profil → Setelan → **Profil Diunduh** → Pasang, lalu Setelan → Umum → Info →
+     **Pengaturan Kepercayaan Sertifikat** → aktifkan untuk "Caddy Local Authority".
+4. Buka `https://192.168.1.10/` di tablet: tidak boleh ada peringatan sertifikat. Lalu pasang PWA (lihat bawah).
+5. **Jangan menghapus volume `caddy_data`.** Di dalamnya ada root CA; bila hilang, CA baru terbentuk dan semua tablet
+   harus memasang ulang. Cadangkan berkas `silat-root-ca.crt` dan folder volume itu.
+
+Bila ternyata ada internet **dan** domain, `TLS_DIRECTIVE` dikosongkan memakai Let's Encrypt dan langkah 3 tidak perlu; tetapi
+tablet harus bisa menjangkau server lewat domain itu (DNS publik yang menunjuk ke IP server tidak cukup untuk jaringan
+tertutup: tantangan HTTP Let's Encrypt harus dapat menjangkau server dari internet). Karena itu **jalur CA internal tetap
+yang disarankan** untuk acara di jaringan lokal.
+
+### Pengaturan jaringan yang sering terlewat
+
+- **Matikan "AP/Client Isolation"** di router Wi-Fi. Bila aktif, tablet tidak bisa menjangkau laptop sama sekali.
+- **Firewall laptop** harus mengizinkan masuk TCP **80 dan 443** (Windows: izinkan Docker Desktop di jaringan *Private*).
+- **Jangan biarkan laptop tidur/hibernasi** (Setelan daya: tidak pernah sleep saat dicolok) dan colokkan ke listrik.
+- Sinyal Wi-Fi: satu AP kelas 5 GHz dekat gelanggang; uji dengan semua tablet menyala sekaligus.
+
+### Risiko: semua tablet terlihat satu IP (Docker Desktop di Windows/macOS)
+
+Pembatas login/PIN backend membatasi **10 percobaan per menit per IP** (burst 10) dan semua pembatas bekerja per IP klien.
+Di Docker Desktop (Windows/macOS), sambungan masuk sering terlihat datang dari gateway Docker sehingga **seluruh tablet
+dianggap satu IP**; beberapa tablet yang login berbarengan atau satu juri yang salah PIN berulang dapat membuat yang lain
+terkena "too many requests". Di Linux (Docker Engine) IP klien asli diteruskan. **Uji sebelum acara:** login PIN dari
+6–8 tablet dalam waktu satu menit; bila ada yang ditolak dengan "too many requests", jalankan server di Linux, atau
+backend langsung di host (tanpa Docker NAT) atau hubungi pengembang untuk menyesuaikan pembatas.
+
+## Detail HTTPS
 
 Peramban hanya mendaftarkan service worker dan menawarkan pemasangan pada **konteks aman**: `https://…` atau
 `http://localhost`. Alamat jaringan lokal seperti `http://192.168.1.10` **tidak** memenuhi syarat itu, jadi di tablet
@@ -32,8 +78,7 @@ meneruskan semuanya, termasuk WebSocket (`wss://`), ke layanan `web`.
 
 Tanpa `--profile https` perilaku lama tidak berubah (HTTP di `WEB_PORT`).
 
-**Memasang root CA internal di tablet** (hanya mode `tls internal`). Ambil sertifikat dari server, lalu kirim ke tablet
-(AirDrop, USB, atau tautan):
+**Cara lain mengambil root CA** (selain `http://<SITE_ADDRESS>/root.crt`), bila perlu mengirimnya lewat AirDrop/USB:
 ```bash
 docker compose --env-file .env.prod cp caddy:/data/caddy/pki/authorities/local/root.crt ./silat-root.crt
 ```
