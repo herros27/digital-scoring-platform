@@ -149,6 +149,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 
 	// Competitions
 	protected.HandleFunc("GET /api/v1/competitions", compH.List)
+	protected.HandleFunc("GET /api/v1/competitions/stats", compH.Stats)
 	protected.Handle("POST /api/v1/competitions", adminOrDewan(http.HandlerFunc(compH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{id}", compH.Get)
 	protected.Handle("PUT /api/v1/competitions/{id}", adminOrDewan(http.HandlerFunc(compH.Update)))

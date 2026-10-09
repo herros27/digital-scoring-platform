@@ -370,9 +370,39 @@ paths:
   # -------------------------------------------------------
   # COMPETITIONS
   # -------------------------------------------------------
+  /api/v1/competitions/stats:
+    get:
+      summary: Jumlah Kejuaraan per Status
+      description: |
+        Hitungan global (draft, active, paused, completed, cancelled, total), tidak bergantung filter atau halaman daftar.
+      tags:
+        - Competition
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Hitungan per status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total: {type: integer}
+                      draft: {type: integer}
+                      active: {type: integer}
+                      paused: {type: integer}
+                      completed: {type: integer}
+                      cancelled: {type: integer}
   /api/v1/competitions:
     get:
-      summary: Daftar Seluruh Kejuaraan (Mendukung Pagination & Filter Status)
+      summary: Daftar Seluruh Kejuaraan (Pagination, Filter Status, Pencarian)
+      description: |
+        Urutan: active, paused, draft, completed, lalu cancelled; di dalam status yang sama yang terbaru lebih dulu.
       tags:
         - Competition
       security:
@@ -397,8 +427,14 @@ paths:
           required: false
           schema:
             type: string
-            enum: [upcoming, ongoing, completed]
+            enum: [draft, active, paused, completed, cancelled]
           description: Filter berdasarkan status kompetisi
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Cari teks pada nama, lokasi, nama ruleset, atau ID (tidak peka huruf besar/kecil)
       responses:
         '200':
           description: List kompetisi berhasil diambil beserta metadata pagination

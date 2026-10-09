@@ -214,7 +214,8 @@ GET http://localhost:8080/docs/openapi.yaml
 ### 2. Competition
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/competitions` | JWT | List kompetisi (mendukung pagination `?page=1&limit=20&status=`) |
+| GET | `/api/v1/competitions` | JWT | List kompetisi (`?page=1&limit=20&status=&q=`; urut active, paused, draft, completed, cancelled) |
+| GET | `/api/v1/competitions/stats` | JWT | Jumlah kompetisi per status (global, tak bergantung filter/halaman) |
 | POST | `/api/v1/competitions` | Admin, Dewan | Buat kompetisi baru (termasuk binding `ruleset_id`) |
 | GET | `/api/v1/competitions/{id}` | JWT | Detail data kompetisi |
 | PUT | `/api/v1/competitions/{id}` | Admin, Dewan | Perbarui data kompetisi |

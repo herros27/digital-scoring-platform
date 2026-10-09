@@ -26,6 +26,7 @@ export const ENDPOINTS = {
   // Competitions
   COMPETITIONS: {
     LIST: '/api/v1/competitions',
+    STATS: '/api/v1/competitions/stats',
     CREATE: '/api/v1/competitions',
     DETAIL: (id: string) => `/api/v1/competitions/${id}`,
     UPDATE: (id: string) => `/api/v1/competitions/${id}`,

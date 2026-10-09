@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -28,6 +29,81 @@ func NewCompetitionService(repo CompetitionRepository) *CompetitionService {
 
 type CompetitionPagedRepository interface {
 	ListPaged(status string, limit, offset int) ([]domain.Competition, int, error)
+}
+
+// CompetitionSearchRepository kemampuan opsional repo: daftar berhalaman dengan pencarian teks.
+type CompetitionSearchRepository interface {
+	ListPagedSearch(status, q string, limit, offset int) ([]domain.Competition, int, error)
+}
+
+// CompetitionStatsRepository kemampuan opsional repo: hitungan kejuaraan per status.
+type CompetitionStatsRepository interface {
+	CountByStatus() (map[string]int, error)
+}
+
+// CompetitionStats jumlah kejuaraan per status dan total. Semua status dikembalikan (nol bila kosong) supaya klien
+// dapat menampilkan angka tetap yang tidak bergantung pada filter atau halaman daftar.
+func (s *CompetitionService) CompetitionStats() (map[string]int, error) {
+	counts := map[string]int{}
+	if sr, ok := s.repo.(CompetitionStatsRepository); ok {
+		var err error
+		if counts, err = sr.CountByStatus(); err != nil {
+			return nil, err
+		}
+	} else {
+		all, err := s.repo.List()
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range all {
+			counts[c.Status]++
+		}
+	}
+	out := map[string]int{"draft": 0, "active": 0, "paused": 0, "completed": 0, "cancelled": 0}
+	total := 0
+	for st, n := range counts {
+		out[st] = n
+		total += n
+	}
+	out["total"] = total
+	return out, nil
+}
+
+// GetCompetitionsSearch seperti GetCompetitionsPaged, ditambah pencarian teks q (nama, lokasi, ruleset, ID).
+func (s *CompetitionService) GetCompetitionsSearch(status, q string, page, limit int) ([]domain.Competition, int, error) {
+	if q == "" {
+		return s.GetCompetitionsPaged(status, page, limit)
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if sr, ok := s.repo.(CompetitionSearchRepository); ok {
+		return sr.ListPagedSearch(status, q, limit, (page-1)*limit)
+	}
+	all, err := s.repo.List()
+	if err != nil {
+		return nil, 0, err
+	}
+	needle := strings.ToLower(q)
+	var filtered []domain.Competition
+	for _, c := range all {
+		if (status == "" || c.Status == status) && strings.Contains(strings.ToLower(c.Name+" "+c.Location+" "+c.RulesetName+" "+c.ID), needle) {
+			filtered = append(filtered, c)
+		}
+	}
+	total := len(filtered)
+	start := (page - 1) * limit
+	if start >= total {
+		return []domain.Competition{}, total, nil
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return filtered[start:end], total, nil
 }
 
 func (s *CompetitionService) GetAllCompetitions() ([]domain.Competition, error) {
