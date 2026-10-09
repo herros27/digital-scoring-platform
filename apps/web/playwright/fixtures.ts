@@ -8,7 +8,14 @@ import {
 import { adminToken } from '../cypress/support/match/auth.ts'
 import { must } from '../cypress/support/match/http.ts'
 import { buildKit } from '../cypress/support/match/kit.ts'
-import type { MatchKit, MatchRef, Session } from '../cypress/support/match/kit.ts'
+import type {
+  Devices as SocketDevices,
+  MatchKit,
+  MatchRef,
+  Session,
+} from '../cypress/support/match/kit.ts'
+import { confirmScore, snapshot } from '../cypress/support/match/helpers.ts'
+import type { Json } from '../cypress/support/match/http.ts'
 
 /** Empat perangkat pada satu partai: konsol wasit dan layar juri kursi 1-3. */
 export interface Devices {
@@ -20,7 +27,7 @@ export interface Devices {
   startViaApi(): Promise<void>
 }
 
-async function openAs(
+export async function openAs(
   context: BrowserContext,
   s: Session,
   path: string,
@@ -119,7 +126,68 @@ export async function openCrew(
   }
 }
 
-export const test = base.extend<{ devices: Devices }, { kit: MatchKit }>({
+/**
+ * Satu partai di gelanggang utama dengan konsol wasit (UI) + layar scoreboard publik (UI) + tiga juri lewat soket.
+ * Untuk tes yang fokus pada tampilan wasit/penonton dan butuh poin juri tanpa membuka tiga browser lagi.
+ */
+export interface Arena {
+  kit: MatchKit
+  match: MatchRef
+  wasit: Page
+  scoreboard: Page
+  sockets: SocketDevices
+  /** Memulai partai lewat REST dan menunggu konsol wasit menampilkan BERJALAN. */
+  start(): Promise<void>
+  /** Dua juri menekan teknik yang sama pada sudut itu (konsensus) dan menunggu poin terkonfirmasi. */
+  score(target: 'red' | 'blue', type?: string): Promise<void>
+  /** Ringkasan keadaan partai dari server (sync_response). */
+  state(): Promise<Json>
+}
+
+export const test = base.extend<{ devices: Devices; arena: Arena }, { kit: MatchKit }>({
+  arena: async ({ browser, kit, baseURL }, use) => {
+    const match = await kit.createMatch()
+    await must('load-arena', kit.loadMatch(match))
+    const sockets = await kit.openDevices()
+    const wctx = await browser.newContext({ baseURL, viewport: { width: 1600, height: 1000 } })
+    const wasit = await openAs(wctx, kit.wasit, '/referee', undefined)
+    const sctx = await browser.newContext({ baseURL, viewport: { width: 1600, height: 900 } })
+    const scoreboard = await sctx.newPage()
+    await scoreboard.goto(`/scoreboard/${kit.arenaId}`)
+    await expect(wasit.locator('.ref-fighter-card--red .ref-fighter-name')).toHaveText(
+      match.redName,
+      { timeout: 15_000 },
+    )
+    await expect(scoreboard.locator('.sb-athlete-name').first()).toHaveText(match.redName, {
+      timeout: 15_000,
+    })
+
+    await use({
+      kit,
+      match,
+      wasit,
+      scoreboard,
+      sockets,
+      async start() {
+        await must('start', kit.control(match, 'start'))
+        await expect(wasit.locator('.ref-chrono-round')).toContainText('BERJALAN')
+      },
+      async score(target, type = 'knockdown') {
+        const before = sockets.wasit.mark()
+        await confirmScore(sockets, target, type)
+        await sockets.wasit.waitFor('score_confirmed', {
+          since: before,
+          what: 'poin terkonfirmasi',
+        })
+      },
+      state: () => snapshot(sockets.wasit),
+    })
+
+    await sockets.closeAll()
+    await Promise.all([wctx.close(), sctx.close()])
+    await kit.control(match, 'cancel').catch(() => undefined)
+  },
+
   // Satu kejuaraan + ruleset + PIN untuk seluruh sesi tes (dibersihkan di akhir)
   kit: [
     // Playwright mewajibkan pola destrukturisasi (kosong) untuk fixture tanpa dependensi
