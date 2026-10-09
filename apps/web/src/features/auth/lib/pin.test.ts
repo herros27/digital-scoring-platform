@@ -53,6 +53,20 @@ describe('pinLoginErrorMessage', () => {
     expect(pinLoginErrorMessage(apiError('INVALID_PIN'))).toMatch(/salah/)
     expect(pinLoginErrorMessage(apiError('TOO_MANY_ATTEMPTS'))).toMatch(/Terlalu banyak/)
   })
+  it('meneruskan pesan server yang membedakan perangkat ini dan jaringan ini', () => {
+    const device = apiError(
+      'TOO_MANY_ATTEMPTS',
+      'terlalu banyak PIN salah dari perangkat ini, coba lagi nanti',
+    )
+    const network = apiError(
+      'TOO_MANY_ATTEMPTS',
+      'terlalu banyak PIN salah dari jaringan ini, coba lagi nanti',
+    )
+    expect(pinLoginErrorMessage(device)).toMatch(
+      /^Terlalu banyak PIN salah dari perangkat ini, coba lagi nanti\./,
+    )
+    expect(pinLoginErrorMessage(network)).toMatch(/dari jaringan ini/)
+  })
   it('jatuh ke pesan umum untuk error lain', () => {
     expect(pinLoginErrorMessage(undefined)).toMatch(/terhubung/)
   })

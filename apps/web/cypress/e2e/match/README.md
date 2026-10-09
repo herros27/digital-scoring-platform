@@ -44,6 +44,7 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 | `07-kompetisi-penuh`              | satu kompetisi dari pendaftaran sampai juara: 4 atlet/3 kontingen → verifikasi → bagan → bagan publik (tersembunyi sebelum aktif) → 2 semifinal → final otomatis → final dua babak habis waktu → juara di bagan → klasemen medali |
 | `08-kompetisi-8-peserta`          | bagan 8 peserta (perempat → semi → final) dimainkan penuh; partai berikutnya terbentuk otomatis; medali hanya final dan semifinal                                                                                                 |
 | `09-kompetisi-bye`                | 3, 5, 6, 7, 9, 12 peserta (BYE) dimainkan sampai juara: tidak ada pasangan BYE lawan BYE, total partai N-1, medali sesuai struktur                                                                                                |
+| `11-pembatas-login-pin`           | pelindung tebak-PIN berlapis: tablet terkunci sendiri, IP bersama tetap bisa login, ganti ID tidak menembus, login sah tidak menghapus hitungan IP                                                                                |
 | `10-beberapa-kategori-gelanggang` | dua kategori (Putra/Putri) di dua gelanggang SERENTAK dengan wasit + 3 juri masing-masing; bagan terisolasi; final bertukar gelanggang; medali kontingen dijumlah dari kedua kategori; dua bagan publik terpisah                  |
 | `ui-05-layar-juri`                | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                                                     |
 | `ui-06-konsol-wasit`              | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                                          |
@@ -98,7 +99,13 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
     Ping yang hanya menampilkan toast. Kini memakai kehadiran WebSocket nyata lewat `GET …/arenas/{id}/presence`
     (ONLINE/OFFLINE per kursi, jumlah juri online, status server dan latensi dari polling itu sendiri); model dan baterai
     dihapus karena server tidak mengetahuinya; Ping menjadi "Cek" koneksi sesungguhnya.
-17. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+17. **Satu juri salah PIN mengunci semua tablet di IP yang sama**: lockout 5x per IP dan batas 10 login/menit per IP
+    (menghitung login berhasil juga) membuat beberapa tablet yang berbagi satu IP (router, Docker Desktop) saling
+    memblokir, dan login berhasil mereset hitungan IP sehingga penyerang dengan satu PIN sah bisa menebak tanpa batas.
+    Kini pelindung tebak-PIN tiga lapis (`auth.PinGuard`): per perangkat (ID acak tablet, header `X-Device-Id`) 5x, per IP
+    25x, global 200x per 15 menit; hanya PIN salah yang dihitung dan login berhasil hanya mereset hitungan perangkat.
+    Batas laju PIN menjadi 1/dtk (burst 60) hanya untuk banjir permintaan. Spec `11-pembatas-login-pin`.
+18. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
