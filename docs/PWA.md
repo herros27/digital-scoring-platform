@@ -7,23 +7,44 @@ bilah alamat, dan cangkang aplikasi (HTML/JS/CSS/ikon) tetap terbuka walau jarin
 
 Peramban hanya mendaftarkan service worker dan menawarkan pemasangan pada **konteks aman**: `https://…` atau
 `http://localhost`. Alamat jaringan lokal seperti `http://192.168.1.10` **tidak** memenuhi syarat itu, jadi di tablet
-juri aplikasi hanya terbuka sebagai situs biasa (tanpa pemasangan penuh dan tanpa mode offline). Pilihan yang umum:
+juri aplikasi hanya terbuka sebagai situs biasa (tanpa pemasangan penuh dan tanpa mode offline).
 
-| Cara | Cocok untuk | Catatan |
-| --- | --- | --- |
-| Domain + sertifikat Let's Encrypt (Caddy/nginx/Traefik) | server di internet/VPS atau LAN dengan domain | paling sederhana; tablet tidak perlu pengaturan |
-| Caddy dengan sertifikat internal (`tls internal`) atau mkcert | LAN tertutup tanpa internet | root CA harus dipasang dan dipercaya di setiap tablet |
-| Tunnel (Cloudflare Tunnel, Tailscale Funnel) | server di balik NAT | butuh internet saat acara |
+### Mengaktifkan HTTPS dengan docker compose (Caddy)
 
-Contoh Caddy di depan layanan `web` (nginx) pada docker compose:
+Repo menyertakan layanan `caddy` (profil `https`, konfigurasi di `deploy/Caddyfile`) yang menerima HTTPS dan
+meneruskan semuanya, termasuk WebSocket (`wss://`), ke layanan `web`.
 
+1. Di `.env.prod`, pindahkan `web` ke loopback agar port 80/443 dipakai Caddy dan `web` tidak terbuka ke LAN:
+   ```
+   WEB_PORT=127.0.0.1:8081
+   SITE_ADDRESS=silat.contoh.id        # domain atau IP yang diketik di tablet
+   ```
+2. Pilih jenis sertifikat:
+
+   | Situasi | Pengaturan | Catatan |
+   | --- | --- | --- |
+   | Domain publik, server terjangkau internet (port 80/443 terbuka) | `TLS_DIRECTIVE=` (kosong) | Let's Encrypt otomatis dan diperbarui sendiri; tablet tidak perlu pengaturan |
+   | LAN tertutup tanpa domain, atau memakai IP | `TLS_DIRECTIVE=tls internal` | CA internal Caddy; **root CA wajib dipasang dan dipercaya di setiap tablet** (lihat di bawah) |
+   | Server di balik NAT | tunnel (Cloudflare Tunnel / Tailscale Funnel) di depan layanan `web` | tanpa Caddy |
+
+3. Jalankan: `docker compose --env-file .env.prod --profile https up -d --build`
+4. Buka `https://<SITE_ADDRESS>/` di satu tablet; harus tanpa peringatan sertifikat.
+
+Tanpa `--profile https` perilaku lama tidak berubah (HTTP di `WEB_PORT`).
+
+**Memasang root CA internal di tablet** (hanya mode `tls internal`). Ambil sertifikat dari server, lalu kirim ke tablet
+(AirDrop, USB, atau tautan):
+```bash
+docker compose --env-file .env.prod cp caddy:/data/caddy/pki/authorities/local/root.crt ./silat-root.crt
 ```
-silat.contoh.id {
-    reverse_proxy web:80
-}
-```
+- Android: Setelan → Keamanan → Enkripsi & kredensial → Instal sertifikat → **Sertifikat CA**.
+- iPad/iPhone: buka berkas → pasang profil, lalu Setelan → Umum → Info → **Pengaturan Kepercayaan Sertifikat** → aktifkan.
+- Simpan volume `caddy_data` (sudah persisten di compose); bila terhapus, root CA berubah dan semua tablet harus memasang ulang.
 
-WebSocket (`/ws/…`) ikut lewat reverse proxy yang sama dan otomatis menjadi `wss://`.
+**Mengapa `web` harus di loopback:** di balik Caddy, nginx memulihkan IP klien dari `X-Forwarded-For` hanya untuk
+sambungan dari jaringan Docker (`set_real_ip_from 172.16.0.0/12`), supaya pembatas login/PIN per IP membedakan setiap
+tablet (tanpa ini semua tablet terlihat satu IP dan satu juri salah PIN bisa mengunci semuanya). Port `web` yang
+terbuka ke LAN dapat dipakai untuk memalsukan header itu pada Docker Desktop (alamat sumber disamarkan jadi 172.x).
 
 ## Cara memasang
 
@@ -49,5 +70,8 @@ npm run test:pw:pwa     # di apps/web; membangun, menyajikan lewat vite preview,
 ```
 
 Mencakup: manifest dan ikon, service worker aktif, kriteria installable Chrome, cangkang offline, API tidak di-cache,
-serta login PIN + koneksi realtime tetap berfungsi lewat service worker. **Belum teruji:** pemasangan di perangkat
-Android/iOS sungguhan dan sertifikat HTTPS di jaringan acara.
+serta login PIN + koneksi realtime tetap berfungsi lewat service worker. Rantai HTTPS (Caddy `tls internal` → nginx →
+backend, termasuk `wss://`) sudah diuji dengan suite yang sama, dan konfigurasi nginx diuji perilaku
+`set_real_ip_from`-nya (XFF palsu dari klien biasa diabaikan, dari jaringan Docker dipercaya). **Belum teruji:**
+`docker compose --profile https` itu sendiri (tidak ada daemon Docker di lingkungan pengembangan), pemasangan di
+perangkat Android/iOS sungguhan, dan sertifikat Let's Encrypt/root CA di jaringan acara.
