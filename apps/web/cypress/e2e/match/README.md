@@ -72,13 +72,23 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
-## Playwright: 3 layar juri + 1 konsol wasit
+## Playwright Test: 3 layar juri + 1 konsol wasit
 
-`playwright/tiga-juri-satu-wasit.ts` (`npm run test:pw-match`) membuka **4 browser context** (3 juri + wasit) dengan
-UI sungguhan, hal yang tidak mungkin dalam satu tes Cypress. Mencakup: semua online, MULAI di konsol wasit,
-tiga juri menekan tombol sama bersamaan (tepat 1 poin), satu suara menunggu lalu padam, BATAL, JEDA/LANJUT
-mengunci semua layar, dua juri bersamaan, dan SELESAIKAN. Jalankan `npm run test:pw-match:headed` (atau tambahkan `PW_HEADED=1`) untuk melihat 4 jendela tersusun grid 2×2 (`PW_SLOWMO`, `PW_HOLD`, `PW_SCREEN_W/H` opsional). Memakai `PW_CHROMIUM` bila Chromium bukan di
-`/opt/pw-browsers`. Tes ini menemukan tombol skor juri masih aktif setelah SELESAI (kini terkunci kecuali saat berjalan).
+`playwright/tiga-juri-satu-wasit.spec.ts` membuka **4 browser context** (3 juri + wasit) dengan UI sungguhan, hal
+yang tidak mungkin dalam satu tes Cypress. Tiap tes berdiri sendiri (partai baru), sehingga bisa dipilih satu per satu.
+Mencakup: semua online, MULAI di konsol wasit, tiga juri menekan tombol sama bersamaan (tepat 1 poin), satu suara
+menunggu lalu padam, BATAL (dengan dan tanpa tekanan menunggu), JEDA/LANJUT mengunci semua layar, dua juri
+bersamaan, dan SELESAIKAN. Tes ini menemukan tombol skor juri masih aktif setelah SELESAI (kini terkunci).
+
+```bash
+npm run test:pw          # headless
+npm run test:pw:ui       # UI Mode: daftar tes, pilih/jalankan, time-travel, watch
+npm run test:pw:headed   # 4 jendela browser tersusun grid 2x2 (skala PW_ZOOM, bawaan 0.5)
+npx playwright test -g "BATAL"     # pilih tes lewat nama
+npx playwright show-report         # laporan HTML (trace tersimpan bila tes gagal)
+```
+
+Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaan Playwright), `PW_ZOOM`, `PW_SLOWMO`.
 
 ## Spesifik lingkungan
 

@@ -12,5 +12,10 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["./**/*.ts", "../cypress/support/match/*.ts", "../cypress/support/accounts.ts"]
+  "include": [
+    "./**/*.ts",
+    "../playwright.config.ts",
+    "../cypress/support/match/*.ts",
+    "../cypress/support/accounts.ts"
+  ]
 }
