@@ -503,6 +503,8 @@ Daftar lengkap akun login official, kontingen, dan PIN wasit/juri didokumentasik
 👉 **[docs/CREDENTIALS.md](docs/CREDENTIALS.md)**
 
 ### Run Tests
+Panduan menjalankan semua suite (Go, vitest, headless, Playwright, Cypress): [docs/TESTING.md](docs/TESTING.md).
+
 ```bash
 go test -v -count=1 ./...
 ```
