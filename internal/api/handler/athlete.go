@@ -19,6 +19,17 @@ type AthleteHandler struct {
 	Competition *service.CompetitionService
 }
 
+// contingentScope mengembalikan id kontingen pemanggil dan true bila ia manajer kontingen; peran lain
+// (admin/dewan/wasit/operator) mendapat restricted=false dan melihat semua. Manajer kontingen hanya boleh
+// menyentuh data miliknya sendiri. restricted dipisah dari id agar token kontingen berid kosong tetap
+// dibatasi (tidak cocok dengan data apa pun), bukan jatuh ke "lihat semua".
+func contingentScope(r *http.Request) (id string, restricted bool) {
+	if claims := auth.ClaimsFromContext(r.Context()); claims != nil && claims.Role == "contingent" {
+		return claims.JudgePinID, true
+	}
+	return "", false
+}
+
 // ageReferenceDate tanggal acuan golongan umur: hari pertama kejuaraan, fallback hari ini.
 func (h *AthleteHandler) ageReferenceDate(compID string) time.Time {
 	if h.Competition != nil {
@@ -38,6 +49,11 @@ func (h *AthleteHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := Decode(r, &a); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
+	}
+
+	// Atlet yang dibuat manajer kontingen selalu milik kontingennya, apa pun isi body.
+	if scope, restricted := contingentScope(r); restricted {
+		a.ContingentID = scope
 	}
 
 	if err := h.Service.CreateAthlete(&a); err != nil {
@@ -73,6 +89,11 @@ func (h *AthleteHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
+	// Atlet kontingen lain disamarkan sebagai tidak ditemukan agar id tidak bisa ditebak.
+	if scope, restricted := contingentScope(r); restricted && (scope == "" || athlete.ContingentID != scope) {
+		Fail(w, http.StatusNotFound, "NOT_FOUND", domain.ErrNotFound.Error(), nil)
+		return
+	}
 	Ok(w, athlete)
 }
 
@@ -103,6 +124,15 @@ func (h *AthleteHandler) RegisterToCompetition(w http.ResponseWriter, r *http.Re
 
 	athleteID := req.AthleteID
 	gender := req.Gender
+
+	// Manajer kontingen hanya boleh mendaftarkan atlet miliknya sendiri.
+	if scope, restricted := contingentScope(r); restricted && athleteID != "" {
+		existing, err := h.Service.GetAthleteByID(athleteID)
+		if err != nil || scope == "" || existing.ContingentID != scope {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "athlete not found", nil)
+			return
+		}
+	}
 
 	// Determine status and contingent_id based on caller claims
 	status := "registered"
@@ -237,6 +267,16 @@ func (h *AthleteHandler) ListParticipants(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
+	}
+	// Manajer kontingen hanya melihat peserta yang ia daftarkan beserta status verifikasinya.
+	if scope, restricted := contingentScope(r); restricted {
+		own := make([]domain.Participant, 0, len(list))
+		for _, p := range list {
+			if scope != "" && p.ContingentID == scope {
+				own = append(own, p)
+			}
+		}
+		list = own
 	}
 	Ok(w, list)
 }

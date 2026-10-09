@@ -1,0 +1,168 @@
+package handler
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/herros27/digital-scoring/internal/auth"
+	"github.com/herros27/digital-scoring/internal/domain"
+	"github.com/herros27/digital-scoring/internal/service"
+)
+
+// scopeRepo repo atlet in-memory untuk menguji pembatasan data per kontingen.
+type scopeRepo struct {
+	athletes map[string]*domain.Athlete
+	parts    []domain.Participant
+}
+
+func (f *scopeRepo) Create(a *domain.Athlete) error {
+	a.ID = "ath-" + a.Name
+	f.athletes[a.ID] = a
+	return nil
+}
+func (f *scopeRepo) GetByID(id string) (*domain.Athlete, error) {
+	a, ok := f.athletes[id]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return a, nil
+}
+func (f *scopeRepo) List() ([]domain.Athlete, error)                    { return nil, nil }
+func (f *scopeRepo) RegisterToCompetition(_, _, _, _ string) error      { return nil }
+func (f *scopeRepo) ListByCompetition(string) ([]domain.Athlete, error) { return nil, nil }
+func (f *scopeRepo) RegisterParticipant(compID, athID, contID, wc, gender, status string) error {
+	f.parts = append(f.parts, domain.Participant{ID: "p-" + athID, CompetitionID: compID, AthleteID: athID, ContingentID: contID, RegistrationStatus: status})
+	return nil
+}
+func (f *scopeRepo) UpdateParticipantStatus(string, string) error { return nil }
+func (f *scopeRepo) ListParticipants(_, status string) ([]domain.Participant, error) {
+	var out []domain.Participant
+	for _, p := range f.parts {
+		if status == "" || p.RegistrationStatus == status {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func newScopeHandler() (*AthleteHandler, *scopeRepo) {
+	repo := &scopeRepo{athletes: map[string]*domain.Athlete{
+		"a-own":   {ID: "a-own", Name: "Milik Saya", ContingentID: "k1"},
+		"a-other": {ID: "a-other", Name: "Milik Lain", ContingentID: "k2"},
+	}}
+	repo.parts = []domain.Participant{
+		{ID: "p1", ContingentID: "k1", RegistrationStatus: "pending"},
+		{ID: "p2", ContingentID: "k1", RegistrationStatus: "verified"},
+		{ID: "p3", ContingentID: "k2", RegistrationStatus: "verified"},
+		{ID: "p4", ContingentID: "", RegistrationStatus: "registered"}, // didaftarkan admin
+	}
+	return &AthleteHandler{Service: service.NewAthleteService(repo)}, repo
+}
+
+func asRole(r *http.Request, role, id string) *http.Request {
+	return r.WithContext(auth.ContextWithClaims(context.Background(), &auth.Claims{Role: role, JudgePinID: id}))
+}
+
+func participantIDs(t *testing.T, rec *httptest.ResponseRecorder) []string {
+	t.Helper()
+	var body struct{ Data []domain.Participant }
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{}
+	for _, p := range body.Data {
+		ids = append(ids, p.ID)
+	}
+	return ids
+}
+
+func TestListParticipantsScopedToContingent(t *testing.T) {
+	h, _ := newScopeHandler()
+	cases := []struct {
+		name, role, id, query string
+		want                  []string
+	}{
+		{"kontingen hanya melihat miliknya", "contingent", "k1", "", []string{"p1", "p2"}},
+		{"kontingen lain tidak melihat milik k1", "contingent", "k2", "", []string{"p3"}},
+		{"filter status tetap dibatasi", "contingent", "k1", "?status=verified", []string{"p2"}},
+		{"token kontingen tanpa id tidak melihat apa pun", "contingent", "", "", []string{}},
+		{"admin melihat semua", "admin", "", "", []string{"p1", "p2", "p3", "p4"}},
+		{"dewan melihat semua", "dewan", "", "", []string{"p1", "p2", "p3", "p4"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/competitions/c1/participants"+tc.query, nil)
+			req.SetPathValue("comp_id", "c1")
+			rec := httptest.NewRecorder()
+			h.ListParticipants(rec, asRole(req, tc.role, tc.id))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d", rec.Code)
+			}
+			got := participantIDs(t, rec)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("got %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestGetAthleteHidesOtherContingents(t *testing.T) {
+	h, _ := newScopeHandler()
+	get := func(role, id, athleteID string) int {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/athletes/"+athleteID, nil)
+		req.SetPathValue("id", athleteID)
+		rec := httptest.NewRecorder()
+		h.Get(rec, asRole(req, role, id))
+		return rec.Code
+	}
+	if c := get("contingent", "k1", "a-own"); c != http.StatusOK {
+		t.Fatalf("atlet sendiri = %d, want 200", c)
+	}
+	if c := get("contingent", "k1", "a-other"); c != http.StatusNotFound {
+		t.Fatalf("atlet kontingen lain = %d, want 404", c)
+	}
+	if c := get("admin", "", "a-other"); c != http.StatusOK {
+		t.Fatalf("admin = %d, want 200", c)
+	}
+}
+
+func TestCreateAthleteForcesContingentOwnership(t *testing.T) {
+	h, repo := newScopeHandler()
+	body, _ := json.Marshal(map[string]any{"name": "Baru", "gender": "male", "team": "T", "contingent_id": "k2"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/athletes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.Create(rec, asRole(req, "contingent", "k1"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := repo.athletes["ath-Baru"].ContingentID; got != "k1" {
+		t.Fatalf("contingent_id = %q, want k1 (tidak boleh memakai nilai dari body)", got)
+	}
+}
+
+func TestRegisterRejectsOtherContingentsAthlete(t *testing.T) {
+	h, repo := newScopeHandler()
+	before := len(repo.parts)
+	body, _ := json.Marshal(map[string]any{"athlete_id": "a-other", "weight_class": "A"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/competitions/c1/athletes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("comp_id", "c1")
+	rec := httptest.NewRecorder()
+	h.RegisterToCompetition(rec, asRole(req, "contingent", "k1"))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+	if len(repo.parts) != before {
+		t.Fatal("peserta tidak boleh bertambah")
+	}
+}

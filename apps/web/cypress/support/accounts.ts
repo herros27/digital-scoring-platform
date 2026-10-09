@@ -28,3 +28,10 @@ export const KONTINGEN: EmailAccount = {
   password: 'DemoPass_2026',
   role: 'contingent',
 }
+
+/** Kontingen kedua, dipakai untuk menguji isolasi data antar kontingen. */
+export const KONTINGEN_PSHT: EmailAccount = {
+  email: 'psht@contingent.id',
+  password: 'DemoPass_2026',
+  role: 'contingent',
+}

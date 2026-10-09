@@ -13,11 +13,11 @@ type AthleteStore struct {
 	DB *sql.DB
 }
 
-// athleteColumns membaca birth_date sebagai teks YYYY-MM-DD (” untuk data lama tanpa tanggal lahir).
-const athleteColumns = `id, name, gender, team, COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''), COALESCE(nik, ''), created_at`
+// athleteColumns membaca contingent_id ('' bila atlet didaftarkan admin) dan birth_date sebagai teks YYYY-MM-DD (” untuk data lama tanpa tanggal lahir).
+const athleteColumns = `id, name, gender, team, COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''), COALESCE(nik, ''), COALESCE(contingent_id::text, ''), created_at`
 
 func scanAthlete(row rowScanner, a *Athlete) error {
-	return row.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.BirthDate, &a.NIK, &a.CreatedAt)
+	return row.Scan(&a.ID, &a.Name, &a.Gender, &a.Team, &a.BirthDate, &a.NIK, &a.ContingentID, &a.CreatedAt)
 }
 
 func (s *AthleteStore) Create(a *Athlete) error {
@@ -241,7 +241,7 @@ func (s *AthleteStore) SaveVerification(participantID, status string, actualWeig
 
 func (s *AthleteStore) ListByCompetition(competitionID string) ([]Athlete, error) {
 	rows, err := s.DB.Query(`
-		SELECT a.id, a.name, a.gender, a.team, COALESCE(to_char(a.birth_date, 'YYYY-MM-DD'), ''), COALESCE(a.nik, ''), a.created_at
+		SELECT a.id, a.name, a.gender, a.team, COALESCE(to_char(a.birth_date, 'YYYY-MM-DD'), ''), COALESCE(a.nik, ''), COALESCE(a.contingent_id::text, ''), a.created_at
 		FROM athletes a
 		JOIN participants p ON p.athlete_id = a.id
 		WHERE p.competition_id = $1 ORDER BY a.name`, competitionID)

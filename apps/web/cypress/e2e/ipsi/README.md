@@ -11,6 +11,7 @@ membatalkannya di `after`, sehingga data seed tidak tersentuh dan hasil umur sel
 | `03-verifikasi-timbang`               | berkas wajib per gender/golongan, timbang 0 kg toleransi (inklusif), timbang ulang, status, RBAC                    |
 | `04-bagan-per-kategori`               | struktur bagan 2/3/4/5/8/9 peserta, hanya `verified`, isolasi kategori, regenerate, akses                           |
 | `05-matriks-hak-akses`                | anonim / kontingen / dewan / admin x endpoint kategori-registrasi-verifikasi-bagan                                  |
+| `07-isolasi-data-kontingen`           | kontingen hanya melihat peserta/atlet/profil miliknya + statusnya; tidak bisa mendaftarkan atlet kontingen lain     |
 | `06-alur-lengkap-registrasi-ke-bagan` | skenario berurutan kontingen -> verifikasi -> bagan -> tampilan publik + UI meja verifikasi                         |
 
 ## Menjalankan

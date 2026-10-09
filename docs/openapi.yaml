@@ -973,7 +973,7 @@ paths:
 
   /api/v1/competitions/{comp_id}/participants:
     get:
-      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected/overweight/underweight)
+      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected/overweight/underweight). Peran contingent hanya menerima peserta yang ia daftarkan sendiri
       tags:
         - Athlete
       security:

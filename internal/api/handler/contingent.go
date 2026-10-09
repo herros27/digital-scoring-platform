@@ -70,6 +70,11 @@ func (h *ContingentHandler) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/contingents/{id}
 func (h *ContingentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	// Kontingen hanya boleh membaca profilnya sendiri (memuat email & telepon PIC).
+	if scope, restricted := contingentScope(r); restricted && scope != id {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "insufficient role permissions", nil)
+		return
+	}
 	c, err := h.Service.GetByID(id)
 	if err != nil {
 		Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
