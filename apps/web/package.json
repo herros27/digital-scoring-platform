@@ -20,7 +20,7 @@
     "cypress:open:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress open --expose SLOW_MO=800",
     "cypress:headed:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --headed --no-exit --expose SLOW_MO=800",
     "test:match-flow": "node cypress/scripts/run-match-flow.ts",
-    "test:pw": "playwright test",
+    "test:pw": "playwright test", 
     "test:pw:ui": "playwright test --ui",
     "test:pw:headed": "playwright test --headed"
   },
