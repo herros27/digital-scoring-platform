@@ -138,6 +138,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 
 	// RBAC roles
 	adminOrDewan := RequireRole("admin", "dewan")
+	officialRoles := RequireRole("admin", "dewan", "wasit", "operator", "juri")
 	matchOperators := RequireRole("admin", "dewan", "wasit")
 	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
 	athleteViewers := RequireRole("admin", "dewan", "operator", "contingent")
@@ -218,6 +219,8 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("GET /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Get)))
 	protected.Handle("PUT /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Update)))
 	protected.Handle("DELETE /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Delete)))
+	protected.Handle("PUT /api/v1/officials/{id}/password", adminOrDewan(http.HandlerFunc(officialH.ResetPassword)))
+	protected.Handle("POST /api/v1/auth/change-password", officialRoles(http.HandlerFunc(officialH.ChangePassword)))
 
 	// Contingents Management
 	protected.Handle("GET /api/v1/contingents", adminOrDewan(http.HandlerFunc(contingentH.List)))

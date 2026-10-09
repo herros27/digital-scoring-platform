@@ -10,6 +10,7 @@ var (
 	ErrAlreadyActive          = errors.New("competition is already active")
 	ErrInvalidInput           = errors.New("invalid input")
 	ErrUnauthorized           = errors.New("unauthorized")
+	ErrForbidden              = errors.New("forbidden")
 	ErrConflict               = errors.New("resource conflict")
 	ErrArenaBusy              = errors.New("arena is currently assigned to another active match")
 	ErrInvalidStateTransition = errors.New("invalid state transition")

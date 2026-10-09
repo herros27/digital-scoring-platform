@@ -72,3 +72,16 @@ func (s *OfficialStore) Delete(id string) error {
 	_, err := s.DB.Exec(query, id)
 	return err
 }
+
+// UpdatePassword mengganti hash password akun.
+func (s *OfficialStore) UpdatePassword(id, passwordHash string) error {
+	_, err := s.DB.Exec(`UPDATE officials SET password_hash = $1 WHERE id = $2`, passwordHash, id)
+	return err
+}
+
+// CountByRole jumlah akun dengan peran tertentu (dipakai agar admin terakhir tidak terhapus/diturunkan).
+func (s *OfficialStore) CountByRole(role string) (int, error) {
+	var n int
+	err := s.DB.QueryRow(`SELECT COUNT(*) FROM officials WHERE role = $1`, role).Scan(&n)
+	return n, err
+}

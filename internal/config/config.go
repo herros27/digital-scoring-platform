@@ -15,6 +15,10 @@ type Config struct {
 	JWTSecret   string `env:"JWT_SECRET" envDefault:"dev-secret-change-in-prod"`
 	AutoMigrate bool   `env:"AUTO_MIGRATE" envDefault:"true"`
 	SeedData    bool   `env:"SEED_DATA" envDefault:"false"`
+	// Admin pertama (produksi tanpa seed demo): dibuat saat start bila belum ada admin. Lihat OfficialService.EnsureAdmin.
+	AdminEmail    string `env:"ADMIN_EMAIL" envDefault:""`
+	AdminPassword string `env:"ADMIN_PASSWORD" envDefault:""`
+	AdminName     string `env:"ADMIN_NAME" envDefault:"Administrator"`
 	// MetricsToken: bila diisi, /metrics wajib header Authorization: Bearer <token>; kosong = hanya loopback.
 	MetricsToken string `env:"METRICS_TOKEN" envDefault:""`
 }
