@@ -5,6 +5,7 @@
  *
  *   npm run test:pw-match
  *   PW_CHROMIUM=/path/chrome E2E_BASE_URL=http://127.0.0.1:5173 npm run test:pw-match
+ *   PW_HEADED=1 npm run test:pw-match      # tampilkan 4 jendela (PW_SLOWMO, PW_HOLD, PW_SCREEN_W/H opsional)
  */
 import { chromium, type Browser, type Page } from 'playwright-core'
 import { adminToken } from '../cypress/support/match/auth.ts'
@@ -13,6 +14,15 @@ import { buildKit, type Session } from '../cypress/support/match/kit.ts'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173'
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
+// PW_HEADED=1 → jendela browser tampil (4 jendela disusun grid 2x2); PW_SLOWMO=ms memperlambat tiap aksi
+const HEADED = process.env.PW_HEADED === '1'
+const SLOWMO = Number(process.env.PW_SLOWMO ?? (HEADED ? 250 : 0))
+const HOLD_MS = Number(process.env.PW_HOLD ?? (HEADED ? 8000 : 0)) // jeda di akhir agar hasil sempat dilihat
+const SCREEN = {
+  w: Number(process.env.PW_SCREEN_W ?? 1920),
+  h: Number(process.env.PW_SCREEN_H ?? 1040),
+}
+let windowIndex = 0
 
 let failed = 0
 async function step(name: string, fn: () => Promise<void>) {
@@ -47,8 +57,32 @@ async function waitText(page: Page, sel: string, re: RegExp, timeout = 8000): Pr
 const allPages = (pages: Page[], fn: (p: Page, i: number) => Promise<unknown>) =>
   Promise.all(pages.map(fn))
 
+/** Menaruh jendela di kuadran grid 2x2 (0 kiri-atas, 1 kanan-atas, 2 kiri-bawah, 3 kanan-bawah). */
+async function tileWindow(page: Page, index: number): Promise<void> {
+  try {
+    const cdp = await page.context().newCDPSession(page)
+    const { windowId } = await cdp.send('Browser.getWindowForTarget')
+    const w = Math.floor(SCREEN.w / 2)
+    const h = Math.floor(SCREEN.h / 2)
+    await cdp.send('Browser.setWindowBounds', {
+      windowId,
+      bounds: {
+        left: (index % 2) * w,
+        top: Math.floor(index / 2) * h,
+        width: w,
+        height: h,
+        windowState: 'normal',
+      },
+    })
+  } catch {
+    // penataan jendela opsional: bila gagal, jendela tampil di posisi bawaan
+  }
+}
+
 async function openAs(browser: Browser, s: Session, path: string): Promise<Page> {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const ctx = await browser.newContext({
+    viewport: HEADED ? null : { width: 1280, height: 800 },
+  })
   await ctx.addInitScript((sess) => {
     sessionStorage.setItem(
       'ds_auth_session',
@@ -63,6 +97,7 @@ async function openAs(browser: Browser, s: Session, path: string): Promise<Page>
     sessionStorage.setItem('ds_token', sess.token)
   }, s)
   const page = await ctx.newPage()
+  if (HEADED) await tileWindow(page, windowIndex++)
   await page.goto(BASE + path, { waitUntil: 'domcontentloaded' })
   return page
 }
@@ -73,7 +108,12 @@ const kit = await buildKit(await adminToken(), {
   breakSeconds: 3,
   totalRounds: 2,
 })
-const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] })
+const browser = await chromium.launch({
+  executablePath: CHROMIUM,
+  headless: !HEADED,
+  slowMo: SLOWMO,
+  args: ['--no-sandbox'],
+})
 const match = await kit.createMatch()
 await must('load-arena', kit.loadMatch(match))
 
@@ -223,6 +263,7 @@ try {
     )
   })
 } finally {
+  if (HOLD_MS > 0) await sleep(HOLD_MS)
   await browser.close()
   await kit.control(match, 'cancel').catch(() => undefined)
   await kit.teardown().catch(() => undefined)
