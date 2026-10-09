@@ -33,16 +33,18 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 
 ## Cakupan
 
-| Spec                            | Isi                                                                                                                                                                                                       |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `01-wasit-kontrol-pertandingan` | load-arena, start, status partai di DB, timer (jalan/beku/lanjut/koreksi/`timer_sync`), pergantian ronde otomatis, selesai otomatis, seri → keputusan wasit, finish/cancel/outcome, sanksi, sinyal, audit |
-| `02-juri-sinkronisasi-realtime` | tiap kursi 1–3: snapshot identik, urutan `state_change` identik, hitung mundur konsisten, konsensus (2 dari 3), jendela 3 dtk, suara ganda, input di luar waktu, hak akses WS juri, audit                 |
-| `03-otorisasi-role`             | matriks REST (wasit/dewan/admin vs juri/operator/kontingen/anon/gelanggang lain), skor REST hanya juri atas identitas token, handshake WS, perintah WS per role                                           |
-| `04-ketahanan-dan-kasus-tepi`   | gagal memulai, ARENA_BUSY, reschedule, balapan (5× start, 3× finish), aksi berulang, putus/sambung ulang (juri, wasit, semua perangkat, tablet kembar), pesan rusak, konsistensi dengan endpoint publik   |
-| `05-format-5-juri`              | konsensus 3-dari-5: kelima juri online, progres 1→2→3, kombinasi juri mana pun, sudut berbeda tidak digabung, di luar window tidak digabung                                                               |
-| `06-pemulihan-restart-server`   | restart backend di tengah partai: skor/babak bertahan, jam dijeda, skor ditolak sampai wasit melanjutkan, partai selesai normal (perlu `E2E_RESTART_CMD`)                                                 |
-| `ui-05-layar-juri`              | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                             |
-| `ui-06-konsol-wasit`            | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                  |
+| Spec                            | Isi                                                                                                                                                                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-wasit-kontrol-pertandingan` | load-arena, start, status partai di DB, timer (jalan/beku/lanjut/koreksi/`timer_sync`), pergantian ronde otomatis, selesai otomatis, seri → keputusan wasit, finish/cancel/outcome, sanksi, sinyal, audit                         |
+| `02-juri-sinkronisasi-realtime` | tiap kursi 1–3: snapshot identik, urutan `state_change` identik, hitung mundur konsisten, konsensus (2 dari 3), jendela 3 dtk, suara ganda, input di luar waktu, hak akses WS juri, audit                                         |
+| `03-otorisasi-role`             | matriks REST (wasit/dewan/admin vs juri/operator/kontingen/anon/gelanggang lain), skor REST hanya juri atas identitas token, handshake WS, perintah WS per role                                                                   |
+| `04-ketahanan-dan-kasus-tepi`   | gagal memulai, ARENA_BUSY, reschedule, balapan (5× start, 3× finish), aksi berulang, putus/sambung ulang (juri, wasit, semua perangkat, tablet kembar), pesan rusak, konsistensi dengan endpoint publik                           |
+| `05-format-5-juri`              | konsensus 3-dari-5: kelima juri online, progres 1→2→3, kombinasi juri mana pun, sudut berbeda tidak digabung, di luar window tidak digabung                                                                                       |
+| `06-pemulihan-restart-server`   | restart backend di tengah partai: skor/babak bertahan, jam dijeda, skor ditolak sampai wasit melanjutkan, partai selesai normal (perlu `E2E_RESTART_CMD`)                                                                         |
+| `07-kompetisi-penuh`            | satu kompetisi dari pendaftaran sampai juara: 4 atlet/3 kontingen → verifikasi → bagan → bagan publik (tersembunyi sebelum aktif) → 2 semifinal → final otomatis → final dua babak habis waktu → juara di bagan → klasemen medali |
+| `08-kompetisi-8-peserta`        | bagan 8 peserta (perempat → semi → final) dimainkan penuh; partai berikutnya terbentuk otomatis; medali hanya final dan semifinal                                                                                                 |
+| `ui-05-layar-juri`              | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                                                     |
+| `ui-06-konsol-wasit`            | tombol MULAI/JEDA/LANJUTKAN/SELESAIKAN memanggil server dan terbukti dari soket juri; skor konsensus tampil; akses antar role/gelanggang                                                                                          |
 
 ## Cacat yang ditemukan tes ini dan sudah diperbaiki
 
@@ -68,7 +70,11 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
    (lampu konsensus turun/padam di semua tablet), menarik sudut yang **terakhir ditekan** (bukan selalu merah),
    dan bila tidak ada yang bisa ditarik server membalas `UNDO_NOT_POSSIBLE` yang tampil di layar. Poin yang
    sudah terkonfirmasi tidak dapat dibatalkan dari tablet (itu wewenang wasit).
-10. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+10. **Klasemen medali salah** (ditemukan spec 07): setiap pemenang partai dihitung emas dan setiap yang kalah perak
+    (4 peserta menghasilkan 3 emas + 3 perak), tanpa perunggu, dan semua masuk tim "Umum" karena partai menyimpan ID
+    peserta sedangkan penghitungan mencari ID atlet. Kini medali diturunkan dari struktur bagan: juara emas, finalis perak,
+    dua yang kalah di semifinal perunggu, perempat final tanpa medali, dan tim diambil dari atlet milik peserta.
+11. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 

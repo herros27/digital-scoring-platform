@@ -235,3 +235,48 @@ func (s *MatchStore) Reschedule(id string) (bool, error) {
 	}
 	return true, tx.Commit()
 }
+
+// MedalPlacement satu medali yang diperoleh sebuah tim dari hasil bagan.
+type MedalPlacement struct {
+	Team  string
+	Medal string // gold | silver | bronze
+}
+
+// MedalPlacements menurunkan medali dari struktur bagan: pemenang final emas, yang kalah di final perak, dan yang
+// kalah di semifinal (partai yang pemenangnya melaju ke final) perunggu. Hanya partai berbagan yang selesai dan
+// berpemenang yang dihitung; babak sebelum semifinal tidak memberi medali. Tim diambil dari atlet milik peserta
+// (match menyimpan ID peserta, bukan ID atlet).
+func (s *MatchStore) MedalPlacements(competitionID string) ([]MedalPlacement, error) {
+	rows, err := s.DB.Query(`
+		WITH decided AS (
+			SELECT m.winner_id AS winner,
+			       CASE WHEN m.winner_id = m.athlete_red_id THEN m.athlete_blue_id ELSE m.athlete_red_id END AS loser,
+			       CASE WHEN sl.next_slot_id IS NULL THEN 'final'
+			            WHEN nx.next_slot_id IS NULL THEN 'semi' END AS stage
+			FROM matches m
+			JOIN bracket_slots sl ON sl.id = m.bracket_slot_id
+			LEFT JOIN bracket_slots nx ON nx.id = sl.next_slot_id
+			WHERE m.competition_id = $1 AND m.status = 'finished' AND m.winner_id IS NOT NULL
+		), placed AS (
+			SELECT winner AS participant, 'gold' AS medal FROM decided WHERE stage = 'final'
+			UNION ALL SELECT loser, 'silver' FROM decided WHERE stage = 'final'
+			UNION ALL SELECT loser, 'bronze' FROM decided WHERE stage = 'semi'
+		)
+		SELECT COALESCE(NULLIF(a.team, ''), 'Independen'), pl.medal
+		FROM placed pl
+		JOIN participants p ON p.id = pl.participant
+		JOIN athletes a ON a.id = p.athlete_id`, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MedalPlacement
+	for rows.Next() {
+		var mp MedalPlacement
+		if err := rows.Scan(&mp.Team, &mp.Medal); err != nil {
+			return nil, err
+		}
+		out = append(out, mp)
+	}
+	return out, rows.Err()
+}

@@ -37,6 +37,8 @@ export interface MatchKit {
   adminToken: string
   competitionId: string
   arenaId: string
+  /** Kategori resmi tunggal kejuaraan uji (Dewasa Putra A) tempat bagan dibentuk. */
+  categoryId: string
   /** Gelanggang kedua di kejuaraan yang sama (untuk uji isolasi antar gelanggang). */
   otherArenaId: string
   rulesetId: string
@@ -196,6 +198,7 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
     adminToken,
     competitionId: comp.id,
     arenaId: arena.id,
+    categoryId: category.id,
     otherArenaId: other.id,
     rulesetId: ruleset.id,
     wasit,

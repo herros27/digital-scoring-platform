@@ -65,8 +65,12 @@ function define(title: string, body: () => void, skip = false) {
   body()
   current = prev
 }
-const describeFn = Object.assign((t: string, b: () => void) => define(t, b), {
-  skip: (t: string, b: () => void) => define(t, b, true),
+// describe(title, fn) atau describe(title, opsi, fn) seperti Mocha/Cypress (opsi mis. { retries: 0 } diabaikan di sini)
+type Body = () => void
+const pick = (a: Body | object, b?: Body): Body =>
+  typeof a === 'function' ? (a as Body) : (b as Body)
+const describeFn = Object.assign((t: string, a: Body | object, b?: Body) => define(t, pick(a, b)), {
+  skip: (t: string, a: Body | object, b?: Body) => define(t, pick(a, b), true),
 })
 function itFn(title: string, fn: Fn) {
   current.children.push({ title, fn, skip: false, only: false, suite: current })
