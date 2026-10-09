@@ -72,6 +72,14 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
+## Playwright: 3 layar juri + 1 konsol wasit
+
+`playwright/tiga-juri-satu-wasit.ts` (`npm run test:pw-match`) membuka **4 browser context** (3 juri + wasit) dengan
+UI sungguhan, hal yang tidak mungkin dalam satu tes Cypress. Mencakup: semua online, MULAI di konsol wasit,
+tiga juri menekan tombol sama bersamaan (tepat 1 poin), satu suara menunggu lalu padam, BATAL, JEDA/LANJUT
+mengunci semua layar, dua juri bersamaan, dan SELESAIKAN. Memakai `PW_CHROMIUM` bila Chromium bukan di
+`/opt/pw-browsers`. Tes ini menemukan tombol skor juri masih aktif setelah SELESAI (kini terkunci kecuali saat berjalan).
+
 ## Spesifik lingkungan
 
 - `05-format-5-juri`: ruleset 5 juri, 3 harus sepakat (kit: `judges: 5, majority: 3`).

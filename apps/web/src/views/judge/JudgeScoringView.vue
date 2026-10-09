@@ -60,7 +60,8 @@ const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
 const isBreak = computed(() => matchStatus.value === 'break')
 // Skor juga ditolak saat partai dijeda wasit; tombol dikunci dengan alasan yang sama.
 const isPaused = computed(() => matchStatus.value === 'paused')
-const scoringLocked = computed(() => isBreak.value || isPaused.value)
+// Tombol hanya aktif saat babak berjalan: istirahat, dijeda, belum mulai, dan selesai semuanya ditolak server.
+const scoringLocked = computed(() => matchStatus.value !== 'running')
 
 // Pesan penolakan dari server (mis. skor saat dijeda, BATAL tanpa input yang bisa dibatalkan)
 const notice = ref('')

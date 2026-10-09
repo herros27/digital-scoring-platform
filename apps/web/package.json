@@ -19,7 +19,8 @@
     "cypress:record": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --record",
     "cypress:open:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress open --expose SLOW_MO=800",
     "cypress:headed:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --headed --no-exit --expose SLOW_MO=800",
-    "test:match-flow": "node cypress/scripts/run-match-flow.ts"
+    "test:match-flow": "node cypress/scripts/run-match-flow.ts",
+    "test:pw-match": "node playwright/tiga-juri-satu-wasit.ts"
   },
   "dependencies": {
     "@tanstack/vue-query": "^5.104.1",
@@ -46,6 +47,7 @@
     "eslint-plugin-vue": "^10.11.1",
     "globals": "^17.13.0",
     "jsdom": "^29.1.1",
+    "playwright-core": "^1.49.0",
     "prettier": "^3.9.9",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
