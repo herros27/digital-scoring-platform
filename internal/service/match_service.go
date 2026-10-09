@@ -41,6 +41,8 @@ type MatchService struct {
 	categoryRulesets CategoryRulesetLookup
 	arenaStore       *store.ArenaStore
 	runtimeStore     *store.MatchRuntimeStore
+	// participantLookup opsional: memvalidasi peserta saat partai dibuat manual (ada, sekejuaraan, terverifikasi).
+	participantLookup func(id string) (*domain.Participant, error)
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
@@ -88,6 +90,11 @@ func (s *MatchService) ArenaName(arenaID string) string {
 
 // SetArenaStore memungkinkan daftar scoreboard publik menampilkan nama gelanggang.
 func (s *MatchService) SetArenaStore(a *store.ArenaStore) { s.arenaStore = a }
+
+// SetParticipantLookup mengaktifkan validasi peserta pada pembuatan partai manual.
+func (s *MatchService) SetParticipantLookup(f func(id string) (*domain.Participant, error)) {
+	s.participantLookup = f
+}
 
 // CategoryRulesetLookup mencari ruleset khusus kategori dari slot bagan sebuah partai.
 type CategoryRulesetLookup interface {
@@ -203,7 +210,24 @@ func (s *MatchService) CreateMatch(m *store.Match) error {
 		return errors.New("both athletes (red and blue) must be specified")
 	}
 	if m.AthleteRedID == m.AthleteBlueID {
-		return errors.New("athlete red and blue cannot be the same person")
+		return fmt.Errorf("%w: peserta merah dan biru tidak boleh sama", domain.ErrInvalidInput)
+	}
+	if s.participantLookup != nil {
+		for corner, id := range map[string]string{"merah": m.AthleteRedID, "biru": m.AthleteBlueID} {
+			p, err := s.participantLookup(id)
+			if err != nil || p == nil || p.CompetitionID != m.CompetitionID {
+				return fmt.Errorf("%w: peserta sudut %s tidak ditemukan pada kejuaraan ini", domain.ErrInvalidInput, corner)
+			}
+			if p.RegistrationStatus != "verified" {
+				return fmt.Errorf("%w: peserta sudut %s (%s) belum terverifikasi", domain.ErrInvalidInput, corner, p.Name)
+			}
+		}
+	}
+	if s.arenaStore != nil && m.ArenaID != "" {
+		a, err := s.arenaStore.GetByID(m.ArenaID)
+		if err != nil || a == nil || a.CompetitionID != m.CompetitionID {
+			return fmt.Errorf("%w: gelanggang tidak ditemukan pada kejuaraan ini", domain.ErrInvalidInput)
+		}
 	}
 	m.Status = "idle"
 	m.CurrentRound = 1

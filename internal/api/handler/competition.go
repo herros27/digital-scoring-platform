@@ -31,12 +31,25 @@ func (h *CompetitionHandler) List(w http.ResponseWriter, r *http.Request) {
 	page, limit, _ := ParsePagination(r)
 	status := r.URL.Query().Get("status")
 
-	list, total, err := h.Service.GetCompetitionsPaged(status, page, limit)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	list, total, err := h.Service.GetCompetitionsSearch(status, q, page, limit)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
 	OkPaged(w, list, page, limit, total)
+}
+
+// GET /api/v1/competitions/stats
+// Jumlah kejuaraan per status (draft, active, paused, completed, cancelled) dan total, tidak bergantung pada filter
+// atau halaman daftar. Dipakai kartu ringkasan dan angka pada tab filter.
+func (h *CompetitionHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.Service.CompetitionStats()
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, stats)
 }
 
 // GET /api/v1/competitions/{id}

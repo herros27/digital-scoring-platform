@@ -208,3 +208,81 @@ func (s *CategoryService) SetBracketLock(competitionID, categoryID string, locke
 	}
 	return bl.SetBracketLock(competitionID, categoryID, locked)
 }
+
+// CategoryEditor kemampuan opsional repo kategori untuk mengubah dan menghapus satu kategori.
+type CategoryEditor interface {
+	Update(c *domain.Category) error
+	Delete(competitionID, id string) error
+	ParticipantCount(categoryID string) (int, error)
+}
+
+func floatPtrEq(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// UpdateCategory mengubah atribut satu kategori. Standar (IPSI/PERSILAT) tidak dapat diubah (gunakan reset kategori).
+// Setelah ada peserta terdaftar, hanya nama yang boleh diubah agar kelayakan umur/bobot/gender peserta tidak berubah
+// diam-diam. Ruleset dan kunci bagan punya endpoint sendiri dan tidak disentuh di sini.
+func (s *CategoryService) UpdateCategory(competitionID, id string, in *domain.Category) (*domain.Category, error) {
+	if competitionID == "" || id == "" || in == nil {
+		return nil, domain.ErrInvalidInput
+	}
+	ed, ok := s.repo.(CategoryEditor)
+	if !ok {
+		return nil, errors.New("category repository does not support update")
+	}
+	cur, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if cur == nil || cur.CompetitionID != competitionID {
+		return nil, domain.ErrNotFound
+	}
+	if in.Name == "" || in.Gender == "" {
+		return nil, fmt.Errorf("%w: nama dan gender wajib diisi", domain.ErrInvalidInput)
+	}
+	if in.PresetStandard != "" && in.PresetStandard != cur.PresetStandard {
+		return nil, fmt.Errorf("%w: standar kategori tidak dapat diubah; reset kategori kejuaraan untuk beralih standar", domain.ErrConflict)
+	}
+	next := *cur
+	next.Name, next.Gender, next.WeightClass = in.Name, in.Gender, in.WeightClass
+	next.MinWeight, next.MaxWeight = in.MinWeight, in.MaxWeight
+	if in.AgeGroup != "" {
+		next.AgeGroup = in.AgeGroup
+	}
+	if in.BracketMode != "" {
+		next.BracketMode = in.BracketMode
+	}
+	if err := normalizeCategory(&next); err != nil {
+		return nil, fmt.Errorf("%w: %s", domain.ErrInvalidInput, err.Error())
+	}
+	if n, err := ed.ParticipantCount(id); err != nil {
+		return nil, err
+	} else if n > 0 {
+		same := domain.NormalizeGender(next.Gender) == domain.NormalizeGender(cur.Gender) &&
+			next.WeightClass == cur.WeightClass && next.AgeGroup == cur.AgeGroup && next.BracketMode == cur.BracketMode &&
+			floatPtrEq(next.MinWeight, cur.MinWeight) && floatPtrEq(next.MaxWeight, cur.MaxWeight)
+		if !same {
+			return nil, fmt.Errorf("%w: kategori sudah memiliki %d peserta; hanya nama yang dapat diubah", domain.ErrConflict, n)
+		}
+	}
+	if err := ed.Update(&next); err != nil {
+		return nil, err
+	}
+	return &next, nil
+}
+
+// DeleteCategory menghapus satu kategori yang belum punya peserta dan belum punya partai berjalan.
+func (s *CategoryService) DeleteCategory(competitionID, id string) error {
+	if competitionID == "" || id == "" {
+		return domain.ErrInvalidInput
+	}
+	ed, ok := s.repo.(CategoryEditor)
+	if !ok {
+		return errors.New("category repository does not support delete")
+	}
+	return ed.Delete(competitionID, id)
+}

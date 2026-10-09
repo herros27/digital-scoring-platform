@@ -14,6 +14,7 @@ import (
 	"github.com/herros27/digital-scoring/internal/config"
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/logger"
+	"github.com/herros27/digital-scoring/internal/service"
 	"github.com/herros27/digital-scoring/internal/store"
 )
 
@@ -54,6 +55,15 @@ func main() {
 				"judge_pins", summary.JudgePins,
 			)
 		}
+	}
+
+	// Admin pertama dari ADMIN_EMAIL/ADMIN_PASSWORD (tanpa seed demo). Konfigurasi yang salah menghentikan start
+	// agar tidak berjalan tanpa satu pun akun admin.
+	if created, err := service.NewOfficialService(&store.OfficialStore{DB: db}).EnsureAdmin(cfg.AdminName, cfg.AdminEmail, cfg.AdminPassword); err != nil {
+		logger.Log.Error("admin bootstrap failed", "error", err)
+		os.Exit(1)
+	} else if created {
+		logger.Log.Info("admin pertama dibuat dari ADMIN_EMAIL", "email", cfg.AdminEmail)
 	}
 
 	// 4. Hub Manager & Router

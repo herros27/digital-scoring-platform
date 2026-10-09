@@ -14,6 +14,8 @@ import ParticipantVerificationView from '@/features/athletes/views/ParticipantVe
 import ScheduleOpsView from '@/features/matches/views/ScheduleOpsView.vue'
 import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
 import RulesetsOpsView from '@/features/rulesets/views/RulesetsOpsView.vue'
+import OfficialsOpsView from '@/features/officials/views/OfficialsOpsView.vue'
+import ChangeOwnPasswordDialog from '@/features/officials/components/ChangeOwnPasswordDialog.vue'
 import { matchService } from '@/features/matches/api/matchService'
 import type { BracketSlotRecord } from '@/features/tournament/api/bracketService'
 import {
@@ -240,6 +242,7 @@ const NAV_KEYS = [
   'bagan',
   'pin',
   'regulasi',
+  'petugas',
   'laporan',
 ] as const
 type NavKey = (typeof NAV_KEYS)[number]
@@ -259,6 +262,7 @@ function canAccessTab(tab: NavKey): boolean {
     case 'verifikasi':
     case 'pin':
     case 'regulasi':
+    case 'petugas':
       return isAdminOrDewan.value
     case 'gelanggang':
       return !isContingent.value
@@ -367,6 +371,11 @@ const navConfig = {
     sub: 'NILAI TEKNIK, SANKSI, KONSENSUS JURI, ATURAN SERI',
     hasArena: false,
   },
+  petugas: {
+    title: 'AKUN PETUGAS',
+    sub: 'ADMIN, DEWAN JURI, WASIT, OPERATOR & KEAMANAN PASSWORD',
+    hasArena: false,
+  },
   laporan: {
     title: 'LAPORAN & EKSPOR DATA',
     sub: 'REKAPITULASI MEDALI & ARSIP PERTANDINGAN',
@@ -434,6 +443,8 @@ const userInitials = computed(() => {
   }
   return n.slice(0, 2).toUpperCase()
 })
+
+const ownPasswordOpen = ref(false)
 
 function triggerLogoutPrompt() {
   modal.value = {
@@ -1089,6 +1100,29 @@ function handleLoadToMat1() {
         </button>
 
         <button
+          v-if="canAccessTab('petugas')"
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'petugas' }"
+          data-test="nav-petugas"
+          @click="setNav('petugas')"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>Akun Petugas</span>
+        </button>
+
+        <button
           v-if="canAccessTab('laporan')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
@@ -1123,6 +1157,27 @@ function handleLoadToMat1() {
             </div>
           </div>
         </div>
+        <button
+          v-if="authStore.isAuthenticated"
+          class="ops-logout-btn ops-logout-btn--key"
+          title="Ganti Password Saya"
+          aria-label="Ganti Password Saya"
+          data-test="ops-change-password"
+          @click="ownPasswordOpen = true"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="7.5" cy="15.5" r="4.5" />
+            <path d="m10.7 12.3 9.8-9.8" />
+            <path d="m16 7 3 3" />
+          </svg>
+        </button>
         <button
           class="ops-logout-btn"
           title="Keluar dari Sesi (Logout)"
@@ -1283,6 +1338,7 @@ function handleLoadToMat1() {
           'ops-content-scroll--pin':
             activeNav === 'pin' ||
             activeNav === 'regulasi' ||
+            activeNav === 'petugas' ||
             activeNav === 'laporan' ||
             activeNav === 'kompetisi' ||
             activeNav === 'gelanggang' ||
@@ -1344,6 +1400,9 @@ function handleLoadToMat1() {
           v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')"
           :competition-id="activeCompId"
         />
+
+        <!-- TAB AKUN PETUGAS -->
+        <OfficialsOpsView v-else-if="activeNav === 'petugas' && canAccessTab('petugas')" />
 
         <!-- TAB LAPORAN & EKSPOR -->
         <ReportsOpsView
@@ -1710,6 +1769,14 @@ function handleLoadToMat1() {
       </div>
     </Transition>
 
+    <ChangeOwnPasswordDialog
+      :open="ownPasswordOpen"
+      @close="ownPasswordOpen = false"
+      @changed="
+        showToast('Password Diganti', 'Gunakan password baru saat masuk berikutnya.', 'success')
+      "
+    />
+
     <!-- MODAL CONFIRMATION DIALOG -->
     <Transition name="modal-fade">
       <div v-if="modal?.show" class="ops-modal-backdrop" @click.self="modal = null">
@@ -2030,6 +2097,11 @@ function handleLoadToMat1() {
 .ops-logout-btn:hover {
   color: #dc2626;
   background-color: rgba(220, 38, 38, 0.1);
+}
+
+.ops-logout-btn--key:hover {
+  color: #34d399;
+  background-color: rgba(52, 211, 153, 0.1);
 }
 
 /* ==========================================================================

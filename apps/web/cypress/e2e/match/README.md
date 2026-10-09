@@ -143,6 +143,12 @@ Spec Playwright lain (semua UI sungguhan):
   poin juri realtime, sanksi/potongan, jeda, sinyal dokter, layar pemenang).
 - `sanksi-hasil-khusus.spec.ts`: sanksi dari konsol wasit (Binaan/Teguran/DQ, batalkan sanksi) dan hasil khusus
   (KO/TKO/WO/Undur diri) beserta dampaknya ke bagan (pemenang maju) dan medali.
+- `akun-petugas-ui.spec.ts`: layar **Akun Petugas**: tambah, ubah peran, reset password, hapus (dengan konfirmasi), batas
+  wewenang Dewan Juri, akun sendiri tidak dapat dihapus, dan ganti password sendiri (password lama salah tidak
+  mengeluarkan sesi). Hasil akhir selalu dicek ke server.
+- `administrasi-ui.spec.ts`: administrasi di ruang operasi: ubah dan hapus satu kategori (setelah ada peserta hanya nama yang
+  berubah), batal daftar atlet oleh admin dan manajer kontingen (termasuk penolakan bila sudah di bagan), reset password
+  kontingen, tambah partai manual, dan rincian skor per partai.
 - `panitia-ui.spec.ts`: ruang operasi panitia: bagan (kunci draw, generate, acak ulang), jadwal (muat, mulai, jeda,
   lanjut, selesaikan, filter gelanggang), dan PIN (PIN kustom, login tablet, Reset PIN).
 

@@ -65,6 +65,21 @@ func (m *mockOfficialRepo) Update(o *domain.Official) error {
 	return nil
 }
 
+func (m *mockOfficialRepo) UpdatePassword(id, passwordHash string) error {
+	m.passwords[id] = passwordHash
+	return nil
+}
+
+func (m *mockOfficialRepo) CountByRole(role string) (int, error) {
+	n := 0
+	for _, o := range m.officials {
+		if o.Role == role {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (m *mockOfficialRepo) Delete(id string) error {
 	delete(m.officials, id)
 	delete(m.passwords, id)
@@ -339,6 +354,7 @@ func TestOfficialHandler_HTTP(t *testing.T) {
 	createBody := strings.NewReader(`{"name":"Operator 1","email":"op1@silat.id","password":"test_password_1","role":"operator"}`)
 	req := httptest.NewRequest("POST", "/api/v1/officials", createBody)
 	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(auth.ContextWithClaims(req.Context(), &auth.Claims{JudgePinID: "admin-x", Role: "admin"}))
 	w := httptest.NewRecorder()
 	h.Create(w, req)
 
@@ -437,4 +453,12 @@ func TestReportHandler_HTTP(t *testing.T) {
 	if wExport.Code != http.StatusOK {
 		t.Errorf("expected 200 OK for export, got %d: %s", wExport.Code, wExport.Body.String())
 	}
+}
+
+// firstID ID akun pertama yang ada (dipakai tes yang membuat akun lewat service).
+func (m *mockOfficialRepo) firstID() string {
+	for id := range m.officials {
+		return id
+	}
+	return ""
 }

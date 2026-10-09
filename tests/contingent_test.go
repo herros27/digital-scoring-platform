@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -52,6 +53,15 @@ func (m *mockContingentRepo) GetByEmail(email string) (*domain.Contingent, strin
 		}
 	}
 	return nil, "", nil
+}
+
+func (m *mockContingentRepo) UpdatePassword(id, hash string) error {
+	c, ok := m.contingents[id]
+	if !ok {
+		return sql.ErrNoRows
+	}
+	m.passwords[c.Email] = hash
+	return nil
 }
 
 func (m *mockContingentRepo) List() ([]domain.Contingent, error) {

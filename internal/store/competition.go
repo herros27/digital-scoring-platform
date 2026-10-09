@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"strings"
+)
 
 // nullableID mengubah string kosong menjadi NULL untuk kolom UUID opsional.
 func nullableID(id *string) any {
@@ -60,20 +63,39 @@ func (s *CompetitionStore) List() ([]Competition, error) {
 	return list, rows.Err()
 }
 
+// ListPaged daftar kejuaraan berhalaman menurut status ("" = semua).
 func (s *CompetitionStore) ListPaged(status string, limit, offset int) ([]Competition, int, error) {
+	return s.ListPagedSearch(status, "", limit, offset)
+}
+
+// likePattern membungkus teks pencarian untuk ILIKE dan menetralkan karakter khusus (%, _, \).
+func likePattern(q string) string {
+	return "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q) + "%"
+}
+
+// competitionFilter klausa WHERE bersama untuk hitungan dan daftar: status (opsional) dan teks pencarian pada nama,
+// lokasi, nama ruleset, atau ID.
+const competitionFilter = `
+	WHERE ($1 = '' OR status = $1)
+	  AND ($2 = '' OR name ILIKE $3 OR location ILIKE $3 OR ruleset_name ILIKE $3 OR id::text ILIKE $3)`
+
+// ListPagedSearch daftar kejuaraan berhalaman, difilter status dan teks pencarian q. Urutan: yang sedang berlangsung
+// lebih dulu (aktif, dijeda, draft, selesai, lalu dibatalkan), lalu yang terbaru, agar kejuaraan nyata tidak tertimbun
+// kejuaraan uji yang dibatalkan. Total dihitung dengan filter yang sama.
+func (s *CompetitionStore) ListPagedSearch(status, q string, limit, offset int) ([]Competition, int, error) {
+	pattern := likePattern(q)
 	var total int
-	countQuery := `SELECT COUNT(*) FROM competitions WHERE ($1 = '' OR status = $1)`
-	if err := s.DB.QueryRow(countQuery, status).Scan(&total); err != nil {
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM competitions`+competitionFilter, status, q, pattern).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
 	query := `
-		SELECT id, name, location, start_date, end_date, ruleset_name, ruleset_id, status, created_at 
-		FROM competitions 
-		WHERE ($1 = '' OR status = $1) 
-		ORDER BY created_at DESC 
-		LIMIT $2 OFFSET $3`
-	rows, err := s.DB.Query(query, status, limit, offset)
+		SELECT id, name, location, start_date, end_date, ruleset_name, ruleset_id, status, created_at
+		FROM competitions` + competitionFilter + `
+		ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 WHEN 'draft' THEN 2 WHEN 'completed' THEN 3 ELSE 4 END,
+		         created_at DESC
+		LIMIT $4 OFFSET $5`
+	rows, err := s.DB.Query(query, status, q, pattern, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -93,6 +115,25 @@ func (s *CompetitionStore) ListPaged(status string, limit, offset int) ([]Compet
 		list = []Competition{}
 	}
 	return list, total, rows.Err()
+}
+
+// CountByStatus jumlah kejuaraan per status di seluruh basis data (tidak bergantung filter atau halaman).
+func (s *CompetitionStore) CountByStatus() (map[string]int, error) {
+	rows, err := s.DB.Query(`SELECT status, COUNT(*) FROM competitions GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var st string
+		var n int
+		if err := rows.Scan(&st, &n); err != nil {
+			return nil, err
+		}
+		out[st] = n
+	}
+	return out, rows.Err()
 }
 
 func (s *CompetitionStore) UpdateStatus(id, status string) error {

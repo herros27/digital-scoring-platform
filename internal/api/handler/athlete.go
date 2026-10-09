@@ -347,3 +347,31 @@ func (h *AthleteHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, updated)
 }
+
+// DELETE /api/v1/competitions/{comp_id}/participants/{id}
+// Membatalkan pendaftaran peserta dari kejuaraan. Admin/dewan: semua peserta yang belum masuk bagan/partai. Manajer
+// kontingen: hanya peserta kontingennya sendiri yang belum diverifikasi.
+func (h *AthleteHandler) UnregisterParticipant(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	scope, restricted := contingentScope(r)
+	err := h.Service.UnregisterParticipant(compID, r.PathValue("id"), scope, restricted)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "peserta tidak ditemukan pada kejuaraan ini", nil)
+		case errors.Is(err, domain.ErrForbidden):
+			Fail(w, http.StatusForbidden, "FORBIDDEN", strings.TrimPrefix(err.Error(), domain.ErrForbidden.Error()+": "), nil)
+		case errors.Is(err, domain.ErrConflict):
+			Fail(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), domain.ErrConflict.Error()+": "), nil)
+		case errors.Is(err, domain.ErrInvalidInput):
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		default:
+			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		}
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]string{"status": "unregistered"})
+}

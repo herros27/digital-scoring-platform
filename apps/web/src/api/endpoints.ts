@@ -15,10 +15,10 @@ export const ENDPOINTS = {
   AUTH: {
     OFFICIAL_LOGIN: '/api/v1/auth/login',
     JUDGE_LOGIN: '/api/v1/auth/judge-login',
-    PIN_LOGIN: '/api/v1/auth/pin',
     CONTINGENT_REGISTER: '/api/v1/auth/contingent/register',
     CONTINGENT_LOGIN: '/api/v1/auth/contingent/login',
     LOGOUT: '/api/v1/auth/logout',
+    CHANGE_PASSWORD: '/api/v1/auth/change-password',
     CREATE_PIN: '/api/v1/auth/create-pin',
     PINS: '/api/v1/auth/pins',
   },
@@ -26,6 +26,7 @@ export const ENDPOINTS = {
   // Competitions
   COMPETITIONS: {
     LIST: '/api/v1/competitions',
+    STATS: '/api/v1/competitions/stats',
     CREATE: '/api/v1/competitions',
     DETAIL: (id: string) => `/api/v1/competitions/${id}`,
     UPDATE: (id: string) => `/api/v1/competitions/${id}`,
@@ -58,6 +59,8 @@ export const ENDPOINTS = {
     BY_COMPETITION: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     REGISTER_TO_COMP: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     PARTICIPANTS: (compId: string) => `/api/v1/competitions/${compId}/participants`,
+    PARTICIPANT: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}`,
     VERIFY_PARTICIPANT: (compId: string, id: string) =>
       `/api/v1/competitions/${compId}/participants/${id}/verify`,
   },
@@ -66,6 +69,7 @@ export const ENDPOINTS = {
   CONTINGENTS: {
     LIST: '/api/v1/contingents',
     DETAIL: (id: string) => `/api/v1/contingents/${id}`,
+    PASSWORD: (id: string) => `/api/v1/contingents/${id}/password`,
   },
 
   // Arenas
@@ -129,6 +133,7 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/api/v1/officials/${id}`,
     UPDATE: (id: string) => `/api/v1/officials/${id}`,
     DELETE: (id: string) => `/api/v1/officials/${id}`,
+    PASSWORD: (id: string) => `/api/v1/officials/${id}/password`,
   },
 
   // Reports

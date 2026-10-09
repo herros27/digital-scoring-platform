@@ -13,7 +13,7 @@ import { api } from '../../support/match/http.ts'
 const WRONG = '000001'
 
 async function pinLogin(pin: string, opts: { ip: string; device?: string }) {
-  const res = await fetch(`${appOrigin()}/api/v1/auth/pin`, {
+  const res = await fetch(`${appOrigin()}/api/v1/auth/judge-login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -5,6 +5,7 @@ import type {
   CreateCompetitionFormValues,
   UpdateCompetitionFormValues,
   CompetitionFilterValues,
+  CompetitionStats,
 } from '../types/competition.schema'
 import type { CompetitionListResult } from '@/types/competition'
 
@@ -17,6 +18,7 @@ export const competitionService = {
     if (params?.page) query.append('page', String(params.page))
     if (params?.limit) query.append('limit', String(params.limit))
     if (params?.status && params.status !== 'all') query.append('status', params.status)
+    if (params?.search?.trim()) query.append('q', params.search.trim())
 
     const url = `${ENDPOINTS.COMPETITIONS.LIST}${query.toString() ? `?${query.toString()}` : ''}`
     const res = await http.get<Competition[]>(url)
@@ -29,6 +31,14 @@ export const competitionService = {
         total: res.data ? res.data.length : 0,
       },
     }
+  },
+
+  /**
+   * GET /api/v1/competitions/stats: jumlah per status di seluruh data, tidak bergantung filter/halaman.
+   */
+  async getStats(): Promise<CompetitionStats> {
+    const res = await http.get<CompetitionStats>(ENDPOINTS.COMPETITIONS.STATS)
+    return res.data
   },
 
   /**

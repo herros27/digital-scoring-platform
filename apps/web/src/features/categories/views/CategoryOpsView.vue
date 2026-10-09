@@ -9,7 +9,9 @@ import {
   useCategoriesQuery,
   useAssignRulesetsMutation,
   useCreateCategoryMutation,
+  useDeleteCategoryMutation,
   useResetCategoriesMutation,
+  useUpdateCategoryMutation,
   useSeedPresetsMutation,
 } from '../api/categoryQueries'
 import {
@@ -60,6 +62,8 @@ const {
 const createMutation = useCreateCategoryMutation(activeCompId)
 const seedMutation = useSeedPresetsMutation(activeCompId)
 const resetMutation = useResetCategoriesMutation(activeCompId)
+const updateMutation = useUpdateCategoryMutation(activeCompId)
+const deleteMutation = useDeleteCategoryMutation(activeCompId)
 
 const categories = computed(() => rawCategories.value || [])
 
@@ -298,6 +302,10 @@ function showToast(
 
 // Modal Form State (Create Category)
 const isModalOpen = ref(false)
+// Kategori yang sedang diubah; null = mode tambah. Server menolak (409) perubahan bobot/gender/golongan bila sudah
+// ada peserta, dan pesannya ditampilkan di dalam dialog.
+const editingCategory = ref<Category | null>(null)
+const submitError = ref('')
 const selectedPresetIndex = ref<number | ''>('')
 const formErrors = ref<Record<string, string>>({})
 interface CategoryFormState {
@@ -326,10 +334,51 @@ const modalPresets = computed(() => presetsFor(formState.value.preset_standard))
 const modalAgeBands = computed(() => AGE_BANDS[formState.value.preset_standard])
 
 function openCreateModal() {
+  editingCategory.value = null
+  submitError.value = ''
   selectedPresetIndex.value = ''
   formState.value = emptyForm()
   formErrors.value = {}
   isModalOpen.value = true
+}
+
+function openEditModal(cat: Category) {
+  editingCategory.value = cat
+  submitError.value = ''
+  selectedPresetIndex.value = ''
+  formState.value = {
+    name: cat.name,
+    gender: cat.gender,
+    weight_class: cat.weight_class,
+    age_group: cat.age_group ?? 'dewasa',
+    preset_standard: cat.preset_standard ?? 'ipsi',
+    min_weight: cat.min_weight ?? null,
+    max_weight: cat.max_weight ?? null,
+    bracket_mode: cat.bracket_mode ?? 'single_elimination',
+  }
+  formErrors.value = {}
+  isModalOpen.value = true
+}
+
+// Hapus satu kategori
+const deleteTarget = ref<Category | null>(null)
+const deleteError = ref('')
+
+function openDeleteDialog(cat: Category) {
+  deleteTarget.value = cat
+  deleteError.value = ''
+}
+
+async function confirmDeleteCategory() {
+  if (!deleteTarget.value) return
+  deleteError.value = ''
+  try {
+    await deleteMutation.mutateAsync(deleteTarget.value.id)
+    showToast('Kategori Dihapus', `${deleteTarget.value.name} telah dihapus.`, 'success')
+    deleteTarget.value = null
+  } catch (err) {
+    deleteError.value = getErrorMessage(err, 'Kategori tidak dapat dihapus.')
+  }
 }
 
 // Mengganti standar mereset template & memastikan golongan umur valid untuk standar tsb.
@@ -387,6 +436,18 @@ async function handleSubmitCategory() {
       min_weight: formState.value.min_weight,
       max_weight: formState.value.max_weight,
       bracket_mode: formState.value.bracket_mode,
+    }
+
+    if (editingCategory.value) {
+      submitError.value = ''
+      try {
+        const updated = await updateMutation.mutateAsync({ id: editingCategory.value.id, payload })
+        isModalOpen.value = false
+        showToast('Kategori Diperbarui', `${updated.name} berhasil diperbarui.`, 'success')
+      } catch (err) {
+        submitError.value = getErrorMessage(err, 'Kategori tidak dapat diperbarui.')
+      }
+      return
     }
 
     const created = await createMutation.mutateAsync(payload)
@@ -986,6 +1047,26 @@ function handleCategoryClick(cat: Category) {
 
         <!-- Card Footer: Direct Bracket Action -->
         <footer class="cat-card__footer">
+          <div class="cat-card__manage font-mono">
+            <button
+              type="button"
+              class="cat-manage-btn"
+              :aria-label="`Ubah ${cat.name}`"
+              data-test="category-edit"
+              @click="openEditModal(cat)"
+            >
+              Ubah
+            </button>
+            <button
+              type="button"
+              class="cat-manage-btn cat-manage-btn--danger"
+              :aria-label="`Hapus ${cat.name}`"
+              data-test="category-delete"
+              @click="openDeleteDialog(cat)"
+            >
+              Hapus
+            </button>
+          </div>
           <button
             type="button"
             class="cat-view-bracket-btn font-mono"
@@ -1304,7 +1385,56 @@ function handleCategoryClick(cat: Category) {
       </div>
     </div>
 
-    <!-- Create Category Modal Dialog -->
+    <!-- Hapus Satu Kategori -->
+    <div
+      v-if="deleteTarget"
+      class="cat-modal-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="cat-delete-title"
+      data-test="category-delete-dialog"
+      @click.self="deleteTarget = null"
+    >
+      <div class="cat-modal cat-modal--compact">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">HAPUS KATEGORI</div>
+            <h3 id="cat-delete-title" class="cat-modal__title">Hapus Kategori Ini?</h3>
+          </div>
+        </header>
+        <div class="cat-modal__body cat-modal__body--compact">
+          <p class="cat-form-help">
+            <strong>{{ deleteTarget.name }}</strong> beserta bagan kosongnya akan dihapus. Kategori
+            yang masih memiliki peserta atau partai yang sudah berjalan tidak dapat dihapus.
+          </p>
+          <p
+            v-if="deleteError"
+            class="cat-form-error"
+            role="alert"
+            data-test="category-delete-error"
+          >
+            {{ deleteError }}
+          </p>
+          <footer class="cat-modal__footer font-mono">
+            <AppButton type="button" variant="secondary" size="md" @click="deleteTarget = null">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="md"
+              :loading="deleteMutation.isPending.value"
+              data-test="category-delete-confirm"
+              @click="confirmDeleteCategory"
+            >
+              Hapus Kategori
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create / Edit Category Modal Dialog -->
     <div
       v-if="isModalOpen"
       class="cat-modal-overlay"
@@ -1316,15 +1446,23 @@ function handleCategoryClick(cat: Category) {
       <div class="cat-modal">
         <header class="cat-modal__header">
           <div>
-            <div class="cat-modal__tag font-mono">FORM KATEGORI BARU</div>
-            <h3 id="modal-title" class="cat-modal__title">Tambah Kategori Tanding</h3>
+            <div class="cat-modal__tag font-mono">
+              {{ editingCategory ? 'UBAH KATEGORI' : 'FORM KATEGORI BARU' }}
+            </div>
+            <h3 id="modal-title" class="cat-modal__title">
+              {{ editingCategory ? 'Ubah Kategori Tanding' : 'Tambah Kategori Tanding' }}
+            </h3>
           </div>
           <button class="cat-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
           </button>
         </header>
 
-        <form class="cat-modal__body" @submit.prevent="handleSubmitCategory">
+        <form
+          class="cat-modal__body"
+          data-test="category-form"
+          @submit.prevent="handleSubmitCategory"
+        >
           <!-- Active Competition Target Banner -->
           <div class="cat-target-comp font-mono">
             <svg
@@ -1370,7 +1508,7 @@ function handleCategoryClick(cat: Category) {
             >
           </div>
 
-          <div class="cat-form-group">
+          <div v-if="!editingCategory" class="cat-form-group">
             <label for="cat-preset-select" class="cat-form-label font-mono">
               PILIH TEMPLATE KELAS STANDAR (OPSIONAL)
             </label>
@@ -1549,6 +1687,14 @@ function handleCategoryClick(cat: Category) {
             >
           </div>
 
+          <p v-if="submitError" class="cat-form-error" role="alert" data-test="category-form-error">
+            {{ submitError }}
+          </p>
+          <p v-if="editingCategory" class="cat-form-help">
+            Bila kategori sudah memiliki peserta, hanya nama yang dapat diubah. Standar regulasi
+            tidak dapat diubah (gunakan "Reset Kategori").
+          </p>
+
           <footer class="cat-modal__footer font-mono">
             <AppButton type="button" variant="secondary" size="md" @click="isModalOpen = false">
               Batal
@@ -1557,9 +1703,10 @@ function handleCategoryClick(cat: Category) {
               type="submit"
               variant="emerald"
               size="md"
-              :loading="createMutation.isPending.value"
+              :loading="createMutation.isPending.value || updateMutation.isPending.value"
+              data-test="category-save"
             >
-              Simpan Kategori
+              {{ editingCategory ? 'Simpan Perubahan' : 'Simpan Kategori' }}
             </AppButton>
           </footer>
         </form>
@@ -2084,6 +2231,34 @@ function handleCategoryClick(cat: Category) {
   padding: 12px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.15);
+}
+.cat-card__manage {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cat-manage-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card, #334155);
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--color-neutral-200, #e2e8f0);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cat-manage-btn:hover {
+  background: rgba(51, 65, 85, 0.7);
+  color: #fff;
+}
+.cat-manage-btn--danger {
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.cat-manage-btn--danger:hover {
+  background: rgba(220, 38, 38, 0.25);
 }
 .cat-view-bracket-btn {
   display: flex;

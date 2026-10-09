@@ -39,6 +39,7 @@ async function handleLogin() {
         role: role,
         name: res.user?.name || 'Ofisial Pertandingan',
         email: res.user?.email,
+        userId: res.user?.id,
       })
 
       // Redirect otomatis sesuai wewenang

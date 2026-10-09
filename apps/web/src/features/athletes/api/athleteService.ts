@@ -101,6 +101,14 @@ export const athleteService = {
   },
 
   /**
+   * DELETE /api/v1/competitions/{comp_id}/participants/{id} — batal daftar dari kejuaraan.
+   * Admin/dewan: peserta yang belum masuk bagan/partai. Manajer kontingen: pesertanya sendiri yang belum diverifikasi.
+   */
+  async unregisterParticipant(compId: string, participantId: string): Promise<void> {
+    await http.delete<unknown>(ENDPOINTS.ATHLETES.PARTICIPANT(compId, participantId))
+  },
+
+  /**
    * 7. GET /api/v1/contingents
    */
   async getContingents(): Promise<Contingent[]> {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/api/error'
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { AppButton, AppBadge, AppInput } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -9,6 +9,7 @@ import { summarize } from '@/features/rulesets/lib/rulesetDraft'
 import type { RulesetDTO } from '@/features/rulesets/types'
 import {
   useCompetitionsQuery,
+  useCompetitionStatsQuery,
   useCreateCompetitionMutation,
   useUpdateCompetitionMutation,
   useActivateCompetitionMutation,
@@ -35,6 +36,23 @@ const filters = ref<CompetitionFilterValues>({
 })
 const searchQuery = ref('')
 
+// Pencarian dilakukan di server (agar mencakup seluruh kejuaraan, bukan hanya halaman yang termuat); ditunda sebentar
+// supaya tidak menembak API tiap ketukan. Filter atau pencarian baru selalu kembali ke halaman 1.
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchQuery, (v) => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    filters.value = { ...filters.value, search: v.trim(), page: 1 }
+  }, 300)
+})
+onBeforeUnmount(() => clearTimeout(searchTimer))
+function setStatusFilter(st: NonNullable<CompetitionFilterValues['status']>) {
+  filters.value = { ...filters.value, status: st, page: 1 }
+}
+function goToPage(p: number) {
+  filters.value = { ...filters.value, page: Math.min(Math.max(1, p), totalPages.value) }
+}
+
 // TanStack Query for Server State (automatic caching, background refetch, and deduplication)
 const {
   data: competitionsData,
@@ -42,6 +60,7 @@ const {
   error: queryError,
   refetch,
 } = useCompetitionsQuery(filters)
+const { data: statsData } = useCompetitionStatsQuery()
 
 // TanStack Mutations for State Transitions
 const createMutation = useCreateCompetitionMutation()
@@ -53,6 +72,15 @@ const cancelMutation = useCancelCompetitionMutation()
 
 const competitions = computed(() => competitionsData.value?.data || [])
 const totalCompetitions = computed(() => competitionsData.value?.pagination?.total || 0)
+const pageSize = computed(() => filters.value.limit)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCompetitions.value / pageSize.value)))
+const currentPage = computed(() => filters.value.page)
+const rangeFrom = computed(() =>
+  totalCompetitions.value === 0 ? 0 : (currentPage.value - 1) * pageSize.value + 1,
+)
+const rangeTo = computed(() =>
+  Math.min(currentPage.value * pageSize.value, totalCompetitions.value),
+)
 
 // Feedback toast
 const toast = ref<{ title: string; message: string; type: 'success' | 'danger' | 'info' } | null>(
@@ -132,33 +160,13 @@ const detailModal = ref<{
   competition: null,
 })
 
-// Stats computation
-const stats = computed(() => {
-  const all = competitions.value
-  return {
-    total: totalCompetitions.value || all.length,
-    active: all.filter((c) => c.status === 'active').length,
-    paused: all.filter((c) => c.status === 'paused').length,
-    draft: all.filter((c) => c.status === 'draft').length,
-    completed: all.filter((c) => c.status === 'completed').length,
-  }
-})
+// Hitungan global dari server: tetap sama apa pun tab/halaman/pencarian yang aktif.
+const stats = computed(
+  () => statsData.value ?? { total: 0, active: 0, paused: 0, draft: 0, completed: 0, cancelled: 0 },
+)
 
-// Filtered list
-const filteredCompetitions = computed(() => {
-  let list = competitions.value
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase().trim()
-    list = list.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.location && c.location.toLowerCase().includes(q)) ||
-        (c.ruleset_name && c.ruleset_name.toLowerCase().includes(q)) ||
-        c.id.toLowerCase().includes(q),
-    )
-  }
-  return list
-})
+// Daftar sudah difilter dan dipaginasi oleh server.
+const filteredCompetitions = computed(() => competitions.value)
 
 // Open Create Modal
 function openCreateModal() {
@@ -551,14 +559,14 @@ function openBracketOps(c: Competition) {
         <button
           class="tab-btn"
           :class="{ 'tab-btn--active': filters.status === 'all' }"
-          @click="filters.status = 'all'"
+          @click="setStatusFilter('all')"
         >
           Semua ({{ stats.total }})
         </button>
         <button
           class="tab-btn"
           :class="{ 'tab-btn--active': filters.status === 'active' }"
-          @click="filters.status = 'active'"
+          @click="setStatusFilter('active')"
         >
           <span class="dot-indicator dot-emerald" />
           Aktif ({{ stats.active }})
@@ -566,7 +574,7 @@ function openBracketOps(c: Competition) {
         <button
           class="tab-btn"
           :class="{ 'tab-btn--active': filters.status === 'draft' }"
-          @click="filters.status = 'draft'"
+          @click="setStatusFilter('draft')"
         >
           <span class="dot-indicator dot-neutral" />
           Draft ({{ stats.draft }})
@@ -574,7 +582,7 @@ function openBracketOps(c: Competition) {
         <button
           class="tab-btn"
           :class="{ 'tab-btn--active': filters.status === 'paused' }"
-          @click="filters.status = 'paused'"
+          @click="setStatusFilter('paused')"
         >
           <span class="dot-indicator dot-amber" />
           Dijeda ({{ stats.paused }})
@@ -582,9 +590,16 @@ function openBracketOps(c: Competition) {
         <button
           class="tab-btn"
           :class="{ 'tab-btn--active': filters.status === 'completed' }"
-          @click="filters.status = 'completed'"
+          @click="setStatusFilter('completed')"
         >
           Selesai ({{ stats.completed }})
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ 'tab-btn--active': filters.status === 'cancelled' }"
+          @click="setStatusFilter('cancelled')"
+        >
+          Dibatalkan ({{ stats.cancelled }})
         </button>
       </div>
 
@@ -820,6 +835,31 @@ function openBracketOps(c: Competition) {
           </div>
         </article>
       </div>
+
+      <nav v-if="totalCompetitions > pageSize" class="comp-pager" aria-label="Halaman kejuaraan">
+        <span class="comp-pager__info tabular-nums" data-testid="comp-pager-info">
+          {{ rangeFrom }}–{{ rangeTo }} dari {{ totalCompetitions }}
+        </span>
+        <AppButton
+          variant="secondary"
+          size="sm"
+          :disabled="currentPage <= 1"
+          data-testid="comp-pager-prev"
+          @click="goToPage(currentPage - 1)"
+        >
+          Sebelumnya
+        </AppButton>
+        <span class="tabular-nums">Hal. {{ currentPage }} / {{ totalPages }}</span>
+        <AppButton
+          variant="secondary"
+          size="sm"
+          :disabled="currentPage >= totalPages"
+          data-testid="comp-pager-next"
+          @click="goToPage(currentPage + 1)"
+        >
+          Berikutnya
+        </AppButton>
+      </nav>
     </main>
 
     <!-- Create / Edit Competition Modal -->
@@ -1289,6 +1329,19 @@ function openBracketOps(c: Competition) {
   align-items: center;
   gap: 6px;
   overflow-x: auto;
+}
+.comp-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 0.875rem;
+}
+.comp-pager__info {
+  margin-right: auto;
+  color: var(--color-text-muted, inherit);
 }
 .tab-btn {
   display: inline-flex;

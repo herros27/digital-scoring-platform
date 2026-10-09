@@ -5,8 +5,16 @@ import { AppButton } from '@/components/ui'
 import {
   useCompetitionAthletesQuery,
   useContingentsQuery,
+  useParticipantsQuery,
   useRegisterToCompetitionMutation,
+  useUnregisterParticipantMutation,
 } from '../api/athleteQueries'
+import {
+  canUnregister,
+  participantStatusLabel,
+  participantStatusTone,
+} from '../lib/participantStatus'
+import type { Athlete, Participant } from '../types/athlete.schema'
 import { createAthleteSchema } from '../types/athlete.schema'
 import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
 import { useCompetitionQuery } from '@/features/competitions/api/competitionQueries'
@@ -51,6 +59,42 @@ const { data: competition } = useCompetitionQuery(activeCompId)
 const categories = computed(() => rawCategories.value || [])
 
 const registerMutation = useRegisterToCompetitionMutation(activeCompId)
+const unregisterMutation = useUnregisterParticipantMutation(activeCompId)
+
+// Status pendaftaran nyata tiap atlet (manajer kontingen hanya menerima pesertanya sendiri dari server).
+const { data: rawParticipants } = useParticipantsQuery(activeCompId)
+const participantByAthlete = computed(() => {
+  const map = new Map<string, Participant>()
+  for (const p of rawParticipants.value || []) map.set(p.athlete_id, p)
+  return map
+})
+
+// Batal daftar
+const cancelTarget = ref<{ participant: Participant; athlete: Athlete } | null>(null)
+const cancelError = ref('')
+
+function openCancelDialog(athlete: Athlete) {
+  const participant = participantByAthlete.value.get(athlete.id)
+  if (!participant) return
+  cancelTarget.value = { participant, athlete }
+  cancelError.value = ''
+}
+
+async function confirmCancelRegistration() {
+  if (!cancelTarget.value) return
+  cancelError.value = ''
+  try {
+    await unregisterMutation.mutateAsync(cancelTarget.value.participant.id)
+    showToast(
+      'Pendaftaran Dibatalkan',
+      `${cancelTarget.value.athlete.name} dikeluarkan dari kejuaraan ini.`,
+      'success',
+    )
+    cancelTarget.value = null
+  } catch (err) {
+    cancelError.value = getErrorMessage(err, 'Pendaftaran tidak dapat dibatalkan.')
+  }
+}
 
 // Tanggal acuan umur = hari pertama kejuaraan (fallback hari ini).
 const ageReferenceDate = computed(() => {
@@ -622,10 +666,37 @@ function isMaleGender(gender: string): boolean {
 
         <!-- Card Footer -->
         <footer class="atl-card__footer">
-          <div class="atl-card__status-row font-mono">
-            <span class="atl-status-dot" />
-            <span class="atl-status-text">TERDAFTAR RESMI</span>
+          <div class="atl-card__status-row font-mono" data-test="athlete-status">
+            <span
+              class="atl-status-dot"
+              :class="`atl-status-dot--${participantStatusTone(participantByAthlete.get(athlete.id)?.registration_status ?? 'registered')}`"
+            />
+            <span
+              class="atl-status-text"
+              :class="`atl-status-text--${participantStatusTone(participantByAthlete.get(athlete.id)?.registration_status ?? 'registered')}`"
+              >{{
+                participantStatusLabel(
+                  participantByAthlete.get(athlete.id)?.registration_status ?? 'registered',
+                )
+              }}</span
+            >
           </div>
+          <button
+            v-if="
+              participantByAthlete.get(athlete.id) &&
+              canUnregister(
+                authStore.role || '',
+                participantByAthlete.get(athlete.id)!.registration_status,
+              )
+            "
+            type="button"
+            class="atl-cancel-link font-mono"
+            :aria-label="`Batal daftar ${athlete.name}`"
+            data-test="athlete-unregister"
+            @click="openCancelDialog(athlete)"
+          >
+            Batal Daftar
+          </button>
           <button
             v-if="authStore.isAdminOrDewan"
             type="button"
@@ -647,6 +718,52 @@ function isMaleGender(gender: string): boolean {
           </button>
         </footer>
       </article>
+    </div>
+
+    <!-- Konfirmasi batal daftar -->
+    <div
+      v-if="cancelTarget"
+      class="atl-modal-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="atl-cancel-title"
+      data-test="unregister-dialog"
+      @click.self="cancelTarget = null"
+    >
+      <div class="atl-modal">
+        <header class="atl-modal__header">
+          <div>
+            <div class="atl-modal__tag font-mono">BATAL PENDAFTARAN</div>
+            <h3 id="atl-cancel-title" class="atl-modal__title">Batalkan Pendaftaran?</h3>
+          </div>
+        </header>
+        <div class="atl-modal__body">
+          <p class="atl-form-help">
+            <strong>{{ cancelTarget.athlete.name }}</strong> akan dikeluarkan dari kejuaraan ini.
+            Data atlet tetap tersimpan dan dapat didaftarkan lagi. Peserta yang sudah masuk bagan
+            atau partai tidak dapat dibatalkan; ubah statusnya menjadi ditolak lalu buat ulang bagan
+            kategorinya.
+          </p>
+          <p v-if="cancelError" class="atl-form-error" role="alert" data-test="unregister-error">
+            {{ cancelError }}
+          </p>
+          <footer class="atl-modal__footer font-mono">
+            <AppButton type="button" variant="secondary" size="md" @click="cancelTarget = null">
+              Kembali
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="md"
+              :loading="unregisterMutation.isPending.value"
+              data-test="unregister-confirm"
+              @click="confirmCancelRegistration"
+            >
+              Batalkan Pendaftaran
+            </AppButton>
+          </footer>
+        </div>
+      </div>
     </div>
 
     <!-- Modal Form (Daftarkan Atlet Baru) -->
@@ -1340,11 +1457,35 @@ function isMaleGender(gender: string): boolean {
   border-radius: 50%;
   background-color: var(--color-emerald-400, #34d399);
 }
+.atl-status-dot--wait {
+  background-color: #fbbf24;
+}
+.atl-status-dot--bad {
+  background-color: #f87171;
+}
 .atl-status-text {
   font-size: 0.625rem;
   color: var(--color-emerald-400, #34d399);
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+.atl-status-text--wait {
+  color: #fbbf24;
+}
+.atl-status-text--bad {
+  color: #f87171;
+}
+.atl-cancel-link {
+  background: none;
+  border: none;
+  color: #fca5a5;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.atl-cancel-link:hover {
+  color: #ef4444;
+  text-decoration: underline;
 }
 .atl-verify-link {
   display: inline-flex;

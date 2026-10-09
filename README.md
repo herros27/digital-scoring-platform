@@ -208,16 +208,18 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/auth/judge-login` | Public | Login juri/wasit hanya dengan `{ "pin" }` (6 digit juri, 8 digit wasit) → JWT (claims: `role`, `arena_id`, `competition_id`, `seat_number`) |
 | POST | `/api/v1/auth/contingent/register` | Public | Registrasi akun manajer kontingen baru |
 | POST | `/api/v1/auth/contingent/login` | Public | Login akun kontingen via email & password → JWT (`role: contingent`) |
+| POST | `/api/v1/auth/change-password` | JWT (petugas / kontingen) | Ganti password sendiri `{ current_password, new_password }` (min. 8 karakter; password lama salah dijawab 400) |
 | POST | `/api/v1/auth/create-pin` | Admin, Dewan | Generate PIN acak/custom untuk juri gelanggang tertentu |
 
 ### 2. Competition
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/competitions` | JWT | List kompetisi (mendukung pagination `?page=1&limit=20&status=`) |
+| GET | `/api/v1/competitions` | JWT | List kompetisi (`?page=1&limit=20&status=&q=`; urut active, paused, draft, completed, cancelled) |
+| GET | `/api/v1/competitions/stats` | JWT | Jumlah kompetisi per status (global, tak bergantung filter/halaman) |
 | POST | `/api/v1/competitions` | Admin, Dewan | Buat kompetisi baru (termasuk binding `ruleset_id`) |
 | GET | `/api/v1/competitions/{id}` | JWT | Detail data kompetisi |
 | PUT | `/api/v1/competitions/{id}` | Admin, Dewan | Perbarui data kompetisi |
-| PUT/POST | `/api/v1/competitions/{id}/activate` | Admin, Dewan | Aktifkan status kompetisi |
+| PUT | `/api/v1/competitions/{id}/activate` | Admin, Dewan | Aktifkan status kompetisi |
 | POST | `/api/v1/competitions/{id}/pause` | Admin, Dewan | Jeda kompetisi |
 | POST | `/api/v1/competitions/{id}/finish` | Admin, Dewan | Selesaikan kompetisi |
 | POST | `/api/v1/competitions/{id}/cancel` | Admin, Dewan | Batalkan kompetisi |
@@ -228,6 +230,8 @@ GET http://localhost:8080/docs/openapi.yaml
 | GET | `/api/v1/competitions/{comp_id}/categories` | JWT | List kategori kelas tanding kompetisi |
 | POST | `/api/v1/competitions/{comp_id}/categories` | Admin, Dewan | Tambah kategori baru (nama, gender, min/max weight) |
 | GET | `/api/v1/competitions/{comp_id}/categories/{id}` | JWT | Detail kategori |
+| PUT | `/api/v1/competitions/{comp_id}/categories/{id}` | Admin, Dewan | Ubah satu kategori (setelah ada peserta hanya nama yang boleh berubah; standar tidak dapat diubah) |
+| DELETE | `/api/v1/competitions/{comp_id}/categories/{id}` | Admin, Dewan | Hapus satu kategori (409 bila masih ada peserta atau partai yang sudah berjalan) |
 
 ### 4. Athletes & Participants
 | Method | Path | Auth | Description |
@@ -239,6 +243,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/competitions/{comp_id}/athletes` | Admin, Dewan, Contingent | Daftarkan atlet ke kompetisi (auto status: `pending` jika kontingen) |
 | GET | `/api/v1/competitions/{comp_id}/participants` | JWT | List peserta kompetisi (`?status=pending/verified/rejected`) |
 | PUT | `/api/v1/competitions/{comp_id}/participants/{id}/verify` | Admin, Dewan | Verifikasi/tolak peserta (meja timbang / verifikasi berkas) |
+| DELETE | `/api/v1/competitions/{comp_id}/participants/{id}` | Admin, Dewan, Kontingen | Batal daftar peserta (kontingen: miliknya yang belum diverifikasi; 409 bila sudah masuk bagan/partai) |
 
 ### 5. Arena
 | Method | Path | Auth | Description |
@@ -277,11 +282,13 @@ GET http://localhost:8080/docs/openapi.yaml
 |--------|------|------|-------------|
 | GET | `/api/v1/contingents` | Admin, Dewan | List semua kontingen yang terdaftar |
 | GET | `/api/v1/contingents/{id}` | JWT | Detail profil kontingen |
+| PUT | `/api/v1/contingents/{id}/password` | Admin, Dewan | Reset password manajer kontingen (lupa password) |
 | GET | `/api/v1/officials` | Admin, Dewan | List akun panitia/wasit/operator |
 | POST | `/api/v1/officials` | Admin, Dewan | Buat akun official baru |
 | GET | `/api/v1/officials/{id}` | Admin, Dewan | Detail akun official |
 | PUT | `/api/v1/officials/{id}` | Admin, Dewan | Perbarui akun official |
-| DELETE | `/api/v1/officials/{id}` | Admin, Dewan | Hapus akun official |
+| DELETE | `/api/v1/officials/{id}` | Admin, Dewan | Hapus akun official (akun sendiri dan admin terakhir tidak dapat dihapus; Dewan tidak dapat menghapus Admin/Dewan) |
+| PUT | `/api/v1/officials/{id}/password` | Admin, Dewan | Reset password akun official (Dewan hanya Wasit/Operator) |
 
 ### 9. Rulesets
 | Method | Path | Auth | Description |
@@ -417,7 +424,18 @@ DB_URL="postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable" 
 ```
 
 ### Konfigurasi dari `.env`
-`.env.example` adalah daftar lengkap variabel (dan satu-satunya sumber nilai bawaan). **Berkas `.env.prod` wajib ada untuk docker compose** (`.env` dipakai untuk development; kedua berkas, dan semua `.env.*` selain `.env.example`, diabaikan git): layanan `app` memakai `env_file: .env.prod`, jadi seluruh isinya (`JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`, ...) menjadi environment backend, kecuali tiga nilai yang ditimpa compose karena harus berbeda di dalam container (`PORT=8080`, `ENV=production`, dan `DB_URL` yang diarahkan ke layanan `postgres`; `DB_URL` di `.env.prod` tidak dipakai di Docker). Mengisi `SEED_DATA=true` di `.env.prod` membuat backend di Docker mengisi data contoh saat start (nyalakan hanya untuk start pertama). Jalankan selalu dengan `--env-file .env.prod` agar `${VAR}` pada `docker-compose.yml` juga dibaca dari `.env.prod` (tanpa opsi itu compose membaca `.env` development untuk nilai-nilai ini, sedangkan `JWT_SECRET` tetap dari `.env.prod`): `POSTGRES_USER`, `POSTGRES_DB` (dipakai layanan `postgres`, healthcheck, dan `DB_URL` backend, jadi tidak perlu ditulis dua kali), `JWT_SECRET`, serta port host `WEB_PORT`, `APP_PORT`, `POSTGRES_PORT`. Backend yang dijalankan langsung (`go run ./cmd/server`) membaca `.env` lewat godotenv (`PORT`, `ENV`, `DB_URL`, `JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`). Variabel environment host mengalahkan `.env`.
+`.env.example` adalah daftar lengkap variabel (dan satu-satunya sumber nilai bawaan). **Berkas `.env.prod` wajib ada untuk docker compose** (`.env` dipakai untuk development; kedua berkas, dan semua `.env.*` selain `.env.example`, diabaikan git): layanan `app` memakai `env_file: .env.prod`, jadi seluruh isinya (`JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`, ...) menjadi environment backend, kecuali tiga nilai yang ditimpa compose karena harus berbeda di dalam container (`PORT=8080`, `ENV=production`, dan `DB_URL` yang diarahkan ke layanan `postgres`; `DB_URL` di `.env.prod` tidak dipakai di Docker). Mengisi `SEED_DATA=true` di `.env.prod` membuat backend di Docker mengisi data contoh saat start (nyalakan hanya untuk start pertama). Jalankan selalu dengan `--env-file .env.prod` agar `${VAR}` pada `docker-compose.yml` juga dibaca dari `.env.prod` (tanpa opsi itu compose membaca `.env` development untuk nilai-nilai ini, sedangkan `JWT_SECRET` tetap dari `.env.prod`): `POSTGRES_USER`, `POSTGRES_DB` (dipakai layanan `postgres`, healthcheck, dan `DB_URL` backend, jadi tidak perlu ditulis dua kali), `JWT_SECRET`, serta port host `WEB_PORT`, `PORT` (port backend di host; di dalam kontainer tetap 8080), dan `POSTGRES_PORT`. Backend yang dijalankan langsung (`go run ./cmd/server`) membaca `.env` lewat godotenv (`PORT`, `ENV`, `DB_URL`, `JWT_SECRET`, `AUTO_MIGRATE`, `SEED_DATA`). Variabel environment host mengalahkan `.env`.
+
+#### Akun petugas dan admin pertama (produksi)
+
+Seed (`SEED_DATA=true`) membuat akun demo berpassword lemah (`DemoPass_2026`, `DemoPass_2026`, ...), kejuaraan, dan atlet contoh. **Jangan dipakai untuk lomba nyata.** Untuk produksi:
+
+1. Isi `ADMIN_EMAIL`, `ADMIN_PASSWORD` (minimal 8 karakter), dan opsional `ADMIN_NAME` di `.env.prod`, dan biarkan `SEED_DATA=false`.
+2. Saat backend start dan belum ada satu pun admin, akun itu dibuat. Aman diulang di setiap restart: bila sudah ada admin, tidak melakukan apa pun dan tidak menimpa password yang sudah diganti. Konfigurasi yang salah (email/password tidak lengkap, password pendek) menghentikan start dengan pesan jelas.
+3. Masuk sebagai admin, buka menu **Akun Petugas** di ruang operasi: tambah Dewan Juri, Wasit, dan Operator, ubah peran, reset password, atau hapus akun. Tab **Manajer Kontingen** di menu yang sama mereset password manajer kontingen yang lupa. Setiap pengguna (petugas maupun manajer kontingen) dapat mengganti password sendiri lewat ikon kunci di pojok kiri bawah. Setelah admin pertama masuk, hapus `ADMIN_PASSWORD` dari `.env.prod`.
+
+Aturan wewenang: **Admin** mengelola semua akun. **Dewan Juri** hanya mengelola Wasit dan Operator (tidak dapat membuat, mengubah, menghapus, atau mereset Admin dan Dewan). Akun sendiri dan admin terakhir tidak dapat dihapus, dan admin terakhir tidak dapat diturunkan perannya. Password baru minimal 8 karakter. Reset password tidak mencabut sesi yang sedang berjalan (token berlaku 24 jam).
+
 
 **CI GitHub tidak dapat membaca `.env`** (berkas itu sengaja tidak di-commit dan job berjalan di mesin lain). Untuk nilai non-rahasia, `ci.yml` memakai Repository Variables (Settings → Secrets and variables → Actions → Variables) bernama `POSTGRES_USER` dan `POSTGRES_DB`, dengan nilai bawaan yang sama dengan `.env.example` bila variabel itu tidak dibuat. Rahasia nyata (mis. `JWT_SECRET` produksi) tidak pernah dibutuhkan CI dan sebaiknya tidak disimpan di repo atau variabel biasa. Versi alat (Go dari `go.mod`, Node 22 pada `ci.yml` dan `apps/web/Dockerfile`) sengaja ditetapkan di tempatnya.
 

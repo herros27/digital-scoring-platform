@@ -160,3 +160,55 @@ func (h *CategoryHandler) SetBracketLock(w http.ResponseWriter, r *http.Request)
 	}
 	Ok(w, cat)
 }
+
+// PUT /api/v1/competitions/{comp_id}/categories/{id}
+// Mengubah nama, gender, kelas/batas bobot, golongan umur, dan mode bagan satu kategori. Ditolak 409 bila standar
+// berbeda atau kategori sudah punya peserta (saat itu hanya nama yang boleh berubah).
+func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name           string   `json:"name" validate:"required,min=2,max=100"`
+		Gender         string   `json:"gender" validate:"required,oneof=male female putra putri"`
+		WeightClass    string   `json:"weight_class" validate:"required"`
+		AgeGroup       string   `json:"age_group"`
+		PresetStandard string   `json:"preset_standard"`
+		MinWeight      *float64 `json:"min_weight"`
+		MaxWeight      *float64 `json:"max_weight"`
+		BracketMode    string   `json:"bracket_mode"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	cat, err := h.Service.UpdateCategory(r.PathValue("comp_id"), r.PathValue("id"), &domain.Category{
+		Name: req.Name, Gender: req.Gender, WeightClass: req.WeightClass, AgeGroup: req.AgeGroup,
+		PresetStandard: req.PresetStandard, MinWeight: req.MinWeight, MaxWeight: req.MaxWeight, BracketMode: req.BracketMode,
+	})
+	if err != nil {
+		failCategory(w, err)
+		return
+	}
+	Ok(w, cat)
+}
+
+// DELETE /api/v1/competitions/{comp_id}/categories/{id}
+// Menghapus satu kategori. 409 bila masih ada peserta atau partainya sudah berjalan/selesai.
+func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	if err := h.Service.DeleteCategory(r.PathValue("comp_id"), r.PathValue("id")); err != nil {
+		failCategory(w, err)
+		return
+	}
+	Ok(w, map[string]string{"status": "deleted"})
+}
+
+func failCategory(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		Fail(w, http.StatusNotFound, "NOT_FOUND", "kategori tidak ditemukan pada kejuaraan ini", nil)
+	case errors.Is(err, domain.ErrConflict):
+		Fail(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), domain.ErrConflict.Error()+": "), nil)
+	case errors.Is(err, domain.ErrInvalidInput):
+		Fail(w, http.StatusBadRequest, "INVALID_INPUT", strings.TrimPrefix(err.Error(), domain.ErrInvalidInput.Error()+": "), nil)
+	default:
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+	}
+}

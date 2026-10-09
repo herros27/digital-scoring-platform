@@ -33,6 +33,26 @@ export function useMatchQuery(compId: Ref<string>, matchId: Ref<string>) {
   })
 }
 
+/** Rincian skor satu partai (per babak). Hanya diambil saat dialog rincian dibuka. */
+export function useMatchScoresQuery(compId: Ref<string>, matchId: Ref<string>) {
+  return useQuery({
+    queryKey: computed(() => [...matchKeys.all, 'scores', compId.value, matchId.value] as const),
+    queryFn: () => matchService.getMatchScores(compId.value, matchId.value),
+    enabled: computed(() => !!compId.value && !!matchId.value),
+    staleTime: 0,
+  })
+}
+
+/** Riwayat kejadian satu partai (poin sah, sanksi, kontrol wasit). */
+export function useMatchEventsQuery(compId: Ref<string>, matchId: Ref<string>) {
+  return useQuery({
+    queryKey: computed(() => [...matchKeys.all, 'events', compId.value, matchId.value] as const),
+    queryFn: () => matchService.getEvents(compId.value, matchId.value),
+    enabled: computed(() => !!compId.value && !!matchId.value),
+    staleTime: 0,
+  })
+}
+
 /**
  * Create match mutation
  */

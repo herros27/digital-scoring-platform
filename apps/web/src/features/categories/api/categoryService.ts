@@ -41,6 +41,27 @@ export const categoryService = {
   },
 
   /**
+   * PUT /api/v1/competitions/{comp_id}/categories/{id}
+   * Ditolak 409 bila standar berbeda atau kategori sudah punya peserta (saat itu hanya nama yang dapat diubah).
+   */
+  async updateCategory(
+    competitionId: string,
+    id: string,
+    payload: CreateCategoryFormValues,
+  ): Promise<Category> {
+    const res = await http.put<Category>(ENDPOINTS.CATEGORIES.DETAIL(competitionId, id), payload)
+    return res.data
+  },
+
+  /**
+   * DELETE /api/v1/competitions/{comp_id}/categories/{id}
+   * Ditolak 409 bila masih ada peserta atau partainya sudah berjalan/selesai.
+   */
+  async deleteCategory(competitionId: string, id: string): Promise<void> {
+    await http.delete<unknown>(ENDPOINTS.CATEGORIES.DETAIL(competitionId, id))
+  },
+
+  /**
    * DELETE /api/v1/competitions/{comp_id}/categories — reset seluruh kategori (ganti standar).
    * Ditolak 409 bila masih ada peserta terdaftar pada kategori.
    */

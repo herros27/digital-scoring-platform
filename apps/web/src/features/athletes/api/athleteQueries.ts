@@ -114,6 +114,20 @@ export function useUpdateAthleteProfileMutation(compId: Ref<string>) {
   })
 }
 
+/** Batalkan pendaftaran peserta dari kejuaraan, lalu muat ulang daftar atlet dan peserta. */
+export function useUnregisterParticipantMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (participantId: string) =>
+      athleteService.unregisterParticipant(compId.value, participantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
+      queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}
+
 export function useVerifyParticipantMutation(compId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({

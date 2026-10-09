@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/herros27/digital-scoring/internal/domain"
 )
@@ -192,4 +193,78 @@ func (s *CategoryStore) SetBracketLock(competitionID, categoryID string, locked 
 		return nil, err
 	}
 	return c, nil
+}
+
+// ParticipantCount jumlah peserta yang terdaftar pada kategori.
+func (s *CategoryStore) ParticipantCount(categoryID string) (int, error) {
+	var n int
+	err := s.DB.QueryRow(`SELECT COUNT(*) FROM participants WHERE category_id = $1`, categoryID).Scan(&n)
+	return n, err
+}
+
+// Update menyimpan perubahan atribut kategori (bukan ruleset dan kunci bagan; keduanya punya endpoint sendiri).
+// domain.ErrNotFound bila kategori bukan milik kejuaraan itu.
+func (s *CategoryStore) Update(c *Category) error {
+	res, err := s.DB.Exec(`
+		UPDATE categories
+		SET name = $3, gender = $4, weight_class = $5, age_group = $6, min_weight = $7, max_weight = $8, bracket_mode = $9
+		WHERE id = $1 AND competition_id = $2`,
+		c.ID, c.CompetitionID, c.Name, c.Gender, c.WeightClass, c.AgeGroup, c.MinWeight, c.MaxWeight, c.BracketMode)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// Delete menghapus satu kategori beserta slot bagannya (partai idle yang terhubung ikut dihapus).
+// Ditolak (ErrConflict) bila masih ada peserta pada kategori atau partainya sudah berjalan/selesai.
+func (s *CategoryStore) Delete(competitionID, id string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var exists int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM categories WHERE id = $1 AND competition_id = $2`, id, competitionID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return domain.ErrNotFound
+	}
+	var participants int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM participants WHERE category_id = $1`, id).Scan(&participants); err != nil {
+		return err
+	}
+	if participants > 0 {
+		return fmt.Errorf("%w: kategori masih memiliki %d peserta; batalkan pendaftaran mereka terlebih dahulu", domain.ErrConflict, participants)
+	}
+	var started int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM matches m
+		JOIN bracket_slots b ON b.id = m.bracket_slot_id
+		WHERE b.category_id = $1 AND m.status <> 'idle'`, id).Scan(&started); err != nil {
+		return err
+	}
+	if started > 0 {
+		return fmt.Errorf("%w: kategori memiliki partai yang sudah berjalan atau selesai", domain.ErrConflict)
+	}
+	if _, err := tx.Exec(`
+		DELETE FROM matches WHERE status = 'idle' AND bracket_slot_id IN (SELECT id FROM bracket_slots WHERE category_id = $1)`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		UPDATE matches SET bracket_slot_id = NULL WHERE bracket_slot_id IN (SELECT id FROM bracket_slots WHERE category_id = $1)`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM bracket_slots WHERE category_id = $1`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM categories WHERE id = $1 AND competition_id = $2`, id, competitionID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
