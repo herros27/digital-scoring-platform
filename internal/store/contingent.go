@@ -60,3 +60,15 @@ func (s *ContingentStore) List() ([]Contingent, error) {
 	}
 	return list, rows.Err()
 }
+
+// UpdatePassword mengganti hash password akun kontingen.
+func (s *ContingentStore) UpdatePassword(id, passwordHash string) error {
+	res, err := s.DB.Exec(`UPDATE contingents SET password_hash = $1 WHERE id = $2`, passwordHash, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}

@@ -82,3 +82,42 @@ func (h *ContingentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, c)
 }
+
+// PUT /api/v1/contingents/{id}/password — admin/dewan mereset password manajer kontingen (lupa password).
+func (h *ContingentHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Password string `json:"password" validate:"required,min=8,max=72"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	if err := h.Service.ResetPassword(r.PathValue("id"), req.Password); err != nil {
+		failOfficial(w, err)
+		return
+	}
+	Ok(w, map[string]string{"status": "password_reset"})
+}
+
+// ChangePassword mengganti password milik manajer kontingen yang sedang masuk (dipanggil dari
+// POST /api/v1/auth/change-password bila peran token = contingent).
+func (h *ContingentHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		CurrentPassword string `json:"current_password" validate:"required"`
+		NewPassword     string `json:"new_password" validate:"required,min=8,max=72"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	id, restricted := contingentScope(r)
+	if !restricted || id == "" {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "akun kontingen tidak dikenali", nil)
+		return
+	}
+	if err := h.Service.ChangeOwnPassword(id, req.CurrentPassword, req.NewPassword); err != nil {
+		failOfficial(w, err)
+		return
+	}
+	Ok(w, map[string]string{"status": "password_changed"})
+}

@@ -217,7 +217,7 @@ GET http://localhost:8080/docs/openapi.yaml
 | POST | `/api/v1/competitions` | Admin, Dewan | Buat kompetisi baru (termasuk binding `ruleset_id`) |
 | GET | `/api/v1/competitions/{id}` | JWT | Detail data kompetisi |
 | PUT | `/api/v1/competitions/{id}` | Admin, Dewan | Perbarui data kompetisi |
-| PUT/POST | `/api/v1/competitions/{id}/activate` | Admin, Dewan | Aktifkan status kompetisi |
+| PUT | `/api/v1/competitions/{id}/activate` | Admin, Dewan | Aktifkan status kompetisi |
 | POST | `/api/v1/competitions/{id}/pause` | Admin, Dewan | Jeda kompetisi |
 | POST | `/api/v1/competitions/{id}/finish` | Admin, Dewan | Selesaikan kompetisi |
 | POST | `/api/v1/competitions/{id}/cancel` | Admin, Dewan | Batalkan kompetisi |

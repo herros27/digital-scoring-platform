@@ -146,7 +146,7 @@ async function pinSession(
   )
   const login = await must(
     `login PIN ${role}${seat || ''}`,
-    api('POST', '/auth/pin', null, { pin: created.pin }),
+    api('POST', '/auth/judge-login', null, { pin: created.pin }),
   )
   return {
     token: login.token,

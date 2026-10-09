@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -330,4 +331,36 @@ func (s *AthleteService) UpdateAthleteProfile(id string, birthDate, nik *string)
 		return nil, err
 	}
 	return s.GetAthleteByID(id)
+}
+
+// ParticipantRemover kemampuan opsional repo atlet untuk membatalkan pendaftaran peserta.
+type ParticipantRemover interface {
+	DeleteParticipant(competitionID, participantID string) error
+}
+
+// UnregisterParticipant membatalkan pendaftaran peserta dari kejuaraan. Admin/dewan boleh kapan saja (selama peserta
+// belum masuk bagan/partai). Manajer kontingen (restricted) hanya boleh membatalkan peserta kontingennya sendiri yang
+// belum diverifikasi; peserta kontingen lain dijawab ErrNotFound agar keberadaannya tidak bocor.
+func (s *AthleteService) UnregisterParticipant(competitionID, participantID, contingentScope string, restricted bool) error {
+	if competitionID == "" || participantID == "" {
+		return domain.ErrInvalidInput
+	}
+	rm, ok := s.repo.(ParticipantRemover)
+	if !ok {
+		return errors.New("athlete repository does not support unregistering participants")
+	}
+	if restricted {
+		cm, ok := s.repo.(CategoryParticipantManager)
+		if !ok {
+			return errors.New("athlete repository does not support participant lookup")
+		}
+		part, err := cm.GetParticipantByID(participantID)
+		if err != nil || part == nil || part.CompetitionID != competitionID || contingentScope == "" || part.ContingentID != contingentScope {
+			return domain.ErrNotFound
+		}
+		if part.RegistrationStatus == "verified" {
+			return fmt.Errorf("%w: peserta sudah diverifikasi; hubungi panitia untuk membatalkan pendaftaran", domain.ErrForbidden)
+		}
+	}
+	return rm.DeleteParticipant(competitionID, participantID)
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/herros27/digital-scoring/internal/domain"
 )
@@ -279,4 +280,35 @@ func (s *AthleteStore) UpdateProfile(id string, birthDate, nik *string) error {
 		return domain.ErrNotFound
 	}
 	return nil
+}
+
+// DeleteParticipant membatalkan pendaftaran satu peserta dari kejuaraan (atlet tetap tersimpan di basis data atlet).
+// Ditolak (ErrConflict) bila peserta sudah dirujuk bagan atau partai; domain.ErrNotFound bila bukan peserta kejuaraan itu.
+func (s *AthleteStore) DeleteParticipant(competitionID, participantID string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var exists int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM participants WHERE id = $1 AND competition_id = $2`, participantID, competitionID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return domain.ErrNotFound
+	}
+	var refs int
+	if err := tx.QueryRow(`
+		SELECT (SELECT COUNT(*) FROM bracket_slots WHERE participant_id = $1 OR winner_id = $1)
+		     + (SELECT COUNT(*) FROM matches WHERE athlete_red_id = $1 OR athlete_blue_id = $1 OR winner_id = $1)`, participantID).Scan(&refs); err != nil {
+		return err
+	}
+	if refs > 0 {
+		return fmt.Errorf("%w: peserta sudah masuk bagan atau partai; ubah statusnya menjadi ditolak lalu buat ulang bagan kategorinya sebelum membatalkan pendaftaran", domain.ErrConflict)
+	}
+	if _, err := tx.Exec(`DELETE FROM participants WHERE id = $1 AND competition_id = $2`, participantID, competitionID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

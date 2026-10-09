@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -93,8 +94,15 @@ func (h *MatchHandler) Create(w http.ResponseWriter, r *http.Request) {
 	m.Status = "idle"
 	m.CurrentRound = 1
 	if err := h.Service.CreateMatch(&m); err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Fail(w, http.StatusBadRequest, "INVALID_INPUT", strings.TrimPrefix(err.Error(), domain.ErrInvalidInput.Error()+": "), nil)
+			return
+		}
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(m.CompetitionID)
 	}
 	w.WriteHeader(http.StatusCreated)
 	Ok(w, m)

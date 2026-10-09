@@ -49,6 +49,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	matchService.SetRulesetResolver(rulesetService)
 	matchService.SetCategoryRulesetLookup(categoryRepo)
 	matchService.SetArenaStore(arenaRepo)
+	matchService.SetParticipantLookup(athleteRepo.GetParticipantByID)
 	matchService.SetRuntimeStore(&store.MatchRuntimeStore{DB: db})
 	if n, err := matchService.RestoreActiveMatches(); err != nil {
 		log.Printf("[match] pemulihan partai gagal: %v", err)
@@ -109,7 +110,6 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 
 	// === Public endpoints (no auth) ===
 	mux.Handle("POST /api/v1/auth/judge-login", pinLimiter(http.HandlerFunc(authH.JudgeLogin)))
-	mux.Handle("POST /api/v1/auth/pin", pinLimiter(http.HandlerFunc(authH.JudgeLogin)))
 	mux.Handle("POST /api/v1/auth/login", authLimiter(http.HandlerFunc(officialH.Login)))
 	mux.Handle("POST /api/v1/auth/contingent/register", authLimiter(http.HandlerFunc(contingentH.Register)))
 	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
@@ -138,7 +138,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 
 	// RBAC roles
 	adminOrDewan := RequireRole("admin", "dewan")
-	officialRoles := RequireRole("admin", "dewan", "wasit", "operator", "juri")
+	changePasswordRoles := RequireRole("admin", "dewan", "wasit", "operator", "juri", "contingent")
 	matchOperators := RequireRole("admin", "dewan", "wasit")
 	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
 	athleteViewers := RequireRole("admin", "dewan", "operator", "contingent")
@@ -153,7 +153,6 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.HandleFunc("GET /api/v1/competitions/{id}", compH.Get)
 	protected.Handle("PUT /api/v1/competitions/{id}", adminOrDewan(http.HandlerFunc(compH.Update)))
 	protected.Handle("PUT /api/v1/competitions/{id}/activate", adminOrDewan(http.HandlerFunc(compH.Activate)))
-	protected.Handle("POST /api/v1/competitions/{id}/activate", adminOrDewan(http.HandlerFunc(compH.Activate)))
 	protected.Handle("POST /api/v1/competitions/{id}/pause", adminOrDewan(http.HandlerFunc(compH.Pause)))
 	protected.Handle("POST /api/v1/competitions/{id}/finish", adminOrDewan(http.HandlerFunc(compH.Finish)))
 	protected.Handle("POST /api/v1/competitions/{id}/cancel", adminOrDewan(http.HandlerFunc(compH.Cancel)))
@@ -163,6 +162,8 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("POST /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories/{id}", categoryH.Get)
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Reset)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Update)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Delete)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock", adminOrDewan(http.HandlerFunc(categoryH.SetBracketLock)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 
@@ -177,6 +178,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.RegisterToCompetition)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/participants", athleteH.ListParticipants)
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/verify", adminOrDewan(http.HandlerFunc(athleteH.VerifyParticipant)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/participants/{id}", canRegisterAthlete(http.HandlerFunc(athleteH.UnregisterParticipant)))
 
 	// Arenas
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas", arenaH.List)
@@ -220,7 +222,15 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("PUT /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Update)))
 	protected.Handle("DELETE /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Delete)))
 	protected.Handle("PUT /api/v1/officials/{id}/password", adminOrDewan(http.HandlerFunc(officialH.ResetPassword)))
-	protected.Handle("POST /api/v1/auth/change-password", officialRoles(http.HandlerFunc(officialH.ChangePassword)))
+	protected.Handle("PUT /api/v1/contingents/{id}/password", adminOrDewan(http.HandlerFunc(contingentH.ResetPassword)))
+	// Ganti password sendiri: petugas dan manajer kontingen memakai satu endpoint; peran token menentukan akun mana.
+	protected.Handle("POST /api/v1/auth/change-password", changePasswordRoles(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if c := ClaimsFrom(r); c != nil && c.Role == "contingent" {
+			contingentH.ChangePassword(w, r)
+			return
+		}
+		officialH.ChangePassword(w, r)
+	})))
 
 	// Contingents Management
 	protected.Handle("GET /api/v1/contingents", adminOrDewan(http.HandlerFunc(contingentH.List)))

@@ -15,7 +15,6 @@ export const ENDPOINTS = {
   AUTH: {
     OFFICIAL_LOGIN: '/api/v1/auth/login',
     JUDGE_LOGIN: '/api/v1/auth/judge-login',
-    PIN_LOGIN: '/api/v1/auth/pin',
     CONTINGENT_REGISTER: '/api/v1/auth/contingent/register',
     CONTINGENT_LOGIN: '/api/v1/auth/contingent/login',
     LOGOUT: '/api/v1/auth/logout',

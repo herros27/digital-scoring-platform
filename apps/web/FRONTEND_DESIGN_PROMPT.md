@@ -176,7 +176,7 @@ Seluruh panggilan REST menggunakan wrapper pada `src/lib/api.ts`. Response forma
 4. **`PUT /api/v1/competitions/{id}`** *(Admin / Dewan)*
    - **Request**: Perubahan nama, lokasi, tanggal, dan ruleset.
 5. **Aksi Transisi Lifecycle Kompetisi** *(Admin / Dewan)*:
-   - `POST /api/v1/competitions/{id}/activate` (Mengaktifkan turnamen)
+   - `PUT /api/v1/competitions/{id}/activate` (Mengaktifkan turnamen)
    - `POST /api/v1/competitions/{id}/pause` (Menjeda turnamen)
    - `POST /api/v1/competitions/{id}/finish` (Menyelesaikan turnamen)
    - `POST /api/v1/competitions/{id}/cancel` (Membatalkan turnamen)
