@@ -148,18 +148,21 @@ type Contingent struct {
 }
 
 type Category struct {
-	ID             string    `json:"id"`
-	CompetitionID  string    `json:"competition_id"`
-	Name           string    `json:"name"`
-	Gender         string    `json:"gender"`
-	WeightClass    string    `json:"weight_class"`
-	RulesetID      *string   `json:"ruleset_id,omitempty"`
-	AgeGroup       string    `json:"age_group"`
-	PresetStandard string    `json:"preset_standard"`
-	MinWeight      *float64  `json:"min_weight,omitempty"`
-	MaxWeight      *float64  `json:"max_weight,omitempty"`
-	BracketMode    string    `json:"bracket_mode"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string   `json:"id"`
+	CompetitionID  string   `json:"competition_id"`
+	Name           string   `json:"name"`
+	Gender         string   `json:"gender"`
+	WeightClass    string   `json:"weight_class"`
+	RulesetID      *string  `json:"ruleset_id,omitempty"`
+	AgeGroup       string   `json:"age_group"`
+	PresetStandard string   `json:"preset_standard"`
+	MinWeight      *float64 `json:"min_weight,omitempty"`
+	MaxWeight      *float64 `json:"max_weight,omitempty"`
+	BracketMode    string   `json:"bracket_mode"`
+	// BracketLockedAt bukan nil bila draw bagan kategori ini dikunci panitia: bagan tidak boleh diacak ulang.
+	BracketLockedAt *time.Time `json:"bracket_locked_at,omitempty"`
+	BracketLocked   bool       `json:"bracket_locked"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 // CategoryRulesetAssignment menetapkan ruleset khusus untuk satu kategori (CategoryID) atau

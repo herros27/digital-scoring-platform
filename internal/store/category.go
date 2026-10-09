@@ -11,7 +11,7 @@ type CategoryStore struct {
 	DB *sql.DB
 }
 
-const categoryColumns = `id, competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight, bracket_mode, created_at`
+const categoryColumns = `id, competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight, bracket_mode, bracket_locked_at, created_at`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -20,9 +20,15 @@ type rowScanner interface {
 func scanCategory(row rowScanner, c *Category) error {
 	var minW, maxW sql.NullFloat64
 	var weightClass sql.NullString
+	var lockedAt sql.NullTime
 	if err := row.Scan(&c.ID, &c.CompetitionID, &c.Name, &c.Gender, &weightClass, &c.RulesetID,
-		&c.AgeGroup, &c.PresetStandard, &minW, &maxW, &c.BracketMode, &c.CreatedAt); err != nil {
+		&c.AgeGroup, &c.PresetStandard, &minW, &maxW, &c.BracketMode, &lockedAt, &c.CreatedAt); err != nil {
 		return err
+	}
+	c.BracketLockedAt, c.BracketLocked = nil, lockedAt.Valid
+	if lockedAt.Valid {
+		t := lockedAt.Time
+		c.BracketLockedAt = &t
 	}
 	c.WeightClass = weightClass.String
 	c.MinWeight, c.MaxWeight = nil, nil
@@ -171,4 +177,19 @@ func (s *CategoryStore) AssignRulesets(competitionID string, items []domain.Cate
 		affected += n
 	}
 	return affected, tx.Commit()
+}
+
+// SetBracketLock mengunci/membuka draw bagan sebuah kategori milik kejuaraan itu. Mengembalikan kategori terbaru,
+// atau domain.ErrNotFound bila kategori bukan milik kejuaraan.
+func (s *CategoryStore) SetBracketLock(competitionID, categoryID string, locked bool) (*Category, error) {
+	query := `UPDATE categories SET bracket_locked_at = CASE WHEN $3 THEN COALESCE(bracket_locked_at, NOW()) ELSE NULL END
+		WHERE id = $1 AND competition_id = $2 RETURNING ` + categoryColumns
+	c := &Category{}
+	if err := scanCategory(s.DB.QueryRow(query, categoryID, competitionID, locked), c); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	return c, nil
 }

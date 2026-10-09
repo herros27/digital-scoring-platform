@@ -44,6 +44,7 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 | `07-kompetisi-penuh`              | satu kompetisi dari pendaftaran sampai juara: 4 atlet/3 kontingen → verifikasi → bagan → bagan publik (tersembunyi sebelum aktif) → 2 semifinal → final otomatis → final dua babak habis waktu → juara di bagan → klasemen medali |
 | `08-kompetisi-8-peserta`          | bagan 8 peserta (perempat → semi → final) dimainkan penuh; partai berikutnya terbentuk otomatis; medali hanya final dan semifinal                                                                                                 |
 | `09-kompetisi-bye`                | 3, 5, 6, 7, 9, 12 peserta (BYE) dimainkan sampai juara: tidak ada pasangan BYE lawan BYE, total partai N-1, medali sesuai struktur                                                                                                |
+| `12-kunci-draw-bagan`             | kunci draw tersimpan di server, generate ditolak 409 walau lewat API, hanya admin/dewan, kunci tidak menghalangi pertandingan, bagan yang sudah dimainkan tidak bisa dibentuk ulang                                               |
 | `11-pembatas-login-pin`           | pelindung tebak-PIN berlapis: tablet terkunci sendiri, IP bersama tetap bisa login, ganti ID tidak menembus, login sah tidak menghapus hitungan IP                                                                                |
 | `10-beberapa-kategori-gelanggang` | dua kategori (Putra/Putri) di dua gelanggang SERENTAK dengan wasit + 3 juri masing-masing; bagan terisolasi; final bertukar gelanggang; medali kontingen dijumlah dari kedua kategori; dua bagan publik terpisah                  |
 | `ui-05-layar-juri`                | per kursi: layar online, atlet, status/timer mengikuti wasit tanpa reload, konsensus tampil, terkunci saat istirahat/dijeda, BATAL + pesan penolakan, SELESAI                                                                     |
@@ -105,7 +106,13 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
     Kini pelindung tebak-PIN tiga lapis (`auth.PinGuard`): per perangkat (ID acak tablet, header `X-Device-Id`) 5x, per IP
     25x, global 200x per 15 menit; hanya PIN salah yang dihitung dan login berhasil hanya mereset hitungan perangkat.
     Batas laju PIN menjadi 1/dtk (burst 60) hanya untuk banjir permintaan. Spec `11-pembatas-login-pin`.
-18. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+18. **Kunci draw hanya state di browser** (ditemukan panitia-ui.spec): `isLocked` adalah `ref` di halaman, jadi tidak
+    tersimpan (kembali terkunci/terbuka saat dimuat ulang atau dibuka dari perangkat lain) dan tidak ditegakkan:
+    `brackets/generate` tetap mengacak ulang bagan resmi. Kini kunci per kategori disimpan di server
+    (`PUT …/categories/{id}/bracket-lock`, kolom `bracket_locked_at`), `generate` ditolak `409 BRACKET_LOCKED` walau
+    dipanggil langsung lewat API, dan bagan yang sudah mulai dimainkan juga tidak bisa dibentuk ulang
+    (`409 BRACKET_IN_PROGRESS`: mengacak ulang memutus partai selesai dari slotnya). Spec `12-kunci-draw-bagan`.
+19. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
@@ -158,8 +165,6 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
 
 ## Temuan yang belum diubah
 
-- **Kunci draw hanya state di browser** (`isLocked = ref(true)`): tidak tersimpan dan tidak ditegakkan server;
-  endpoint `brackets/generate` tetap mengacak ulang walau layar "terkunci", dan kunci kembali terkunci saat halaman dimuat ulang.
 - **Pesan galat kurang jelas**: "Muat ke Gelanggang" pada kejuaraan tanpa ruleset menampilkan `ruleset '' not found`.
 - **`<label for="login-email">` menunjuk ke div pembungkus** (komponen `AppInput` menaruh `id` di pembungkus, bukan di
   `input`), sehingga klik label tidak memfokuskan kolom.

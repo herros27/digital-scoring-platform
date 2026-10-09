@@ -44,6 +44,19 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", "category not found in this competition", nil)
 			return
 		}
+		// Draw yang dikunci panitia tidak boleh diacak ulang (ditegakkan di server, bukan hanya di tombol UI), dan
+		// bagan yang sudah mulai dimainkan tidak boleh dibentuk ulang sama sekali (akan memutus partai dari slotnya).
+		if cat.BracketLocked {
+			Fail(w, http.StatusConflict, "BRACKET_LOCKED", "draw bagan kategori ini terkunci; buka kunci draw terlebih dahulu", nil)
+			return
+		}
+		if started, err := h.Service.CategoryBracketStarted(compID, cat.ID); err != nil {
+			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+			return
+		} else if started {
+			Fail(w, http.StatusConflict, "BRACKET_IN_PROGRESS", "bagan kategori ini sudah mulai dimainkan dan tidak bisa dibentuk ulang", nil)
+			return
+		}
 		req.WeightClass = cat.WeightClass
 		req.Gender = cat.Gender
 		bracketMode = cat.BracketMode

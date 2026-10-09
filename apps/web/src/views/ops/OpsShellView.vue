@@ -22,7 +22,10 @@ import {
   useGenerateBracketMutation,
 } from '@/features/tournament/api/bracketQueries'
 import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
-import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import {
+  useCategoriesQuery,
+  useSetBracketLockMutation,
+} from '@/features/categories/api/categoryQueries'
 import { AGE_BANDS, ageGroupLabel } from '@/features/categories/lib/ageGroups'
 import { useArenasQuery, useCompetitionPresence } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
@@ -457,7 +460,13 @@ function handleProfileClick() {
 }
 
 // Draw & Locking State
-const isLocked = ref(true)
+// Kunci draw disimpan di SERVER per kategori (kolom bracket_locked); tombol hanya memintanya diubah.
+// Kelas turunan dari peserta lama tanpa kategori resmi tidak punya kunci.
+const lockMutation = useSetBracketLockMutation(activeCompId)
+const currentCategory = computed(() =>
+  (rawCategories.value || []).find((c) => c.id === currentCategoryId.value),
+)
+const isLocked = computed(() => currentCategory.value?.bracket_locked === true)
 const drawHash = ref('#IPSI-2025-CL-A-9941')
 // Telemetri NYATA: latensi dari polling kehadiran ke server dan jumlah juri yang benar-benar terhubung
 const { data: presence, isError: serverUnreachable } = useCompetitionPresence(activeCompId)
@@ -741,7 +750,34 @@ function handleGenerateDraw() {
   }
 }
 
+async function applyLock(locked: boolean) {
+  try {
+    await lockMutation.mutateAsync({ categoryId: currentCategoryId.value, locked })
+    showToast(
+      locked ? 'Bagan Dikunci' : 'Kunci Dibuka',
+      locked
+        ? 'Susunan bagan resmi terkunci di server dan tidak bisa diacak ulang.'
+        : 'Bagan kini dapat diacak ulang.',
+      locked ? 'success' : 'info',
+    )
+  } catch (err) {
+    showToast(
+      'Gagal Mengubah Kunci',
+      getErrorMessage(err, 'Kunci draw tidak dapat diubah.'),
+      'warning',
+    )
+  }
+}
+
 function toggleLock() {
+  if (!currentCategoryId.value) {
+    showToast(
+      'Kunci Tidak Tersedia',
+      'Kunci draw hanya untuk kategori resmi. Kelas ini berasal dari peserta lama tanpa kategori.',
+      'info',
+    )
+    return
+  }
   if (isLocked.value) {
     modal.value = {
       show: true,
@@ -749,15 +785,13 @@ function toggleLock() {
       message: 'Membuka kunci memungkinkan perubahan susunan atlet oleh Delegasi Teknik.',
       confirmText: 'Buka Kunci',
       confirmVariant: 'danger',
-      action: () => {
-        isLocked.value = false
-        showToast('Kunci Dibuka', 'Bagan kini dapat disunting atau diacak ulang.', 'info')
+      action: async () => {
+        await applyLock(false)
         modal.value = null
       },
     }
   } else {
-    isLocked.value = true
-    showToast('Bagan Dikunci', 'Susunan bagan resmi terkunci dan tersertifikasi.', 'success')
+    void applyLock(true)
   }
 }
 

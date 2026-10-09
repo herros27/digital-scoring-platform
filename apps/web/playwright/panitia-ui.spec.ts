@@ -55,10 +55,13 @@ async function openOps(browser: Browser, baseURL: string | undefined, tab: strin
   return page
 }
 
+const listCategories = (): Promise<Json[]> =>
+  must('kategori', api('GET', `/competitions/${kit.competitionId}/categories`, adminTok))
+
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Panitia: bagan, jadwal, dan PIN', () => {
-  test('bagan: draw terkunci sejak awal; buka kunci, Generate Bagan Acak membentuk bagan dan dua semifinal; acak ulang tidak menggandakan; kunci lagi mencegah acak', async ({
+  test('bagan: generate dan acak ulang saat terbuka; kunci draw tersimpan di server, bertahan setelah muat ulang, dan menolak acak', async ({
     browser,
     baseURL,
   }) => {
@@ -68,20 +71,13 @@ test.describe('Panitia: bagan, jadwal, dan PIN', () => {
     await expect(page.getByText('Bagan Pertandingan Belum Di-Generate')).toBeVisible({
       timeout: 15_000,
     })
+    const lock = page.locator('[data-test="draw-lock"]')
+    const isLockedOnServer = async () =>
+      (await listCategories()).find((c: Json) => c.id === kit.categoryId).bracket_locked
 
-    // status kunci terbaca jelas dari label tombol
-    await expect(page.locator('[data-test="draw-lock"]')).toContainText('Draw Terkunci')
-    // draw terkunci sejak awal: Generate ditolak dengan peringatan dan tidak membuat apa pun
-    await page.getByRole('button', { name: 'Generate Bagan Acak' }).first().click()
-    await expect(page.getByText('Bagan Terkunci')).toBeVisible()
-    expect(await listMatches(kit)).toHaveLength(0)
-
-    // panitia membuka kunci (dengan konfirmasi), lalu generate (dengan konfirmasi)
-    await page.locator('[data-test="draw-lock"]').click()
-    await expect(page.getByText('Buka Kunci Legalitas Draw?')).toBeVisible()
-    await page.getByRole('button', { name: 'Buka Kunci', exact: true }).last().click()
-    await expect(page.getByText('Kunci Dibuka')).toBeVisible()
-    await expect(page.locator('[data-test="draw-lock"]')).toContainText('Draw Terbuka')
+    // kategori baru terbuka: status terbaca jelas dari label tombol
+    await expect(lock).toContainText('Draw Terbuka')
+    expect(await isLockedOnServer()).toBe(false)
 
     const generate = async () => {
       await page.getByRole('button', { name: 'Generate Bagan Acak' }).first().click()
@@ -102,13 +98,40 @@ test.describe('Panitia: bagan, jadwal, dan PIN', () => {
     await generate()
     expect(await listMatches(kit)).toHaveLength(2)
 
-    // dikunci kembali: acak ditolak lagi
-    await expect(page.locator('[data-test="draw-lock"]')).toContainText('Draw Terbuka') // status jelas
-    await page.locator('[data-test="draw-lock"]').click()
-    await expect(page.locator('[data-test="draw-lock"]')).toContainText('Draw Terkunci')
+    // panitia mengunci draw: tersimpan di server
+    await lock.click()
     await expect(page.getByText('Bagan Dikunci')).toBeVisible()
+    await expect(lock).toContainText('Draw Terkunci')
+    expect(await isLockedOnServer()).toBe(true)
+
+    // muat ulang halaman (atau buka dari perangkat lain): kunci tetap terkunci karena berasal dari server
+    await page.reload()
+    await page.locator('.comp-dropdown').selectOption(kit.competitionId)
+    await page.locator('.filter-select').selectOption({ label: '[Dewasa Putra] - Kelas A' })
+    await expect(page.locator('[data-test="draw-lock"]')).toContainText('Draw Terkunci')
+
+    // acak ditolak: oleh tombol UI, dan oleh server walau API dipanggil langsung
     await page.getByRole('button', { name: 'Generate Bagan Acak' }).first().click()
     await expect(page.getByText('Bagan Terkunci')).toBeVisible()
+    const direct = await api(
+      'POST',
+      `/competitions/${kit.competitionId}/brackets/generate`,
+      adminTok,
+      {
+        category_id: kit.categoryId,
+      },
+    )
+    expect(direct.status).toBe(409)
+    expect(direct.error?.code).toBe('BRACKET_LOCKED')
+    expect(await listMatches(kit)).toHaveLength(2)
+
+    // buka kunci (dengan konfirmasi): kembali terbuka di server
+    await page.locator('[data-test="draw-lock"]').click()
+    await expect(page.getByText('Buka Kunci Legalitas Draw?')).toBeVisible()
+    await page.getByRole('button', { name: 'Buka Kunci', exact: true }).last().click()
+    await expect(page.getByText('Kunci Dibuka')).toBeVisible()
+    await expect(page.locator('[data-test="draw-lock"]')).toContainText('Draw Terbuka')
+    expect(await isLockedOnServer()).toBe(false)
     await page.context().close()
   })
 

@@ -137,3 +137,26 @@ func (h *CategoryHandler) AssignRulesets(w http.ResponseWriter, r *http.Request)
 	}
 	Ok(w, map[string]any{"competition_id": compID, "updated": n})
 }
+
+// PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock
+// Body: {"locked": true|false}. Mengunci draw bagan kategori: setelah dikunci, brackets/generate untuk kategori itu
+// ditolak (409 BRACKET_LOCKED) sampai dibuka lagi. Hanya admin/dewan.
+func (h *CategoryHandler) SetBracketLock(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Locked *bool `json:"locked" validate:"required"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	cat, err := h.Service.SetBracketLock(r.PathValue("comp_id"), r.PathValue("id"), *req.Locked)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "kategori tidak ditemukan pada kejuaraan ini", nil)
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, cat)
+}

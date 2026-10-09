@@ -19,6 +19,11 @@ type BracketRepository interface {
 }
 
 // CategoryBracketRepository adalah kemampuan opsional repo bagan untuk isolasi per category_id.
+// BracketProgressChecker kemampuan opsional repo bagan untuk mengetahui apakah bagan kategori sudah dimainkan.
+type BracketProgressChecker interface {
+	HasStartedMatches(competitionID, categoryID string) (bool, error)
+}
+
 type CategoryBracketRepository interface {
 	GetByCategoryID(competitionID, categoryID string) ([]store.BracketSlot, error)
 	DeleteByCategoryID(competitionID, categoryID string) error
@@ -214,4 +219,14 @@ func (s *BracketService) ListCategoryBracketSummaries(competitionID string) ([]s
 		return nil, errors.New("bracket repository does not support category summaries")
 	}
 	return sm.ListCategorySummaries(competitionID)
+}
+
+// CategoryBracketStarted true bila ada partai bagan kategori itu yang sudah dimulai/selesai/dibatalkan, sehingga
+// bagan tidak boleh dibentuk ulang.
+func (s *BracketService) CategoryBracketStarted(competitionID, categoryID string) (bool, error) {
+	pc, ok := s.repo.(BracketProgressChecker)
+	if !ok {
+		return false, nil
+	}
+	return pc.HasStartedMatches(competitionID, categoryID)
 }

@@ -97,3 +97,14 @@ export function useAssignRulesetsMutation(competitionId: Ref<string>) {
     },
   })
 }
+
+/** Kunci/buka draw bagan sebuah kategori; daftar kategori dimuat ulang agar status kunci dari server tampil. */
+export function useSetBracketLockMutation(competitionId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { categoryId: string; locked: boolean }) =>
+      categoryService.setBracketLock(competitionId.value, vars.categoryId, vars.locked),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list(competitionId.value) }),
+  })
+}
