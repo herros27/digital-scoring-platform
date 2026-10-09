@@ -792,7 +792,7 @@ paths:
   # -------------------------------------------------------
   /api/v1/athletes:
     get:
-      summary: Daftar Master Seluruh Atlet (Mendukung Pagination & Filter Gender)
+      summary: Daftar Master Seluruh Atlet (Mendukung Pagination & Filter Gender). Hanya admin/dewan; memuat tanggal lahir & NIK
       tags:
         - Athlete
       security:
@@ -897,7 +897,7 @@ paths:
 
   /api/v1/competitions/{comp_id}/athletes:
     get:
-      summary: Daftar Peserta / Atlet yang Terdaftar pada Kompetisi
+      summary: Daftar Peserta / Atlet yang Terdaftar pada Kompetisi. Perlu login (admin/dewan/operator/contingent); peran contingent hanya menerima atlet kontingennya sendiri
       tags:
         - Athlete
       security:

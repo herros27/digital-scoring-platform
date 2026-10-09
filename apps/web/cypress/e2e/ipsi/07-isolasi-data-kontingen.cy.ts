@@ -138,6 +138,54 @@ describe('Isolasi data antar kontingen', () => {
     })
   })
 
+  describe('daftar atlet kejuaraan (halaman Data Atlet)', () => {
+    const listAthletes = (token: string | null) =>
+      apiCall<Array<{ id: string; nik?: string }>>(
+        'GET',
+        `/competitions/${comp.id}/athletes`,
+        token,
+      )
+
+    it('tanpa login ditolak 401 (data atlet memuat tanggal lahir & NIK)', () => {
+      listAthletes(null).its('status').should('eq', 401)
+      apiCall('GET', '/athletes', null).its('status').should('eq', 401)
+    })
+
+    it('kontingen hanya menerima atlet kontingennya sendiri', () => {
+      listAthletes(k1).then((res) => {
+        expect(res.status).to.eq(200)
+        expect(res.body.data.map((a) => a.id)).to.deep.eq([own.k1.athleteId])
+      })
+      listAthletes(k2).then((res) => {
+        expect(res.body.data.map((a) => a.id)).to.deep.eq([own.k2.athleteId])
+      })
+    })
+
+    it('respons admin tidak bocor ke kontingen lewat cache (urutan admin -> kontingen)', () => {
+      listAthletes(admin).its('body.data').should('have.length.at.least', 3)
+      listAthletes(k1).then((res) => {
+        const ids = res.body.data.map((a) => a.id)
+        expect(ids).to.not.include.members([own.k2.athleteId])
+        expect(ids).to.not.include(own.admin.athleteId)
+      })
+    })
+
+    it('admin melihat atlet semua kontingen', () => {
+      listAthletes(admin).then((res) => {
+        expect(res.body.data.map((a) => a.id)).to.include.members([
+          own.k1.athleteId,
+          own.k2.athleteId,
+          own.admin.athleteId,
+        ])
+      })
+    })
+
+    it('daftar master /athletes hanya untuk admin/dewan (kontingen 403)', () => {
+      apiCall('GET', '/athletes?limit=1', k1).its('status').should('eq', 403)
+      apiCall('GET', '/athletes?limit=1', admin).its('status').should('eq', 200)
+    })
+  })
+
   describe('detail atlet', () => {
     const getAthlete = (token: string, id: string) => apiCall('GET', `/athletes/${id}`, token)
 

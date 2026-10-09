@@ -31,9 +31,17 @@ func (f *scopeRepo) GetByID(id string) (*domain.Athlete, error) {
 	}
 	return a, nil
 }
-func (f *scopeRepo) List() ([]domain.Athlete, error)                    { return nil, nil }
-func (f *scopeRepo) RegisterToCompetition(_, _, _, _ string) error      { return nil }
-func (f *scopeRepo) ListByCompetition(string) ([]domain.Athlete, error) { return nil, nil }
+func (f *scopeRepo) List() ([]domain.Athlete, error)               { return nil, nil }
+func (f *scopeRepo) RegisterToCompetition(_, _, _, _ string) error { return nil }
+func (f *scopeRepo) ListByCompetition(string) ([]domain.Athlete, error) {
+	out := []domain.Athlete{}
+	for _, id := range []string{"a-own", "a-other", "a-admin"} { // urutan tetap agar hasil deterministik
+		if a, ok := f.athletes[id]; ok {
+			out = append(out, *a)
+		}
+	}
+	return out, nil
+}
 func (f *scopeRepo) RegisterParticipant(compID, athID, contID, wc, gender, status string) error {
 	f.parts = append(f.parts, domain.Participant{ID: "p-" + athID, CompetitionID: compID, AthleteID: athID, ContingentID: contID, RegistrationStatus: status})
 	return nil
@@ -53,6 +61,7 @@ func newScopeHandler() (*AthleteHandler, *scopeRepo) {
 	repo := &scopeRepo{athletes: map[string]*domain.Athlete{
 		"a-own":   {ID: "a-own", Name: "Milik Saya", ContingentID: "k1"},
 		"a-other": {ID: "a-other", Name: "Milik Lain", ContingentID: "k2"},
+		"a-admin": {ID: "a-admin", Name: "Dari Admin"}, // tanpa kontingen
 	}}
 	repo.parts = []domain.Participant{
 		{ID: "p1", ContingentID: "k1", RegistrationStatus: "pending"},
@@ -164,5 +173,46 @@ func TestRegisterRejectsOtherContingentsAthlete(t *testing.T) {
 	}
 	if len(repo.parts) != before {
 		t.Fatal("peserta tidak boleh bertambah")
+	}
+}
+
+func TestListAthletesByCompetitionScopedToContingent(t *testing.T) {
+	h, _ := newScopeHandler()
+	cases := []struct {
+		name, role, id string
+		want           []string
+	}{
+		{"kontingen hanya melihat atletnya", "contingent", "k1", []string{"a-own"}},
+		{"kontingen lain hanya melihat atletnya", "contingent", "k2", []string{"a-other"}},
+		{"token kontingen tanpa id tidak melihat apa pun", "contingent", "", []string{}},
+		{"admin melihat semua", "admin", "", []string{"a-own", "a-other", "a-admin"}},
+		{"operator melihat semua", "operator", "", []string{"a-own", "a-other", "a-admin"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/competitions/c1/athletes", nil)
+			req.SetPathValue("comp_id", "c1")
+			rec := httptest.NewRecorder()
+			h.ListByCompetition(rec, asRole(req, tc.role, tc.id))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d", rec.Code)
+			}
+			var body struct{ Data []domain.Athlete }
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			got := []string{}
+			for _, a := range body.Data {
+				got = append(got, a.ID)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("got %v, want %v", got, tc.want)
+				}
+			}
+		})
 	}
 }

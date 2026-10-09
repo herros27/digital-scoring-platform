@@ -114,8 +114,6 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/medals", appCache.Handler(10*time.Second, reportH.Medals))
 	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/export", appCache.Handler(10*time.Second, reportH.Export))
 	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/brackets", appCache.Handler(10*time.Second, bracketH.GetTree))
-	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/athletes", appCache.Handler(15*time.Second, athleteH.ListByCompetition))
-	mux.HandleFunc("GET /api/v1/athletes", appCache.Handler(15*time.Second, athleteH.List))
 
 	// === Protected endpoints (JWT required) ===
 	protected := http.NewServeMux()
@@ -124,6 +122,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	adminOrDewan := RequireRole("admin", "dewan")
 	matchOperators := RequireRole("admin", "dewan", "wasit")
 	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
+	athleteViewers := RequireRole("admin", "dewan", "operator", "contingent")
 
 	// Auth & PIN (Admin only)
 	protected.Handle("GET /api/v1/auth/pins", adminOrDewan(http.HandlerFunc(authH.ListPINs)))
@@ -148,6 +147,10 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 
 	// Athletes & Participants
+	// Data atlet memuat tanggal lahir & NIK, jadi TIDAK publik dan TIDAK lewat cache bersama (kunci cache hanya
+	// method+URL, sedangkan hasilnya berbeda per peran: kontingen hanya melihat atletnya sendiri).
+	protected.Handle("GET /api/v1/athletes", adminOrDewan(http.HandlerFunc(athleteH.List)))
+	protected.Handle("GET /api/v1/competitions/{comp_id}/athletes", athleteViewers(http.HandlerFunc(athleteH.ListByCompetition)))
 	protected.Handle("POST /api/v1/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.Create)))
 	protected.HandleFunc("GET /api/v1/athletes/{id}", athleteH.Get)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.RegisterToCompetition)))

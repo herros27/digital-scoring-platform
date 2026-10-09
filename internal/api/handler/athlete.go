@@ -293,5 +293,15 @@ func (h *AthleteHandler) ListByCompetition(w http.ResponseWriter, r *http.Reques
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
+	// Manajer kontingen hanya melihat atlet kontingennya sendiri (tanggal lahir & NIK bersifat pribadi).
+	if scope, restricted := contingentScope(r); restricted {
+		own := make([]domain.Athlete, 0, len(list))
+		for _, a := range list {
+			if scope != "" && a.ContingentID == scope {
+				own = append(own, a)
+			}
+		}
+		list = own
+	}
 	Ok(w, list)
 }
