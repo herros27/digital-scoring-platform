@@ -6,7 +6,8 @@
 #
 # Backend dijalankan dari akar repo sehingga `.env` terbaca seperti `go run ./cmd/server`. Database harus sudah hidup.
 # Yang dimatikan: proses dari skrip ini (bin/backend.pid) dan proses apa pun yang mendengarkan port backend
-# (mis. `go run` yang dijalankan manual). Opsi lewat variabel: PORT (bawaan 8080), TIMEOUT_SEC (bawaan 60), NO_BUILD=1.
+# (mis. `go run` yang dijalankan manual). Opsi lewat variabel: PORT (bawaan 8080), TIMEOUT_SEC (bawaan 60), NO_BUILD=1,
+# CONTAINER=<nama> (backend di Docker: restart kontainer itu saja, tanpa build/kill proses).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -46,6 +47,21 @@ stop_backend() {
   for p in $(listener_pids); do kill -9 "$p" 2>/dev/null || true; done
   sleep 0.5
 }
+
+if [ -n "${CONTAINER:-}" ]; then # backend di Docker: restart kontainer lalu tunggu health
+  echo "[restart-backend] restart kontainer $CONTAINER ..."
+  docker restart "$CONTAINER" >/dev/null || { echo "[restart-backend] docker restart gagal" >&2; exit 1; }
+  for _ in $(seq 1 $((TIMEOUT_SEC * 4))); do
+    if curl -fsS -o /dev/null --max-time 2 "$HEALTH" 2>/dev/null; then
+      echo "[restart-backend] siap di http://127.0.0.1:${PORT} (kontainer $CONTAINER)"
+      exit 0
+    fi
+    sleep 0.25
+  done
+  echo "[restart-backend] tidak siap dalam ${TIMEOUT_SEC} dtk. Log kontainer:" >&2
+  docker logs --tail 25 "$CONTAINER" >&2 || true
+  exit 1
+fi
 
 echo "[restart-backend] mematikan backend di port $PORT ..."
 stop_backend

@@ -16,7 +16,8 @@
 param(
   [int]$Port = 0,
   [int]$TimeoutSec = 60,
-  [switch]$NoBuild
+  [switch]$NoBuild,
+  [string]$Container = ''  # nama kontainer Docker backend (mis. scoring-backend): restart kontainer, bukan proses lokal
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,6 +78,25 @@ function Show-LogTail {
       Get-Content $f -Tail 25 | ForEach-Object { Write-Host $_ }
     }
   }
+}
+
+if ($Container) { # backend di Docker: restart kontainer lalu tunggu health
+  Write-Step "restart kontainer $Container ..."
+  & docker restart $Container | Out-Null
+  if ($LASTEXITCODE -ne 0) { Write-Host "[restart-backend] docker restart $Container gagal" -ForegroundColor Red; exit 1 }
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      if ((Invoke-WebRequest -Uri $Health -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) {
+        Write-Step "siap di http://127.0.0.1:$Port (kontainer $Container)"
+        exit 0
+      }
+    } catch { }
+    Start-Sleep -Milliseconds 250
+  }
+  Write-Host "[restart-backend] tidak siap dalam $TimeoutSec dtk. Log kontainer:" -ForegroundColor Red
+  & docker logs --tail 25 $Container
+  exit 1
 }
 
 Write-Step "mematikan backend di port $Port ..."

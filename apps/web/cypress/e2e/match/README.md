@@ -178,8 +178,9 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
   ```
 
   Skrip dapat dicoba sendiri tanpa tes: `powershell -File scripts\restart-backend.ps1` / `scripts/restart-backend.sh`.
-  Bila backend berjalan di Docker, pakai `E2E_RESTART_CMD="docker compose restart app"` (nama layanan sesuai
-  `docker-compose.yml`; pastikan perintahnya menunggu sampai siap).
+  Bila backend berjalan di Docker, tambahkan `-Container scoring-backend` (PowerShell) atau `CONTAINER=scoring-backend`
+  (bash): skrip hanya me-restart kontainer itu lalu menunggu health, tanpa membangun atau mematikan proses lokal.
+  Jangan jalankan mode lokal saat backend ada di Docker: ia akan mematikan penerus port Docker di 8080.
 
 ## Temuan yang belum diubah
 
