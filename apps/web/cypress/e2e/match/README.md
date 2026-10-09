@@ -104,6 +104,14 @@ npx playwright test -g "BATAL"     # pilih tes lewat nama
 npx playwright show-report         # laporan HTML (trace tersimpan bila tes gagal)
 ```
 
+`playwright/kompetisi-penuh-ui.spec.ts` memainkan SATU kompetisi penuh lewat layar: panitia login lewat form, mengaktifkan
+kejuaraan lewat tombol + dialog, penonton membuka `/bagan` di browser (bagan tersembunyi sebelum aktif, lalu tampil dan
+berisi keempat atlet), tiga partai (2 semifinal + final otomatis) dimainkan dengan konsol wasit + 3 layar juri sungguhan,
+lalu halaman publik menampilkan juara. Penyiapan data dan "muat partai ke gelanggang" memakai API.
+
+> Login dibatasi 10 kali per menit per IP. Menjalankan beberapa suite berturut-turut dengan cepat bisa memunculkan
+> "too many requests" di langkah login; tunggu semenit lalu ulangi.
+
 Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaan Playwright), `PW_ZOOM`, `PW_SLOWMO`.
 
 ## Spesifik lingkungan
