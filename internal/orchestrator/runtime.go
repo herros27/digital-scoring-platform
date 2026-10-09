@@ -138,6 +138,9 @@ func Restore(
 	case sm.IsInRound():
 		o.timer = o.newTimer(remaining, o.onRoundExpired) // sengaja tidak dijalankan: dipulihkan dijeda
 		o.recovered = true
+		if matchStore != nil {
+			_ = matchStore.UpdateStatus(rec.MatchID, "paused") // daftar partai di UI menampilkan Lanjutkan
+		}
 	case state == statemachine.StateBreak1 || state == statemachine.StateBreak2:
 		o.timer = o.newTimer(remaining, o.onBreakExpired)
 		o.timer.Start()

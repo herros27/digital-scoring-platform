@@ -84,7 +84,16 @@ Setiap `describe` membuat kejuaraan sendiri dan membersihkannya (`teardown`).
 12. **Partai tidak berpindah gelanggang saat dimuat** (ditemukan spec 10): `load-arena` hanya membuat orkestrator, sedangkan
     `matches.arena_id` tetap gelanggang bergilir saat bagan dibentuk. Antrean per gelanggang dan nomor partai di scoreboard
     menunjuk gelanggang yang salah bila partai dimainkan di gelanggang lain. Kini `arena_id` ikut diperbarui.
-13. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
+13. **Scoreboard selalu menampilkan 3 babak** (ditemukan scoreboard-tv.spec): partai 2 babak (mis. Usia Dini) menampilkan
+    "BABAK 3 MENUNGGU" yang tidak pernah terjadi. Kini jumlah babak mengikuti `total_rounds` ruleset dari server.
+14. **Jeda dari panitia tidak bisa dilanjutkan di Jadwal** (ditemukan panitia-ui.spec): halaman Jadwal menampilkan tombol
+    Lanjutkan hanya bila status partai `paused`, padahal server tidak pernah menyimpannya (jeda hanya menghentikan jam).
+    Kini jeda menyimpan `paused`, lanjut mengembalikan `running`, dan partai yang dipulihkan setelah restart tercatat
+    `paused`. UI menghitung `paused` sebagai live.
+15. **Label tombol kunci draw membingungkan** (laporan pengguna): saat terkunci tertulis "Kunci Draw (Locked)" dan saat
+    terbuka "Buka Kunci", jadi status tidak terbaca. Kini tombol menampilkan status ("Draw Terkunci" / "Draw Terbuka"),
+    ikon gembok yang berbeda, dan tooltip aksinya.
+16. **Tidak ada ping/pong WebSocket**: koneksi mati (jaringan putus tanpa menutup soket) tetap tercatat online.
     Server kini mengirim ping tiap 54 dtk dan memutus klien yang tidak membalas dalam 60 dtk
     (`WS_PONG_WAIT_MS` mengubahnya; diuji di `internal/hub/hub_test.go`).
 
@@ -109,6 +118,15 @@ kejuaraan lewat tombol + dialog, penonton membuka `/bagan` di browser (bagan ter
 berisi keempat atlet), tiga partai (2 semifinal + final otomatis) dimainkan dengan konsol wasit + 3 layar juri sungguhan,
 lalu halaman publik menampilkan juara. Penyiapan data dan "muat partai ke gelanggang" memakai API.
 
+Spec Playwright lain (semua UI sungguhan):
+
+- `scoreboard-tv.spec.ts`: layar TV publik (daftar "Sedang Berlangsung", identitas dan jumlah babak sesuai ruleset, timer,
+  poin juri realtime, sanksi/potongan, jeda, sinyal dokter, layar pemenang).
+- `sanksi-hasil-khusus.spec.ts`: sanksi dari konsol wasit (Binaan/Teguran/DQ, batalkan sanksi) dan hasil khusus
+  (KO/TKO/WO/Undur diri) beserta dampaknya ke bagan (pemenang maju) dan medali.
+- `panitia-ui.spec.ts`: ruang operasi panitia: bagan (kunci draw, generate, acak ulang), jadwal (muat, mulai, jeda,
+  lanjut, selesaikan, filter gelanggang), dan PIN (PIN kustom, login tablet, Reset PIN).
+
 > Login dibatasi 10 kali per menit per IP. Menjalankan beberapa suite berturut-turut dengan cepat bisa memunculkan
 > "too many requests" di langkah login; tunggu semenit lalu ulangi.
 
@@ -125,6 +143,20 @@ Variabel opsional: `E2E_BASE_URL`, `PW_CHROMIUM` (path Chromium bila bukan bawaa
   E2E_RESTART_CMD="./scripts/restart-backend.sh" npx cypress run --spec "cypress/e2e/match/06-*"
   E2E_RESTART_CMD="./scripts/restart-backend.sh" npm run test:match-flow -- 06
   ```
+
+## Temuan yang belum diubah
+
+- **Data perangkat di tab "Perangkat & PIN" dikarang**: model tablet ("Samsung Galaxy Tab A9"), latensi (12 + 3×kursi ms),
+  dan baterai (96 − 4×kursi %) di-hardcode; "5 JURY CONNECTED" di header juga statis. Panitia bisa mengira tablet
+  online/berbaterai padahal tidak. Sebaiknya memakai kehadiran WebSocket (`presence`) yang sudah ada atau disembunyikan.
+- **Kunci draw hanya state di browser** (`isLocked = ref(true)`): tidak tersimpan dan tidak ditegakkan server;
+  endpoint `brackets/generate` tetap mengacak ulang walau layar "terkunci", dan kunci kembali terkunci saat halaman dimuat ulang.
+- **Pesan galat kurang jelas**: "Muat ke Gelanggang" pada kejuaraan tanpa ruleset menampilkan `ruleset '' not found`.
+- **`<label for="login-email">` menunjuk ke div pembungkus** (komponen `AppInput` menaruh `id` di pembungkus, bukan di
+  `input`), sehingga klik label tidak memfokuskan kolom.
+- **Dropdown kejuaraan di ruang operasi memuat semua kejuaraan termasuk yang CANCELLED**, sehingga daftar membengkak.
+- Dock bagan "Kirim ke Gelanggang" memuat ke gelanggang partai itu (sudah benar); tombol Jadwal "Mulai Partai" selalu
+  terlihat walau partai belum dimuat (ditolak dengan pesan "Gagal Memulai").
 
 ## Perilaku yang dicatat
 

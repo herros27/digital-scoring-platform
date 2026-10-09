@@ -178,12 +178,13 @@ function openRefereeConsole() {
 }
 
 // Stats
+// Partai yang sedang dijeda masih "live" (belum selesai, sudah di gelanggang): tidak masuk antrean
+const isLive = (status: string) => status === 'running' || status === 'paused'
+
 const stats = computed(() => {
   const all = matches.value
-  const running = all.filter((m) => m.status === 'running').length
-  const ready = all.filter(
-    (m) => m.status === 'ready' || m.status === 'idle' || m.status === 'paused',
-  ).length
+  const running = all.filter((m) => isLive(m.status)).length
+  const ready = all.filter((m) => m.status === 'ready' || m.status === 'idle').length
   const finished = all.filter((m) => m.status === 'finished').length
   return {
     total: all.length,
@@ -199,9 +200,9 @@ const filteredMatches = computed(() => {
 
   // Status Filter
   if (activeStatusFilter.value === 'running') {
-    list = list.filter((m) => m.status === 'running')
+    list = list.filter((m) => isLive(m.status))
   } else if (activeStatusFilter.value === 'ready') {
-    list = list.filter((m) => m.status === 'ready' || m.status === 'idle' || m.status === 'paused')
+    list = list.filter((m) => m.status === 'ready' || m.status === 'idle')
   } else if (activeStatusFilter.value === 'finished') {
     list = list.filter((m) => m.status === 'finished')
   }
@@ -539,7 +540,7 @@ const filteredMatches = computed(() => {
           </div>
 
           <div class="sch-status-pill" :class="`sch-status-pill--${m.status}`">
-            <span v-if="m.status === 'running'" class="sch-pulse-dot-live" />
+            <span v-if="isLive(m.status)" class="sch-pulse-dot-live" />
             <span>
               {{
                 m.status === 'running'

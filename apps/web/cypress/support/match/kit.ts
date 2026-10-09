@@ -194,6 +194,17 @@ export async function buildKit(adminToken: string, options: KitOptions): Promise
     'buat ruleset uji',
     api('POST', '/rulesets', adminToken, { name: tag, version: '1', scoring: scoring(opt) }),
   )
+  // kejuaraan sungguhan selalu punya ruleset; tanpa ini "Muat ke Gelanggang" dari UI panitia gagal ("ruleset '' not found")
+  await must(
+    'pasang ruleset ke kejuaraan',
+    api('PUT', `/competitions/${comp.id}`, adminToken, {
+      name: tag,
+      location: 'Cypress E2E',
+      start_date: '2026-06-01',
+      end_date: '2026-06-03',
+      ruleset_id: ruleset.id,
+    }),
+  )
   const category = await must(
     'buat kategori',
     api('POST', `/competitions/${comp.id}/categories`, adminToken, {

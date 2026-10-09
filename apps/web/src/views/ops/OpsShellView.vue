@@ -586,20 +586,20 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
       id: `slot-${slotRed?.id || i}`,
       partaiNumber: pairIndex,
       arenaLabel: arenaLabel,
-      status: isFinished ? 'selesai' : matchedMatch?.status === 'running' ? 'live' : 'ready',
+      status: isFinished ? 'selesai' : isLiveMatch(matchedMatch?.status) ? 'live' : 'ready',
       statusBadge: isFinished
         ? 'SELESAI'
-        : matchedMatch?.status === 'running'
+        : isLiveMatch(matchedMatch?.status)
           ? 'LIVE'
           : hasRedBye || hasBlueBye
             ? 'BYE'
             : 'SIAP',
       statusVariant: isFinished
         ? 'neutral'
-        : matchedMatch?.status === 'running'
+        : isLiveMatch(matchedMatch?.status)
           ? 'emerald'
           : 'neutral',
-      isLive: matchedMatch?.status === 'running',
+      isLive: isLiveMatch(matchedMatch?.status),
       red: {
         name:
           redParticipant?.name ||
@@ -663,6 +663,9 @@ const bracketRounds = computed<BracketRoundDisplay[]>(() => {
   }
   return list
 })
+
+// Partai live = berjalan atau sedang dijeda (belum selesai)
+const isLiveMatch = (status?: string) => status === 'running' || status === 'paused'
 
 // Current selected or queued match for bottom dock
 const selectedBracketMatch = ref<MatchCard | null>(null)
@@ -1366,9 +1369,18 @@ function handleLoadToMat1() {
               <button
                 v-if="isAdminOrDewan"
                 class="ops-action-btn-dark font-mono"
+                :class="{ 'ops-action-btn-dark--unlocked': !isLocked }"
+                :title="
+                  isLocked
+                    ? 'Draw sedang TERKUNCI. Klik untuk membuka kunci.'
+                    : 'Draw sedang TERBUKA (bisa diacak ulang). Klik untuk mengunci.'
+                "
+                :aria-pressed="isLocked"
+                data-test="draw-lock"
                 @click="toggleLock"
               >
                 <svg
+                  v-if="isLocked"
                   width="15"
                   height="15"
                   viewBox="0 0 24 24"
@@ -1379,7 +1391,22 @@ function handleLoadToMat1() {
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                <span>{{ isLocked ? 'Kunci Draw (Locked)' : 'Buka Kunci' }}</span>
+                <svg
+                  v-else
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                </svg>
+                <span>{{ isLocked ? 'Draw Terkunci' : 'Draw Terbuka' }}</span>
+                <small class="ops-lock-hint">{{
+                  isLocked ? 'klik untuk buka' : 'klik untuk kunci'
+                }}</small>
               </button>
 
               <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
@@ -1477,7 +1504,7 @@ function handleLoadToMat1() {
             <div class="metric-block">
               <div class="metric-label">SEDANG TANDING</div>
               <div class="metric-val text-emerald-400">
-                {{ rawMatches?.filter((m) => m.status === 'running').length || 0 }}
+                {{ rawMatches?.filter((m) => isLiveMatch(m.status)).length || 0 }}
                 <span class="metric-unit">LIVE</span>
               </div>
             </div>
@@ -2252,6 +2279,17 @@ function handleLoadToMat1() {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.ops-action-btn-dark--unlocked {
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+.ops-lock-hint {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .ops-action-btn-dark:hover {

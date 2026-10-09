@@ -256,6 +256,10 @@ func (o *Orchestrator) doPause() error {
 	if o.timer != nil {
 		rem = o.timer.Remaining().Milliseconds()
 	}
+	// Status 'paused' disimpan agar daftar partai di UI panitia menampilkan Lanjutkan (bukan Jeda lagi)
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, "paused")
+	}
 	o.appendEvent("match_paused", map[string]any{
 		"remaining_ms": rem,
 	}, "")
@@ -274,6 +278,9 @@ func (o *Orchestrator) doResume() error {
 		o.timer.Start()
 	}
 	o.recovered = false
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, "running")
+	}
 	o.appendEvent("match_resumed", nil, "")
 	o.broadcastState()
 	return nil
