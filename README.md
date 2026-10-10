@@ -467,6 +467,8 @@ Tablet juri, konsol wasit, dan scoreboard tersambung ulang sendiri dan meminta s
 
 ## Deployment (Production)
 
+Langkah lengkap deploy ke server lokal (build di PC, HTTPS lewat Cloudflare, backup, checklist hari pertandingan): [docs/DEPLOY-HOMESERVER.md](docs/DEPLOY-HOMESERVER.md).
+
 ### HTTPS dan PWA (tablet juri)
 
 Aplikasi (frontend + proxy API/WebSocket) disajikan nginx di layanan `web`. HTTPS **wajib** bila tablet memasang
