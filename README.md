@@ -43,14 +43,17 @@ internal/
 rulesets/
   ipsi_2024.json             # IPSI 2024 ruleset
   persilat_v7.json           # PERSILAT ruleset
-migrations/                  # SQL migrations (001 s/d 018) + Auto-migration engine
+migrations/                  # SQL migrations berurutan (NNN_nama.sql) + Auto-migration engine
 tests/                       # End-to-end integration test scenarios (tournament lifecycle & workflows)
 docker-compose.yml           # PostgreSQL + backend + frontend (nginx)
 docs/
   openapi.yaml               # OpenAPI 3.0 spec & WebSocket protocol contracts
-  task_update.md             # Log progres & status fitur backend
-  frontend_progress.md       # Log progres, status modul & gap analysis frontend
-  CREDENTIALS.md             # Kredensial akun uji coba & format otorisasi
+  CREDENTIALS.md             # Kredensial akun uji coba & format otorisasi (hanya development)
+  TESTING.md                 # Cara menjalankan semua tes
+  PWA.md                     # HTTPS & pemasangan PWA di tablet
+  DEPLOY-HOMESERVER.md       # Deploy ke server lokal (build di PC, HTTPS Cloudflare, backup)
+  CEK-SERVER.md              # Cek kesehatan server & bersihkan sesi SSH
+  rencana_kategori_dan_registrasi_ipsi.md  # Rujukan aturan kategori & pendaftaran PB IPSI
 ```
 
 ---
@@ -179,7 +182,7 @@ export ENV="development"  # atau "production"
 ```
 
 ### 3. Run Migrations (Otomatis)
-Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema (001 s/d 018) akan otomatis diterapkan:
+Server secara otomatis menjalankan migrasi saat bootstrap menggunakan file migration yang di-embed langsung ke binary Go (`//go:embed` + Goose v3). Cukup jalankan server, dan seluruh schema akan otomatis diterapkan:
 ```bash
 go run ./cmd/server
 ```
@@ -576,8 +579,6 @@ migrate create -ext sql -dir migrations -seq description
 
 ## Architecture References
 
-- **Full Backend Architecture**: [`architecture-backend.md`](architecture-backend.md) — comprehensive design doc
-- **Development Log**: [`workLog/task.md`](workLog/task.md) — feature history
 - **OpenAPI Spec**: [`docs/openapi.yaml`](docs/openapi.yaml)
 
 ---

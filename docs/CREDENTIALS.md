@@ -1,5 +1,9 @@
 # 🔐 Daftar Akun & Kredensial Sistem (DigitalScoring Pencak Silat)
 
+> **HANYA UNTUK DEVELOPMENT DAN UJI COBA.** Akun di bawah ditanam oleh seed (`SEED_DATA=true` atau `go run ./cmd/seed`)
+> dengan password publik yang tertulis di dokumen ini. Backend menolak `SEED_DATA=true` di luar `ENV=development`; jangan
+> membuat akun dengan password ini di server lomba nyata (buat admin pertama lewat `ADMIN_EMAIL`/`ADMIN_PASSWORD`).
+
 > **Catatan Penggunaan:**  
 > Seluruh kredensial, akun, PIN perangkat, dan data turnamen pada dokumen ini digenerate secara otomatis melalui database seeder backend (`cmd/seed/main.go`).  
 > Dokumen ini dirancang sebagai panduan referensi utama bagi tim pengembang Frontend, QA/Tester, dan Operator untuk pengujian integrasi antarmuka dan autentikasi multi-peran.
