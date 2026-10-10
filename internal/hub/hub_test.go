@@ -138,3 +138,26 @@ func TestKeepalive_DropsSilentClientKeepsLiveOne(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestReadLimit_DropsOversizedMessage(t *testing.T) {
+	h := NewHub("arena-1")
+	go h.Run()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.HandleWSWithSeat(w, r, "spectator", RoleScoreboard, 0)
+	}))
+	defer srv.Close()
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(strings.Repeat("a", maxMessageSize+1))); err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, _, err := conn.ReadMessage(); !websocket.IsCloseError(err, websocket.CloseMessageTooBig) {
+		t.Fatalf("err = %v, want close 1009 (message too big)", err)
+	}
+}

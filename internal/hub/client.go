@@ -40,6 +40,9 @@ var (
 	writeWait  = 10 * time.Second
 )
 
+// maxMessageSize batas satu pesan masuk; pesan juri/wasit hanya JSON kecil.
+const maxMessageSize = 64 << 10
+
 func envDuration(key string, def time.Duration) time.Duration {
 	if v, err := strconv.Atoi(os.Getenv(key)); err == nil && v > 0 {
 		return time.Duration(v) * time.Millisecond
@@ -84,6 +87,8 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
+	// Penonton publik tanpa token boleh terhubung; tanpa batas, satu pesan raksasa dibaca penuh ke memori.
+	c.conn.SetReadLimit(maxMessageSize)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
