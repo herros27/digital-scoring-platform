@@ -17,7 +17,7 @@ func (h *ContingentHandler) Register(w http.ResponseWriter, r *http.Request) {
 		PicName  string `json:"pic_name" validate:"required,min=2,max=100"`
 		Email    string `json:"email" validate:"required,email"`
 		Phone    string `json:"phone" validate:"required,min=6,max=20"`
-		Password string `json:"password" validate:"required,min=6"`
+		Password string `json:"password" validate:"required,min=8,max=72"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)

@@ -38,8 +38,8 @@ async function handleRegister() {
     return
   }
 
-  if (form.value.password.length < 6) {
-    errorMessage.value = 'Kata sandi minimal 6 karakter.'
+  if (form.value.password.length < 8) {
+    errorMessage.value = 'Kata sandi minimal 8 karakter.'
     return
   }
 

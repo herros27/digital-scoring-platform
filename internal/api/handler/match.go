@@ -136,6 +136,10 @@ func (h *MatchHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 		return
 	}
+	if auth.Revoked(claims) {
+		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "sesi dicabut, silakan login ulang", nil)
+		return
+	}
 	// Token PIN selalu terikat ke satu arena dan harus cocok. Token login email
 	// (tanpa arena) hanya diterima untuk petugas: admin, dewan, wasit.
 	unscopedOperator := claims.ArenaID == "" && hub.IsOperatorClaim(claims.Role)

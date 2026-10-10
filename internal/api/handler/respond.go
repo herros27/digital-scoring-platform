@@ -105,8 +105,14 @@ func Validate(dst any) error {
 	return err
 }
 
+// maxBodyBytes batas isi permintaan JSON. Payload terbesar (ruleset lengkap, daftar peserta bagan) jauh di bawah
+// ini; batas ada agar klien tanpa login tidak bisa memaksa server membaca isi tanpa akhir (nginx sudah membatasi
+// 1 MB, tetapi deploy langsung di belakang Caddy tidak).
+const maxBodyBytes = 1 << 20
+
 // Decode decodes the JSON request body and validates the destination struct.
 func Decode(r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		return err
 	}

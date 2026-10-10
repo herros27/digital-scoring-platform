@@ -238,7 +238,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [judge, referee, admin, dewan, operator, judge_1, judge_2, judge_3]
+                  enum: [judge, juri, wasit]
                   example: "judge"
                 seat_number:
                   type: integer

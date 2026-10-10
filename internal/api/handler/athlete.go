@@ -30,6 +30,20 @@ func contingentScope(r *http.Request) (id string, restricted bool) {
 	return "", false
 }
 
+// canSeePersonalData: tanggal lahir & NIK hanya untuk panitia dan manajer kontingen (yang sudah dibatasi ke
+// atletnya sendiri). Token juri/wasit PIN tidak memerlukannya, jadi tidak boleh membacanya.
+func canSeePersonalData(r *http.Request) bool {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		return false
+	}
+	switch claims.Role {
+	case "admin", "dewan", "operator", "contingent":
+		return true
+	}
+	return false
+}
+
 // ageReferenceDate tanggal acuan golongan umur: hari pertama kejuaraan, fallback hari ini.
 func (h *AthleteHandler) ageReferenceDate(compID string) time.Time {
 	if h.Competition != nil {
@@ -93,6 +107,11 @@ func (h *AthleteHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if scope, restricted := contingentScope(r); restricted && (scope == "" || athlete.ContingentID != scope) {
 		Fail(w, http.StatusNotFound, "NOT_FOUND", domain.ErrNotFound.Error(), nil)
 		return
+	}
+	if !canSeePersonalData(r) {
+		masked := *athlete // salinan: jangan ubah objek milik repo
+		masked.BirthDate, masked.NIK = "", ""
+		athlete = &masked
 	}
 	Ok(w, athlete)
 }
@@ -230,7 +249,7 @@ func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	res, err := h.Service.VerifyParticipantDetailed(participantID, service.VerifyInput{
+	res, err := h.Service.VerifyParticipantDetailed(compID, participantID, service.VerifyInput{
 		Status:       req.Status,
 		ActualWeight: req.ActualWeight,
 		Docs:         req.DocsVerified,
@@ -273,6 +292,11 @@ func (h *AthleteHandler) ListParticipants(w http.ResponseWriter, r *http.Request
 	ref := h.ageReferenceDate(compID)
 	for i := range list {
 		list[i].AgeCheck = domain.AgeCheck(list[i].BirthDate, list[i].AgeGroup, list[i].PresetStandard, ref)
+	}
+	if !canSeePersonalData(r) {
+		for i := range list {
+			list[i].BirthDate, list[i].NIK = "", ""
+		}
 	}
 	// Manajer kontingen hanya melihat peserta yang ia daftarkan beserta status verifikasinya.
 	if scope, restricted := contingentScope(r); restricted {

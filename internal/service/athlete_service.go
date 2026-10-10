@@ -229,7 +229,7 @@ type VerifyResult struct {
 
 // VerifyParticipantDetailed menerapkan aturan resmi: tanpa toleransi bobot (0 kg) dan
 // berkas perlindungan atlet di bawah umur harus lengkap sebelum status VERIFIED.
-func (s *AthleteService) VerifyParticipantDetailed(participantID string, in VerifyInput) (*VerifyResult, error) {
+func (s *AthleteService) VerifyParticipantDetailed(competitionID, participantID string, in VerifyInput) (*VerifyResult, error) {
 	if participantID == "" || (in.Status != "verified" && in.Status != "rejected") {
 		return nil, domain.ErrInvalidInput
 	}
@@ -245,7 +245,8 @@ func (s *AthleteService) VerifyParticipantDetailed(participantID string, in Veri
 	if err != nil {
 		return nil, err
 	}
-	if part == nil {
+	// Peserta kejuaraan lain dijawab tidak ditemukan: URL kejuaraan A tidak boleh memverifikasi peserta kejuaraan B.
+	if part == nil || part.CompetitionID != competitionID {
 		return nil, domain.ErrNotFound
 	}
 

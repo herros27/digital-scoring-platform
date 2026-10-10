@@ -336,3 +336,36 @@ func TestJudgeLoginHandler_WrongPINsOnOneTabletDoNotLockOthersOnSameIP(t *testin
 		t.Fatalf("tablet B ikut terkunci: %d %s", rec.Code, rec.Body)
 	}
 }
+
+// Mengganti PIN sebuah kursi dengan PIN yang bentrok dengan kursi lain ditolak, dan PIN lama kursi itu tetap berlaku
+// (sebelumnya PIN lama sudah terhapus sebelum penolakan sehingga kursi kehilangan PIN).
+func TestCreatePIN_RejectedReplacementKeepsOldPIN(t *testing.T) {
+	pins, comp, arenaA, _ := pinTestEnv(t)
+
+	pin1, pin2 := uniquePIN(t, "judge"), uniquePIN(t, "judge")
+	if _, err := pins.CreatePINWithSeat(comp, arenaA, "juri", 1, pin1, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pins.CreatePINWithSeat(comp, arenaA, "juri", 2, pin2, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := pins.CreatePINWithSeat(comp, arenaA, "juri", 1, pin2, time.Hour); !errors.Is(err, auth.ErrPinTaken) {
+		t.Fatalf("PIN bentrok harus ErrPinTaken, got %v", err)
+	}
+	if _, rec, err := pins.LoginWithPIN(pin1); err != nil || rec.SeatNumber != 1 {
+		t.Fatalf("PIN lama kursi 1 harus tetap berlaku: rec=%+v err=%v", rec, err)
+	}
+
+	// penggantian yang sah tetap menukar PIN lama dengan yang baru
+	pin3 := uniquePIN(t, "judge")
+	if _, err := pins.CreatePINWithSeat(comp, arenaA, "juri", 1, pin3, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := pins.LoginWithPIN(pin1); !errors.Is(err, auth.ErrInvalidPIN) {
+		t.Errorf("PIN lama setelah diganti harus ditolak, got %v", err)
+	}
+	if _, _, err := pins.LoginWithPIN(pin3); err != nil {
+		t.Errorf("PIN baru harus berlaku: %v", err)
+	}
+}

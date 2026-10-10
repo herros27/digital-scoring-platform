@@ -160,3 +160,41 @@ func TestAuthHandler_Logout(t *testing.T) {
 		t.Fatalf("unexpected logout response: %+v", res)
 	}
 }
+
+// Isi permintaan di atas batas ditolak (tidak dibaca tanpa akhir); isi normal tetap diterima.
+func TestDecode_RejectsOversizedBody(t *testing.T) {
+	var dst struct {
+		Note string `json:"note"`
+	}
+	big := `{"note":"` + strings.Repeat("a", maxBodyBytes) + `"}`
+	if err := Decode(httptest.NewRequest("POST", "/", strings.NewReader(big)), &dst); err == nil {
+		t.Fatal("isi lebih dari batas harus ditolak")
+	}
+	if err := Decode(httptest.NewRequest("POST", "/", strings.NewReader(`{"note":"ok"}`)), &dst); err != nil || dst.Note != "ok" {
+		t.Fatalf("isi normal harus diterima: %v %q", err, dst.Note)
+	}
+}
+
+// PIN dengan role admin/dewan/operator akan menghasilkan token admin dari 6 digit angka; hanya juri dan wasit.
+func TestCreatePIN_RejectsPrivilegedRoles(t *testing.T) {
+	h := &AuthHandler{} // ditolak oleh validasi sebelum menyentuh database
+	for _, role := range []string{"admin", "dewan", "operator", "referee"} {
+		body := `{"competition_id":"c","arena_id":"a","role":"` + role + `"}`
+		rec := httptest.NewRecorder()
+		h.CreatePIN(rec, httptest.NewRequest("POST", "/api/v1/auth/create-pin", strings.NewReader(body)))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("role %q: status = %d, want 400", role, rec.Code)
+		}
+	}
+}
+
+// Daftar kontingen memakai batas password yang sama dengan reset/ganti password (8 karakter).
+func TestContingentRegister_RejectsShortPassword(t *testing.T) {
+	h := &ContingentHandler{} // ditolak oleh validasi sebelum menyentuh service
+	body := `{"name":"Tim","pic_name":"PIC","email":"a@b.id","phone":"081234","password":"1234567"}`
+	rec := httptest.NewRecorder()
+	h.Register(rec, httptest.NewRequest("POST", "/api/v1/auth/contingent/register", strings.NewReader(body)))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("password 7 karakter: status = %d, want 400", rec.Code)
+	}
+}

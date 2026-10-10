@@ -302,3 +302,56 @@ func TestListParticipantsFlagsAgeCheck(t *testing.T) {
 		t.Fatal("preset_standard tidak boleh muncul di respons")
 	}
 }
+
+// Juri/wasit (token PIN) tidak boleh membaca tanggal lahir & NIK atlet; panitia dan kontingen pemilik boleh.
+func TestPersonalDataHiddenFromPinRoles(t *testing.T) {
+	h, repo := newScopeHandler()
+	repo.athletes["a-own"].NIK, repo.athletes["a-own"].BirthDate = "3171000000000001", "2015-05-01"
+	repo.parts[0].NIK, repo.parts[0].BirthDate = "3171000000000001", "2015-05-01"
+
+	cases := []struct {
+		role, id string
+		visible  bool
+	}{
+		{"judge", "pin-1", false},
+		{"wasit", "pin-2", false},
+		{"admin", "", true},
+		{"dewan", "", true},
+		{"contingent", "k1", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.role, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/athletes/a-own", nil)
+			req.SetPathValue("id", "a-own")
+			rec := httptest.NewRecorder()
+			h.Get(rec, asRole(req, tc.role, tc.id))
+			var one struct{ Data domain.Athlete }
+			if err := json.Unmarshal(rec.Body.Bytes(), &one); err != nil {
+				t.Fatal(err)
+			}
+			if got := one.Data.NIK != "" || one.Data.BirthDate != ""; got != tc.visible {
+				t.Errorf("athlete: data pribadi terlihat = %v, want %v (%s)", got, tc.visible, rec.Body)
+			}
+
+			req = httptest.NewRequest(http.MethodGet, "/api/v1/competitions/c1/participants", nil)
+			req.SetPathValue("comp_id", "c1")
+			rec = httptest.NewRecorder()
+			h.ListParticipants(rec, asRole(req, tc.role, tc.id))
+			var list struct{ Data []domain.Participant }
+			if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+				t.Fatal(err)
+			}
+			for _, p := range list.Data {
+				if p.ID != "p1" {
+					continue
+				}
+				if got := p.NIK != "" || p.BirthDate != ""; got != tc.visible {
+					t.Errorf("participant: data pribadi terlihat = %v, want %v", got, tc.visible)
+				}
+			}
+		})
+	}
+	if repo.athletes["a-own"].NIK == "" {
+		t.Error("data di repo ikut terhapus; penyamaran harus bekerja pada salinan")
+	}
+}

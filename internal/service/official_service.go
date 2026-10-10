@@ -177,13 +177,6 @@ func (s *OfficialService) UpdateOfficial(id, name, role string) (*domain.Officia
 	return o, nil
 }
 
-func (s *OfficialService) DeleteOfficial(id string) error {
-	if _, err := s.load(id); err != nil {
-		return err
-	}
-	return s.repo.Delete(id)
-}
-
 // CreateOfficialBy membuat akun atas nama actor: dewan hanya boleh membuat wasit, operator, dan juri.
 func (s *OfficialService) CreateOfficialBy(actor Actor, name, email, password, role string) (*domain.Official, error) {
 	if role == "" {
@@ -207,14 +200,19 @@ func (s *OfficialService) UpdateOfficialBy(actor Actor, id, name, role string) (
 	if !CanManageRole(actor.Role, o.Role) || (role != "" && !CanManageRole(actor.Role, role)) {
 		return nil, forbidden("peran %s tidak boleh mengubah akun ini ke peran %s", actor.Role, role)
 	}
-	if role != "" && role != o.Role {
+	roleChanged := role != "" && role != o.Role
+	if roleChanged {
 		if last, err := s.lastAdmin(o); err != nil {
 			return nil, err
 		} else if last {
 			return nil, conflict("admin terakhir tidak dapat diturunkan perannya")
 		}
 	}
-	return s.UpdateOfficial(id, name, role)
+	updated, err := s.UpdateOfficial(id, name, role)
+	if err == nil && roleChanged {
+		auth.RevokeTokensOf(id) // token lama masih membawa peran lama
+	}
+	return updated, err
 }
 
 // DeleteOfficialBy menghapus akun. Akun sendiri dan admin terakhir tidak dapat dihapus.
@@ -234,7 +232,11 @@ func (s *OfficialService) DeleteOfficialBy(actor Actor, id string) error {
 	} else if last {
 		return conflict("admin terakhir tidak dapat dihapus")
 	}
-	return s.repo.Delete(id)
+	if err := s.repo.Delete(id); err != nil {
+		return err
+	}
+	auth.RevokeTokensOf(id) // akun yang dihapus tidak boleh tetap bekerja sampai token kedaluwarsa
+	return nil
 }
 
 // ResetPassword mengganti password akun lain tanpa password lama (lupa password). Token lama tetap berlaku sampai habis.

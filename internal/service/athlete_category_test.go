@@ -109,25 +109,40 @@ func TestRegisterToCategory_AgeGuard(t *testing.T) {
 	}
 }
 
+// URL kejuaraan lain tidak boleh memverifikasi peserta: tidak ditemukan, dan status peserta tidak berubah.
+func TestVerify_RejectsParticipantOfAnotherCompetition(t *testing.T) {
+	svc, ar := setup()
+	if _, err := svc.RegisterParticipantToCategory("c1", "adult", "", "cat-dew", "pending", refDate); err != nil {
+		t.Fatal(err)
+	}
+	_, err := svc.VerifyParticipantDetailed("kejuaraan-lain", "p1", VerifyInput{Status: "rejected"})
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+	if _, saved := ar.saved["p1"]; saved {
+		t.Error("status peserta tidak boleh berubah")
+	}
+}
+
 func TestVerify_WeightNoTolerance(t *testing.T) {
 	svc, ar := setup()
 	if _, err := svc.RegisterParticipantToCategory("c1", "adult", "", "cat-dew", "pending", refDate); err != nil {
 		t.Fatal(err)
 	}
 	docs := map[string]bool{domain.DocIdentity: true, domain.DocHealth: true}
-	res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(50.1), Docs: docs})
+	res, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(50.1), Docs: docs})
 	if err != nil || res.Status != domain.ParticipantOverweight {
 		t.Fatalf("want overweight, got %v %v", res, err)
 	}
-	res, _ = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(44.9), Docs: docs})
+	res, _ = svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(44.9), Docs: docs})
 	if res.Status != domain.ParticipantUnderweight {
 		t.Fatalf("want underweight, got %s", res.Status)
 	}
-	res, err = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(50), Docs: docs})
+	res, err = svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(50), Docs: docs})
 	if err != nil || res.Status != "verified" || ar.parts["p1"].RegistrationStatus != "verified" {
 		t.Fatalf("exact limit must pass: %v %v", res, err)
 	}
-	if _, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified"}); err != nil {
+	if _, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified"}); err != nil {
 		t.Fatalf("previously stored weight should be reused: %v", err)
 	}
 }
@@ -137,15 +152,15 @@ func TestVerify_WeightRequiredAndDocs(t *testing.T) {
 	if _, err := svc.RegisterParticipantToCategory("c1", "kid", "", "cat-sd", "pending", refDate); err != nil {
 		t.Fatal(err)
 	}
-	_, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27)})
+	_, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(27)})
 	if err == nil || !strings.Contains(err.Error(), "berkas") {
 		t.Fatalf("minor without docs must be blocked, got %v", err)
 	}
 	docs := map[string]bool{domain.DocIdentity: true, domain.DocHealth: true}
-	if _, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", Docs: docs}); err == nil {
+	if _, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", Docs: docs}); err == nil {
 		t.Fatal("weight must be required for weight-bound category")
 	}
-	res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs})
+	res, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs})
 	if err != nil || res.Status != "verified" {
 		t.Fatalf("complete docs + valid weight must verify: %v %v", res, err)
 	}
@@ -153,7 +168,7 @@ func TestVerify_WeightRequiredAndDocs(t *testing.T) {
 		t.Error("docs not persisted")
 	}
 	// Reject tidak mensyaratkan berkas/bobot.
-	if res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "rejected"}); err != nil || res.Status != "rejected" {
+	if res, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "rejected"}); err != nil || res.Status != "rejected" {
 		t.Fatalf("reject failed: %v %v", res, err)
 	}
 }
@@ -209,8 +224,8 @@ func TestVerifyBlockedWhenBirthDateMissingOrAgeMismatch(t *testing.T) {
 
 	// peserta lama: atlet tanpa tanggal lahir
 	ar.athletes["legacy"] = &domain.Athlete{ID: "legacy", Name: "Lama", Gender: "male"}
-	ar.parts["p1"] = &domain.Participant{ID: "p1", AthleteID: "legacy", CategoryID: "cat-sd", Gender: "male"}
-	_, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
+	ar.parts["p1"] = &domain.Participant{ID: "p1", CompetitionID: "c1", AthleteID: "legacy", CategoryID: "cat-sd", Gender: "male"}
+	_, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
 	if err == nil || !strings.Contains(err.Error(), "tanggal lahir") {
 		t.Fatalf("tanpa tanggal lahir harus ditolak, got %v", err)
 	}
@@ -219,7 +234,7 @@ func TestVerifyBlockedWhenBirthDateMissingOrAgeMismatch(t *testing.T) {
 	if _, err := svc.UpdateAthleteProfile("legacy", sp("2016-05-01"), nil); err != nil {
 		t.Fatal(err)
 	}
-	res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
+	res, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
 	if err != nil || res.Status != "verified" {
 		t.Fatalf("setelah dilengkapi harus lolos, got %v %v", res, err)
 	}
@@ -228,13 +243,13 @@ func TestVerifyBlockedWhenBirthDateMissingOrAgeMismatch(t *testing.T) {
 	if _, err := svc.UpdateAthleteProfile("legacy", sp("1990-01-01"), nil); err != nil {
 		t.Fatal(err)
 	}
-	_, err = svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
+	_, err = svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "verified", ActualWeight: fl(27), Docs: docs, Ref: ref})
 	if err == nil || !strings.Contains(err.Error(), "tidak sesuai golongan umur") {
 		t.Fatalf("usia tidak sesuai harus ditolak, got %v", err)
 	}
 
 	// penolakan tidak diblokir pemeriksaan umur
-	if res, err := svc.VerifyParticipantDetailed("p1", VerifyInput{Status: "rejected", Ref: ref}); err != nil || res.Status != "rejected" {
+	if res, err := svc.VerifyParticipantDetailed("c1", "p1", VerifyInput{Status: "rejected", Ref: ref}); err != nil || res.Status != "rejected" {
 		t.Fatalf("rejected harus tetap bisa, got %v %v", res, err)
 	}
 }

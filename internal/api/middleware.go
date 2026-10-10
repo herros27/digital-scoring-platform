@@ -29,6 +29,10 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 			return
 		}
+		if auth.Revoked(claims) {
+			handler.Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "sesi dicabut, silakan login ulang", nil)
+			return
+		}
 		ctx := auth.ContextWithClaims(r.Context(), claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

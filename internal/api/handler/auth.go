@@ -101,7 +101,7 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CompetitionID string `json:"competition_id" validate:"required"`
 		ArenaID       string `json:"arena_id" validate:"required"`
-		Role          string `json:"role" validate:"required,oneof=wasit juri dewan admin operator"`
+		Role          string `json:"role" validate:"required,oneof=wasit juri judge"`
 		SeatNumber    int    `json:"seat_number" validate:"min=0,max=10"`
 		PIN           string `json:"pin" validate:"omitempty,numeric,min=6,max=8"`
 		TTLHours      int    `json:"ttl_hours" validate:"min=0,max=720"`

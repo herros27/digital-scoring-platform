@@ -145,6 +145,23 @@ func TestOfficialService_CRUDAndLogin(t *testing.T) {
 		t.Errorf("ListOfficials failed: len=%d err=%v", len(list), err)
 	}
 
+	// 7b. Token lama dicabut saat perannya diubah lewat UpdateOfficialBy, dan saat akun dihapus
+	oldToken, _, err := svc.Login("dewan@silat.id", "mock_secret_1")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	oldClaims, _ := auth.ParseToken(oldToken)
+	if auth.Revoked(oldClaims) {
+		t.Fatal("token tidak boleh dicabut sebelum ada perubahan")
+	}
+	admin := service.Actor{ID: "admin-lain", Role: "admin"}
+	if _, err := svc.UpdateOfficialBy(admin, created.ID, "", "wasit"); err != nil {
+		t.Fatalf("UpdateOfficialBy failed: %v", err)
+	}
+	if !auth.Revoked(oldClaims) {
+		t.Error("token lama harus dicabut setelah peran diubah")
+	}
+
 	// 7. Update Official
 	updated, err := svc.UpdateOfficial(created.ID, "Dewan Utama", "admin")
 	if err != nil {
@@ -154,9 +171,12 @@ func TestOfficialService_CRUDAndLogin(t *testing.T) {
 		t.Errorf("updated fields mismatch: %+v", updated)
 	}
 
-	// 8. Delete Official
-	if err := svc.DeleteOfficial(created.ID); err != nil {
-		t.Fatalf("DeleteOfficial failed: %v", err)
+	// 8. Delete Official (oleh admin lain; admin terakhir tidak boleh dihapus, jadi turunkan dulu perannya)
+	if _, err := svc.UpdateOfficial(created.ID, "", "wasit"); err != nil {
+		t.Fatalf("UpdateOfficial failed: %v", err)
+	}
+	if err := svc.DeleteOfficialBy(service.Actor{ID: "admin-lain", Role: "admin"}, created.ID); err != nil {
+		t.Fatalf("DeleteOfficialBy failed: %v", err)
 	}
 	_, errDel := svc.GetOfficialByID(created.ID)
 	if errDel != domain.ErrNotFound {
