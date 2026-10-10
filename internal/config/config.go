@@ -53,6 +53,11 @@ var placeholderSecrets = map[string]bool{
 	"change-this-in-production-secret-key-123": true,
 }
 
+// placeholderDBPasswords password contoh di .env.example; terlihat publik, jadi tidak boleh dipakai di produksi.
+var placeholderDBPasswords = map[string]bool{
+	"dev_password_placeholder": true,
+}
+
 // Validate memeriksa konfigurasi yang berbahaya bila dibiarkan di luar development. Hanya ENV=development (persis)
 // yang boleh memakai kunci contoh dan seed; ENV kosong, "prod", atau "Production" diperlakukan sebagai produksi,
 // sehingga salah ketik tidak membuka jalan bagi kunci yang tercantum di repo.
@@ -65,6 +70,9 @@ func (c *Config) Validate() error {
 	}
 	if dbURLWithoutPassword(c.DBURL) {
 		return fmt.Errorf("DB_URL tidak berisi password database (ENV=%q); isi POSTGRES_PASSWORD di .env.prod, atau pakai PGPASSWORD/password= di DB_URL", c.Env)
+	}
+	if dbURLUsesPlaceholderPassword(c.DBURL) {
+		return fmt.Errorf("DB_URL memakai password contoh dari .env.example; isi POSTGRES_PASSWORD dengan nilai acak milik Anda sendiri (ENV=%q)", c.Env)
 	}
 	if c.SeedData {
 		return fmt.Errorf("SEED_DATA=true menanam akun demo berpassword publik dan hanya boleh dengan ENV=development (ENV=%q)", c.Env)
@@ -91,6 +99,15 @@ func dbURLWithoutPassword(raw string) bool {
 		return false
 	}
 	return u.Query().Get("password") == "" && os.Getenv("PGPASSWORD") == ""
+}
+
+func dbURLUsesPlaceholderPassword(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	pw, _ := u.User.Password()
+	return placeholderDBPasswords[pw]
 }
 
 func (c *Config) IsProduction() bool {

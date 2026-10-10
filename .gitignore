@@ -24,3 +24,4 @@ apps/web/test/cypress/videos/
 apps/web/test/cypress/downloads/
 apps/web/test/playwright/test-results/
 apps/web/test/playwright/report/
+*.tar

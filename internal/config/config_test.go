@@ -144,6 +144,23 @@ func TestValidate_DatabasePasswordRequiredOutsideDevelopment(t *testing.T) {
 	}
 }
 
+// Password contoh dari .env.example (dev_password_placeholder) tidak boleh lolos di produksi, tetapi sah untuk
+// development: lupa menggantinya di .env.prod harus membuat backend menolak start.
+func TestValidate_PlaceholderDatabasePasswordRejectedOutsideDevelopment(t *testing.T) {
+	strong := "mock-jwt-secret-key-for-test-32chars-ok!"
+	example := "postgres://scoring_user:dev_password_placeholder@postgres:5432/digital_scoring?sslmode=disable"
+	if err := (&Config{Env: "development", JWTSecret: strong, DBURL: example}).Validate(); err != nil {
+		t.Errorf("development boleh memakai password contoh: %v", err)
+	}
+	if err := (&Config{Env: "production", JWTSecret: strong, DBURL: example}).Validate(); err == nil {
+		t.Error("production harus menolak password contoh")
+	}
+	own := "postgres://scoring_user:test_custom_database_password_99@postgres:5432/digital_scoring"
+	if err := (&Config{Env: "production", JWTSecret: strong, DBURL: own}).Validate(); err != nil {
+		t.Errorf("password milik sendiri harus lolos: %v", err)
+	}
+}
+
 func TestValidate_SeedDataOnlyInDevelopment(t *testing.T) {
 	strong := "mock-jwt-secret-key-for-test-32chars-ok!"
 	cases := []struct {
