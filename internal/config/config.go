@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"log"
+	"net/url"
+	"os"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
@@ -10,7 +12,7 @@ import (
 
 type Config struct {
 	Port        string `env:"PORT" envDefault:"8080"`
-	Env         string `env:"ENV" envDefault:"development"`
+	Env         string `env:"ENV" envDefault:"production"`
 	DBURL       string `env:"DB_URL" envDefault:"postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"`
 	JWTSecret   string `env:"JWT_SECRET" envDefault:"dev-secret-change-in-prod"`
 	AutoMigrate bool   `env:"AUTO_MIGRATE" envDefault:"true"`
@@ -51,21 +53,44 @@ var placeholderSecrets = map[string]bool{
 	"change-this-in-production-secret-key-123": true,
 }
 
-// Validate memeriksa konfigurasi yang berbahaya bila dibiarkan pada mode production. Mode lain selalu lolos.
+// Validate memeriksa konfigurasi yang berbahaya bila dibiarkan di luar development. Hanya ENV=development (persis)
+// yang boleh memakai kunci contoh dan seed; ENV kosong, "prod", atau "Production" diperlakukan sebagai produksi,
+// sehingga salah ketik tidak membuka jalan bagi kunci yang tercantum di repo.
 // JWT_SECRET kosong atau nilai contoh berarti siapa pun dapat memalsukan token login (termasuk token admin).
+// SEED_DATA membuat akun demo (admin@silat.id / DemoPass_2026 dst., tertulis di docs/CREDENTIALS.md) dan SETIAP start
+// mengembalikan password akun itu ke nilai publik tersebut.
 func (c *Config) Validate() error {
-	if !c.IsProduction() {
+	if c.Env == "development" {
 		return nil
+	}
+	if dbURLWithoutPassword(c.DBURL) {
+		return fmt.Errorf("DB_URL tidak berisi password database (ENV=%q); isi POSTGRES_PASSWORD di .env.prod, atau pakai PGPASSWORD/password= di DB_URL", c.Env)
+	}
+	if c.SeedData {
+		return fmt.Errorf("SEED_DATA=true menanam akun demo berpassword publik dan hanya boleh dengan ENV=development (ENV=%q)", c.Env)
 	}
 	switch {
 	case c.JWTSecret == "":
-		return fmt.Errorf("JWT_SECRET kosong pada ENV=production")
+		return fmt.Errorf("JWT_SECRET kosong (ENV=%q; kunci bawaan hanya untuk ENV=development)", c.Env)
 	case placeholderSecrets[c.JWTSecret]:
-		return fmt.Errorf("JWT_SECRET masih nilai contoh dari repo; isi dengan nilai acak milik Anda sendiri pada ENV=production")
+		return fmt.Errorf("JWT_SECRET masih nilai contoh dari repo; isi dengan nilai acak milik Anda sendiri (ENV=%q; kunci contoh hanya untuk ENV=development)", c.Env)
 	case len(c.JWTSecret) < MinProductionSecretLen:
-		return fmt.Errorf("JWT_SECRET terlalu pendek (%d karakter); minimal %d karakter pada ENV=production", len(c.JWTSecret), MinProductionSecretLen)
+		return fmt.Errorf("JWT_SECRET terlalu pendek (%d karakter); minimal %d karakter (ENV=%q; kunci pendek hanya untuk ENV=development)", len(c.JWTSecret), MinProductionSecretLen, c.Env)
 	}
 	return nil
+}
+
+// dbURLWithoutPassword true bila DB_URL berbentuk URL dengan host tetapi tanpa password (di userinfo, parameter
+// `password=`, maupun PGPASSWORD). Bentuk lain (soket Unix tanpa host, string keyword/value) tidak dinilai.
+func dbURLWithoutPassword(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	if _, ok := u.User.Password(); ok {
+		return false
+	}
+	return u.Query().Get("password") == "" && os.Getenv("PGPASSWORD") == ""
 }
 
 func (c *Config) IsProduction() bool {

@@ -24,7 +24,10 @@ temuan) dan `README.md` akar (daftar tes Go).
 | Playwright PWA                                                         | backend (build + preview otomatis) | `npm run test:pw:pwa`                  | `apps/web`  |
 | Cypress (spec `ui-*` dan admin)                                        | backend + Vite + binary Cypress    | `npm run cypress:run`                  | `apps/web`  |
 
-Tes Go yang memakai database akan dilewati bila Postgres tidak ada (`TEST_DB_URL` untuk database lain).
+Tes Go yang memakai database akan dilewati bila Postgres tidak ada atau menolak sambungan (`TEST_DB_URL` untuk database
+lain). Bila Postgres dari docker compose berpassword, tanpa `TEST_DB_URL` yang memuat password tes-tes itu DILEWATI
+diam-diam: set `TEST_DB_URL=postgres://scoring_user:<password>@localhost:5432/digital_scoring?sslmode=disable` dan pakai
+`go test -v` untuk memastikan tidak ada yang `SKIP`.
 
 ## Urutan lengkap (satu kali jalan)
 

@@ -6,7 +6,9 @@ services:
     container_name: scoring-backend
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:8080"
+      # Loopback saja: klien harus lewat nginx, yang menimpa X-Forwarded-For. Port terbuka ke LAN membuat IP palsu
+      # melewati pembatas login/PIN.
+      - "127.0.0.1:${PORT:-8080}:8080"
     # Berkas .env.prod WAJIB ada (cp .env.example .env.prod, lalu isi JWT_SECRET dll.): compose berhenti bila
     # tidak ditemukan. Seluruh isinya menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...).
     # Jalankan selalu dengan:  docker compose --env-file .env.prod up -d --build
@@ -18,7 +20,9 @@ services:
       - PORT=8080 # nginx dan pemetaan port menuju 8080 di dalam container
       - ENV=production # jalur Docker = produksi; development memakai `go run` dengan .env
       # .env berisi DB_URL untuk `go run` di host (localhost); di dalam container database bernama `postgres`
-      - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
+      # Password database wajib (POSTGRES_PASSWORD di .env.prod). Pakai hex/base64url (openssl rand -hex 24): karakter
+      # seperti @ : / # di password merusak URL ini.
+      - DB_URL=postgres://${POSTGRES_USER:-scoring_user}:${POSTGRES_PASSWORD:?set_in_env_file}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
       # JWT_SECRET sengaja tidak ditulis di sini: nilainya datang dari .env.prod (env_file). Backend menolak
       # start bila kosong, masih nilai contoh, atau < 32 karakter (ENV=production).
     depends_on:
@@ -72,10 +76,13 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-digital_scoring}
       POSTGRES_USER: ${POSTGRES_USER:-scoring_user}
-      POSTGRES_PASSWORD: ""
-      POSTGRES_HOST_AUTH_METHOD: trust
+      # Password hanya dibaca saat volume postgres_data pertama dibuat. Volume lama yang dibuat dengan `trust` tidak
+      # berubah: hapus dulu (`docker compose --env-file .env.prod down -v`, SEMUA DATA HILANG) atau migrasi manual.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set_in_env_file (openssl rand -hex 24)}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback saja: database tidak perlu terjangkau dari jaringan; backend memakai jaringan Docker.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

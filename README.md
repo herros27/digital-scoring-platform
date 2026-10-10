@@ -442,7 +442,7 @@ Aturan wewenang: **Admin** mengelola semua akun. **Dewan Juri** hanya mengelola 
 
 Catatan:
 - nginx menimpa header `X-Forwarded-For` dengan alamat sambungan asli, sehingga pembatas percobaan PIN (15 menit setelah 5 salah) tidak bisa dihindari dengan header palsu. Jangan mempublikasikan port 8080 backend langsung ke jaringan venue bila ingin mengandalkan ini; hapus pemetaan `8080:8080` pada `docker-compose.yml` untuk produksi.
-- `JWT_SECRET` **wajib** diisi di `.env` atau environment: `docker compose up` berhenti dengan pesan jelas bila kosong, dan backend (`ENV=production`, yang diatur compose) menolak start bila nilainya kosong, masih nilai contoh dari repo, atau kurang dari 32 karakter. Buat nilai acak dengan `openssl rand -base64 48`. Database memakai `trust` tanpa kata sandi, cocok untuk jaringan venue tertutup saja.
+- `JWT_SECRET` **wajib** diisi di `.env` atau environment: `docker compose up` berhenti dengan pesan jelas bila kosong, dan backend (`ENV=production`, yang diatur compose) menolak start bila nilainya kosong, masih nilai contoh dari repo, atau kurang dari 32 karakter. Buat nilai acak dengan `openssl rand -base64 48`. Database wajib berpassword: isi `POSTGRES_PASSWORD` di `.env.prod` (`openssl rand -hex 24`); compose berhenti bila kosong, dan backend menolak `DB_URL` tanpa password di luar `ENV=development`. Password hanya dibaca saat volume `postgres_data` pertama dibuat; volume lama yang memakai `trust` harus dihapus (`docker compose --env-file .env.prod down -v`, semua data hilang) atau dimigrasi manual dengan `ALTER USER` dan `pg_hba.conf`.
 - CI membangun kedua image dan memeriksa sintaks konfigurasi nginx (`nginx -t`).
 
 ---
