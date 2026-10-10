@@ -14,8 +14,6 @@ type BracketRepository interface {
 	GetByCompetitionCategory(competitionID, weightClass, gender string) ([]store.BracketSlot, error)
 	DeleteByCompetitionCategory(competitionID, weightClass, gender string) error
 	GetByID(id string) (*store.BracketSlot, error)
-	UpdateWinner(slotID, winnerID string) error
-	SetParticipant(slotID, participantID string) error
 }
 
 // CategoryBracketRepository adalah kemampuan opsional repo bagan untuk isolasi per category_id.
@@ -240,30 +238,6 @@ func (s *BracketService) GetBracketTreeByCategory(competitionID, categoryID stri
 // GetBracketTree mengambil struktur pohon bagan pertandingan
 func (s *BracketService) GetBracketTree(competitionID, weightClass, gender string) ([]store.BracketSlot, error) {
 	return s.repo.GetByCompetitionCategory(competitionID, weightClass, gender)
-}
-
-// AdvanceWinner memajukan pemenang pertandingan ke slot ronde berikutnya
-func (s *BracketService) AdvanceWinner(currentSlotID, winnerID string) error {
-	currentSlot, err := s.repo.GetByID(currentSlotID)
-	if err != nil {
-		return err
-	}
-	if currentSlot == nil {
-		return errors.New("slot not found")
-	}
-
-	// Update pemenang pada slot saat ini
-	if err := s.repo.UpdateWinner(currentSlotID, winnerID); err != nil {
-		return err
-	}
-
-	// Jika ada babak selanjutnya, masukkan winner ke next_slot_id
-	if currentSlot.NextSlotID != nil {
-		return s.repo.SetParticipant(*currentSlot.NextSlotID, winnerID)
-	}
-
-	// Jika tidak ada next_slot_id, berarti ini adalah babak Final (Juara 1)
-	return nil
 }
 
 // ListCategoryBracketSummaries meringkas semua bagan kategori pada satu kejuaraan (untuk daftar bagan publik).

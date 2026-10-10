@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 )
 
 type BracketStore struct {
@@ -109,29 +110,17 @@ func (s *BracketStore) DeleteByCompetitionCategory(competitionID, weightClass, g
 	return err
 }
 
-// UpdateWinner memperbarui winner_id pada slot tertentu
-func (s *BracketStore) UpdateWinner(slotID, winnerID string) error {
-	query := `UPDATE bracket_slots SET winner_id = $1 WHERE id = $2`
-	_, err := s.DB.Exec(query, winnerID, slotID)
-	return err
+// dbQuerier dipenuhi *sql.DB dan *sql.Tx, supaya langkah bagan bisa berjalan di dalam transaksi pemanggil.
+type dbQuerier interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	QueryRow(query string, args ...any) *sql.Row
 }
 
-// SetParticipant mengisi peserta di slot tertentu (misal saat menang dan naik ronde)
-func (s *BracketStore) SetParticipant(slotID, participantID string) error {
-	query := `UPDATE bracket_slots SET participant_id = $1 WHERE id = $2`
-	_, err := s.DB.Exec(query, participantID, slotID)
-	return err
-}
+const slotColumns = `id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id`
 
-// GetByID mengambil 1 slot berdasarkan ID
-func (s *BracketStore) GetByID(id string) (*BracketSlot, error) {
+func scanSlot(row *sql.Row) (*BracketSlot, error) {
 	b := &BracketSlot{}
-	query := `
-		SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
-		FROM bracket_slots
-		WHERE id = $1
-	`
-	err := s.DB.QueryRow(query, id).Scan(
+	err := row.Scan(
 		&b.ID, &b.CompetitionID, &b.WeightClass, &b.Gender,
 		&b.Round, &b.SlotIndex, &b.ParticipantID, &b.IsBye,
 		&b.WinnerID, &b.NextSlotID, &b.CategoryID,
@@ -139,93 +128,118 @@ func (s *BracketStore) GetByID(id string) (*BracketSlot, error) {
 	return b, err
 }
 
-// AdvanceWinner memajukan pemenang pertandingan ke slot ronde berikutnya
+// UpdateWinner memperbarui winner_id pada slot tertentu
+func (s *BracketStore) UpdateWinner(slotID, winnerID string) error {
+	_, err := s.DB.Exec(`UPDATE bracket_slots SET winner_id = $1 WHERE id = $2`, winnerID, slotID)
+	return err
+}
+
+// SetParticipant mengisi peserta di slot tertentu (misal saat menang dan naik ronde)
+func (s *BracketStore) SetParticipant(slotID, participantID string) error {
+	_, err := s.DB.Exec(`UPDATE bracket_slots SET participant_id = $1 WHERE id = $2`, participantID, slotID)
+	return err
+}
+
+// GetByID mengambil 1 slot berdasarkan ID
+func (s *BracketStore) GetByID(id string) (*BracketSlot, error) {
+	return getSlot(s.DB, id)
+}
+
+func getSlot(q dbQuerier, id string) (*BracketSlot, error) {
+	return scanSlot(q.QueryRow(`SELECT `+slotColumns+` FROM bracket_slots WHERE id = $1`, id))
+}
+
+// AdvanceWinner memajukan pemenang pertandingan ke slot ronde berikutnya. Semua langkahnya (pemenang slot, slot
+// berikutnya, partai babak lanjutan) tersimpan bersama atau tidak sama sekali.
 func (s *BracketStore) AdvanceWinner(currentSlotID, winnerID string) error {
-	currentSlot, err := s.GetByID(currentSlotID)
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
-	if currentSlot == nil {
-		return sql.ErrNoRows
+	defer tx.Rollback()
+	if err := advanceWinner(tx, currentSlotID, winnerID); err != nil {
+		return err
 	}
+	return tx.Commit()
+}
 
-	if err := s.UpdateWinner(currentSlotID, winnerID); err != nil {
+func advanceWinner(q dbQuerier, currentSlotID, winnerID string) error {
+	currentSlot, err := getSlot(q, currentSlotID)
+	if err != nil {
+		return err
+	}
+	if _, err := q.Exec(`UPDATE bracket_slots SET winner_id = $1 WHERE id = $2`, winnerID, currentSlotID); err != nil {
+		return err
+	}
+	if currentSlot.NextSlotID == nil || *currentSlot.NextSlotID == "" {
+		return nil // babak final: tidak ada slot berikutnya
+	}
+	if _, err := q.Exec(`UPDATE bracket_slots SET participant_id = $1 WHERE id = $2`, winnerID, *currentSlot.NextSlotID); err != nil {
 		return err
 	}
 
-	if currentSlot.NextSlotID != nil && *currentSlot.NextSlotID != "" {
-		if err := s.SetParticipant(*currentSlot.NextSlotID, winnerID); err != nil {
-			return err
-		}
-
-		// Otomatis buat match untuk babak selanjutnya jika kedua sudut (merah & biru) sudah terisi pemenang
-		parentSlot, err := s.GetByID(*currentSlot.NextSlotID)
-		if err == nil && parentSlot != nil {
-			siblingIndex := parentSlot.SlotIndex ^ 1
-			var siblingSlot BracketSlot
-			var errSibling error
-			if parentSlot.CategoryID != nil && *parentSlot.CategoryID != "" {
-				// Bagan terisolasi per kategori: kelas bobot yang sama di golongan umur berbeda tidak boleh bertabrakan.
-				errSibling = s.DB.QueryRow(`
-					SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
-					FROM bracket_slots
-					WHERE competition_id = $1 AND category_id = $2 AND round = $3 AND slot_index = $4
-					LIMIT 1`, parentSlot.CompetitionID, *parentSlot.CategoryID, parentSlot.Round, siblingIndex).Scan(
-					&siblingSlot.ID, &siblingSlot.CompetitionID, &siblingSlot.WeightClass, &siblingSlot.Gender,
-					&siblingSlot.Round, &siblingSlot.SlotIndex, &siblingSlot.ParticipantID, &siblingSlot.IsBye,
-					&siblingSlot.WinnerID, &siblingSlot.NextSlotID, &siblingSlot.CategoryID,
-				)
-			} else {
-				errSibling = s.DB.QueryRow(`
-					SELECT id, competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, winner_id, next_slot_id, category_id
-					FROM bracket_slots
-					WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL AND round = $4 AND slot_index = $5
-					LIMIT 1`, parentSlot.CompetitionID, parentSlot.WeightClass, parentSlot.Gender, parentSlot.Round, siblingIndex).Scan(
-					&siblingSlot.ID, &siblingSlot.CompetitionID, &siblingSlot.WeightClass, &siblingSlot.Gender,
-					&siblingSlot.Round, &siblingSlot.SlotIndex, &siblingSlot.ParticipantID, &siblingSlot.IsBye,
-					&siblingSlot.WinnerID, &siblingSlot.NextSlotID, &siblingSlot.CategoryID,
-				)
-			}
-
-			if errSibling == nil && siblingSlot.ParticipantID != nil && *siblingSlot.ParticipantID != "" {
-				var redSlot, blueSlot *BracketSlot
-				if parentSlot.SlotIndex%2 == 0 {
-					redSlot = parentSlot
-					blueSlot = &siblingSlot
-				} else {
-					redSlot = &siblingSlot
-					blueSlot = parentSlot
-				}
-
-				var existingMatchID string
-				checkMatchQuery := `SELECT id FROM matches WHERE competition_id = $1 AND bracket_slot_id = $2 LIMIT 1`
-				errCheck := s.DB.QueryRow(checkMatchQuery, parentSlot.CompetitionID, redSlot.ID).Scan(&existingMatchID)
-				if errCheck == sql.ErrNoRows {
-					// Partai babak lanjutan memakai gelanggang asal kategori (sama dengan babak sebelumnya); gelanggang
-					// pertama menurut nama hanya untuk bagan lama tanpa kategori.
-					var arenaID sql.NullString
-					if parentSlot.CategoryID != nil && *parentSlot.CategoryID != "" {
-						_ = s.DB.QueryRow(`SELECT home_arena_id FROM categories WHERE id = $1`, *parentSlot.CategoryID).Scan(&arenaID)
-					}
-					if !arenaID.Valid {
-						_ = s.DB.QueryRow(`SELECT id FROM arenas WHERE competition_id = $1 ORDER BY name ASC, id ASC LIMIT 1`, parentSlot.CompetitionID).Scan(&arenaID)
-					}
-
-					insertMatchQuery := `
-						INSERT INTO matches (competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status)
-						VALUES ($1, $2, $3, $4, $5, $6, 'idle')
-					`
-					var aID any = nil
-					if arenaID.Valid {
-						aID = arenaID.String
-					}
-					_, _ = s.DB.Exec(insertMatchQuery, parentSlot.CompetitionID, aID, redSlot.ID, *redSlot.ParticipantID, *blueSlot.ParticipantID, redSlot.Round)
-				}
-			}
-		}
+	// Otomatis buat match untuk babak selanjutnya jika kedua sudut (merah & biru) sudah terisi pemenang
+	parentSlot, err := getSlot(q, *currentSlot.NextSlotID)
+	if err != nil {
+		return err
+	}
+	siblingIndex := parentSlot.SlotIndex ^ 1
+	var sibling *BracketSlot
+	if parentSlot.CategoryID != nil && *parentSlot.CategoryID != "" {
+		// Bagan terisolasi per kategori: kelas bobot yang sama di golongan umur berbeda tidak boleh bertabrakan.
+		sibling, err = scanSlot(q.QueryRow(`
+			SELECT `+slotColumns+` FROM bracket_slots
+			WHERE competition_id = $1 AND category_id = $2 AND round = $3 AND slot_index = $4
+			LIMIT 1`, parentSlot.CompetitionID, *parentSlot.CategoryID, parentSlot.Round, siblingIndex))
+	} else {
+		sibling, err = scanSlot(q.QueryRow(`
+			SELECT `+slotColumns+` FROM bracket_slots
+			WHERE competition_id = $1 AND weight_class = $2 AND gender = $3 AND category_id IS NULL AND round = $4 AND slot_index = $5
+			LIMIT 1`, parentSlot.CompetitionID, parentSlot.WeightClass, parentSlot.Gender, parentSlot.Round, siblingIndex))
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if sibling.ParticipantID == nil || *sibling.ParticipantID == "" {
+		return nil // lawan belum ada
 	}
 
-	return nil
+	redSlot, blueSlot := sibling, parentSlot
+	if parentSlot.SlotIndex%2 == 0 {
+		redSlot, blueSlot = parentSlot, sibling
+	}
+
+	var existingMatchID string
+	err = q.QueryRow(`SELECT id FROM matches WHERE competition_id = $1 AND bracket_slot_id = $2 LIMIT 1`,
+		parentSlot.CompetitionID, redSlot.ID).Scan(&existingMatchID)
+	if err == nil {
+		return nil // partainya sudah ada
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	// Partai babak lanjutan memakai gelanggang asal kategori (sama dengan babak sebelumnya); gelanggang
+	// pertama menurut nama hanya untuk bagan lama tanpa kategori.
+	var arenaID sql.NullString
+	if parentSlot.CategoryID != nil && *parentSlot.CategoryID != "" {
+		_ = q.QueryRow(`SELECT home_arena_id FROM categories WHERE id = $1`, *parentSlot.CategoryID).Scan(&arenaID)
+	}
+	if !arenaID.Valid {
+		_ = q.QueryRow(`SELECT id FROM arenas WHERE competition_id = $1 ORDER BY name ASC, id ASC LIMIT 1`, parentSlot.CompetitionID).Scan(&arenaID)
+	}
+	var aID any
+	if arenaID.Valid {
+		aID = arenaID.String
+	}
+	_, err = q.Exec(`
+		INSERT INTO matches (competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status)
+		VALUES ($1, $2, $3, $4, $5, $6, 'idle')`,
+		parentSlot.CompetitionID, aID, redSlot.ID, *redSlot.ParticipantID, *blueSlot.ParticipantID, redSlot.Round)
+	return err
 }
 
 // GetByCategoryID mengambil seluruh slot bagan milik satu kategori.

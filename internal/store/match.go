@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type MatchStore struct {
 	DB *sql.DB
@@ -86,9 +89,42 @@ func (s *MatchStore) UpdateStatus(id, status string) error {
 	return err
 }
 
-func (s *MatchStore) SetWinner(matchID, winnerID string) error {
-	_, err := s.DB.Exec(`UPDATE matches SET winner_id = $1, status = 'finished', finished_at = NOW() WHERE id = $2`, winnerID, matchID)
-	return err
+// FinishMatch menutup partai dalam satu transaksi: status, pemenang, dan kemajuan bagan (termasuk membuat partai
+// babak berikutnya) tersimpan semuanya atau tidak sama sekali. winnerCorner "red" atau "blue"; mengembalikan id atlet
+// pemenang. Bila gagal, partai di database tetap seperti sebelumnya sehingga penutupan bisa diulang.
+func (s *MatchStore) FinishMatch(matchID, winnerCorner string) (string, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	var red, blue string
+	var slotID sql.NullString
+	if err := tx.QueryRow(`SELECT athlete_red_id, athlete_blue_id, bracket_slot_id FROM matches WHERE id = $1 FOR UPDATE`,
+		matchID).Scan(&red, &blue, &slotID); err != nil {
+		return "", err
+	}
+	var winnerID string
+	switch winnerCorner {
+	case "red":
+		winnerID = red
+	case "blue":
+		winnerID = blue
+	default:
+		return "", fmt.Errorf("sudut pemenang %q tidak dikenal", winnerCorner)
+	}
+
+	if _, err := tx.Exec(`UPDATE matches SET winner_id = $1, status = 'finished', finished_at = NOW() WHERE id = $2`,
+		winnerID, matchID); err != nil {
+		return "", err
+	}
+	if slotID.Valid && slotID.String != "" {
+		if err := advanceWinner(tx, slotID.String, winnerID); err != nil {
+			return "", err
+		}
+	}
+	return winnerID, tx.Commit()
 }
 
 const matchColumns = `id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at`

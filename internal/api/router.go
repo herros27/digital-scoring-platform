@@ -38,7 +38,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// services
 	compService := service.NewCompetitionService(compRepo)
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
-	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
+	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo)
 	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo).WithCategoryArenas(categoryRepo)
 	categoryService := service.NewCategoryService(categoryRepo).WithRulesetLookup(func(id string) bool {
 		rs, err := rulesetRepo.GetByID(id)

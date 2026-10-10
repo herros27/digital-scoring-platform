@@ -336,6 +336,9 @@ func (o *Orchestrator) doDeclareOutcome(outcome, winner, note string) error {
 		"outcome": rule.Type, "label": rule.Label, "winner_corner": winner, "note": note,
 	}, "")
 	o.finalize()
+	if o.unsavedCorner != "" {
+		return ErrResultNotSaved
+	}
 	return nil
 }
 

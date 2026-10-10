@@ -5,7 +5,6 @@ import (
 
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/statemachine"
-	"github.com/herros27/digital-scoring/internal/store"
 )
 
 func progressCounts(msgs []hub.Message) []int {
@@ -99,15 +98,14 @@ func (s *statusRecorder) UpdateStatus(_, status string) error {
 	s.statuses = append(s.statuses, status)
 	return nil
 }
-func (s *statusRecorder) SetWinner(string, string) error       { return nil }
-func (s *statusRecorder) GetByID(string) (*store.Match, error) { return nil, nil }
+func (s *statusRecorder) FinishMatch(_, corner string) (string, error) { return corner, nil }
 
 // Daftar partai di UI panitia membaca status dari database: jeda harus tersimpan sebagai "paused" (agar tombol
 // Lanjutkan muncul) dan kembali "running" saat dilanjutkan.
 func TestPauseAndResumePersistMatchStatus(t *testing.T) {
 	rec := &statusRecorder{}
 	h := hub.NewHub("arena-1")
-	o := New("match-1", "arena-1", statemachine.New("match-1"), customRuleset(), h, rec, nil, nil, nil)
+	o := New("match-1", "arena-1", statemachine.New("match-1"), customRuleset(), h, rec, nil, nil)
 	referee, _ := hub.NewClient("ref-1", hub.RoleReferee, "arena-1")
 	h.Register(referee)
 

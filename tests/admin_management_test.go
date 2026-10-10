@@ -429,7 +429,7 @@ func TestUnregisterParticipant_AturanKepemilikanDanBagan(t *testing.T) {
 // --- Partai manual: validasi peserta ---------------------------------------------------------------------------
 
 func TestMatchService_CreateMatch_ValidasiPeserta(t *testing.T) {
-	svc := service.NewMatchService(newMockMatchRepo(), &mockCompRepo{}, hub.NewManager(), nil, nil, nil, nil)
+	svc := service.NewMatchService(newMockMatchRepo(), &mockCompRepo{}, hub.NewManager(), nil, nil, nil)
 	parts := map[string]*domain.Participant{
 		"merah":   {ID: "merah", CompetitionID: "c1", RegistrationStatus: "verified", Name: "Merah"},
 		"biru":    {ID: "biru", CompetitionID: "c1", RegistrationStatus: "verified", Name: "Biru"},

@@ -12,8 +12,9 @@ import (
 )
 
 type mockMatchRepo struct {
-	mu      sync.RWMutex
-	matches map[string]*store.Match
+	mu       sync.RWMutex
+	matches  map[string]*store.Match
+	onFinish func(slotID, winnerID string)
 }
 
 func newMockMatchRepo() *mockMatchRepo {
@@ -46,14 +47,23 @@ func (m *mockMatchRepo) UpdateStatus(id, status string) error {
 	return domain.ErrNotFound
 }
 
-func (m *mockMatchRepo) SetWinner(matchID, winnerID string) error {
+// FinishMatch meniru MatchStore.FinishMatch; onFinish (opsional) meniru kemajuan bagan di dalam transaksi.
+func (m *mockMatchRepo) FinishMatch(matchID, corner string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if match, ok := m.matches[matchID]; ok {
-		match.WinnerID = winnerID
-		return nil
+	match, ok := m.matches[matchID]
+	if !ok {
+		return "", domain.ErrNotFound
 	}
-	return domain.ErrNotFound
+	winner := match.AthleteRedID
+	if corner == "blue" {
+		winner = match.AthleteBlueID
+	}
+	match.Status, match.WinnerID = "finished", winner
+	if m.onFinish != nil && match.BracketSlotID != "" {
+		m.onFinish(match.BracketSlotID, winner)
+	}
+	return winner, nil
 }
 
 type mockCompRepo struct{}
@@ -71,7 +81,7 @@ func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 	compRepo := &mockCompRepo{}
 	hubManager := hub.NewManager()
 
-	svc := service.NewMatchService(matchRepo, compRepo, hubManager, nil, nil, nil, nil)
+	svc := service.NewMatchService(matchRepo, compRepo, hubManager, nil, nil, nil)
 	rulesetPath := "ipsi"
 
 	// 1. Create Match
@@ -155,7 +165,7 @@ func TestMatchService_LifecycleAndArenaBusy(t *testing.T) {
 // Wasit hanya boleh memuat partai yang dijadwalkan di gelanggangnya; partai tanpa gelanggang juga ditolak.
 func TestMatchService_LoadOnlyInScheduledArena(t *testing.T) {
 	matchRepo := newMockMatchRepo()
-	svc := service.NewMatchService(matchRepo, &mockCompRepo{}, hub.NewManager(), nil, nil, nil, nil)
+	svc := service.NewMatchService(matchRepo, &mockCompRepo{}, hub.NewManager(), nil, nil, nil)
 	_ = svc.CreateMatch(&store.Match{ID: "m-a", CompetitionID: "c", ArenaID: "arena-a", AthleteRedID: "r", AthleteBlueID: "b"})
 	_ = svc.CreateMatch(&store.Match{ID: "m-none", CompetitionID: "c", AthleteRedID: "r", AthleteBlueID: "b"})
 

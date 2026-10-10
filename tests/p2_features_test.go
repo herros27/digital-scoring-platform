@@ -132,7 +132,7 @@ func TestPaginationAndFiltering(t *testing.T) {
 		_ = matchRepo.Create(m)
 	}
 
-	matchSvc := service.NewMatchService(matchRepo, &mockCompRepo{}, hub.NewManager(), nil, nil, nil, nil)
+	matchSvc := service.NewMatchService(matchRepo, &mockCompRepo{}, hub.NewManager(), nil, nil, nil)
 	pagedMatches, totalMatches, err := matchSvc.GetMatchesByCompetitionPaged("comp-pagination", "running", 1, 10)
 	if err != nil {
 		t.Fatalf("GetMatchesByCompetitionPaged failed: %v", err)
@@ -168,7 +168,7 @@ func TestIdempotencyKey_ScoringDeduplication(t *testing.T) {
 	sm := statemachine.New("match-idempotency")
 	ruleset, _ := rules.LoadRuleset("ipsi")
 
-	orch := orchestrator.New("match-idempotency", "arena-idempotency", sm, ruleset, h, nil, nil, nil, nil)
+	orch := orchestrator.New("match-idempotency", "arena-idempotency", sm, ruleset, h, nil, nil, nil)
 	if err := orch.Start(); err != nil {
 		t.Fatalf("orch.Start failed: %v", err)
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/herros27/digital-scoring/internal/hub"
 	"github.com/herros27/digital-scoring/internal/rules"
-	"github.com/herros27/digital-scoring/internal/store"
 )
 
 func declare(r *testRig, by *hub.Client, outcome, winner string) {
@@ -152,10 +151,7 @@ func (f *recordingMatchStore) UpdateStatus(_ string, status string) error {
 	f.statuses = append(f.statuses, status)
 	return nil
 }
-func (f *recordingMatchStore) SetWinner(string, string) error { return nil }
-func (f *recordingMatchStore) GetByID(string) (*store.Match, error) {
-	return &store.Match{ID: "match-1"}, nil
-}
+func (f *recordingMatchStore) FinishMatch(_, corner string) (string, error) { return corner, nil }
 
 // Status 'running' harus tersimpan saat partai dimulai: UI membaca status dari database untuk badge LIVE
 // dan penghitung "sedang tanding"; sebelumnya partai berjalan tetap tercatat 'idle'.

@@ -98,7 +98,6 @@ func Restore(
 	matchStore MatchStore,
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
-	bracketStore BracketAdvancer,
 	rs RuntimeStore,
 ) (*Orchestrator, error) {
 	var d runtimeData
@@ -113,7 +112,7 @@ func Restore(
 
 	sm := statemachine.NewWithState(rec.MatchID, state)
 	ruleset := d.Ruleset
-	o := New(rec.MatchID, rec.ArenaID, sm, &ruleset, h, matchStore, eventStore, scoreStore, bracketStore)
+	o := New(rec.MatchID, rec.ArenaID, sm, &ruleset, h, matchStore, eventStore, scoreStore)
 
 	o.mu.Lock()
 	defer o.mu.Unlock()

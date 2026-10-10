@@ -266,7 +266,7 @@ func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 	}
 
 	hubMgr := hub.NewManager()
-	matchSvc := service.NewMatchService(matchRepo, compRepo, hubMgr, nil, nil, nil, nil)
+	matchSvc := service.NewMatchService(matchRepo, compRepo, hubMgr, nil, nil, nil)
 	matchSvc.SetRulesetResolver(rulesetSvc)
 
 	// Load match to arena dengan rulesetPath kosong -> otomatis mengambil dari comp.RulesetID!
@@ -313,7 +313,7 @@ func TestMatchService_CategoryRulesetOverridesCompetition(t *testing.T) {
 	matchRepo.matches["m-ud"] = &store.Match{ID: "m-ud", CompetitionID: "comp-1", ArenaID: "arena-1", BracketSlotID: "slot-ud", Status: "idle"}
 	matchRepo.matches["m-dw"] = &store.Match{ID: "m-dw", CompetitionID: "comp-1", ArenaID: "arena-2", BracketSlotID: "slot-dw", Status: "idle"}
 
-	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil, nil)
+	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil)
 	svc.SetRulesetResolver(rulesetSvc)
 	svc.SetCategoryRulesetLookup(fakeCategoryRulesets{"slot-ud": usiaDini.ID}) // slot-dw: tanpa override
 

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -22,15 +23,15 @@ type RoundScore struct {
 	BluePenalties int
 }
 
-type BracketAdvancer interface {
-	AdvanceWinner(slotID, winnerID string) error
-}
-
+// MatchStore penyimpanan partai. FinishMatch menutup partai secara atomik (status, pemenang, dan kemajuan bagan
+// dalam satu transaksi) dan mengembalikan id atlet pemenang dari sudut "red"/"blue".
 type MatchStore interface {
 	UpdateStatus(id, status string) error
-	SetWinner(matchID, winnerID string) error
-	GetByID(id string) (*store.Match, error)
+	FinishMatch(matchID, winnerCorner string) (winnerID string, err error)
 }
+
+// ErrResultNotSaved: hasil akhir sudah dihitung tetapi gagal ditulis ke database. Wasit boleh menekan Selesai lagi.
+var ErrResultNotSaved = errors.New("hasil pertandingan belum tersimpan ke database; tekan Selesai lagi untuk mengulang")
 
 type Orchestrator struct {
 	mu      sync.Mutex
@@ -45,7 +46,6 @@ type Orchestrator struct {
 	matchStore   MatchStore
 	eventStore   *store.MatchEventStore
 	scoreStore   *store.MatchScoreStore
-	bracketStore BracketAdvancer
 
 	// skor per ronde: index = round number (1-based, [0] tidak dipakai)
 	scores     [4]RoundScore
@@ -67,6 +67,8 @@ type Orchestrator struct {
 	// pemulihan setelah server restart (lihat runtime.go)
 	runtimeStore RuntimeStore
 	recovered    bool // dipulihkan dari keadaan tersimpan dan belum dilanjutkan wasit
+	// unsavedCorner terisi (red/blue) selama hasil akhir belum berhasil ditulis ke database; lihat saveResultLocked
+	unsavedCorner string
 }
 
 func New(
@@ -77,7 +79,6 @@ func New(
 	matchStore MatchStore,
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
-	bracketStore BracketAdvancer,
 ) *Orchestrator {
 	o := &Orchestrator{
 		matchID:      matchID,
@@ -89,7 +90,6 @@ func New(
 		matchStore:   matchStore,
 		eventStore:   eventStore,
 		scoreStore:   scoreStore,
-		bracketStore: bracketStore,
 		seenEvents:   make(map[string]time.Time),
 		lastInput:    make(map[int]judgeAction),
 		inputCount:   make(map[int]int),
@@ -286,8 +286,6 @@ func (o *Orchestrator) doResume() error {
 	return nil
 }
 
-// doFinish mengakhiri pertandingan. Bila skor seri, wasit wajib menentukan pemenang
-// (`winner` = "red"/"blue", keputusan wasit); tanpa itu pertandingan tidak diakhiri.
 // doFinish mengakhiri pertandingan. `winner` (keputusan wasit) menimpa hasil; `method` menjelaskan
 // dasar keputusan (kosong = keputusan wasit; selain itu salah satu metode manual ruleset).
 // Tanpa `winner` dan skor seri, aturan seri otomatis dijalankan; bila masih seri, ErrTieNeedsDecision.
@@ -296,6 +294,9 @@ func (o *Orchestrator) doFinish(winner, method string) error {
 	defer o.mu.Unlock()
 
 	if o.sm.IsFinished() {
+		if o.unsavedCorner != "" {
+			return o.retrySaveLocked()
+		}
 		return fmt.Errorf("match is already finished")
 	}
 	// Partai yang belum dimulai tidak boleh "diselesaikan": tanpa pertandingan tidak ada hasil, dan
@@ -330,6 +331,9 @@ func (o *Orchestrator) doFinish(winner, method string) error {
 		o.forceTiebreakLocked(res)
 	}
 	o.finalize()
+	if o.unsavedCorner != "" {
+		return ErrResultNotSaved
+	}
 	return nil
 }
 
@@ -340,15 +344,21 @@ func (o *Orchestrator) doCancel() error {
 	if o.sm.IsFinished() {
 		return fmt.Errorf("cannot cancel finished match")
 	}
+	// Status ditulis lebih dulu dan kegagalannya dikembalikan: dari semua keadaan yang belum selesai pembatalan selalu
+	// sah, jadi partai tetap utuh (jam, pemulihan) dan wasit bisa mengulang, tidak berakhir "dibatalkan" di layar tetapi
+	// "running" di database tanpa jalan pemulihan.
+	if o.matchStore != nil {
+		if err := o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateCancelled)); err != nil {
+			log.Printf("[orch:%s] cancel gagal disimpan: %v", o.matchID, err)
+			return fmt.Errorf("pembatalan belum tersimpan ke database, coba lagi: %w", err)
+		}
+	}
 	if o.timer != nil {
 		o.timer.Stop()
 	}
 	if err := o.sm.Transition(statemachine.EventCancel); err != nil {
 		log.Printf("[orch:%s] cancel transition error: %v", o.matchID, err)
 		return err
-	}
-	if o.matchStore != nil {
-		_ = o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateCancelled))
 	}
 	o.appendEvent("match_cancelled", nil, "")
 	o.broadcastState()
@@ -380,13 +390,28 @@ func (o *Orchestrator) scoringOpen() error {
 	return nil
 }
 
+// firstTime mencatat kunci idempotensi dan mengembalikan false bila kunci itu sudah pernah masuk (kiriman ulang
+// tablet atau klien REST). Kunci lebih tua dari 5 menit dibuang agar peta tidak tumbuh selama partai berlangsung.
+func (o *Orchestrator) firstTime(key string) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if _, exists := o.seenEvents[key]; exists {
+		return false
+	}
+	o.seenEvents[key] = time.Now()
+	if len(o.seenEvents) > 500 {
+		cutoff := time.Now().Add(-5 * time.Minute)
+		for k, t := range o.seenEvents {
+			if t.Before(cutoff) {
+				delete(o.seenEvents, k)
+			}
+		}
+	}
+	return true
+}
+
 func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	// hanya judge yang boleh submit skor
-	// if client.Role != hub.RoleJudge {
-	// 	o.sendError(client, "FORBIDDEN", "only judges can submit scores")
-	// 	return
-	// }
-
 	if !client.Role.IsJudge() {
 		o.sendError(client, "FORBIDDEN", "only judges can submit scores")
 		return
@@ -413,23 +438,9 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	if key == "" {
 		key = p.IdempotencyKey
 	}
-	if key != "" {
-		o.mu.Lock()
-		if _, exists := o.seenEvents[key]; exists {
-			o.mu.Unlock()
-			log.Printf("[orch:%s] duplicate score event ignored by idempotency key: %s", o.matchID, key)
-			return
-		}
-		o.seenEvents[key] = time.Now()
-		if len(o.seenEvents) > 500 {
-			cutoff := time.Now().Add(-5 * time.Minute)
-			for k, t := range o.seenEvents {
-				if t.Before(cutoff) {
-					delete(o.seenEvents, k)
-				}
-			}
-		}
-		o.mu.Unlock()
+	if key != "" && !o.firstTime(key) {
+		log.Printf("[orch:%s] duplicate score event ignored by idempotency key: %s", o.matchID, key)
+		return
 	}
 
 	if p.ScoreType == undoScoreType {
@@ -485,14 +496,8 @@ func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyK
 		return nil, false, fmt.Errorf("score_type %q tidak dikenal pada ruleset ini", input.ScoreType)
 	}
 
-	if idempotencyKey != "" {
-		o.mu.Lock()
-		if _, exists := o.seenEvents[idempotencyKey]; exists {
-			o.mu.Unlock()
-			return nil, true, nil
-		}
-		o.seenEvents[idempotencyKey] = time.Now()
-		o.mu.Unlock()
+	if idempotencyKey != "" && !o.firstTime(idempotencyKey) {
+		return nil, true, nil
 	}
 
 	input.MatchID = o.matchID
@@ -579,6 +584,12 @@ func (o *Orchestrator) notifyConsensusProgress(res *consensus.ConsensusResult) {
 func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+
+	// Pemeriksaan scoringOpen dilakukan sebelum kunci diambil; bila bel ronde sempat menutup babak atau partai di
+	// sela itu, poin yang terlambat tidak boleh mengubah skor yang sudah menentukan pemenang.
+	if !o.sm.IsInRound() {
+		return
+	}
 
 	round := result.Round
 	pts := o.pointsFor(result.ScoreType)
@@ -793,29 +804,7 @@ func (o *Orchestrator) finalize() {
 	if o.forced != nil {
 		winnerCorner, resultType = o.forced.Corner, o.forced.ResultType
 	}
-	winnerID := winnerCorner
-
-	if o.matchStore != nil {
-		_ = o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateFinished))
-		m, err := o.matchStore.GetByID(o.matchID)
-		if err == nil && m != nil {
-			if winnerCorner == "red" && m.AthleteRedID != "" {
-				winnerID = m.AthleteRedID
-			} else if winnerCorner == "blue" && m.AthleteBlueID != "" {
-				winnerID = m.AthleteBlueID
-			}
-			_ = o.matchStore.SetWinner(o.matchID, winnerID)
-
-			// Otomatisasi Bracket Advancement: majukan pemenang ke slot berikutnya
-			if m.BracketSlotID != "" && o.bracketStore != nil {
-				if err := o.bracketStore.AdvanceWinner(m.BracketSlotID, winnerID); err != nil {
-					log.Printf("[orch:%s] failed to advance bracket winner: %v", o.matchID, err)
-				}
-			}
-		} else {
-			_ = o.matchStore.SetWinner(o.matchID, winnerID)
-		}
-	}
+	winnerID, saved := o.saveResultLocked(winnerCorner)
 
 	o.appendEvent("match_finished", map[string]any{
 		"winner":      winnerID,
@@ -841,7 +830,44 @@ func (o *Orchestrator) finalize() {
 			"scores":      o.scores[1:4],
 		},
 	})
+	if saved {
+		o.clearRuntimeLocked()
+		return
+	}
+	// Keadaan pemulihan sengaja dipertahankan: baris partai di database tidak berubah (transaksi dibatalkan), jadi
+	// setelah restart partai kembali dijeda dan wasit dapat menutupnya lagi.
+	msg := hub.Message{Type: hub.MsgError, Payload: map[string]string{"code": "RESULT_NOT_SAVED", "message": ErrResultNotSaved.Error()}}
+	o.h.SendToRole(hub.RoleReferee, msg)
+	o.h.SendToRole(hub.RoleAdmin, msg)
+}
+
+// saveResultLocked menulis hasil akhir ke database (satu transaksi) dan mengembalikan id pemenang. Gagal berarti tidak
+// ada yang berubah: unsavedCorner terisi dan wasit bisa mengulang lewat doFinish. Pemanggil memegang o.mu.
+func (o *Orchestrator) saveResultLocked(corner string) (winnerID string, saved bool) {
+	if o.matchStore == nil {
+		return corner, true
+	}
+	id, err := o.matchStore.FinishMatch(o.matchID, corner)
+	if err != nil {
+		log.Printf("[orch:%s] hasil akhir gagal disimpan: %v", o.matchID, err)
+		o.unsavedCorner = corner
+		return corner, false
+	}
+	o.unsavedCorner = ""
+	return id, true
+}
+
+// retrySaveLocked mengulang penulisan hasil akhir yang gagal tadi. Pemanggil memegang o.mu.
+func (o *Orchestrator) retrySaveLocked() error {
+	winnerID, saved := o.saveResultLocked(o.unsavedCorner)
+	if !saved {
+		return ErrResultNotSaved
+	}
+	if o.result != nil {
+		o.result["winner"] = winnerID
+	}
 	o.clearRuntimeLocked()
+	return nil
 }
 
 // Hitung total skor semua ronde, tentukan pemenang

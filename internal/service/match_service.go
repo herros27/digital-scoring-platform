@@ -21,7 +21,7 @@ type MatchRepository interface {
 	Create(m *store.Match) error
 	GetByID(id string) (*store.Match, error)
 	UpdateStatus(id, status string) error
-	SetWinner(matchID, winnerID string) error
+	FinishMatch(matchID, winnerCorner string) (winnerID string, err error)
 }
 
 type RulesetResolver interface {
@@ -36,7 +36,6 @@ type MatchService struct {
 	eventStore       *store.MatchEventStore
 	scoreStore       *store.MatchScoreStore
 	matchStore       *store.MatchStore
-	bracketStore     orchestrator.BracketAdvancer
 	rulesetResolver  RulesetResolver
 	categoryRulesets CategoryRulesetLookup
 	arenaStore       *store.ArenaStore
@@ -117,7 +116,6 @@ func NewMatchService(
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
 	matchStore *store.MatchStore,
-	bracketStore orchestrator.BracketAdvancer,
 ) *MatchService {
 	return &MatchService{
 		matchRepo:           matchRepo,
@@ -126,7 +124,6 @@ func NewMatchService(
 		eventStore:          eventStore,
 		scoreStore:          scoreStore,
 		matchStore:          matchStore,
-		bracketStore:        bracketStore,
 		activeOrchestrators: make(map[string]*orchestrator.Orchestrator),
 	}
 }
@@ -304,7 +301,7 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 		mStore = s.matchRepo
 	}
 
-	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore)
+	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore)
 	if s.runtimeStore != nil {
 		orch.SetRuntimeStore(s.runtimeStore)
 	}
@@ -353,7 +350,7 @@ func (s *MatchService) RestoreActiveMatches() (int, error) {
 		} else if s.matchRepo != nil {
 			mStore = s.matchRepo
 		}
-		orch, err := orchestrator.Restore(rec, s.hubManager.GetOrCreate(rec.ArenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore, s.runtimeStore)
+		orch, err := orchestrator.Restore(rec, s.hubManager.GetOrCreate(rec.ArenaID), mStore, s.eventStore, s.scoreStore, s.runtimeStore)
 		if err != nil {
 			log.Printf("[match] gagal memulihkan partai %s: %v", rec.MatchID, err)
 			_ = s.runtimeStore.Delete(rec.MatchID)
