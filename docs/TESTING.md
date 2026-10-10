@@ -24,10 +24,11 @@ temuan) dan `README.md` akar (daftar tes Go).
 | Playwright PWA                                                         | backend (build + preview otomatis) | `npm run test:pw:pwa`                  | `apps/web`  |
 | Cypress (spec `ui-*` dan admin)                                        | backend + Vite + binary Cypress    | `npm run cypress:run`                  | `apps/web`  |
 
-Tes Go yang memakai database akan dilewati bila Postgres tidak ada atau menolak sambungan (`TEST_DB_URL` untuk database
-lain). Bila Postgres dari docker compose berpassword, tanpa `TEST_DB_URL` yang memuat password tes-tes itu DILEWATI
-diam-diam: set `TEST_DB_URL=postgres://scoring_user:<password>@localhost:5432/digital_scoring?sslmode=disable` dan pakai
-`go test -v` untuk memastikan tidak ada yang `SKIP`.
+Tes Go yang memakai database memilih alamatnya berurutan: `TEST_DB_URL` (shell/CI), lalu `DB_URL` dari `.env` di akar
+repo (hanya bila menunjuk ke `localhost`/`127.0.0.1`: tes membuat dan menghapus data), lalu bawaan lokal tanpa password.
+Dengan `.env` yang `DB_URL`-nya berpassword (Postgres compose wajib berpassword) tidak perlu mengatur apa pun di shell.
+Tes DILEWATI hanya bila server database tidak terjangkau; bila server ada tetapi menolak password, tes GAGAL dengan
+petunjuk, bukan dilewati diam-diam. Pakai `go test -v` untuk memastikan tidak ada yang `SKIP`.
 
 ## Urutan lengkap (satu kali jalan)
 

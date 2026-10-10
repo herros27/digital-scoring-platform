@@ -557,7 +557,7 @@ Menjalankan seluruh **automated unit tests** (co-located di `internal/`) dan **i
   - `tests/p1_features_test.go` & `tests/p2_features_test.go`: Phase 1 & 2 feature regression tests
 
 Tes login PIN (`tests/pin_login_test.go`) memakai database PostgreSQL nyata dan dilewati bila tidak tersedia
-(default `postgres://scoring_user@localhost:5432/digital_scoring`, atau set `TEST_DB_URL`). CI menyediakannya lewat service Postgres.
+(alamat dari `TEST_DB_URL`, lalu `DB_URL` di `.env` bila menunjuk ke localhost, lalu `postgres://scoring_user@localhost:5432/digital_scoring`). CI menyediakannya lewat service Postgres.
 
 Simulasi end-to-end (REST + WebSocket + konsensus juri, 20+ pemeriksaan; butuh backend berjalan dan data seed):
 ```bash

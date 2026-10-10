@@ -1,13 +1,11 @@
 package tests
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,18 +19,11 @@ import (
 )
 
 // pinTestEnv menyiapkan 1 kompetisi dengan 2 arena di database nyata. Dilewati bila
-// database tidak tersedia (set TEST_DB_URL untuk memakai database lain).
+// database tidak tersedia (TEST_DB_URL atau DB_URL di .env menentukan database yang dipakai).
 func pinTestEnv(t *testing.T) (pins *auth.PinStore, comp, arenaA, arenaB string) {
 	t.Helper()
 	auth.SetBcryptCost(bcrypt.MinCost) // cost produksi (12) terlalu lambat untuk tes
-	dsn := os.Getenv("TEST_DB_URL")
-	if dsn == "" {
-		dsn = "postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil || db.Ping() != nil {
-		t.Skip("database tidak tersedia; tes PIN dilewati")
-	}
+	db := openTestDB(t, "tes PIN")
 	t.Cleanup(func() { db.Close() })
 	if err := store.RunMigrations(db); err != nil {
 		t.Fatalf("migrasi: %v", err)

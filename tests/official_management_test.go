@@ -1,12 +1,10 @@
 package tests
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -288,14 +286,7 @@ func TestOfficialHandler_StatusMapping(t *testing.T) {
 // --- Database nyata -------------------------------------------------------------------------------------------------
 
 func TestOfficialStore_PasswordDanHitungPeran(t *testing.T) {
-	dsn := os.Getenv("TEST_DB_URL")
-	if dsn == "" {
-		dsn = "postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil || db.Ping() != nil {
-		t.Skip("database tidak tersedia; tes store petugas dilewati")
-	}
+	db := openTestDB(t, "tes store petugas")
 	t.Cleanup(func() { db.Close() }) // didaftarkan lebih dulu agar berjalan SETELAH cleanup penghapusan akun di bawah
 	if err := store.RunMigrations(db); err != nil {
 		t.Fatalf("migrasi: %v", err)

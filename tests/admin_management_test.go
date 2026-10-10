@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -251,14 +250,7 @@ type adminDB struct {
 
 func newAdminDB(t *testing.T) *adminDB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DB_URL")
-	if dsn == "" {
-		dsn = "postgres://scoring_user@localhost:5432/digital_scoring?sslmode=disable"
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil || db.Ping() != nil {
-		t.Skip("database tidak tersedia; tes administrasi kategori/peserta dilewati")
-	}
+	db := openTestDB(t, "tes administrasi kategori/peserta")
 	if err := store.RunMigrations(db); err != nil {
 		t.Fatalf("migrasi: %v", err)
 	}
