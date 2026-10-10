@@ -1,6 +1,6 @@
 # Panduan Menjalankan Semua Tes
 
-Ringkasan satu pintu. Detail tiap suite ada di `apps/web/cypress/e2e/match/README.md` (alur partai, Playwright,
+Ringkasan satu pintu. Detail tiap suite ada di `apps/web/test/cypress/e2e/match/README.md` (alur partai, Playwright,
 temuan) dan `README.md` akar (daftar tes Go).
 
 ## Prasyarat umum
@@ -71,7 +71,7 @@ Perintah `E2E_RESTART_CMD` memakai path relatif, jadi jalankan tes dari `apps/we
 - Satu spec headless: `npm run test:match-flow -- 03`
 - Playwright dengan UI untuk memilih tes: `npm run test:pw:ui`; lihat jendela browser: `npm run test:pw:headed`
 - Satu tes Playwright berdasarkan nama: `npx playwright test -g "BATAL"`
-- Laporan HTML: `npx playwright show-report`
+- Laporan HTML: `npx playwright show-report test/playwright/report`
 - Menguji build Docker (nginx, port 80) alih-alih server dev: set `E2E_BASE_URL=http://localhost`
 
 ## Spec yang butuh pengaturan khusus

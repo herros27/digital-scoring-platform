@@ -218,7 +218,9 @@ func (s *BracketService) generate(competitionID, categoryID, weightClass, gender
 					CurrentRound:  r,
 					Status:        "idle",
 				}
-				_ = s.matchRepo.Create(m)
+				if err := s.matchRepo.Create(m); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}

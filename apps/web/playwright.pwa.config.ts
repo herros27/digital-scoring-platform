@@ -5,7 +5,7 @@ import base from './playwright.config.ts'
  * Uji PWA pada BUILD PRODUKSI (service worker hanya terdaftar di build, bukan `vite dev`): membangun lalu menyajikan
  * dengan `vite preview` di port 4173 (proxy /api dan /ws ke backend). Backend harus berjalan.
  *
- *   npm run test:pw:pwa
+ *   npm run playwright:pw:pwa
  */
 export default defineConfig({
   ...base,

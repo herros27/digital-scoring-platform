@@ -19,11 +19,11 @@
     "cypress:record": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --record",
     "cypress:open:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress open --expose SLOW_MO=800",
     "cypress:headed:slow": "cross-env ELECTRON_EXTRA_LAUNCH_ARGS=\"--no-sandbox --disable-gpu --disable-software-rasterizer\" cypress run --headed --no-exit --expose SLOW_MO=800",
-    "test:match-flow": "node cypress/scripts/run-match-flow.ts",
-    "test:pw": "playwright test", 
-    "test:pw:ui": "playwright test --ui",
-    "test:pw:headed": "playwright test --headed",
-    "test:pw:pwa": "playwright test -c playwright.pwa.config.ts"
+    "cypress:match-flow": "node test/cypress/scripts/run-match-flow.ts",
+    "playwright:pw": "playwright test",
+    "playwright:pw:ui": "playwright test --ui",
+    "playwright:pw:headed": "playwright test --headed",
+    "playwright:pw:pwa": "playwright test -c playwright.pwa.config.ts"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",
@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.49.0",
+    "@playwright/test": "^1.64.0",
     "@types/node": "^24.19.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.5.1",

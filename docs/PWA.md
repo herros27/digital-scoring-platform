@@ -6,7 +6,7 @@ bilah alamat, dan cangkang aplikasi (HTML/JS/CSS/ikon) tetap terbuka walau jarin
 ## Rekomendasi untuk acara: server di laptop + router Wi-Fi (internet tidak pasti)
 
 Rancang untuk **skenario terburuk: tanpa internet**. Aplikasi sendiri tidak membutuhkan internet (font sudah di-host
-sendiri, tidak ada permintaan ke domain luar; diuji di `playwright/pwa.spec.ts`). Satu-satunya hal yang bergantung pada
+sendiri, tidak ada permintaan ke domain luar; diuji di `apps/web/test/playwright/e2e/pwa/pwa.spec.ts`). Satu-satunya hal yang bergantung pada
 internet adalah sertifikat Let's Encrypt, jadi pakai **CA internal Caddy** dengan **IP tetap**:
 
 1. **IP tetap untuk laptop server.** Di router, buat *DHCP reservation* (atau set IP statis di laptop), mis. `192.168.1.10`.

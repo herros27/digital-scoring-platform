@@ -1,4 +1,4 @@
-import './cypress/scripts/load-env.mjs'
+import './test/cypress/scripts/load-env.mjs'
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'cypress'
 
@@ -11,8 +11,12 @@ export default defineConfig({
     screenshotOnRunFailure: true,
     defaultCommandTimeout: 8000,
     retries: { runMode: 1, openMode: 0 },
-    supportFile: 'cypress/support/e2e.ts',
-    specPattern: 'cypress/e2e/**/*.cy.ts',
+    supportFile: 'test/cypress/support/e2e.ts',
+    specPattern: 'test/cypress/e2e/**/*.cy.ts',
+    fixturesFolder: 'test/cypress/fixtures',
+    screenshotsFolder: 'test/cypress/screenshots',
+    videosFolder: 'test/cypress/videos',
+    downloadsFolder: 'test/cypress/downloads',
     // spec pemulihan restart hanya berjalan bila lingkungan menyediakan perintah restart backend
     expose: { E2E_RESTART: Boolean(process.env.E2E_RESTART_CMD) },
     setupNodeEvents(on) {

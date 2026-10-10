@@ -15,12 +15,12 @@ apps/web/dist
 
 PENCAK-SILAT-COMPETITION-REGULATION-VER-FEB-2026-SIN03052026-R.pdf
 # Playwright
-apps/web/test-results
-apps/web/playwright-report
+apps/web/test/playwright/test-results
+apps/web/test/playwright/report
 
 # Keluaran Cypress/Playwright (nama file bisa melebihi batas path Windows)
-apps/web/cypress/screenshots/
-apps/web/cypress/videos/
-apps/web/cypress/downloads/
-apps/web/test-results/
-apps/web/playwright-report/
+apps/web/test/cypress/screenshots/
+apps/web/test/cypress/videos/
+apps/web/test/cypress/downloads/
+apps/web/test/playwright/test-results/
+apps/web/test/playwright/report/

@@ -1345,8 +1345,11 @@ async function handleSaveCustomPin() {
   background-color: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  /* safe: modal yang lebih tinggi dari layar (mis. 1024x600) tidak terpotong di atas dan tetap bisa di-scroll */
+  align-items: safe center;
   justify-content: center;
+  overflow-y: auto;
+  padding: 16px 0;
   z-index: 120;
 }
 
