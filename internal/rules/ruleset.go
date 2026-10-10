@@ -25,6 +25,34 @@ type ScoringRule struct {
 	Consensus  *ConsensusRule  `json:"consensus,omitempty"`
 	Tiebreak   *TiebreakRule   `json:"tiebreak,omitempty"`
 	Outcomes   []OutcomeRule   `json:"outcomes,omitempty"`
+	PointGap   *PointGapRule   `json:"point_gap,omitempty"`
+}
+
+// Selisih poin WMP (Wasit Menghentikan Pertandingan): pertandingan dihentikan dan sudut yang unggul menang bila
+// selisih total poin mencapai batas pada babak yang ditentukan. Bawaan IPSI: 30 untuk remaja/dewasa, 20 untuk usia
+// dini dan pra-remaja (bawaan per golongan umur dipasang saat partai dimuat, lihat MatchService).
+const (
+	PointGapSeniorMargin     = 30
+	PointGapYouthMargin      = 20
+	DefaultPointGapFromRound = 2
+)
+
+// PointGapRule `Margin` 0 = WMP nonaktif. `FromRound` kosong = mulai babak 2.
+type PointGapRule struct {
+	Margin    int `json:"margin"`
+	FromRound int `json:"from_round,omitempty"`
+}
+
+// EffectivePointGap aturan WMP yang berlaku; ruleset tanpa `point_gap` memakai bawaan remaja/dewasa.
+func (s ScoringRule) EffectivePointGap() PointGapRule {
+	g := PointGapRule{Margin: PointGapSeniorMargin}
+	if s.PointGap != nil {
+		g = *s.PointGap
+	}
+	if g.FromRound <= 0 {
+		g.FromRound = DefaultPointGapFromRound
+	}
+	return g
 }
 
 // Jenis hasil khusus yang dapat dinyatakan wasit di luar skor, dan kapan boleh dinyatakan.
@@ -315,6 +343,15 @@ func (s ScoringRule) Validate() error {
 			if m != MethodExtraRound && m != MethodLighterWeight && m != MethodCoinToss {
 				return fmt.Errorf("tiebreak: metode manual %q tidak dikenal (%s, %s, %s)", m, MethodExtraRound, MethodLighterWeight, MethodCoinToss)
 			}
+		}
+	}
+
+	if g := s.PointGap; g != nil {
+		if g.Margin < 0 {
+			return fmt.Errorf("point_gap: margin tidak boleh negatif (0 = nonaktif)")
+		}
+		if g.FromRound < 0 || g.FromRound > s.TotalRounds {
+			return fmt.Errorf("point_gap: from_round harus 1 sampai total_rounds")
 		}
 	}
 

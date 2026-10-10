@@ -146,6 +146,19 @@ func (s *CategoryStore) RulesetIDForSlot(slotID string) (string, error) {
 	return id.String, err
 }
 
+// AgeGroupForSlot golongan umur kategori yang memiliki slot bagan ini ("" = tidak diketahui).
+func (s *CategoryStore) AgeGroupForSlot(slotID string) (string, error) {
+	var ag sql.NullString
+	err := s.DB.QueryRow(`
+		SELECT c.age_group FROM bracket_slots b
+		JOIN categories c ON c.id = b.category_id
+		WHERE b.id = $1`, slotID).Scan(&ag)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return ag.String, err
+}
+
 // AssignRulesets menetapkan ruleset khusus per kategori / per golongan umur dalam satu transaksi.
 // Ditolak (ErrConflict) bila kategori yang terdampak sudah punya partai berjalan/selesai.
 func (s *CategoryStore) AssignRulesets(competitionID string, items []domain.CategoryRulesetAssignment) (int64, error) {

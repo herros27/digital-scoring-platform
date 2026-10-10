@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import {
   METHOD_LABEL,
   PHASE_LABEL,
+  POINT_GAP_MODE_LABEL,
   TIEBREAK_METHODS,
   normalizedPriority,
   payloadFromDraft,
@@ -281,6 +282,67 @@ function submit() {
           <p class="rs-hint">
             Contoh: {{ d.consensus.majority }} dari {{ d.consensus.judges }} juri harus menekan
             teknik dan sudut yang sama dalam {{ (d.consensus.windowMs / 1000).toFixed(1) }} detik.
+          </p>
+        </section>
+
+        <!-- WMP -->
+        <section class="rs-section">
+          <h3>Wasit Menghentikan Pertandingan (WMP)</h3>
+          <p class="rs-hint">
+            Bila selisih total poin kedua sudut (setelah sanksi) mencapai batas pada babak yang
+            ditentukan, pertandingan langsung dihentikan dan sudut yang unggul menang.
+          </p>
+          <div class="rs-grid">
+            <label class="rs-field">
+              <span>Mode</span>
+              <select v-model="d.pointGap.mode" class="rs-input" data-test="gap-mode">
+                <option v-for="(label, mode) in POINT_GAP_MODE_LABEL" :key="mode" :value="mode">
+                  {{ label }}
+                </option>
+              </select>
+            </label>
+            <template v-if="d.pointGap.mode === 'custom'">
+              <label class="rs-field">
+                <span>Selisih poin</span>
+                <input
+                  v-model.number="d.pointGap.margin"
+                  type="number"
+                  min="1"
+                  class="rs-input"
+                  data-test="gap-margin"
+                />
+                <small v-if="showError('pointGap.margin')" class="rs-error">{{
+                  errors['pointGap.margin']
+                }}</small>
+              </label>
+              <label class="rs-field">
+                <span>Berlaku mulai babak</span>
+                <input
+                  v-model.number="d.pointGap.fromRound"
+                  type="number"
+                  min="1"
+                  :max="d.totalRounds"
+                  class="rs-input"
+                  data-test="gap-from-round"
+                />
+                <small v-if="showError('pointGap.fromRound')" class="rs-error">{{
+                  errors['pointGap.fromRound']
+                }}</small>
+              </label>
+            </template>
+          </div>
+          <p class="rs-hint">
+            <template v-if="d.pointGap.mode === 'auto'">
+              Remaja, Dewasa, dan golongan lain: 30 poin. Usia Dini dan Pra-Remaja: 20 poin. Berlaku
+              mulai babak 2.
+            </template>
+            <template v-else-if="d.pointGap.mode === 'custom'">
+              Pertandingan dihentikan bila selisih mencapai {{ d.pointGap.margin }} poin sejak babak
+              {{ d.pointGap.fromRound }}.
+            </template>
+            <template v-else
+              >Pertandingan hanya berakhir lewat waktu atau keputusan wasit.</template
+            >
           </p>
         </section>
 

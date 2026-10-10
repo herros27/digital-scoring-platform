@@ -2433,6 +2433,16 @@ paths:
                         judges: { type: integer, minimum: 1, maximum: 5, example: 3 }
                         majority: { type: integer, minimum: 1, example: 2, description: "Jumlah juri yang harus sepakat (<= judges)" }
                         window_ms: { type: integer, minimum: 500, maximum: 10000, example: 3000 }
+                    point_gap:
+                      type: object
+                      description: |
+                        WMP (Wasit Menghentikan Pertandingan). Bila selisih TOTAL poin kedua sudut (setelah sanksi) mencapai
+                        `margin` pada babak `from_round` atau sesudahnya, partai dihentikan otomatis dan sudut yang unggul menang
+                        dengan `result_type` `wmp`. Tanpa `point_gap`: server memakai 30 poin, atau 20 poin bila kategori partai
+                        adalah Pra-Usia Dini, Usia Dini 1/2, atau Pra-Remaja. `margin: 0` menonaktifkan WMP.
+                      properties:
+                        margin: { type: integer, minimum: 0, example: 30 }
+                        from_round: { type: integer, minimum: 1, example: 2, description: "Bawaan 2; maksimal total_rounds" }
                 status:
                   type: string
                   example: "active"

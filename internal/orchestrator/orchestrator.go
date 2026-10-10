@@ -631,7 +631,7 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	o.broadcastScoreUpdate(round)
 
 	// cek win condition (KO, point difference)
-	o.checkMidMatchWin(round)
+	o.checkPointGapLocked()
 }
 
 // pointsFor nilai teknik menurut ruleset; 0 untuk jenis yang tidak dikenal (mis. "undo").
@@ -774,20 +774,33 @@ func (o *Orchestrator) onBreakExpired() {
 	o.broadcastState()
 }
 
-// Cek KO / point difference di tengah pertandingan
-func (o *Orchestrator) checkMidMatchWin(round int) {
-	sc := o.scores[round]
-	// point difference threshold (hardcode 30, nanti ambil dari ruleset kalau ada)
-	redTotal := sc.RedTechnical - sc.RedPenalties
-	blueTotal := sc.BlueTechnical - sc.BluePenalties
-	diff := redTotal - blueTotal
+// checkPointGapLocked WMP (Wasit Menghentikan Pertandingan): bila selisih total poin kedua sudut (setelah sanksi)
+// mencapai batas ruleset pada babak yang ditentukan, pertandingan dihentikan dan sudut yang unggul menang.
+// Dipanggil setelah poin atau sanksi berubah. Pemanggil memegang o.mu.
+func (o *Orchestrator) checkPointGapLocked() {
+	gap := o.ruleset.Scoring.EffectivePointGap()
+	if gap.Margin <= 0 || !o.sm.IsInRound() || o.sm.CurrentRoundNumber() < gap.FromRound {
+		return
+	}
+	var red, blue int
+	for i := 1; i <= 3; i++ {
+		red += o.scores[i].RedTechnical - o.scores[i].RedPenalties
+		blue += o.scores[i].BlueTechnical - o.scores[i].BluePenalties
+	}
+	diff := red - blue
+	if diff > -gap.Margin && diff < gap.Margin {
+		return
+	}
+	corner := "red"
 	if diff < 0 {
-		diff = -diff
+		corner = "blue"
 	}
-	if diff >= 30 {
-		o.sm.Transition(statemachine.EventFinish)
-		o.finalize()
-	}
+	o.forced = &forcedResult{Corner: corner, ResultType: resultWMP}
+	o.appendEvent("wmp", map[string]any{
+		"winner_corner": corner, "red_total": red, "blue_total": blue, "margin": gap.Margin,
+	}, "")
+	_ = o.sm.Transition(statemachine.EventFinish)
+	o.finalize()
 }
 
 // finalize dipanggil saat match benar-benar selesai

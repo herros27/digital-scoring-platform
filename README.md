@@ -61,7 +61,7 @@ docs/
 ```
 IDLE → READY → ROUND_1 → BREAK_1 → ROUND_2 → BREAK_2 → ROUND_3 → FINISHED
                     ↑_____________|_____________|_____________|
-                    Pause/Resume  Cancel       Early Win (KO/TKO/Point Diff)
+                    Pause/Resume  Cancel       Early Win (KO/TKO/WMP)
 ```
 - Thread-safe dengan `sync.Mutex`
 - Timer server-side (single source of truth)
@@ -87,6 +87,7 @@ Rule set dimuat dari JSON (`rulesets/*.json` atau DB):
 ```
 - `LoadRuleset(name)` → file JSON → fallback hardcoded defaults
 - Bisa extend: tambah file JSON baru, tidak perlu ganti code
+- **WMP (Wasit Menghentikan Pertandingan)**: bila selisih total poin mencapai batas pada babak 2 atau 3, partai dihentikan otomatis dan sudut yang unggul menang (`result_type: wmp`). Bawaan: 30 poin (Remaja/Dewasa), 20 poin (Pra-Usia Dini, Usia Dini, Pra-Remaja). Dapat diubah atau dimatikan per ruleset lewat `scoring.point_gap` (`{"margin": 25, "from_round": 2}`; `margin: 0` = nonaktif) atau di halaman Ruleset.
 
 ### 3. Consensus Engine
 - **Sliding time window** (default 3 detik)

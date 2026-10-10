@@ -37,6 +37,15 @@ export interface DraftPenalty {
   disqualify: boolean
 }
 
+/** auto = server memilih menurut golongan umur kategori; custom = nilai di bawah; off = WMP dimatikan. */
+export type PointGapMode = 'auto' | 'custom' | 'off'
+
+export const POINT_GAP_MODE_LABEL: Record<PointGapMode, string> = {
+  auto: 'Otomatis menurut golongan umur',
+  custom: 'Atur sendiri',
+  off: 'Nonaktif',
+}
+
 export interface DraftOutcome {
   type: string
   label: string
@@ -64,6 +73,7 @@ export interface RulesetDraft {
     manual: string[]
   }
   outcomes: DraftOutcome[]
+  pointGap: { mode: PointGapMode; margin: number; fromRound: number }
   /** nilai skalar warisan yang dipertahankan saat menyimpan */
   legacy: { maxPenalties: number; penaltyThreshold: number }
 }
@@ -128,6 +138,7 @@ export function newDraft(): RulesetDraft {
       manual: [...TIEBREAK_METHODS],
     },
     outcomes: defaultOutcomes(),
+    pointGap: { mode: 'auto', margin: 30, fromRound: 2 },
     legacy: { maxPenalties: 3, penaltyThreshold: 1 },
   }
 }
@@ -191,6 +202,13 @@ export function draftFromRuleset(r: RulesetDTO): RulesetDraft {
         : [...TIEBREAK_METHODS],
     },
     outcomes,
+    pointGap: s.point_gap
+      ? {
+          mode: s.point_gap.margin === 0 ? 'off' : 'custom',
+          margin: s.point_gap.margin || base.pointGap.margin,
+          fromRound: s.point_gap.from_round || base.pointGap.fromRound,
+        }
+      : base.pointGap,
     legacy: { maxPenalties: s.max_penalties ?? 3, penaltyThreshold: s.penalty_threshold ?? 1 },
   }
   draft.tiebreak.priority = normalizedPriority(draft)
@@ -252,6 +270,11 @@ export function payloadFromDraft(d: RulesetDraft): RulesetPayload {
       manual_methods: [...d.tiebreak.manual],
     },
     outcomes,
+    ...(d.pointGap.mode === 'custom'
+      ? { point_gap: { margin: d.pointGap.margin, from_round: d.pointGap.fromRound } }
+      : d.pointGap.mode === 'off'
+        ? { point_gap: { margin: 0 } }
+        : {}),
   }
   return { name: d.name.trim(), version: d.version.trim(), status: d.status, scoring }
 }
@@ -311,6 +334,17 @@ export function validateDraft(d: RulesetDraft): Record<string, string> {
   d.outcomes.forEach((o, i) => {
     if (o.enabled && !o.label.trim()) e[`outcomes.${i}.label`] = 'Label wajib diisi'
   })
+
+  if (d.pointGap.mode === 'custom') {
+    if (!Number.isInteger(d.pointGap.margin) || d.pointGap.margin < 1)
+      e['pointGap.margin'] = 'Selisih minimal 1 poin (pilih Nonaktif untuk mematikan)'
+    if (
+      !Number.isInteger(d.pointGap.fromRound) ||
+      d.pointGap.fromRound < 1 ||
+      d.pointGap.fromRound > d.totalRounds
+    )
+      e['pointGap.fromRound'] = 'Babak mulai 1 sampai jumlah babak'
+  }
   return e
 }
 

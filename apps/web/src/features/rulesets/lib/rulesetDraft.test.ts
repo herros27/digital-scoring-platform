@@ -86,6 +86,35 @@ describe('payloadFromDraft', () => {
   })
 })
 
+describe('WMP (selisih poin)', () => {
+  it('bawaan otomatis: tidak mengirim point_gap sehingga server memilih menurut golongan umur', () => {
+    const p = payloadFromDraft({ ...newDraft(), name: 'Otomatis' })
+    expect(p.scoring.point_gap).toBeUndefined()
+    expect(draftFromRuleset(legacy).pointGap.mode).toBe('auto')
+  })
+
+  it('mode atur sendiri dan nonaktif dikirim dan dibaca kembali', () => {
+    const d = { ...newDraft(), name: 'Atur' }
+    d.pointGap = { mode: 'custom', margin: 20, fromRound: 2 }
+    expect(payloadFromDraft(d).scoring.point_gap).toEqual({ margin: 20, from_round: 2 })
+
+    d.pointGap = { mode: 'off', margin: 20, fromRound: 2 }
+    const off = payloadFromDraft(d)
+    expect(off.scoring.point_gap).toEqual({ margin: 0 })
+    const back = draftFromRuleset({ id: 'x', ...off } as RulesetDTO)
+    expect(back.pointGap.mode).toBe('off')
+    expect(payloadFromDraft(back)).toEqual(off)
+  })
+
+  it('validasi hanya berlaku pada mode atur sendiri', () => {
+    const d = { ...newDraft(), name: 'Valid' }
+    d.pointGap = { mode: 'custom', margin: 0, fromRound: 4 }
+    expect(Object.keys(validateDraft(d)).sort()).toEqual(['pointGap.fromRound', 'pointGap.margin'])
+    d.pointGap = { mode: 'off', margin: 0, fromRound: 4 }
+    expect(validateDraft(d)).toEqual({})
+  })
+})
+
 describe('priority', () => {
   it('urut menurut nilai tertinggi', () => {
     // urutan regulasi: 1+3, 3, 1+2, 2, 1+1, 1

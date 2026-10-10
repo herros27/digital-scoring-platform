@@ -31,6 +31,15 @@ const (
 	AgePreTeen = "pre_teen"
 )
 
+// IsYouthAgeGroup golongan yang memakai selisih WMP lebih kecil (usia dini dan pra-remaja).
+func IsYouthAgeGroup(ageGroup string) bool {
+	switch ageGroup {
+	case AgePraUsiaDini, AgeUsiaDini1, AgeUsiaDini2, AgePraRemaja:
+		return true
+	}
+	return false
+}
+
 // Status peserta tambahan hasil timbang badan (selain pending/verified/rejected).
 const (
 	ParticipantOverweight  = "overweight"

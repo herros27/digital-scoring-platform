@@ -182,6 +182,7 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 		}, client.ID)
 		o.finalize()
 	}
+	o.checkPointGapLocked() // sanksi mengurangi nilai sudut yang dikenai, sehingga selisih bisa mencapai batas
 }
 
 // handlePenaltyRevoke: {"target":"red"} membatalkan sanksi TERAKHIR pada sudut itu.
@@ -430,6 +431,7 @@ func (o *Orchestrator) extraSnapshotLocked() map[string]any {
 		"judge_count":       o.ruleset.Scoring.EffectiveConsensus().Judges,
 		"consensus":         o.ruleset.Scoring.EffectiveConsensus(),
 		"tiebreak":          o.tiebreakSnapshotLocked(),
+		"point_gap":         o.ruleset.Scoring.EffectivePointGap(),
 		"recovered":         o.recovered,
 		"outcomes":          o.ruleset.Scoring.EffectiveOutcomes(),
 		"medic_active":      o.medicActive,

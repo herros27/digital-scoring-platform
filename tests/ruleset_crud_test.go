@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -286,6 +287,7 @@ func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 type fakeCategoryRulesets map[string]string // slotID -> rulesetID
 
 func (f fakeCategoryRulesets) RulesetIDForSlot(slotID string) (string, error) { return f[slotID], nil }
+func (f fakeCategoryRulesets) AgeGroupForSlot(string) (string, error)        { return "", nil }
 
 // Ruleset khusus kategori (mis. Usia Dini 2 babak x 1,5 menit) menimpa ruleset kejuaraan;
 // partai tanpa ruleset kategori tetap memakai ruleset kejuaraan.
@@ -331,4 +333,70 @@ func TestMatchService_CategoryRulesetOverridesCompetition(t *testing.T) {
 	}
 	check("m-ud", "arena-1", "Usia Dini 2x1,5", 2, 90000)
 	check("m-dw", "arena-2", "Standar 3x2", 3, 120000)
+}
+
+type fakeAgeLookup struct {
+	rulesets map[string]string // slotID -> rulesetID
+	ages     map[string]string // slotID -> golongan umur
+}
+
+func (f fakeAgeLookup) RulesetIDForSlot(slotID string) (string, error) { return f.rulesets[slotID], nil }
+func (f fakeAgeLookup) AgeGroupForSlot(slotID string) (string, error)  { return f.ages[slotID], nil }
+
+// Selisih WMP bawaan mengikuti golongan umur kategori (usia dini dan pra-remaja 20, selain itu 30), kecuali
+// ruleset menetapkan point_gap sendiri.
+func TestMatchService_PointGapDefaultFollowsAgeGroup(t *testing.T) {
+	repo := newMemoryRulesetRepo()
+	rulesetSvc := service.NewRulesetService(repo)
+	scoring := rules.ScoringRule{TechniquePoints: 1, KnockdownPoints: 2, RoundDuration: 120, BreakDuration: 60, TotalRounds: 3}
+	standard, err := rulesetSvc.CreateRuleset(service.CreateRulesetInput{Name: "Standar", Version: "1.0", Scoring: scoring})
+	if err != nil {
+		t.Fatal(err)
+	}
+	custom := scoring
+	custom.PointGap = &rules.PointGapRule{Margin: 25, FromRound: 3}
+	own, err := rulesetSvc.CreateRuleset(service.CreateRulesetInput{Name: "Atur Sendiri", Version: "3.0", Scoring: custom})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matchRepo := newMockMatchRepo()
+	compRepo := &mockCompRepoWithRuleset{comps: map[string]*domain.Competition{
+		"comp-1": {ID: "comp-1", Name: "Kejurda", RulesetID: &standard.ID},
+	}}
+	ages := map[string]string{}
+	rulesetOf := map[string]string{"slot-own": own.ID}
+	for i, c := range []struct{ id, age string }{
+		{"dewasa", domain.AgeDewasa}, {"remaja", domain.AgeRemaja}, {"dini", domain.AgeUsiaDini2},
+		{"pra-dini", domain.AgePraUsiaDini}, {"pra-remaja", domain.AgePraRemaja}, {"own", domain.AgeUsiaDini1},
+	} {
+		slot := "slot-" + c.id
+		ages[slot] = c.age
+		matchRepo.matches["m-"+c.id] = &store.Match{ID: "m-" + c.id, CompetitionID: "comp-1", ArenaID: fmt.Sprintf("arena-%d", i), BracketSlotID: slot, Status: "idle"}
+	}
+
+	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil)
+	svc.SetRulesetResolver(rulesetSvc)
+	svc.SetCategoryRulesetLookup(fakeAgeLookup{rulesets: rulesetOf, ages: ages})
+
+	want := map[string]rules.PointGapRule{
+		"dewasa":     {Margin: 30, FromRound: 2},
+		"remaja":     {Margin: 30, FromRound: 2},
+		"dini":       {Margin: 20, FromRound: 2},
+		"pra-dini":   {Margin: 20, FromRound: 2},
+		"pra-remaja": {Margin: 20, FromRound: 2},
+		"own":        {Margin: 25, FromRound: 3}, // ditetapkan ruleset: tidak ditimpa bawaan golongan umur
+	}
+	for id, w := range want {
+		if err := svc.LoadMatchToArena("m-"+id, matchRepo.matches["m-"+id].ArenaID, ""); err != nil {
+			t.Fatalf("load %s: %v", id, err)
+		}
+		orch, _ := svc.GetOrchestrator("m-" + id)
+		if got := orch.Snapshot()["point_gap"]; got != w {
+			t.Errorf("%s: point_gap = %v, want %v", id, got, w)
+		}
+	}
+	if got, _ := rulesetSvc.ResolveRuleset(standard.ID); got.Scoring.PointGap != nil {
+		t.Error("ruleset bersama tidak boleh berubah (harus disalin)")
+	}
 }

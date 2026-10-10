@@ -18,6 +18,8 @@ type tiebreakResult struct {
 const (
 	resultTiebreakPenalties = "tiebreak_penalties"
 	resultTiebreakTechnique = "tiebreak_technique"
+	// resultWMP: Wasit Menghentikan Pertandingan karena selisih poin mencapai batas ruleset.
+	resultWMP = "wmp"
 )
 
 // manualResultType result_type untuk keputusan manual wasit saat seri.

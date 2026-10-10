@@ -3,6 +3,7 @@ export const RESULT_LABEL: Record<string, string> = {
   point_win: 'MENANG ANGKA (POINT WIN)',
   disqualification: 'MENANG DISKUALIFIKASI',
   referee_decision: 'KEPUTUSAN WASIT',
+  wmp: 'MENANG WMP (WASIT MENGHENTIKAN PERTANDINGAN)',
   tiebreak_penalties: 'MENANG ATURAN SERI (SANKSI TERENDAH)',
   tiebreak_technique: 'MENANG ATURAN SERI (TEKNIK TERBANYAK)',
   tiebreak_extra_round: 'MENANG BABAK TAMBAHAN',

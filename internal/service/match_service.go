@@ -98,11 +98,30 @@ func (s *MatchService) SetParticipantLookup(f func(id string) (*domain.Participa
 // CategoryRulesetLookup mencari ruleset khusus kategori dari slot bagan sebuah partai.
 type CategoryRulesetLookup interface {
 	RulesetIDForSlot(slotID string) (string, error)
+	AgeGroupForSlot(slotID string) (string, error)
 }
 
 // SetCategoryRulesetLookup mengaktifkan ruleset khusus per kategori (menimpa ruleset kejuaraan).
 func (s *MatchService) SetCategoryRulesetLookup(l CategoryRulesetLookup) {
 	s.categoryRulesets = l
+}
+
+// withAgeGapDefault: ruleset tanpa `point_gap` memakai selisih WMP menurut golongan umur kategori partai (usia dini
+// dan pra-remaja 20; selain itu bawaan 30). Mengembalikan salinan karena ruleset dari resolver dipakai bersama.
+func (s *MatchService) withAgeGapDefault(matchID string, r *rules.Ruleset) *rules.Ruleset {
+	if r.Scoring.PointGap != nil || s.categoryRulesets == nil || s.matchRepo == nil {
+		return r
+	}
+	m, err := s.matchRepo.GetByID(matchID)
+	if err != nil || m == nil || m.BracketSlotID == "" {
+		return r
+	}
+	if ag, err := s.categoryRulesets.AgeGroupForSlot(m.BracketSlotID); err != nil || !domain.IsYouthAgeGroup(ag) {
+		return r
+	}
+	c := *r
+	c.Scoring.PointGap = &rules.PointGapRule{Margin: rules.PointGapYouthMargin}
+	return &c
 }
 
 func (s *MatchService) SetRulesetResolver(resolver RulesetResolver) {
@@ -293,6 +312,7 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	if err != nil {
 		return err
 	}
+	r = s.withAgeGapDefault(matchID, r)
 
 	var mStore orchestrator.MatchStore
 	if s.matchStore != nil {
