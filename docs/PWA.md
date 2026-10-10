@@ -28,6 +28,30 @@ internet adalah sertifikat Let's Encrypt, jadi pakai **CA internal Caddy** denga
 5. **Jangan menghapus volume `caddy_data`.** Di dalamnya ada root CA; bila hilang, CA baru terbentuk dan semua tablet
    harus memasang ulang. Cadangkan berkas `silat-root-ca.crt` dan folder volume itu.
 
+### Alternatif tanpa root CA di tablet: domain di Cloudflare
+
+Bila Anda punya domain yang DNS-nya di Cloudflare, sertifikat publik bisa diterbitkan lewat **tantangan DNS** walaupun
+server hanya ada di jaringan lokal. Tablet langsung memercayainya, jadi langkah 3 di atas tidak perlu.
+
+1. Di Cloudflare buat record `A`, mis. `skor` → `192.168.1.10`, dengan proxy **mati** ("DNS only", awan abu-abu).
+2. Buat token API: My Profile → API Tokens → Create Token → template **Edit zone DNS**, batasi ke zona domain itu.
+3. `.env.prod`:
+   ```
+   WEB_PORT=127.0.0.1:8081
+   SITE_ADDRESS=skor.domain-anda.id
+   TLS_DIRECTIVE=
+   ACME_DNS=acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+   CLOUDFLARE_API_TOKEN=<token>
+   ```
+4. `docker compose --env-file .env.prod --profile https up -d --build`. Image Caddy dibangun dengan modul DNS
+   Cloudflare (`deploy/caddy/Dockerfile`). Laptop butuh internet saat sertifikat pertama diterbitkan dan saat
+   perpanjangan otomatis (kira-kira tiap 60 hari).
+5. Buka `https://skor.domain-anda.id/` di tablet, lalu pasang PWA.
+
+Tablet harus bisa menerjemahkan nama domain itu: dengan internet, DNS publik cukup; tanpa internet, router di lokasi
+perlu aturan DNS lokal `skor.domain-anda.id → 192.168.1.10`. Sebagian router memblokir nama publik yang menunjuk ke IP
+lokal (*DNS rebinding protection*); bila tablet gagal membuka alamat itu padahal laptop bisa, kecualikan domain itu.
+
 Bila ternyata ada internet **dan** domain, `TLS_DIRECTIVE` dikosongkan memakai Let's Encrypt dan langkah 3 tidak perlu; tetapi
 tablet harus bisa menjangkau server lewat domain itu (DNS publik yang menunjuk ke IP server tidak cukup untuk jaringan
 tertutup: tantangan HTTP Let's Encrypt harus dapat menjangkau server dari internet). Karena itu **jalur CA internal tetap
@@ -111,7 +135,7 @@ terbuka ke LAN dapat dipakai untuk memalsukan header itu pada Docker Desktop (al
 ## Pengujian
 
 ```bash
-npm run test:pw:pwa     # di apps/web; membangun, menyajikan lewat vite preview, lalu menguji PWA (backend harus jalan)
+npm run playwright:pw:pwa     # di apps/web; membangun, menyajikan lewat vite preview, lalu menguji PWA (backend harus jalan)
 ```
 
 Mencakup: manifest dan ikon, service worker aktif, kriteria installable Chrome, cangkang offline, API tidak di-cache,

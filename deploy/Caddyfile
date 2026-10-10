@@ -3,6 +3,13 @@
 #   SITE_ADDRESS   domain atau IP yang dibuka tablet, mis. silat.contoh.id  atau  192.168.1.10
 #   TLS_DIRECTIVE  kosong  -> sertifikat Let's Encrypt otomatis (domain publik)
 #                  "tls internal" -> CA internal Caddy (LAN tertutup / IP); root CA harus dipasang di tiap tablet
+#   ACME_DNS       kosong  -> tantangan HTTP (server harus terjangkau dari internet)
+#                  "acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}" -> tantangan DNS: domain di Cloudflare yang
+#                  menunjuk ke IP LAN tetap mendapat sertifikat publik, tablet tidak perlu memasang root CA
+{
+	{$ACME_DNS}
+}
+
 {$SITE_ADDRESS} {
 	{$TLS_DIRECTIVE}
 
