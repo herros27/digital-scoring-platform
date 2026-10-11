@@ -1,31 +1,48 @@
 package handler
 
 import (
+	"crypto/subtle"
+	"errors"
 	"net/http"
 
+	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type ContingentHandler struct {
-	Service *service.ContingentService
+	Service    *service.ContingentService
+	InviteCode string
 }
 
 // POST /api/v1/auth/contingent/register
 func (h *ContingentHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name     string `json:"name" validate:"required,min=2,max=100"`
-		PicName  string `json:"pic_name" validate:"required,min=2,max=100"`
-		Email    string `json:"email" validate:"required,email"`
-		Phone    string `json:"phone" validate:"required,min=6,max=20"`
-		Password string `json:"password" validate:"required,min=8,max=72"`
+		Name       string `json:"name" validate:"required,min=2,max=100"`
+		PicName    string `json:"pic_name" validate:"required,min=2,max=100"`
+		Email      string `json:"email" validate:"required,email"`
+		Phone      string `json:"phone" validate:"required,min=6,max=20"`
+		Password   string `json:"password" validate:"required,min=8,max=72"`
+		InviteCode string `json:"invite_code"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
+	// ponytail: jika kode undangan dikonfigurasi di server, tolak pendaftaran yang tidak memuat kode cocok
+	if h.InviteCode != "" {
+		if req.InviteCode == "" || subtle.ConstantTimeCompare([]byte(req.InviteCode), []byte(h.InviteCode)) != 1 {
+			Fail(w, http.StatusForbidden, "FORBIDDEN", "kode undangan pendaftaran tidak valid atau belum diisi", nil)
+			return
+		}
+	}
+
 	contingent, err := h.Service.Register(req.Name, req.PicName, req.Email, req.Phone, req.Password)
 	if err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", "email sudah terdaftar atau tidak valid", nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}

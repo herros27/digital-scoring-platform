@@ -482,3 +482,27 @@ func (m *mockOfficialRepo) firstID() string {
 	}
 	return ""
 }
+
+func TestOfficialService_LoginLockout(t *testing.T) {
+	repo := newMockOfficialRepo()
+	svc := service.NewOfficialService(repo)
+
+	_, err := svc.CreateOfficial("Admin Test", "admin-lockout@silat.id", "test_correct_pass_1", "admin")
+	if err != nil {
+		t.Fatalf("CreateOfficial failed: %v", err)
+	}
+
+	// 5 failed login attempts
+	for i := 0; i < 5; i++ {
+		_, _, err := svc.Login("admin-lockout@silat.id", "wrongPass")
+		if err == nil {
+			t.Fatalf("attempt %d: expected error on wrong password", i+1)
+		}
+	}
+
+	// 6th attempt with CORRECT password must be rejected due to account lockout
+	_, _, err = svc.Login("admin-lockout@silat.id", "test_correct_pass_1")
+	if err == nil {
+		t.Fatalf("expected 6th attempt with correct password to be locked out")
+	}
+}

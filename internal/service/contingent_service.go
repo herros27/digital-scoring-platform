@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/auth"
@@ -24,11 +25,15 @@ type ContingentPasswordManager interface {
 }
 
 type ContingentService struct {
-	repo ContingentRepository
+	repo       ContingentRepository
+	loginGuard *auth.AttemptLimiter
 }
 
 func NewContingentService(repo ContingentRepository) *ContingentService {
-	return &ContingentService{repo: repo}
+	return &ContingentService{
+		repo:       repo,
+		loginGuard: auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
+	}
 }
 
 func (s *ContingentService) Register(name, picName, email, phone, password string) (*domain.Contingent, error) {
@@ -64,13 +69,31 @@ func (s *ContingentService) Login(email, password string) (string, *domain.Conti
 		return "", nil, errors.New("email and password are required")
 	}
 
+	key := strings.ToLower(email)
+	if s.loginGuard != nil {
+		if locked, _ := s.loginGuard.Check(key); locked {
+			return "", nil, errors.New("terlalu banyak percobaan login gagal, akun dikunci sementara")
+		}
+	}
+
 	c, hash, err := s.repo.GetByEmail(email)
 	if err != nil || c == nil {
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(password))
+		if s.loginGuard != nil {
+			s.loginGuard.Fail(key)
+		}
 		return "", nil, errors.New("invalid email or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		if s.loginGuard != nil {
+			s.loginGuard.Fail(key)
+		}
 		return "", nil, errors.New("invalid email or password")
+	}
+
+	if s.loginGuard != nil {
+		s.loginGuard.Reset(key)
 	}
 
 	// 24 hour token with role "contingent"

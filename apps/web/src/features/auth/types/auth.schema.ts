@@ -16,6 +16,7 @@ export const contingentRegisterSchema = z.object({
   email: z.string().email('Format email tidak valid'),
   phone: z.string().min(8, 'Nomor telepon tidak valid'),
   password: z.string().min(8, 'Kata sandi minimal 8 karakter'),
+  invite_code: z.string().optional(),
 })
 
 export const createPinSchema = z.object({

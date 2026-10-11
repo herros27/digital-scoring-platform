@@ -1,0 +1,82 @@
+# Stack DEMO untuk client: terpisah penuh dari stack lomba (docker-compose.yml).
+# Database sendiri (data contoh dari seed), tanpa port ke LAN, satu-satunya jalan masuk adalah Cloudflare Tunnel.
+# Stack lomba tidak tersambung ke internet sama sekali.
+#
+#   cp .env.demo.example .env.demo      (isi POSTGRES_PASSWORD, JWT_SECRET, CLOUDFLARE_TUNNEL_TOKEN)
+#   docker compose -f docker-compose.demo.yml --env-file .env.demo up -d --build
+#   docker compose -f docker-compose.demo.yml --env-file .env.demo down        (matikan, mis. saat lomba)
+#   docker compose -f docker-compose.demo.yml --env-file .env.demo down -v     (reset: hapus data demo)
+#
+# Di Cloudflare Zero Trust -> Networks -> Tunnels, Public hostname (mis. demo.<domain>) diarahkan ke http://web:80.
+# Akun demo (admin@silat.id / DemoPass_2026, PIN juri, dst.) berlaku publik: lihat docs/CREDENTIALS.md. Aman karena
+# isinya hanya data contoh dan password akun dikembalikan ke nilai itu setiap start.
+name: scoring-demo
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging: *logging
+    env_file:
+      - .env.demo
+    environment:
+      - PORT=8080
+      # ENV=development + SEED_DATA=true: satu-satunya kombinasi yang membolehkan seed (akun demo berpassword publik).
+      - ENV=development
+      - SEED_DATA=true
+      - AUTO_MIGRATE=true
+      - DB_URL=postgres://${POSTGRES_USER:-demo_user}:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env.demo}@postgres:5432/${POSTGRES_DB:-demo_scoring}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      # Loopback saja, hanya untuk mengecek demo dari server ini; klien masuk lewat tunnel.
+      - "127.0.0.1:${DEMO_WEB_PORT:-8090}:80"
+    depends_on:
+      - app
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-demo_scoring}
+      POSTGRES_USER: ${POSTGRES_USER:-demo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env.demo}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - demo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    logging: *logging
+    # --protocol http2: jaringan homeserver memblokir UDP 7844 (QUIC); HTTP/2 lewat TCP 443/7844 berhasil.
+    command: tunnel --no-autoupdate --protocol http2 run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?isi CLOUDFLARE_TUNNEL_TOKEN di .env.demo}
+    depends_on:
+      - web
+
+volumes:
+  demo_postgres_data:

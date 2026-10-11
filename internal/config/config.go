@@ -23,6 +23,8 @@ type Config struct {
 	AdminName     string `env:"ADMIN_NAME" envDefault:"Administrator"`
 	// MetricsToken: bila diisi, /metrics wajib header Authorization: Bearer <token>; kosong = hanya loopback.
 	MetricsToken string `env:"METRICS_TOKEN" envDefault:""`
+	// ContingentInviteCode: bila diisi, registrasi kontingen wajib menyertakan kode undangan yang cocok.
+	ContingentInviteCode string `env:"CONTINGENT_INVITE_CODE" envDefault:""`
 }
 
 // Load loads configuration from optional .env files and environment variables into Config.

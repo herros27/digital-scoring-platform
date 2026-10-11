@@ -12,6 +12,7 @@ const form = ref({
   pic_name: '',
   email: '',
   phone: '',
+  invite_code: '',
   password: '',
   confirmPassword: '',
 })
@@ -56,6 +57,7 @@ async function handleRegister() {
       pic_name: form.value.pic_name.trim(),
       email: form.value.email.trim(),
       phone: form.value.phone.trim(),
+      invite_code: form.value.invite_code.trim(),
       password: form.value.password,
     })
 
@@ -184,6 +186,16 @@ async function handleRegister() {
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="reg-invite">Kode undangan pendaftaran</label>
+          <AppInput
+            id="reg-invite"
+            v-model="form.invite_code"
+            placeholder="Diberikan oleh panitia pelaksana (bila dibatasi)"
+            :disabled="isLoading"
+          />
+        </div>
+
         <div class="form-row">
           <div class="form-group flex-1">
             <label class="form-label" for="reg-password">Kata sandi</label>
@@ -235,6 +247,10 @@ async function handleRegister() {
             </AppInput>
           </div>
         </div>
+
+        <p class="privacy-note">
+          <strong>Pemberitahuan Privasi:</strong> Data pendaftaran kontingen dan atlet digunakan khusus untuk verifikasi dan pelaksanaan kejuaraan pencak silat sesuai ketentuan panitia pelaksana.
+        </p>
 
         <AppButton type="submit" variant="primary" size="lg" full-width :loading="isLoading">
           Daftarkan Kontingen
@@ -427,6 +443,17 @@ async function handleRegister() {
 }
 .link-primary:hover {
   text-decoration: underline;
+}
+
+.privacy-note {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  margin-top: 4px;
 }
 
 /* Compact screens / Landscape mobile orientation */

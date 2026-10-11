@@ -3,6 +3,8 @@
 Panduan langkah demi langkah menjalankan Digital Scoring di server lokal (laptop Ubuntu) dengan HTTPS lewat
 domain Cloudflare, sehingga tablet juri bisa memasang PWA tanpa root CA. Latar belakang HTTPS/PWA: [PWA.md](PWA.md).
 Memeriksa kesehatan server dan menutup terminal yang menganggur: [CEK-SERVER.md](CEK-SERVER.md).
+Rencana terbaru: lomba dijalankan di laptop pribadi dan demo online di homeserver (stack terpisah), lihat
+[LOMBA-DAN-DEMO.md](LOMBA-DAN-DEMO.md). Panduan di bawah masih menjelaskan penyiapan server dan HTTPS-nya.
 
 ## Gambaran
 

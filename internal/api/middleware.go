@@ -60,19 +60,6 @@ func ClaimsFrom(r *http.Request) *auth.Claims {
 	return auth.ClaimsFromContext(r.Context())
 }
 
-// CORS — izinkan semua origin (untuk PWA dari domain sama / dev)
-func CORSMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Device-Id")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
 
 // chain — apply middleware kanan ke kiri
 func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {

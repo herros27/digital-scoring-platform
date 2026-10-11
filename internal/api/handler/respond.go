@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -149,6 +150,12 @@ func Ok(w http.ResponseWriter, data any) {
 }
 
 func Fail(w http.ResponseWriter, status int, code, message string, details any) {
+	if status >= 500 {
+		// ponytail: jangan bocorkan SQL/constraint internal ke publik; simpan hanya di server log
+		log.Printf("[%s] %s (details: %v)", code, message, details)
+		message = "terjadi kesalahan pada server"
+		details = nil
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]any{

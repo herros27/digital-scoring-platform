@@ -91,12 +91,19 @@ func (s *OfficialService) lastAdmin(o *domain.Official) (bool, error) {
 	return n <= 1, nil
 }
 
+// ponytail: precomputed bcrypt hash untuk dummy comparison pada email yang tidak dikenal (mitigasi timing attack)
+const dummyBcryptHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+
 type OfficialService struct {
-	repo OfficialRepository
+	repo       OfficialRepository
+	loginGuard *auth.AttemptLimiter
 }
 
 func NewOfficialService(repo OfficialRepository) *OfficialService {
-	return &OfficialService{repo: repo}
+	return &OfficialService{
+		repo:       repo,
+		loginGuard: auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
+	}
 }
 
 func (s *OfficialService) Login(email, password string) (string, *domain.Official, error) {
@@ -104,13 +111,31 @@ func (s *OfficialService) Login(email, password string) (string, *domain.Officia
 		return "", nil, errors.New("email and password are required")
 	}
 
+	key := strings.ToLower(email)
+	if s.loginGuard != nil {
+		if locked, _ := s.loginGuard.Check(key); locked {
+			return "", nil, errors.New("terlalu banyak percobaan login gagal, akun dikunci sementara")
+		}
+	}
+
 	official, hash, err := s.repo.GetByEmail(email)
 	if err != nil || official == nil {
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(password))
+		if s.loginGuard != nil {
+			s.loginGuard.Fail(key)
+		}
 		return "", nil, errors.New("invalid email or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		if s.loginGuard != nil {
+			s.loginGuard.Fail(key)
+		}
 		return "", nil, errors.New("invalid email or password")
+	}
+
+	if s.loginGuard != nil {
+		s.loginGuard.Reset(key)
 	}
 
 	// 24 hour token for admin/operator

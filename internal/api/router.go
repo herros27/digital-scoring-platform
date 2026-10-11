@@ -18,7 +18,12 @@ import (
 )
 
 // NewRouter merakit seluruh rute. metricsToken (METRICS_TOKEN) kosong = /metrics hanya dari loopback.
-func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Handler {
+func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optionalInviteCode ...string) http.Handler {
+	var inviteCode string
+	if len(optionalInviteCode) > 0 {
+		inviteCode = optionalInviteCode[0]
+	}
+
 	// in-memory cache (Otter S3-FIFO)
 	appCache := cache.MustNew(10_000)
 
@@ -83,7 +88,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache, Competition: compService}
 	rulesetH := &handler.RulesetHandler{Service: rulesetService}
 	officialH := &handler.OfficialHandler{Service: officialService}
-	contingentH := &handler.ContingentHandler{Service: contingentService}
+	contingentH := &handler.ContingentHandler{Service: contingentService, InviteCode: inviteCode}
 	reportH := &handler.ReportHandler{Service: reportService}
 
 	mux := http.NewServeMux()
@@ -244,6 +249,6 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// === WebSocket (auth via query param) ===
 	mux.HandleFunc("GET /ws/arena/{arena_id}", matchH.HandleWS)
 
-	// Apply CORS, Metrics & Global Rate Limiting ke semua
-	return Chain(mux, CORSMiddleware, MetricsMiddleware, globalLimiter)
+	// Apply Metrics & Global Rate Limiting ke semua
+	return Chain(mux, MetricsMiddleware, globalLimiter)
 }

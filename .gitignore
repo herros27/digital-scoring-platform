@@ -7,6 +7,7 @@ internal/docs
 # Environment
 .env
 .env.prod
+.env.demo
 bin
 
 # Frontend
@@ -25,3 +26,6 @@ apps/web/test/cypress/downloads/
 apps/web/test/playwright/test-results/
 apps/web/test/playwright/report/
 *.tar
+/backups/
+*.sql
+*.sql.gz
