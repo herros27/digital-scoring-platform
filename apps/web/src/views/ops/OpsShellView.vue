@@ -555,6 +555,9 @@ interface AthleteEntry {
 
 interface MatchCard {
   id: string
+  /** id partai nyata (tabel matches) dan gelanggangnya; kosong bila partai belum terbentuk (menunggu pemenang babak lalu) */
+  matchId?: string
+  arenaId?: string
   partaiNumber: number
   arenaLabel: string
   status: 'selesai' | 'live' | 'ready' | 'waiting'
@@ -643,6 +646,8 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
 
     result.push({
       id: `slot-${slotRed?.id || i}`,
+      matchId: matchedMatch?.id,
+      arenaId: matchedMatch?.arena_id,
       partaiNumber: pairIndex,
       arenaLabel: arenaLabel,
       status: isFinished ? 'selesai' : isLiveMatch(matchedMatch?.status) ? 'live' : 'ready',
@@ -903,9 +908,18 @@ function handlePanggilAtlet() {
 
 function handleLoadToMat1() {
   const m = queuedMatch.value
-  const targetArena = rawArenas.value?.[0]?.id || 'gelanggang-1'
-  const arenaName = rawArenas.value?.[0]?.name || 'Gelanggang 1'
-  const matchId = m?.id || 'm-live'
+  // Gelanggang tujuan adalah gelanggang asal partai itu sendiri (server menolak gelanggang lain).
+  if (!m?.matchId || !m.arenaId) {
+    showToast(
+      'Partai Belum Siap',
+      'Partai ini belum terbentuk atau belum punya gelanggang (menunggu pemenang babak sebelumnya).',
+      'warning',
+    )
+    return
+  }
+  const targetArena = m.arenaId
+  const arenaName = rawArenas.value?.find((a) => a.id === targetArena)?.name || m.arenaLabel
+  const matchId = m.matchId
 
   modal.value = {
     show: true,
@@ -917,8 +931,14 @@ function handleLoadToMat1() {
       try {
         await matchService.loadArena(activeCompId.value, matchId, targetArena)
         showToast('Partai Dimuat', `Partai berhasil di-load ke ${arenaName}.`, 'success')
-      } catch {
-        showToast('Partai Dimuat', `Partai siap di ${arenaName}.`, 'success')
+      } catch (err) {
+        const msg = getErrorMessage(err, 'Partai tidak dapat dimuat ke gelanggang.')
+        // Sudah termuat sebelumnya: cukup buka konsol wasit.
+        if (!/sudah dimuat/i.test(msg)) {
+          showToast('Gagal Memuat Partai', msg, 'warning')
+          modal.value = null
+          return
+        }
       }
       modal.value = null
       setTimeout(() => {

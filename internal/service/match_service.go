@@ -275,7 +275,7 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 
 	// 1. Cek apakah match sudah aktif di arena
 	if existing, ok := s.activeOrchestrators[matchID]; ok && existing.IsActive() {
-		return errors.New("match already loaded to arena")
+		return errors.New("partai ini sudah dimuat ke gelanggang")
 	}
 
 	// 2. Cek apakah arena sedang digunakan oleh match aktif lain (ARENA_BUSY)

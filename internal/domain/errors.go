@@ -12,6 +12,6 @@ var (
 	ErrUnauthorized           = errors.New("unauthorized")
 	ErrForbidden              = errors.New("forbidden")
 	ErrConflict               = errors.New("resource conflict")
-	ErrArenaBusy              = errors.New("arena is currently assigned to another active match")
+	ErrArenaBusy              = errors.New("gelanggang sedang dipakai partai lain yang masih aktif; selesaikan atau batalkan partai itu terlebih dahulu")
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )

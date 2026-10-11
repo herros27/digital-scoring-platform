@@ -89,7 +89,7 @@ describe('Ketahanan & kasus tepi pertandingan', () => {
       runAsync(async () => {
         const again = await kit.loadMatch(a!.match)
         expect(again.status).to.eq(400)
-        expect(again.error?.message).to.match(/already loaded/i)
+        expect(again.error?.message).to.match(/sudah dimuat/i)
 
         const second = await kit.createMatch()
         const busy = await kit.loadMatch(second)
