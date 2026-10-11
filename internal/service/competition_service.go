@@ -204,6 +204,11 @@ type MatchActivityChecker interface {
 	HasStartedMatches(competitionID string) (bool, error)
 }
 
+// CategoryRulesetReleaser kemampuan opsional repo kejuaraan: melepas kategori yang terikat ke ruleset lama.
+type CategoryRulesetReleaser interface {
+	ReleaseCategoryRulesets(competitionID, rulesetID string) error
+}
+
 func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competition) (*domain.Competition, error) {
 	if id == "" {
 		return nil, domain.ErrInvalidInput
@@ -249,6 +254,10 @@ func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competi
 		}
 	}
 
+	oldRulesetID := ""
+	if comp.RulesetID != nil {
+		oldRulesetID = *comp.RulesetID
+	}
 	if update.RulesetName != "" {
 		comp.RulesetName = update.RulesetName
 	}
@@ -262,6 +271,14 @@ func (s *CompetitionService) UpdateCompetition(id string, update *domain.Competi
 
 	if err := s.repo.Update(comp); err != nil {
 		return nil, err
+	}
+	// Ruleset kejuaraan berganti: kategori yang masih terikat ke ruleset lama ikut ruleset baru.
+	if rulesetChanged && oldRulesetID != "" && (comp.RulesetID == nil || *comp.RulesetID != oldRulesetID) {
+		if rel, ok := s.repo.(CategoryRulesetReleaser); ok {
+			if err := rel.ReleaseCategoryRulesets(comp.ID, oldRulesetID); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return comp, nil
 }

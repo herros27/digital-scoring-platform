@@ -157,3 +157,12 @@ func (s *CompetitionStore) HasStartedMatches(id string) (bool, error) {
 	err := s.DB.QueryRow(`SELECT EXISTS (SELECT 1 FROM matches WHERE competition_id = $1 AND status <> 'idle')`, id).Scan(&started)
 	return started, err
 }
+
+// ReleaseCategoryRulesets mengembalikan kategori yang terikat ke ruleset itu agar mengikuti ruleset kejuaraan (NULL).
+// Dipanggil saat ruleset kejuaraan diganti: tanpa ini kategori tetap memakai ruleset lama (ruleset kategori diutamakan
+// saat partai dimuat) dan ruleset lama tidak bisa diarsipkan karena masih dirujuk. Ruleset khusus yang berbeda
+// (mis. Usia Dini) tidak disentuh.
+func (s *CompetitionStore) ReleaseCategoryRulesets(competitionID, rulesetID string) error {
+	_, err := s.DB.Exec(`UPDATE categories SET ruleset_id = NULL WHERE competition_id = $1 AND ruleset_id = $2`, competitionID, rulesetID)
+	return err
+}
