@@ -74,7 +74,7 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	}{
 		{Name: "Administrator Utama", Email: "admin@silat.id", Role: "admin", Password: "DemoPass_2026"},
 		{Name: "Ketua Dewan Juri", Email: "dewan@silat.id", Role: "dewan", Password: "DemoPass_2026"},
-		{Name: "Wasit Utama", Email: "wasit@silat.id", Role: "wasit", Password: "DemoPass_2026"},
+		{Name: "Operator Meja Utama", Email: "wasit@silat.id", Role: "wasit", Password: "DemoPass_2026"},
 		{Name: "Operator Gelanggang", Email: "operator@silat.id", Role: "operator", Password: "DemoPass_2026"},
 	}
 

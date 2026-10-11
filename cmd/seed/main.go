@@ -40,7 +40,7 @@ func main() {
 	fmt.Printf("🥋 Atlet         : %d atlet\n", summary.Athletes)
 	fmt.Printf("📋 Peserta Bagan : %d peserta (Kelas A Putra)\n", summary.Participants)
 	fmt.Printf("⚔️ Pertandingan  : %d match aktif siap tanding\n", summary.Matches)
-	fmt.Printf("🔑 PIN Juri/Wasit: %d PIN terkonfigurasi\n", summary.JudgePins)
+	fmt.Printf("🔑 PIN Juri/Operator Meja: %d PIN terkonfigurasi\n", summary.JudgePins)
 
 	fmt.Println("\n================================================================================")
 	fmt.Println("🔐 KREDENSIAL AKSES SISTEM (LOGIN ACCOUNTS & PINS)")
@@ -51,7 +51,7 @@ func main() {
 	fmt.Println("   -----------+--------------------+------------+-----------------------------------")
 	fmt.Println("   admin      | admin@silat.id     | DemoPass_2026  | Full Dashboard, Buat PIN & Bagan")
 	fmt.Println("   dewan      | dewan@silat.id     | DemoPass_2026  | Evaluasi Pertandingan & Pengawasan")
-	fmt.Println("   wasit      | wasit@silat.id     | DemoPass_2026  | Wasit Resmi Pertandingan")
+	fmt.Println("   wasit      | wasit@silat.id     | DemoPass_2026  | Operator Meja Pertandingan")
 	fmt.Println("   operator   | operator@silat.id  | DemoPass_2026| Kendali Layar & Operator Gelanggang")
 
 	fmt.Println("\n2. KONTINGEN / MANAJER TIM (POST /api/v1/auth/contingent/login)")
@@ -62,7 +62,7 @@ func main() {
 	fmt.Println("   PPS Betako Merpati Putih         | merpatiputih@contingent.id| DemoPass_2026")
 	fmt.Println("   KSN Perisai Diri                 | perisaidiri@contingent.id | DemoPass_2026")
 
-	fmt.Println("\n3. WASIT & JURI GELANGGANG A (POST /api/v1/auth/judge-login)")
+	fmt.Println("\n3. OPERATOR MEJA & JURI GELANGGANG A (POST /api/v1/auth/judge-login)")
 	fmt.Printf("   Arena ID: %s\n", summary.ArenaAID)
 	fmt.Printf("   Competition ID: %s\n", summary.CompetitionID)
 	fmt.Println("   Role       | Kursi / Seat | PIN     | Antarmuka")
@@ -72,7 +72,7 @@ func main() {
 	fmt.Println("   juri       | Seat 2       | 123002  | Judge 2 Scoring Tablet PWA")
 	fmt.Println("   juri       | Seat 3       | 123003  | Judge 3 Scoring Tablet PWA")
 
-	fmt.Println("\n4. WASIT & JURI GELANGGANG B (POST /api/v1/auth/judge-login)")
+	fmt.Println("\n4. OPERATOR MEJA & JURI GELANGGANG B (POST /api/v1/auth/judge-login)")
 	fmt.Printf("   Arena ID: %s\n", summary.ArenaBID)
 	fmt.Printf("   Competition ID: %s\n", summary.CompetitionID)
 	fmt.Println("   Role       | Kursi / Seat | PIN     | Antarmuka")

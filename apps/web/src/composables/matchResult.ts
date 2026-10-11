@@ -2,7 +2,7 @@
 export const RESULT_LABEL: Record<string, string> = {
   point_win: 'MENANG ANGKA (POINT WIN)',
   disqualification: 'MENANG DISKUALIFIKASI',
-  referee_decision: 'KEPUTUSAN WASIT',
+  referee_decision: 'KEPUTUSAN OPERATOR MEJA',
   wmp: 'MENANG WMP (WASIT MENGHENTIKAN PERTANDINGAN)',
   tiebreak_penalties: 'MENANG ATURAN SERI (SANKSI TERENDAH)',
   tiebreak_technique: 'MENANG ATURAN SERI (TEKNIK TERBANYAK)',
@@ -13,7 +13,7 @@ export const RESULT_LABEL: Record<string, string> = {
   tko: 'MENANG TEKNIK (TKO)',
   walkover: 'MENANG WO (LAWAN TIDAK HADIR)',
   withdrawal: 'MENANG (LAWAN UNDUR DIRI)',
-  draw: 'SERI (KEPUTUSAN WASIT)',
+  draw: 'SERI (KEPUTUSAN OPERATOR MEJA)',
 }
 
 export const resultLabel = (type: string | undefined): string =>
@@ -21,7 +21,7 @@ export const resultLabel = (type: string | undefined): string =>
 
 /** Metode manual penentuan pemenang saat seri (pilihan wasit) dan labelnya. */
 export const TIEBREAK_METHOD_LABEL: Record<string, string> = {
-  referee_decision: 'Keputusan wasit',
+  referee_decision: 'Keputusan operator meja',
   extra_round: 'Babak tambahan',
   lighter_weight: 'Pesilat lebih ringan (timbang ulang)',
   coin_toss: 'Undian lempar koin (Ketua Pertandingan)',

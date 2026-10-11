@@ -8,9 +8,9 @@ export type OfficialRole = (typeof OFFICIAL_ROLES)[number]
 
 export const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
-  dewan: 'Dewan Juri',
-  wasit: 'Wasit',
-  operator: 'Operator',
+  dewan: 'Pengawas Pertandingan',
+  wasit: 'Operator Meja',
+  operator: 'Staf Administrasi',
   juri: 'Juri',
 }
 

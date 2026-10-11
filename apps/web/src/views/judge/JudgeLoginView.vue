@@ -61,7 +61,7 @@ onUnmounted(() => {
 
 async function handleLogin() {
   if (!isCompletePin(pin.value)) {
-    errorMessage.value = 'PIN harus 6 digit (juri) atau 8 digit (wasit).'
+    errorMessage.value = 'PIN harus 6 digit (juri) atau 8 digit (operator meja).'
     return
   }
 
@@ -79,7 +79,7 @@ async function handleLogin() {
       seatNumber: res.seat_number,
       arenaId: res.arena_id,
       competitionId: res.competition_id,
-      name: res.seat_number ? `Juri ${res.seat_number}` : 'Wasit Gelanggang',
+      name: res.seat_number ? `Juri ${res.seat_number}` : 'Operator Meja Gelanggang',
     })
 
     if (role === 'wasit') {

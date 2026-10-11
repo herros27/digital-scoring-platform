@@ -42,7 +42,7 @@ const (
 )
 
 // ErrTieNeedsDecision: skor seri, wasit harus menentukan pemenang (keputusan wasit).
-var ErrTieNeedsDecision = fmt.Errorf("skor seri: tentukan pemenang sebagai keputusan wasit")
+var ErrTieNeedsDecision = fmt.Errorf("skor seri: tentukan pemenang sebagai keputusan operator meja")
 
 // tiedLocked true bila total skor bersih kedua sudut sama. Pemanggil memegang o.mu.
 func (o *Orchestrator) tiedLocked() bool {

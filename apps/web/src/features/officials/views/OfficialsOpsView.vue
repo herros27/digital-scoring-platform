@@ -200,9 +200,9 @@ const formatDate = (iso: string) => (iso ? dateFmt.format(new Date(iso)) : '-')
         <div class="off-header__sub font-mono">KEAMANAN & AKSES</div>
         <h2 class="off-header__title">AKUN PETUGAS</h2>
         <p class="off-header__desc">
-          Admin, Dewan Juri, Wasit, dan Operator yang masuk dengan email dan password.
+          Admin, Pengawas Pertandingan, Operator Meja, dan Staf Administrasi yang masuk dengan email dan password.
           <template v-if="myRole === 'dewan'">
-            Dewan Juri hanya dapat mengelola akun Wasit dan Operator.
+            Pengawas Pertandingan hanya dapat mengelola akun Operator Meja dan Staf Administrasi.
           </template>
         </p>
       </div>

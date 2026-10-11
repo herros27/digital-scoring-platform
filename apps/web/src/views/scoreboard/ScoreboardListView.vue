@@ -169,7 +169,7 @@ onBeforeUnmount(() => clearInterval(timer))
             <em aria-hidden="true">Masuk →</em>
           </router-link>
           <router-link to="/judge/login" class="sbl-action">
-            <strong>Login Juri / Wasit</strong>
+            <strong>Login Juri / Operator Meja</strong>
             <span>Masuk dengan PIN dari panitia</span>
             <em aria-hidden="true">Masuk →</em>
           </router-link>

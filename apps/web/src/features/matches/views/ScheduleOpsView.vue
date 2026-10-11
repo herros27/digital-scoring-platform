@@ -123,7 +123,7 @@ async function handleStartMatch(m: MatchDTO) {
   actionLoadingId.value = m.id
   try {
     await startMatchMutation.mutateAsync(m.id)
-    showToast('Pertandingan Dimulai', 'Timer dan konsol wasit telah diaktifkan.', 'success')
+    showToast('Pertandingan Dimulai', 'Timer dan konsol meja telah diaktifkan.', 'success')
   } catch (err) {
     showToast('Gagal Memulai', getErrorMessage(err, 'Gagal memulai pertandingan.'), 'danger')
   } finally {
@@ -723,10 +723,10 @@ const filteredMatches = computed(() => {
               v-if="canControlMatch"
               type="button"
               class="sch-link-btn"
-              title="Buka Konsol Wasit"
+              title="Buka Konsol Meja"
               @click="openRefereeConsole"
             >
-              Konsol Wasit
+              Konsol Meja
             </button>
           </div>
         </footer>

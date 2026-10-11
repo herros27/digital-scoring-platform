@@ -101,7 +101,7 @@ test('admin menambah operator lewat form; akun itu bisa masuk dengan password aw
   await page.locator('[data-test="official-save"]').click()
 
   await expect(row(page, mail)).toBeVisible()
-  await expect(row(page, mail)).toContainText('Operator')
+  await expect(row(page, mail)).toContainText('Staf Administrasi')
   created.push(await idOf(mail))
   expect(await canLogin(mail, 'mock_pass_init')).toBe(true)
 })
@@ -143,7 +143,7 @@ test('admin mengubah peran operator menjadi wasit', async ({ page }) => {
   await row(page, mail).locator('[data-test="official-edit"]').click()
   await page.locator('[data-test="official-role"]').selectOption('wasit')
   await page.locator('[data-test="official-save"]').click()
-  await expect(row(page, mail)).toContainText('Wasit')
+  await expect(row(page, mail)).toContainText('Operator Meja')
   const list = await must<{ email: string; role: string }[]>(
     'daftar',
     api('GET', '/officials', admin),
@@ -195,7 +195,7 @@ test('hapus meminta konfirmasi; setelah dikonfirmasi akun tidak bisa masuk lagi'
   expect(await canLogin(mail, 'mock_pass_reset')).toBe(false)
 })
 
-test('Dewan Juri: hanya Wasit/Operator yang bisa dikelola; akun Admin dan Dewan terkunci', async ({
+test('Pengawas Pertandingan: hanya Operator Meja/Staf Administrasi yang bisa dikelola; akun Admin dan Dewan terkunci', async ({
   page,
 }) => {
   await openAsOfficial(page, {
@@ -211,7 +211,7 @@ test('Dewan Juri: hanya Wasit/Operator yang bisa dikelola; akun Admin dan Dewan 
 
   await page.locator('[data-test="official-add"]').click()
   const options = await page.locator('[data-test="official-role"] option').allTextContents()
-  expect(options).toEqual(['Wasit', 'Operator'])
+  expect(options).toEqual(['Operator Meja', 'Staf Administrasi'])
 })
 
 test('ganti password sendiri: password lama salah tidak mengeluarkan sesi; yang benar berhasil', async ({

@@ -418,7 +418,7 @@ function submit() {
               {{ d.pointGap.fromRound }}.
             </template>
             <template v-else
-              >Pertandingan hanya berakhir lewat waktu atau keputusan wasit.</template
+              >Pertandingan hanya berakhir lewat waktu atau keputusan operator meja.</template
             >
           </p>
         </section>
@@ -427,7 +427,7 @@ function submit() {
         <section class="rs-section">
           <h3>Aturan Seri</h3>
           <p class="rs-hint">
-            Dijalankan berurutan bila skor bersih seri; bila masih seri, wasit memutuskan manual.
+            Dijalankan berurutan bila skor bersih seri; bila masih seri, operator meja memutuskan manual.
           </p>
           <label class="rs-check">
             <input v-model="d.tiebreak.fewestPenalties" type="checkbox" />
@@ -469,7 +469,7 @@ function submit() {
             </ol>
           </div>
           <div class="rs-methods">
-            <span class="rs-hint">Dasar keputusan manual yang boleh dipilih wasit:</span>
+            <span class="rs-hint">Dasar keputusan manual yang boleh dipilih operator meja:</span>
             <label v-for="m in TIEBREAK_METHODS" :key="m" class="rs-check">
               <input
                 type="checkbox"
@@ -485,7 +485,7 @@ function submit() {
         <section class="rs-section">
           <h3>Hasil Khusus</h3>
           <p class="rs-hint">
-            Tombol di konsol wasit di luar skor. Nonaktifkan jenis yang tidak dipakai pada regulasi
+            Tombol di konsol meja di luar skor. Nonaktifkan jenis yang tidak dipakai pada regulasi
             ini.
           </p>
           <div v-for="(o, i) in d.outcomes" :key="o.type" class="rs-row" data-test="outcome-row">

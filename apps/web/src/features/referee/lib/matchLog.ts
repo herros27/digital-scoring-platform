@@ -161,7 +161,7 @@ export function toLogEntry(ev: RawMatchEvent | WsMatchEvent): LogEntry | null {
         ...base,
         category: 'sanksi',
         title: `${asString(p.label, 'Sanksi')} ${side} (-${asNumber(p.points)})`,
-        detail: 'Dijatuhkan wasit',
+        detail: 'Dijatuhkan operator meja',
       }
     case 'penalty_revoked':
       return {
@@ -197,7 +197,7 @@ export function toLogEntry(ev: RawMatchEvent | WsMatchEvent): LogEntry | null {
       return {
         ...base,
         category: 'kontrol',
-        title: 'Keputusan wasit',
+        title: 'Keputusan operator meja',
         detail: `Pemenang Sudut ${TARGET_LABEL[asString(p.winner_corner)] ?? ''} • ${asString(p.method)}`,
       }
     case 'disqualified':

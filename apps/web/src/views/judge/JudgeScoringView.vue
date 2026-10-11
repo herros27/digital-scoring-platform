@@ -59,7 +59,7 @@ const matchStatus = ref<MatchStatus>('idle')
 const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
 // Skor ditolak server saat istirahat; tombol dikunci agar juri tidak mengira input tercatat.
 const isBreak = computed(() => matchStatus.value === 'break')
-// Skor juga ditolak saat partai dijeda wasit; tombol dikunci dengan alasan yang sama.
+// Skor juga ditolak saat partai dijeda operator meja; tombol dikunci dengan alasan yang sama.
 const isPaused = computed(() => matchStatus.value === 'paused')
 // Tombol hanya aktif saat babak berjalan: istirahat, dijeda, belum mulai, dan selesai semuanya ditolak server.
 const scoringLocked = computed(() => matchStatus.value !== 'running')
@@ -176,7 +176,7 @@ function handlePinClear() {
 
 async function handlePinSubmit() {
   if (!isCompletePin(pinInput.value)) {
-    pinError.value = 'PIN harus 6 digit (juri) atau 8 digit (wasit)'
+    pinError.value = 'PIN harus 6 digit (juri) atau 8 digit (operator meja)'
     return
   }
   pinLoading.value = true
@@ -450,7 +450,7 @@ onUnmounted(() => {
           <span>{{ timer.formattedTime.value }}</span>
         </div>
         <div v-if="isPaused" class="judge-break-note judge-paused-note font-mono">
-          Pertandingan dijeda wasit — skor tidak diterima
+          Pertandingan dijeda operator meja — skor tidak diterima
         </div>
         <div v-if="notice" class="judge-break-note judge-notice font-mono" role="alert">
           {{ notice }}

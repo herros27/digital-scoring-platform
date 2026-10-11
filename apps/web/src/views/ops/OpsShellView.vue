@@ -398,7 +398,7 @@ const navConfig = {
   },
   pin: {
     title: 'PERANGKAT & PIN JURI',
-    sub: 'OTORISASI TABLET JURI & WASIT PER ARENA',
+    sub: 'OTORISASI TABLET JURI & OPERATOR MEJA PER ARENA',
     hasArena: false,
   },
   regulasi: {
@@ -408,7 +408,7 @@ const navConfig = {
   },
   petugas: {
     title: 'AKUN PETUGAS',
-    sub: 'ADMIN, DEWAN JURI, WASIT, OPERATOR & KEAMANAN PASSWORD',
+    sub: 'ADMIN, PENGAWAS PERTANDINGAN, OPERATOR MEJA, STAF ADMINISTRASI & KEAMANAN PASSWORD',
     hasArena: false,
   },
   laporan: {
@@ -924,8 +924,8 @@ function handleLoadToMat1() {
   modal.value = {
     show: true,
     title: `Muat Partai ke ${arenaName}?`,
-    message: `Data atlet ${m?.red?.name || 'Sudut Merah'} vs ${m?.blue?.name || 'Sudut Biru'} akan dikirim ke Konsol Wasit & Scoreboard ${arenaName}.`,
-    confirmText: 'Muat & Buka Konsol Wasit',
+    message: `Data atlet ${m?.red?.name || 'Sudut Merah'} vs ${m?.blue?.name || 'Sudut Biru'} akan dikirim ke Konsol Meja & Scoreboard ${arenaName}.`,
+    confirmText: 'Muat & Buka Konsol Meja',
     confirmVariant: 'emerald',
     action: async () => {
       try {

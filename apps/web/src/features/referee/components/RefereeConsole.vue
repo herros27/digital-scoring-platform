@@ -55,10 +55,10 @@ function goto(tab: string) {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  wasit: 'WASIT',
-  referee: 'WASIT',
+  wasit: 'OPERATOR MEJA',
+  referee: 'OPERATOR MEJA',
   admin: 'ADMIN',
-  dewan: 'DEWAN HAKIM',
+  dewan: 'PENGAWAS PERTANDINGAN',
 }
 const roleLabel = computed(() => ROLE_LABEL[authStore.role] ?? authStore.role.toUpperCase())
 
@@ -96,7 +96,7 @@ async function runConfirmed() {
 
 function askLogout() {
   askConfirm({
-    title: 'Keluar dari Konsol Wasit?',
+    title: 'Keluar dari Konsol Meja?',
     message:
       'Sesi meja pengawas akan diakhiri. Pertandingan yang berjalan tetap berjalan di server.',
     confirmLabel: 'Keluar',
@@ -163,7 +163,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
           </div>
           <div>
             <span class="ref-brand-sub font-mono">PERSILAT ARENA</span>
-            <h2 class="ref-brand-title">MEJA PENGAWAS</h2>
+            <h2 class="ref-brand-title">MEJA OPERATOR</h2>
           </div>
         </div>
         <button class="ref-sidebar-close-btn" title="Tutup Menu" @click="closeSidebar">
@@ -234,7 +234,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
           <button
             class="ref-hamburger-btn"
             :aria-expanded="isSidebarOpen"
-            title="Buka/Tutup Menu Panel Wasit"
+            title="Buka/Tutup Menu Panel Operator Meja"
             @click="toggleSidebar"
           >
             <svg
@@ -254,7 +254,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
           </button>
           <div class="ref-topbar__titles">
             <span class="ref-top-series font-mono"
-              >PERSILAT DIGITAL ARENA &bull; MEJA PENGAWAS</span
+              >PERSILAT DIGITAL ARENA &bull; MEJA OPERATOR</span
             >
             <div class="ref-top-headline">
               <h1 class="ref-top-title">{{ arenaTitle }} - MEJA PERTANDINGAN</h1>
@@ -275,7 +275,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
           </span>
           <div
             class="ref-avatar"
-            title="Keluar dari Konsol Wasit (Logout)"
+            title="Keluar dari Konsol Meja (Logout)"
             style="cursor: pointer"
             @click="askLogout"
           />

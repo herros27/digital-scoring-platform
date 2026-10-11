@@ -186,14 +186,14 @@ async function fetchPinsForArena(arenaId: string) {
       })
     }
 
-    // 2. Meja Pengawas & Wasit
+    // 2. Meja Operator
     const foundWasit = pinsFromBackend.find((p) => p.role === 'wasit')
     const wasitPinStr = foundWasit?.pin ? formatPin(foundWasit.pin) : '--- ---'
     seats.push({
       id: foundWasit?.id || `${arenaId}-wasit`,
       seatNumber: 0,
       role: 'wasit',
-      label: 'MEJA PENGAWAS & WASIT',
+      label: 'MEJA OPERATOR',
       pin: wasitPinStr,
       expiresAt: formatExpiry(foundWasit?.expires_at),
     })
@@ -346,7 +346,7 @@ async function handleBatchGenerate() {
     await loadAllArenasDeviceCounts()
     showToast(
       'Batch Generate Selesai',
-      `Seluruh PIN ${maxJudge} Juri & Wasit di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang dan disimpan ke server.`,
+      `Seluruh PIN ${maxJudge} Juri & Operator Meja di ${activeArenaObj.value.name.toUpperCase()} berhasil diacak ulang dan disimpan ke server.`,
       'success',
     )
   } catch (err) {
@@ -552,7 +552,7 @@ async function handleSaveCustomPin() {
         <button
           class="format-btn"
           :class="{ 'format-btn--active': judgeFormat === '5' }"
-          title="Format PB IPSI Standar (5 Juri + 1 Wasit)"
+          title="Format PB IPSI Standar (5 Juri + 1 Operator Meja)"
           @click="judgeFormat = '5'"
         >
           5 JURI
@@ -560,7 +560,7 @@ async function handleSaveCustomPin() {
         <button
           class="format-btn"
           :class="{ 'format-btn--active': judgeFormat === '3' }"
-          title="Format Ringkas Daerah (3 Juri + 1 Wasit)"
+          title="Format Ringkas Daerah (3 Juri + 1 Operator Meja)"
           @click="judgeFormat = '3'"
         >
           3 JURI
@@ -618,10 +618,10 @@ async function handleSaveCustomPin() {
           <span>{{
             seatStatus(seat) === 'online'
               ? seat.role === 'wasit'
-                ? 'KONSOL WASIT TERHUBUNG'
+                ? 'KONSOL MEJA TERHUBUNG'
                 : 'TABLET TERHUBUNG'
               : seat.role === 'wasit'
-                ? 'KONSOL WASIT BELUM TERHUBUNG'
+                ? 'KONSOL MEJA BELUM TERHUBUNG'
                 : 'TABLET BELUM TERHUBUNG'
           }}</span>
         </div>
@@ -712,7 +712,7 @@ async function handleSaveCustomPin() {
             class="card-action-link"
             @click="openInNewTab(`/referee?arena_id=${selectedArena}&comp_id=${compIdRef}`)"
           >
-            Buka Konsol Wasit →
+            Buka Konsol Meja →
           </button>
         </div>
       </div>
@@ -783,7 +783,7 @@ async function handleSaveCustomPin() {
       <div class="pin-modal">
         <h3 class="pin-modal-title font-mono">BUAT PIN OTORISASI BARU</h3>
         <p class="pin-modal-sub">
-          Generate atau tentukan PIN khusus untuk juri / wasit gelanggang.
+          Generate atau tentukan PIN khusus untuk juri / operator meja gelanggang.
         </p>
 
         <div class="pin-form-group">
@@ -799,8 +799,8 @@ async function handleSaveCustomPin() {
           <label class="font-mono">PERAN PERANGKAT</label>
           <select v-model="customRole" class="pin-form-select font-mono">
             <option value="juri">Juri Lapangan</option>
-            <option value="wasit">Wasit / Pengawas Gelanggang</option>
-            <option value="dewan">Dewan Hakim / Delegasi Teknik</option>
+            <option value="wasit">Operator Meja Gelanggang</option>
+            <option value="dewan">Pengawas Pertandingan</option>
           </select>
         </div>
 
