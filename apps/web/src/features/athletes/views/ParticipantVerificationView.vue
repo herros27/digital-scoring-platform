@@ -218,7 +218,7 @@ async function handleSetStatus(participant: Participant, newStatus: 'verified' |
       const actionLabel = newStatus === 'verified' ? 'dinyatakan Lolos Verifikasi' : 'ditolak'
       showToast(
         newStatus === 'verified' ? 'Verifikasi Berhasil' : 'Peserta Ditolak',
-        `Peserta ${participant.name} ${actionLabel}.`,
+        `Peserta ${participant.name} ${actionLabel}.${result.bracket_note ? ' ' + result.bracket_note : ''}`,
         newStatus === 'verified' ? 'success' : 'danger',
       )
     }

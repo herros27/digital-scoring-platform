@@ -223,8 +223,9 @@ type VerifyInput struct {
 
 // VerifyResult hasil akhir verifikasi (status bisa berbeda dari yang diminta bila bobot tidak sah).
 type VerifyResult struct {
-	Status string
-	Reason string
+	Status     string
+	Reason     string
+	CategoryID string // kategori peserta; dipakai pemanggil untuk memasukkan peserta lolos ke bagan yang sudah ada
 }
 
 // VerifyParticipantDetailed menerapkan aturan resmi: tanpa toleransi bobot (0 kg) dan
@@ -259,7 +260,7 @@ func (s *AthleteService) VerifyParticipantDetailed(competitionID, participantID 
 		weight = in.ActualWeight
 	}
 
-	result := &VerifyResult{Status: in.Status}
+	result := &VerifyResult{Status: in.Status, CategoryID: part.CategoryID}
 	if in.Status == "verified" && part.CategoryID != "" && s.categoryRepo != nil {
 		cat, err := s.categoryRepo.GetByID(part.CategoryID)
 		if err != nil {

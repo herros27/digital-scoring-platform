@@ -17,6 +17,8 @@ type AthleteHandler struct {
 	Cache   *cache.Cache
 	// Competition opsional: tanggal mulai kejuaraan dipakai sebagai tanggal acuan hitung umur.
 	Competition *service.CompetitionService
+	// OnVerified opsional: dipanggil setelah peserta lolos verifikasi; hasilnya (catatan bagan) ikut ke respons.
+	OnVerified func(compID, categoryID string) string
 }
 
 // contingentScope mengembalikan id kontingen pemanggil dan true bila ia manajer kontingen; peran lain
@@ -268,10 +270,15 @@ func (h *AthleteHandler) VerifyParticipant(w http.ResponseWriter, r *http.Reques
 		h.Cache.InvalidateCompetition(compID)
 	}
 
+	note := ""
+	if res.Status == "verified" && h.OnVerified != nil {
+		note = h.OnVerified(compID, res.CategoryID)
+	}
 	Ok(w, map[string]any{
 		"participant_id": participantID,
 		"status":         res.Status,
 		"reason":         res.Reason,
+		"bracket_note":   note,
 	})
 }
 

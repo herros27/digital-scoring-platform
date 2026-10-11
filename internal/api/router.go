@@ -86,6 +86,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optiona
 	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, CategoryService: categoryService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
 	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache, Competition: compService}
+	athleteH.OnVerified = bracketH.AutoJoin
 	rulesetH := &handler.RulesetHandler{Service: rulesetService, Competitions: compService}
 	officialH := &handler.OfficialHandler{Service: officialService}
 	contingentH := &handler.ContingentHandler{Service: contingentService, InviteCode: inviteCode}

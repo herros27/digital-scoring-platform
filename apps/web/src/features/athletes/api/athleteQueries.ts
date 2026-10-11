@@ -167,6 +167,8 @@ export function useVerifyParticipantMutation(compId: Ref<string>) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
       queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
     },
   })
 }

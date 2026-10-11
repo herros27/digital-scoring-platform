@@ -100,4 +100,6 @@ export interface VerifyParticipantResult {
   /** Status akhir; bisa 'overweight' / 'underweight' walau diminta 'verified'. */
   status: ParticipantStatus
   reason?: string
+  /** Catatan bagan otomatis setelah peserta lolos ("" = tidak ada): bagan dibentuk ulang, atau terkunci/berjalan. */
+  bracket_note?: string
 }
