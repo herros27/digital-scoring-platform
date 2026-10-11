@@ -5,6 +5,7 @@ import {
   groupNote,
   IPSI_STANDARD_PRESETS,
   isJurusOnly,
+  normalizeCategoryName,
   presetToPayload,
 } from './category.schema'
 
@@ -97,5 +98,14 @@ describe('preset kelas bobot resmi PB IPSI', () => {
     for (const p of IPSI_STANDARD_PRESETS) {
       expect(createCategorySchema.safeParse(presetToPayload(p)).success).toBe(true)
     }
+  })
+})
+
+describe('normalizeCategoryName', () => {
+  it('menyamakan tanda hubung, huruf besar/kecil, dan spasi', () => {
+    const a = normalizeCategoryName('Tanding Dewasa Putra - Kelas A (45-50 Kg)')
+    expect(normalizeCategoryName('Tanding  Dewasa Putra – Kelas A (45–50 Kg) ')).toBe(a)
+    expect(normalizeCategoryName('TANDING DEWASA PUTRA — KELAS A (45−50 KG)')).toBe(a)
+    expect(normalizeCategoryName('Tanding Dewasa Putra - Kelas B (50-55 Kg)')).not.toBe(a)
   })
 })

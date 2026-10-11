@@ -176,29 +176,29 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		Gender      string
 		WeightClass string
 	}{
-		{Name: "Tanding Dewasa Putra - Kelas A (45-50 Kg)", Gender: "male", WeightClass: "A"},
-		{Name: "Tanding Dewasa Putra - Kelas B (50-55 Kg)", Gender: "male", WeightClass: "B"},
-		{Name: "Tanding Dewasa Putra - Kelas C (55-60 Kg)", Gender: "male", WeightClass: "C"},
-		{Name: "Tanding Dewasa Putra - Kelas D (60-65 Kg)", Gender: "male", WeightClass: "D"},
-		{Name: "Tanding Dewasa Putra - Kelas E (65-70 Kg)", Gender: "male", WeightClass: "E"},
-		{Name: "Tanding Dewasa Putra - Kelas F (70-75 Kg)", Gender: "male", WeightClass: "F"},
-		{Name: "Tanding Dewasa Putra - Kelas G (75-80 Kg)", Gender: "male", WeightClass: "G"},
-		{Name: "Tanding Dewasa Putra - Kelas H (80-85 Kg)", Gender: "male", WeightClass: "H"},
-		{Name: "Tanding Dewasa Putra - Kelas I (85-90 Kg)", Gender: "male", WeightClass: "I"},
-		{Name: "Tanding Dewasa Putra - Kelas J (90-95 Kg)", Gender: "male", WeightClass: "J"},
-		{Name: "Tanding Dewasa Putri - Kelas A (45-50 Kg)", Gender: "female", WeightClass: "A"},
-		{Name: "Tanding Dewasa Putri - Kelas B (50-55 Kg)", Gender: "female", WeightClass: "B"},
-		{Name: "Tanding Dewasa Putri - Kelas C (55-60 Kg)", Gender: "female", WeightClass: "C"},
-		{Name: "Tanding Dewasa Putri - Kelas D (60-65 Kg)", Gender: "female", WeightClass: "D"},
-		{Name: "Tanding Dewasa Putri - Kelas E (65-70 Kg)", Gender: "female", WeightClass: "E"},
-		{Name: "Tanding Dewasa Putri - Kelas F (70-75 Kg)", Gender: "female", WeightClass: "F"},
+		{Name: "Tanding Dewasa Putra - Kelas A (45–50 Kg)", Gender: "male", WeightClass: "A"},
+		{Name: "Tanding Dewasa Putra - Kelas B (50–55 Kg)", Gender: "male", WeightClass: "B"},
+		{Name: "Tanding Dewasa Putra - Kelas C (55–60 Kg)", Gender: "male", WeightClass: "C"},
+		{Name: "Tanding Dewasa Putra - Kelas D (60–65 Kg)", Gender: "male", WeightClass: "D"},
+		{Name: "Tanding Dewasa Putra - Kelas E (65–70 Kg)", Gender: "male", WeightClass: "E"},
+		{Name: "Tanding Dewasa Putra - Kelas F (70–75 Kg)", Gender: "male", WeightClass: "F"},
+		{Name: "Tanding Dewasa Putra - Kelas G (75–80 Kg)", Gender: "male", WeightClass: "G"},
+		{Name: "Tanding Dewasa Putra - Kelas H (80–85 Kg)", Gender: "male", WeightClass: "H"},
+		{Name: "Tanding Dewasa Putra - Kelas I (85–90 Kg)", Gender: "male", WeightClass: "I"},
+		{Name: "Tanding Dewasa Putra - Kelas J (90–95 Kg)", Gender: "male", WeightClass: "J"},
+		{Name: "Tanding Dewasa Putri - Kelas A (45–50 Kg)", Gender: "female", WeightClass: "A"},
+		{Name: "Tanding Dewasa Putri - Kelas B (50–55 Kg)", Gender: "female", WeightClass: "B"},
+		{Name: "Tanding Dewasa Putri - Kelas C (55–60 Kg)", Gender: "female", WeightClass: "C"},
+		{Name: "Tanding Dewasa Putri - Kelas D (60–65 Kg)", Gender: "female", WeightClass: "D"},
+		{Name: "Tanding Dewasa Putri - Kelas E (65–70 Kg)", Gender: "female", WeightClass: "E"},
+		{Name: "Tanding Dewasa Putri - Kelas F (70–75 Kg)", Gender: "female", WeightClass: "F"},
 	}
 	for _, cat := range categories {
 		// Tabel Dewasa PB IPSI: kelas A = 45-50 kg, B = 50-55, ... (lebar 5 kg), batas inklusif seperti preset UI.
 		minW := 45 + 5*float64(cat.WeightClass[0]-'A')
 		maxW := minW + 5
 		var catID string
-		err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND name = $2 LIMIT 1`, compID, cat.Name).Scan(&catID)
+		err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND translate(name, '–—−', '---') = translate($2, '–—−', '---') LIMIT 1`, compID, cat.Name).Scan(&catID)
 		if err == sql.ErrNoRows {
 			_, err = tx.ExecContext(ctx, `
 				INSERT INTO categories (competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight)
@@ -273,8 +273,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 
 	// Kategori resmi tempat peserta & bagan seed ditautkan (bagan terisolasi per category_id).
 	var seedCategoryID string
-	if err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND name = $2 LIMIT 1`,
-		compID, "Tanding Dewasa Putra - Kelas A (45-50 Kg)").Scan(&seedCategoryID); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND translate(name, '–—−', '---') = translate($2, '–—−', '---') LIMIT 1`,
+		compID, "Tanding Dewasa Putra - Kelas A (45–50 Kg)").Scan(&seedCategoryID); err != nil {
 		return nil, fmt.Errorf("failed to load seed category: %w", err)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -65,9 +66,22 @@ func (s *CategoryService) CreateCategory(c *domain.Category) error {
 			return fmt.Errorf("%w: kejuaraan ini sudah memakai standar %s; reset kategori terlebih dahulu untuk beralih ke %s",
 				domain.ErrConflict, e.PresetStandard, c.PresetStandard)
 		}
+		if sameCategoryName(e.Name, c.Name) {
+			return fmt.Errorf("%w: kategori %q sudah ada pada kejuaraan ini", domain.ErrConflict, e.Name)
+		}
 	}
 	c.CreatedAt = time.Now()
 	return s.repo.Create(c)
+}
+
+// sameCategoryName membandingkan nama kategori tanpa peduli huruf besar/kecil, spasi ganda, dan jenis tanda hubung
+// (- – — −): tanpa itu "45-50 Kg" dan "45–50 Kg" dianggap dua kategori berbeda dan peserta terbelah di antara keduanya.
+func sameCategoryName(a, b string) bool {
+	norm := func(s string) string {
+		s = strings.NewReplacer("\u2010", "-", "\u2011", "-", "\u2012", "-", "\u2013", "-", "\u2014", "-", "\u2212", "-").Replace(s)
+		return strings.ToLower(strings.Join(strings.Fields(s), " "))
+	}
+	return norm(a) == norm(b)
 }
 
 func (s *CategoryService) GetCategoryByID(id string) (*domain.Category, error) {

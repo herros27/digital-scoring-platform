@@ -281,3 +281,16 @@ export function presetToPayload(p: StandardClassPreset): CreateCategoryFormValue
     bracket_mode: p.bracketMode,
   }
 }
+
+/**
+ * Nama kategori untuk perbandingan: huruf kecil, spasi ganda dirapikan, dan semua jenis tanda hubung (- – — −) disamakan.
+ * Tanpa ini "45-50 Kg" dan "45–50 Kg" dianggap kategori berbeda dan peserta terbelah di antara keduanya.
+ */
+export function normalizeCategoryName(name: string): string {
+  return name
+    .replace(/[‐-―−]/g, '-')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}

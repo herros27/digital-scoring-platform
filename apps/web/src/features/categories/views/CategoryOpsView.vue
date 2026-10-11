@@ -26,6 +26,7 @@ import {
   type Category,
   type CreateCategoryFormValues,
   type StandardClassPreset,
+  normalizeCategoryName,
 } from '../types/category.schema'
 import {
   AGE_BANDS,
@@ -494,10 +495,10 @@ const seedExpanded = ref<Set<AgeGroupCode>>(new Set())
 const seedBands = computed(() => AGE_BANDS[seedStandard.value])
 const seedAllPresets = computed(() => presetsFor(seedStandard.value))
 const existingNames = computed(
-  () => new Set(categories.value.map((c) => c.name.toLowerCase().trim())),
+  () => new Set(categories.value.map((c) => normalizeCategoryName(c.name))),
 )
 const isApplied = (p: StandardClassPreset) =>
-  existingNames.value.has(p.categoryName.toLowerCase().trim())
+  existingNames.value.has(normalizeCategoryName(p.categoryName))
 
 function presetsOfGroup(code: AgeGroupCode) {
   return seedAllPresets.value.filter((p) => p.ageGroup === code)
