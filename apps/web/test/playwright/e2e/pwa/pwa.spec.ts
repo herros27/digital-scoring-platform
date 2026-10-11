@@ -22,10 +22,10 @@ test.describe('PWA', () => {
     expect(m).toMatchObject({
       name: 'Digital Scoring Silat',
       short_name: 'DS Silat',
-      start_url: '/judge',
+      start_url: '/judge/login',
       scope: '/',
       display: 'standalone',
-      orientation: 'landscape',
+      orientation: 'any',
       lang: 'id',
     })
     expect(m.shortcuts.map((s: { url: string }) => s.url)).toEqual([

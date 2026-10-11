@@ -25,10 +25,10 @@ export default defineConfig({
         description:
           'Penilaian pertandingan Pencak Silat secara digital: layar juri, konsol wasit, dan scoreboard.',
         lang: 'id',
-        start_url: '/judge',
+        start_url: '/judge/login',
         scope: '/',
         display: 'standalone',
-        orientation: 'landscape',
+        orientation: 'any',
         background_color: '#020617',
         theme_color: '#0b1220',
         categories: ['sports', 'utilities'],
@@ -43,8 +43,8 @@ export default defineConfig({
           },
         ],
         shortcuts: [
-          { name: 'Masuk Juri / Wasit (PIN)', short_name: 'Juri', url: '/judge/login' },
-          { name: 'Konsol Wasit', short_name: 'Wasit', url: '/referee' },
+          { name: 'Masuk Juri / Operator Meja (PIN)', short_name: 'Juri', url: '/judge/login' },
+          { name: 'Konsol Meja', short_name: 'Meja', url: '/referee' },
           { name: 'Scoreboard', short_name: 'Skor', url: '/scoreboard' },
         ],
       },

@@ -119,8 +119,8 @@ terbuka ke LAN dapat dipakai untuk memalsukan header itu pada Docker Desktop (al
 
 - **Android (Chrome):** buka alamat HTTPS aplikasi, menu ⋮ → **Instal aplikasi** (atau **Tambahkan ke layar utama**).
 - **iPad/iPhone (Safari):** buka alamat HTTPS, tombol Bagikan → **Tambahkan ke Layar Utama**.
-- Aplikasi terbuka di `/judge` (masuk dengan PIN). Pintasan lama-tekan ikon: Juri/Wasit (PIN), Konsol Wasit, Scoreboard.
-- Orientasi dikunci **landscape** (layar juri dirancang lebar). Ubah `orientation` di `vite.config.ts` bila perlu.
+- Aplikasi terbuka di `/judge/login` (halaman PIN juri / operator meja). Pintasan lama-tekan ikon: Juri/Operator Meja (PIN), Konsol Meja, Scoreboard.
+- Orientasi **tidak dikunci** (`orientation: 'any'`), supaya halaman login dan PIN nyaman di mode potret. Layar juri tetap meminta landscape lewat panduan putar layar dan tombol layar penuh di halaman itu.
 
 ## Perilaku offline dan pembaruan
 
