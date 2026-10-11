@@ -54,25 +54,6 @@ export function useMatchEventsQuery(compId: Ref<string>, matchId: Ref<string>) {
 }
 
 /**
- * Create match mutation
- */
-export function useCreateMatchMutation(compId: Ref<string>) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (payload: {
-      arena_id?: string
-      bracket_slot_id?: string
-      athlete_red_id: string
-      athlete_blue_id: string
-      current_round?: number
-    }) => matchService.createMatch(compId.value, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: matchKeys.lists() })
-    },
-  })
-}
-
-/**
  * Load match to arena mutation
  */
 export function useLoadArenaMutation(compId: Ref<string>) {

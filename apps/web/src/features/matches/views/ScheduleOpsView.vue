@@ -15,7 +15,6 @@ import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useAuthStore } from '@/stores/auth'
 import type { MatchDTO } from '../api/matchService'
-import CreateMatchDialog from '../components/CreateMatchDialog.vue'
 import MatchScoreDialog from '../components/MatchScoreDialog.vue'
 
 const router = useRouter()
@@ -23,8 +22,6 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const canControlMatch = computed(() => ['admin', 'dewan', 'wasit'].includes(authStore.role || ''))
-// Server hanya mengizinkan admin/dewan membuat partai manual.
-const canCreateMatch = computed(() => authStore.isAdminOrDewan)
 
 const props = withDefaults(
   defineProps<{
@@ -171,17 +168,8 @@ async function handleFinishMatch(m: MatchDTO) {
   }
 }
 
-// Tambah partai manual & rincian skor
-const isCreateOpen = ref(false)
+// Rincian skor
 const scoreMatch = ref<MatchDTO | null>(null)
-
-function handleMatchCreated() {
-  showToast(
-    'Partai Dibuat',
-    'Partai manual ditambahkan ke jadwal dan siap dimuat ke gelanggang.',
-    'success',
-  )
-}
 
 // External Links
 function openScoreboard(arenaId?: string) {
@@ -320,15 +308,6 @@ const filteredMatches = computed(() => {
             </svg>
           </template>
           Segarkan Jadwal
-        </AppButton>
-        <AppButton
-          v-if="canCreateMatch"
-          variant="emerald"
-          size="sm"
-          data-test="match-add"
-          @click="isCreateOpen = true"
-        >
-          Tambah Partai
         </AppButton>
       </div>
     </header>
@@ -753,15 +732,6 @@ const filteredMatches = computed(() => {
         </footer>
       </article>
     </div>
-
-    <CreateMatchDialog
-      :open="isCreateOpen"
-      :competition-id="activeCompId"
-      :participants="participants"
-      :arenas="arenas"
-      @close="isCreateOpen = false"
-      @created="handleMatchCreated"
-    />
 
     <MatchScoreDialog
       :open="!!scoreMatch"

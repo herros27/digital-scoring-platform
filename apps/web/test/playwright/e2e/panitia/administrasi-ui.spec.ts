@@ -277,11 +277,11 @@ test.describe('Akun kontingen', () => {
   })
 })
 
-test.describe('Jadwal: tambah partai manual dan rincian skor', () => {
+test.describe('Jadwal: tanpa tambah partai manual, dan rincian skor', () => {
   const names = [`Manual Merah ${stamp}`, `Manual Biru ${stamp}`]
   let ids: string[] = []
 
-  test('tambah partai manual lewat dialog: hanya atlet terverifikasi, tanpa atlet sama', async ({
+  test('jadwal tidak punya tombol tambah partai; partai dari API tetap tampil', async ({
     browser,
     baseURL,
   }) => {
@@ -303,23 +303,17 @@ test.describe('Jadwal: tambah partai manual dan rincian skor', () => {
     )
     expect(entrants).toHaveLength(2)
 
+    // Jadwal hanya menampilkan partai dari bagan: tidak ada tombol tambah partai manual di UI.
+    await must(
+      'buat partai',
+      api('POST', `/competitions/${kit.competitionId}/matches`, admin, {
+        arena_id: kit.arenaId,
+        athlete_red_id: ids[0],
+        athlete_blue_id: ids[1],
+      }),
+    )
     const page = await openOps(browser, baseURL, 'jadwal')
-    await page.locator('[data-test="match-add"]').click()
-    const dialog = page.locator('[data-test="create-match-dialog"]')
-    await expect(dialog).toBeVisible()
-    const redOptions = await page.locator('[data-test="match-red"] option').allTextContents()
-    expect(redOptions.some((t) => t.includes(`Manual Pending ${stamp}`))).toBe(false)
-    expect(redOptions.some((t) => t.includes(names[0]))).toBe(true)
-
-    // simpan tanpa memilih atlet: ditolak di layar, belum ada partai
-    await page.locator('[data-test="match-save"]').click()
-    await expect(page.locator('[data-test="match-error"]')).toBeVisible()
-
-    await page.locator('[data-test="match-arena"]').selectOption(kit.arenaId)
-    await page.locator('[data-test="match-red"]').selectOption(ids[0])
-    await page.locator('[data-test="match-blue"]').selectOption(ids[1])
-    await page.locator('[data-test="match-save"]').click()
-    await expect(dialog).toBeHidden()
+    await expect(page.locator('[data-test="match-add"]')).toHaveCount(0)
 
     const card = page.locator('article.sch-card', { hasText: names[0] })
     await expect(card).toBeVisible()
