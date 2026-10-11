@@ -334,6 +334,106 @@ func (s *AthleteService) UpdateAthleteProfile(id string, birthDate, nik *string)
 	return s.GetAthleteByID(id)
 }
 
+// AthleteIdentityUpdater kemampuan opsional repo atlet untuk mengubah nama/perguruan.
+type AthleteIdentityUpdater interface {
+	UpdateIdentity(id string, name, team *string) error
+}
+
+// UpdateAthleteIdentity mengubah nama dan/atau perguruan atlet (field nil tidak diubah).
+func (s *AthleteService) UpdateAthleteIdentity(id string, name, team *string) error {
+	if id == "" || (name == nil && team == nil) {
+		return domain.ErrInvalidInput
+	}
+	if name != nil {
+		v := strings.TrimSpace(*name)
+		if len(v) < 2 || len(v) > 100 {
+			return fmt.Errorf("%w: nama atlet harus 2-100 karakter", domain.ErrInvalidInput)
+		}
+		name = &v
+	}
+	if team != nil {
+		v := strings.TrimSpace(*team)
+		if len(v) < 1 || len(v) > 100 {
+			return fmt.Errorf("%w: perguruan harus 1-100 karakter", domain.ErrInvalidInput)
+		}
+		team = &v
+	}
+	up, ok := s.repo.(AthleteIdentityUpdater)
+	if !ok {
+		return errors.New("athlete repository does not support identity updates")
+	}
+	return up.UpdateIdentity(id, name, team)
+}
+
+// ParticipantCategoryChanger kemampuan opsional repo atlet untuk memindahkan peserta ke kategori lain.
+type ParticipantCategoryChanger interface {
+	ChangeParticipantCategory(competitionID, participantID, categoryID, weightClass string) error
+}
+
+// ChangeParticipantCategory memindahkan peserta ke kategori lain setelah memvalidasi gender & golongan umur atlet.
+// Izin sama dengan UnregisterParticipant: manajer kontingen hanya untuk pesertanya sendiri yang belum diverifikasi.
+func (s *AthleteService) ChangeParticipantCategory(competitionID, participantID, categoryID, contingentScope string, restricted bool, ref time.Time) error {
+	if competitionID == "" || participantID == "" || categoryID == "" {
+		return domain.ErrInvalidInput
+	}
+	cm, ok := s.repo.(CategoryParticipantManager)
+	ch, ok2 := s.repo.(ParticipantCategoryChanger)
+	if !ok || !ok2 {
+		return errors.New("athlete repository does not support changing participant category")
+	}
+	part, err := cm.GetParticipantByID(participantID)
+	if err != nil || part == nil || part.CompetitionID != competitionID {
+		return domain.ErrNotFound
+	}
+	if restricted {
+		if contingentScope == "" || part.ContingentID != contingentScope {
+			return domain.ErrNotFound
+		}
+		if part.RegistrationStatus == "verified" {
+			return fmt.Errorf("%w: peserta sudah diverifikasi; hubungi panitia untuk memindahkan kategori", domain.ErrForbidden)
+		}
+	}
+	if part.CategoryID == categoryID {
+		return nil
+	}
+	athlete, err := s.GetAthleteByID(part.AthleteID)
+	if err != nil {
+		return err
+	}
+	cat, err := s.CheckCategoryEligibility(competitionID, categoryID, athlete, ref)
+	if err != nil {
+		return err
+	}
+	return ch.ChangeParticipantCategory(competitionID, participantID, cat.ID, cat.WeightClass)
+}
+
+// AthletePurger kemampuan opsional repo atlet untuk menghapus data atlet yang tidak dipakai lagi.
+type AthletePurger interface {
+	DeleteAthleteIfUnused(id string) error
+}
+
+// RemoveParticipant membatalkan pendaftaran peserta; dengan purge, data atlet ikut dihapus bila tidak terdaftar di
+// kejuaraan lain. Aturan izin dan penolakan (bagan/partai) sama dengan UnregisterParticipant.
+func (s *AthleteService) RemoveParticipant(competitionID, participantID, contingentScope string, restricted, purge bool) error {
+	athleteID := ""
+	if purge {
+		if cm, ok := s.repo.(CategoryParticipantManager); ok {
+			if part, err := cm.GetParticipantByID(participantID); err == nil && part != nil && part.CompetitionID == competitionID {
+				athleteID = part.AthleteID
+			}
+		}
+	}
+	if err := s.UnregisterParticipant(competitionID, participantID, contingentScope, restricted); err != nil {
+		return err
+	}
+	if athleteID != "" {
+		if p, ok := s.repo.(AthletePurger); ok {
+			return p.DeleteAthleteIfUnused(athleteID)
+		}
+	}
+	return nil
+}
+
 // ParticipantRemover kemampuan opsional repo atlet untuk membatalkan pendaftaran peserta.
 type ParticipantRemover interface {
 	DeleteParticipant(competitionID, participantID string) error

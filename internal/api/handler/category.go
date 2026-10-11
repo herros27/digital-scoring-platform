@@ -102,7 +102,7 @@ func (h *CategoryHandler) Reset(w http.ResponseWriter, r *http.Request) {
 	n, err := h.Service.ResetCategories(compID)
 	if err != nil {
 		if errors.Is(err, domain.ErrConflict) {
-			Fail(w, http.StatusConflict, "CONFLICT", "kategori masih dipakai peserta terdaftar; pindahkan atau hapus peserta tersebut terlebih dahulu", nil)
+			Fail(w, http.StatusConflict, "CONFLICT", "kategori masih dipakai peserta terdaftar; batalkan atau hapus peserta tersebut terlebih dahulu", nil)
 			return
 		}
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)

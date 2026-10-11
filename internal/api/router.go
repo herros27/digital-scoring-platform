@@ -186,6 +186,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optiona
 	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.RegisterToCompetition)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/participants", athleteH.ListParticipants)
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/verify", adminOrDewan(http.HandlerFunc(athleteH.VerifyParticipant)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/category", canRegisterAthlete(http.HandlerFunc(athleteH.ChangeParticipantCategory)))
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/participants/{id}", canRegisterAthlete(http.HandlerFunc(athleteH.UnregisterParticipant)))
 
 	// Arenas

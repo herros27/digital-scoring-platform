@@ -67,7 +67,7 @@ export const athleteService = {
    */
   async updateAthleteProfile(
     id: string,
-    payload: { birth_date?: string; nik?: string },
+    payload: { name?: string; team?: string; birth_date?: string; nik?: string },
   ): Promise<Athlete> {
     const res = await http.put<Athlete>(ENDPOINTS.ATHLETES.DETAIL(id), payload)
     return res.data
@@ -104,8 +104,24 @@ export const athleteService = {
    * DELETE /api/v1/competitions/{comp_id}/participants/{id} — batal daftar dari kejuaraan.
    * Admin/dewan: peserta yang belum masuk bagan/partai. Manajer kontingen: pesertanya sendiri yang belum diverifikasi.
    */
-  async unregisterParticipant(compId: string, participantId: string): Promise<void> {
-    await http.delete<unknown>(ENDPOINTS.ATHLETES.PARTICIPANT(compId, participantId))
+  async unregisterParticipant(compId: string, participantId: string, purge = false): Promise<void> {
+    // purge: data atlet ikut dihapus bila tidak terdaftar di kejuaraan lain
+    const url = ENDPOINTS.ATHLETES.PARTICIPANT(compId, participantId)
+    await http.delete<unknown>(purge ? `${url}?purge=1` : url)
+  },
+
+  /**
+   * PUT /api/v1/competitions/{comp_id}/participants/{id}/category — pindah kategori peserta.
+   * Ditolak 409 bila peserta sudah masuk bagan/partai; peserta yang sudah diverifikasi kembali menunggu verifikasi.
+   */
+  async changeParticipantCategory(
+    compId: string,
+    participantId: string,
+    categoryId: string,
+  ): Promise<void> {
+    await http.put<unknown>(ENDPOINTS.ATHLETES.PARTICIPANT_CATEGORY(compId, participantId), {
+      category_id: categoryId,
+    })
   },
 
   /**

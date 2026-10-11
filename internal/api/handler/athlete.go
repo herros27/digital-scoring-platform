@@ -342,6 +342,8 @@ func (h *AthleteHandler) ListByCompetition(w http.ResponseWriter, r *http.Reques
 func (h *AthleteHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req struct {
+		Name      *string `json:"name"`
+		Team      *string `json:"team"`
 		BirthDate *string `json:"birth_date"`
 		NIK       *string `json:"nik" validate:"omitempty,max=50"`
 	}
@@ -349,14 +351,34 @@ func (h *AthleteHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
-	if req.BirthDate == nil && req.NIK == nil {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "birth_date atau nik wajib diisi", nil)
+	if req.Name == nil && req.Team == nil && req.BirthDate == nil && req.NIK == nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "name, team, birth_date, atau nik wajib diisi", nil)
 		return
 	}
 	if scope, restricted := contingentScope(r); restricted {
 		existing, err := h.Service.GetAthleteByID(id)
 		if err != nil || scope == "" || existing.ContingentID != scope {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", domain.ErrNotFound.Error(), nil)
+			return
+		}
+	}
+	if req.Name != nil || req.Team != nil {
+		if err := h.Service.UpdateAthleteIdentity(id, req.Name, req.Team); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+				return
+			}
+			Fail(w, http.StatusBadRequest, "BAD_REQUEST", strings.TrimPrefix(err.Error(), domain.ErrInvalidInput.Error()+": "), nil)
+			return
+		}
+		if req.BirthDate == nil && req.NIK == nil {
+			updated, err := h.Service.GetAthleteByID(id)
+			if err != nil {
+				Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+				return
+			}
+			h.invalidateAll()
+			Ok(w, updated)
 			return
 		}
 	}
@@ -369,16 +391,55 @@ func (h *AthleteHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
+	h.invalidateAll()
 	Ok(w, updated)
 }
 
-// DELETE /api/v1/competitions/{comp_id}/participants/{id}
+// invalidateAll mengosongkan cache publik: nama/perguruan atlet tampil di bagan dan jadwal banyak kejuaraan.
+func (h *AthleteHandler) invalidateAll() {
+	if h.Cache != nil {
+		h.Cache.Clear()
+	}
+}
+
+// PUT /api/v1/competitions/{comp_id}/participants/{id}/category
+// Body: {"category_id":"<uuid>"}. Memindahkan peserta ke kategori lain (gender & umur divalidasi); ditolak 409 bila
+// peserta sudah masuk bagan atau partai.
+func (h *AthleteHandler) ChangeParticipantCategory(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	var req struct {
+		CategoryID string `json:"category_id" validate:"required"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	scope, restricted := contingentScope(r)
+	err := h.Service.ChangeParticipantCategory(compID, r.PathValue("id"), req.CategoryID, scope, restricted, h.ageReferenceDate(compID))
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			Fail(w, http.StatusNotFound, "NOT_FOUND", "peserta tidak ditemukan pada kejuaraan ini", nil)
+		case errors.Is(err, domain.ErrForbidden):
+			Fail(w, http.StatusForbidden, "FORBIDDEN", strings.TrimPrefix(err.Error(), domain.ErrForbidden.Error()+": "), nil)
+		default:
+			failRegistration(w, err, http.StatusBadRequest, "BAD_REQUEST")
+		}
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]string{"status": "category_changed"})
+}
+
+// DELETE /api/v1/competitions/{comp_id}/participants/{id}[?purge=1]
 // Membatalkan pendaftaran peserta dari kejuaraan. Admin/dewan: semua peserta yang belum masuk bagan/partai. Manajer
 // kontingen: hanya peserta kontingennya sendiri yang belum diverifikasi.
 func (h *AthleteHandler) UnregisterParticipant(w http.ResponseWriter, r *http.Request) {
 	compID := r.PathValue("comp_id")
 	scope, restricted := contingentScope(r)
-	err := h.Service.UnregisterParticipant(compID, r.PathValue("id"), scope, restricted)
+	err := h.Service.RemoveParticipant(compID, r.PathValue("id"), scope, restricted, r.URL.Query().Get("purge") == "1")
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrNotFound):

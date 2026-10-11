@@ -282,6 +282,61 @@ func (s *AthleteStore) UpdateProfile(id string, birthDate, nik *string) error {
 	return nil
 }
 
+// UpdateIdentity memperbarui nama dan/atau perguruan atlet; field nil tidak diubah.
+func (s *AthleteStore) UpdateIdentity(id string, name, team *string) error {
+	res, err := s.DB.Exec(`UPDATE athletes SET name = COALESCE($2, name), team = COALESCE($3, team) WHERE id = $1`, id, name, team)
+	if err != nil {
+		return mapLookupErr(err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAthleteIfUnused menghapus data atlet bila tidak lagi terdaftar di kejuaraan mana pun
+// (atlet yang masih dipakai kejuaraan lain dibiarkan).
+func (s *AthleteStore) DeleteAthleteIfUnused(id string) error {
+	_, err := s.DB.Exec(`DELETE FROM athletes a WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM participants p WHERE p.athlete_id = a.id)`, id)
+	return err
+}
+
+// ChangeParticipantCategory memindahkan peserta ke kategori lain. Ditolak (ErrConflict) bila peserta sudah dirujuk bagan
+// atau partai. Peserta yang sudah diverifikasi/ditolak kembali menunggu verifikasi karena batas bobot dan berkas bisa berbeda.
+func (s *AthleteStore) ChangeParticipantCategory(competitionID, participantID, categoryID, weightClass string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var refs int
+	if err := tx.QueryRow(`
+		SELECT (SELECT COUNT(*) FROM bracket_slots WHERE participant_id = $1 OR winner_id = $1)
+		     + (SELECT COUNT(*) FROM matches WHERE athlete_red_id = $1 OR athlete_blue_id = $1 OR winner_id = $1)`, participantID).Scan(&refs); err != nil {
+		return err
+	}
+	if refs > 0 {
+		return fmt.Errorf("%w: peserta sudah masuk bagan atau partai; reset bagan kategorinya terlebih dahulu sebelum memindahkan kategori", domain.ErrConflict)
+	}
+	res, err := tx.Exec(`
+		UPDATE participants
+		SET category_id = $3::uuid, weight_class = $4,
+		    registration_status = CASE WHEN registration_status IN ('registered', 'pending') THEN registration_status ELSE 'pending' END
+		WHERE id = $1 AND competition_id = $2`, participantID, competitionID, categoryID, weightClass)
+	if err != nil {
+		return mapLookupErr(err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return domain.ErrNotFound
+	}
+	return tx.Commit()
+}
+
 // DeleteParticipant membatalkan pendaftaran satu peserta dari kejuaraan (atlet tetap tersimpan di basis data atlet).
 // Ditolak (ErrConflict) bila peserta sudah dirujuk bagan atau partai; domain.ErrNotFound bila bukan peserta kejuaraan itu.
 func (s *AthleteStore) DeleteParticipant(competitionID, participantID string) error {
@@ -305,7 +360,7 @@ func (s *AthleteStore) DeleteParticipant(competitionID, participantID string) er
 		return err
 	}
 	if refs > 0 {
-		return fmt.Errorf("%w: peserta sudah masuk bagan atau partai; ubah statusnya menjadi ditolak lalu buat ulang bagan kategorinya sebelum membatalkan pendaftaran", domain.ErrConflict)
+		return fmt.Errorf("%w: peserta sudah masuk bagan atau partai; reset bagan kategorinya terlebih dahulu sebelum membatalkan atau menghapus peserta", domain.ErrConflict)
 	}
 	if _, err := tx.Exec(`DELETE FROM participants WHERE id = $1 AND competition_id = $2`, participantID, competitionID); err != nil {
 		return err

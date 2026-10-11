@@ -100,16 +100,34 @@ export function useUpdateAthleteProfileMutation(compId: Ref<string>) {
   return useMutation({
     mutationFn: ({
       athleteId,
+      name,
+      team,
       birth_date,
       nik,
     }: {
       athleteId: string
+      name?: string
+      team?: string
       birth_date?: string
       nik?: string
-    }) => athleteService.updateAthleteProfile(athleteId, { birth_date, nik }),
+    }) => athleteService.updateAthleteProfile(athleteId, { name, team, birth_date, nik }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
       queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+    },
+  })
+}
+
+/** Pindahkan peserta ke kategori lain, lalu muat ulang daftar peserta dan bagan. */
+export function useChangeParticipantCategoryMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ participantId, categoryId }: { participantId: string; categoryId: string }) =>
+      athleteService.changeParticipantCategory(compId.value, participantId, categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
+      queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
     },
   })
 }
@@ -118,8 +136,8 @@ export function useUpdateAthleteProfileMutation(compId: Ref<string>) {
 export function useUnregisterParticipantMutation(compId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (participantId: string) =>
-      athleteService.unregisterParticipant(compId.value, participantId),
+    mutationFn: ({ participantId, purge }: { participantId: string; purge?: boolean }) =>
+      athleteService.unregisterParticipant(compId.value, participantId, purge),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
       queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })

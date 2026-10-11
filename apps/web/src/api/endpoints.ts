@@ -68,6 +68,8 @@ export const ENDPOINTS = {
       `/api/v1/competitions/${compId}/participants/${id}`,
     VERIFY_PARTICIPANT: (compId: string, id: string) =>
       `/api/v1/competitions/${compId}/participants/${id}/verify`,
+    PARTICIPANT_CATEGORY: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}/category`,
   },
 
   // Contingents

@@ -1254,7 +1254,7 @@ function handleCategoryClick(cat: Category) {
             lain (PB IPSI atau PERSILAT 2026).
           </p>
           <p class="cat-form-help">
-            Reset ditolak bila masih ada peserta yang terdaftar pada kategori. Pindahkan atau hapus
+            Reset ditolak bila masih ada peserta yang terdaftar pada kategori. Batalkan atau hapus
             peserta tersebut terlebih dahulu.
           </p>
           <footer class="cat-modal__footer font-mono">

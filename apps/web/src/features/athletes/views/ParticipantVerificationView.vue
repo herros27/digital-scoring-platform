@@ -4,6 +4,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
   useParticipantsQuery,
+  useUnregisterParticipantMutation,
   useUpdateAthleteProfileMutation,
   useVerifyParticipantMutation,
 } from '../api/athleteQueries'
@@ -39,6 +40,7 @@ const {
   refetch,
 } = useParticipantsQuery(activeCompId)
 const verifyMutation = useVerifyParticipantMutation(activeCompId)
+const unregisterMutation = useUnregisterParticipantMutation(activeCompId)
 const profileMutation = useUpdateAthleteProfileMutation(activeCompId)
 
 const participants = computed(() => rawParticipants.value || [])
@@ -164,7 +166,8 @@ function approveBlocker(p: Participant): string | null {
 }
 
 function needsDesk(p: Participant): boolean {
-  return p.registration_status !== 'verified' && p.registration_status !== 'rejected'
+  // Peserta ditolak tetap butuh meja berkas: meloloskannya kembali harus melengkapi centang berkas.
+  return p.registration_status !== 'verified'
 }
 
 // UI Filters
@@ -227,6 +230,22 @@ async function handleSetStatus(participant: Participant, newStatus: 'verified' |
     )
   } finally {
     processingId.value = null
+  }
+}
+
+// Hapus peserta yang sudah ditolak (konfirmasi dua langkah di kartu). Data atlet ikut terhapus bila tidak dipakai kejuaraan lain.
+const deleteConfirmId = ref<string | null>(null)
+
+async function handleDeleteParticipant(participant: Participant) {
+  processingId.value = participant.id
+  try {
+    await unregisterMutation.mutateAsync({ participantId: participant.id, purge: true })
+    showToast('Peserta Dihapus', `${participant.name} dihapus dari kejuaraan ini.`, 'info')
+  } catch (err) {
+    showToast('Gagal Menghapus', getErrorMessage(err, 'Peserta tidak dapat dihapus.'), 'danger')
+  } finally {
+    processingId.value = null
+    deleteConfirmId.value = null
   }
 }
 
@@ -843,24 +862,51 @@ function formatDate(iso: string): string {
               </svg>
               <span>Status: Ditolak</span>
             </div>
-            <button
-              type="button"
-              class="verif-btn-approve-action"
-              :disabled="processingId === part.id"
-              @click="handleSetStatus(part, 'verified')"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
+            <template v-if="deleteConfirmId === part.id">
+              <span class="verif-delete-ask">Hapus peserta ini?</span>
+              <button
+                type="button"
+                class="verif-btn-reject-action"
+                :disabled="processingId === part.id"
+                data-test="verif-delete-confirm"
+                @click="handleDeleteParticipant(part)"
               >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Loloskan Peserta
-            </button>
+                Ya, Hapus
+              </button>
+              <button type="button" class="verif-btn-cancel-action" @click="deleteConfirmId = null">
+                Batal
+              </button>
+            </template>
+            <template v-else>
+              <button
+                type="button"
+                class="verif-btn-reject-action"
+                :disabled="processingId === part.id"
+                data-test="verif-delete"
+                @click="deleteConfirmId = part.id"
+              >
+                Hapus
+              </button>
+              <button
+                type="button"
+                class="verif-btn-approve-action"
+                :disabled="processingId === part.id || !!approveBlocker(part)"
+                :title="approveBlocker(part) || undefined"
+                @click="handleSetStatus(part, 'verified')"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Loloskan Peserta
+              </button>
+            </template>
           </template>
 
           <!-- State 3: Pending / Registered (Menunggu) -->
@@ -1449,8 +1495,24 @@ function formatDate(iso: string): string {
   margin: 2px 0;
 }
 
+.verif-delete-ask {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #fca5a5;
+}
+.verif-btn-cancel-action {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--color-neutral-400, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
 .verif-card__footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;

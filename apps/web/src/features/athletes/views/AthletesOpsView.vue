@@ -7,7 +7,9 @@ import {
   useContingentsQuery,
   useParticipantsQuery,
   useRegisterToCompetitionMutation,
+  useChangeParticipantCategoryMutation,
   useUnregisterParticipantMutation,
+  useUpdateAthleteProfileMutation,
 } from '../api/athleteQueries'
 import {
   canUnregister,
@@ -60,6 +62,8 @@ const categories = computed(() => rawCategories.value || [])
 
 const registerMutation = useRegisterToCompetitionMutation(activeCompId)
 const unregisterMutation = useUnregisterParticipantMutation(activeCompId)
+const updateMutation = useUpdateAthleteProfileMutation(activeCompId)
+const changeCategoryMutation = useChangeParticipantCategoryMutation(activeCompId)
 
 // Status pendaftaran nyata tiap atlet (manajer kontingen hanya menerima pesertanya sendiri dari server).
 const { data: rawParticipants } = useParticipantsQuery(activeCompId)
@@ -72,11 +76,14 @@ const participantByAthlete = computed(() => {
 // Batal daftar
 const cancelTarget = ref<{ participant: Participant; athlete: Athlete } | null>(null)
 const cancelError = ref('')
+// true = "Hapus": data atlet ikut dihapus bila tidak terdaftar di kejuaraan lain.
+const cancelPurge = ref(false)
 
-function openCancelDialog(athlete: Athlete) {
+function openCancelDialog(athlete: Athlete, purge = false) {
   const participant = participantByAthlete.value.get(athlete.id)
   if (!participant) return
   cancelTarget.value = { participant, athlete }
+  cancelPurge.value = purge
   cancelError.value = ''
 }
 
@@ -84,15 +91,23 @@ async function confirmCancelRegistration() {
   if (!cancelTarget.value) return
   cancelError.value = ''
   try {
-    await unregisterMutation.mutateAsync(cancelTarget.value.participant.id)
+    await unregisterMutation.mutateAsync({
+      participantId: cancelTarget.value.participant.id,
+      purge: cancelPurge.value,
+    })
     showToast(
-      'Pendaftaran Dibatalkan',
-      `${cancelTarget.value.athlete.name} dikeluarkan dari kejuaraan ini.`,
+      cancelPurge.value ? 'Peserta Dihapus' : 'Pendaftaran Dibatalkan',
+      cancelPurge.value
+        ? `${cancelTarget.value.athlete.name} dihapus dari kejuaraan ini.`
+        : `${cancelTarget.value.athlete.name} dikeluarkan dari kejuaraan ini.`,
       'success',
     )
     cancelTarget.value = null
   } catch (err) {
-    cancelError.value = getErrorMessage(err, 'Pendaftaran tidak dapat dibatalkan.')
+    cancelError.value = getErrorMessage(
+      err,
+      cancelPurge.value ? 'Peserta tidak dapat dihapus.' : 'Pendaftaran tidak dapat dibatalkan.',
+    )
   }
 }
 
@@ -181,7 +196,28 @@ watch(eligibleCategories, (list) => {
   }
 })
 
+// Mode edit: form yang sama dipakai tanpa jenis kelamin (mengubahnya = hapus lalu daftarkan ulang).
+const editTarget = ref<Athlete | null>(null)
+const canEditAthlete = computed(() =>
+  ['admin', 'dewan', 'contingent'].includes(authStore.role || ''),
+)
+
+function openEditModal(athlete: Athlete) {
+  editTarget.value = athlete
+  formState.value = {
+    name: athlete.name,
+    gender: athlete.gender as AthleteFormState['gender'],
+    team: athlete.team || '',
+    birth_date: athlete.birth_date || '',
+    nik: athlete.nik || '',
+    category_id: participantByAthlete.value.get(athlete.id)?.category_id || '',
+  }
+  formErrors.value = {}
+  isModalOpen.value = true
+}
+
 function openCreateModal() {
+  editTarget.value = null
   formState.value = emptyForm(contingents.value.length > 0 ? contingents.value[0].name : '')
   formErrors.value = {}
   isModalOpen.value = true
@@ -220,6 +256,46 @@ async function handleSubmitAthlete() {
   }
   if (Object.keys(errors).length > 0) {
     formErrors.value = errors
+    return
+  }
+
+  if (editTarget.value) {
+    try {
+      await updateMutation.mutateAsync({
+        athleteId: editTarget.value.id,
+        name: formState.value.name.trim(),
+        team: formState.value.team.trim(),
+        birth_date: formState.value.birth_date,
+        nik: formState.value.nik.trim(),
+      })
+      isModalOpen.value = false
+    } catch (err) {
+      showToast('Gagal Memperbarui', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
+      return
+    }
+    // Kategori dipindah setelah profil tersimpan: umur baru bisa membuat kategori lain menjadi sah.
+    const participant = participantByAthlete.value.get(editTarget.value.id)
+    if (participant && participant.category_id !== formState.value.category_id) {
+      try {
+        await changeCategoryMutation.mutateAsync({
+          participantId: participant.id,
+          categoryId: formState.value.category_id,
+        })
+        showToast(
+          'Data Atlet Diperbarui',
+          'Kategori dipindah. Peserta yang sudah diverifikasi perlu diverifikasi ulang.',
+          'success',
+        )
+      } catch (err) {
+        showToast(
+          'Kategori Tidak Dipindah',
+          getErrorMessage(err, 'Data atlet tersimpan, tetapi kategori tidak dapat dipindah.'),
+          'danger',
+        )
+      }
+      return
+    }
+    showToast('Data Atlet Diperbarui', `${formState.value.name} berhasil diperbarui.`, 'success')
     return
   }
 
@@ -698,6 +774,32 @@ function isMaleGender(gender: string): boolean {
             Batal Daftar
           </button>
           <button
+            v-if="canEditAthlete"
+            type="button"
+            class="atl-cancel-link font-mono"
+            :aria-label="`Edit ${athlete.name}`"
+            data-test="athlete-edit"
+            @click="openEditModal(athlete)"
+          >
+            Edit
+          </button>
+          <button
+            v-if="
+              participantByAthlete.get(athlete.id) &&
+              canUnregister(
+                authStore.role || '',
+                participantByAthlete.get(athlete.id)!.registration_status,
+              )
+            "
+            type="button"
+            class="atl-cancel-link font-mono"
+            :aria-label="`Hapus ${athlete.name}`"
+            data-test="athlete-delete"
+            @click="openCancelDialog(athlete, true)"
+          >
+            Hapus
+          </button>
+          <button
             v-if="authStore.isAdminOrDewan"
             type="button"
             class="atl-verify-link font-mono"
@@ -733,16 +835,25 @@ function isMaleGender(gender: string): boolean {
       <div class="atl-modal">
         <header class="atl-modal__header">
           <div>
-            <div class="atl-modal__tag font-mono">BATAL PENDAFTARAN</div>
-            <h3 id="atl-cancel-title" class="atl-modal__title">Batalkan Pendaftaran?</h3>
+            <div class="atl-modal__tag font-mono">
+              {{ cancelPurge ? 'HAPUS PESERTA' : 'BATAL PENDAFTARAN' }}
+            </div>
+            <h3 id="atl-cancel-title" class="atl-modal__title">
+              {{ cancelPurge ? 'Hapus Peserta?' : 'Batalkan Pendaftaran?' }}
+            </h3>
           </div>
         </header>
         <div class="atl-modal__body">
-          <p class="atl-form-help">
+          <p v-if="cancelPurge" class="atl-form-help">
+            <strong>{{ cancelTarget.athlete.name }}</strong> akan dihapus dari kejuaraan ini beserta
+            data atletnya (kecuali masih terdaftar di kejuaraan lain). Tindakan ini tidak dapat
+            dibatalkan. Peserta yang sudah masuk bagan atau partai tidak dapat dihapus; reset bagan
+            kategorinya terlebih dahulu.
+          </p>
+          <p v-else class="atl-form-help">
             <strong>{{ cancelTarget.athlete.name }}</strong> akan dikeluarkan dari kejuaraan ini.
             Data atlet tetap tersimpan dan dapat didaftarkan lagi. Peserta yang sudah masuk bagan
-            atau partai tidak dapat dibatalkan; ubah statusnya menjadi ditolak lalu buat ulang bagan
-            kategorinya.
+            atau partai tidak dapat dibatalkan; reset bagan kategorinya terlebih dahulu.
           </p>
           <p v-if="cancelError" class="atl-form-error" role="alert" data-test="unregister-error">
             {{ cancelError }}
@@ -759,7 +870,7 @@ function isMaleGender(gender: string): boolean {
               data-test="unregister-confirm"
               @click="confirmCancelRegistration"
             >
-              Batalkan Pendaftaran
+              {{ cancelPurge ? 'Ya, Hapus Peserta' : 'Batalkan Pendaftaran' }}
             </AppButton>
           </footer>
         </div>
@@ -778,8 +889,12 @@ function isMaleGender(gender: string): boolean {
       <div class="atl-modal">
         <header class="atl-modal__header">
           <div>
-            <div class="atl-modal__tag font-mono">REGISTRASI PESERTA TURNAMEN</div>
-            <h3 id="atl-modal-title" class="atl-modal__title">Daftarkan Atlet Baru</h3>
+            <div class="atl-modal__tag font-mono">
+              {{ editTarget ? 'UBAH DATA ATLET' : 'REGISTRASI PESERTA TURNAMEN' }}
+            </div>
+            <h3 id="atl-modal-title" class="atl-modal__title">
+              {{ editTarget ? 'Edit Atlet' : 'Daftarkan Atlet Baru' }}
+            </h3>
           </div>
           <button class="atl-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
@@ -805,7 +920,7 @@ function isMaleGender(gender: string): boolean {
           </div>
 
           <!-- Gender Toggle -->
-          <div class="atl-form-group">
+          <div v-if="!editTarget" class="atl-form-group">
             <label class="atl-form-label font-mono">
               GOLONGAN & JENIS KELAMIN <span class="atl-req">*</span>
             </label>
@@ -948,9 +1063,13 @@ function isMaleGender(gender: string): boolean {
               type="submit"
               variant="emerald"
               size="md"
-              :loading="registerMutation.isPending.value"
+              :loading="
+                registerMutation.isPending.value ||
+                updateMutation.isPending.value ||
+                changeCategoryMutation.isPending.value
+              "
             >
-              Simpan & Daftarkan
+              {{ editTarget ? 'Simpan Perubahan' : 'Simpan & Daftarkan' }}
             </AppButton>
           </footer>
         </form>
