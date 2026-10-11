@@ -86,7 +86,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optiona
 	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, CategoryService: categoryService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
 	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache, Competition: compService}
-	rulesetH := &handler.RulesetHandler{Service: rulesetService}
+	rulesetH := &handler.RulesetHandler{Service: rulesetService, Competitions: compService}
 	officialH := &handler.OfficialHandler{Service: officialService}
 	contingentH := &handler.ContingentHandler{Service: contingentService, InviteCode: inviteCode}
 	reportH := &handler.ReportHandler{Service: reportService}
@@ -213,6 +213,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optiona
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/events", matchH.GetEvents)
 
 	// Rulesets
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/techniques", rulesetH.CompetitionTechniques)
 	protected.HandleFunc("GET /api/v1/rulesets", rulesetH.List)
 	protected.Handle("POST /api/v1/rulesets", adminOrDewan(http.HandlerFunc(rulesetH.Create)))
 	protected.HandleFunc("GET /api/v1/rulesets/{id}", rulesetH.Get)

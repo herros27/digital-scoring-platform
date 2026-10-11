@@ -8,8 +8,17 @@ import type {
   CompetitionStats,
 } from '../types/competition.schema'
 import type { CompetitionListResult } from '@/types/competition'
+import type { WsTechniqueKind } from '@/composables/useWebSocket'
 
 export const competitionService = {
+  /**
+   * GET /api/v1/competitions/{comp_id}/techniques: teknik (tombol skor juri) menurut ruleset kejuaraan.
+   */
+  async getTechniques(compId: string): Promise<WsTechniqueKind[]> {
+    const res = await http.get<WsTechniqueKind[]>(ENDPOINTS.TECHNIQUES(compId))
+    return res.data || []
+  },
+
   /**
    * 1. GET /api/v1/competitions
    */

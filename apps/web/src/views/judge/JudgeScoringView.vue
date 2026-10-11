@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
 import { MAX_PIN_LENGTH, isCompletePin, pinLoginErrorMessage } from '@/features/auth/lib/pin'
 import { arenaService } from '@/features/arena/api/arenaService'
+import { competitionService } from '@/features/competitions/api/competitionService'
 
 const route = useRoute()
 const router = useRouter()
@@ -77,8 +78,21 @@ const ERROR_TEXT: Record<string, string> = {
     'Tidak ada input yang bisa dibatalkan (poin terkonfirmasi tidak dapat dibatalkan).',
 }
 
-// Daftar tombol teknik mengikuti ruleset pertandingan yang dimuat (nilai poin dari server)
-const techniques = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
+// Daftar tombol teknik mengikuti ruleset: ruleset kejuaraan sejak halaman dibuka, lalu ruleset partai yang dimuat
+// ke gelanggang (bisa ruleset khusus kategori) begitu snapshot tiba. Kosong sampai salah satunya diterima.
+const techniques = ref<WsTechniqueKind[]>([])
+let techniquesFromMatch = false
+async function loadCompetitionTechniques() {
+  if (!authStore.token || !compId.value || techniques.value.length) return
+  try {
+    const list = await competitionService.getTechniques(compId.value)
+    if (!techniquesFromMatch && list.length) techniques.value = list
+  } catch {
+    // server tidak terjangkau: pakai daftar bawaan agar juri tetap bisa menilai begitu partai dimuat
+    if (!techniques.value.length) techniques.value = DEFAULT_TECHNIQUES
+  }
+}
+watch([() => authStore.token, compId], loadCompetitionTechniques, { immediate: true })
 const TECHNIQUE_HINT: Record<string, string> = {
   technique: 'SERANGAN TANGAN SAH',
   knockdown: 'SERANGAN KAKI SAH',
@@ -266,7 +280,10 @@ onMounted(() => {
       syncedMatchId = payload.match_id
       void loadAthleteNames()
     }
-    if (payload.techniques?.length) techniques.value = payload.techniques
+    if (payload.techniques?.length) {
+      techniques.value = payload.techniques
+      techniquesFromMatch = true
+    }
     feedback.configure(payload.judge_count, payload.consensus?.majority)
     matchStatus.value =
       matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
@@ -597,6 +614,9 @@ onUnmounted(() => {
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Red -->
         <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
+          <p v-if="!techniques.length" class="judge-buttons-loading font-mono">
+            MEMUAT TOMBOL SKOR...
+          </p>
           <button
             v-for="tech in techniques"
             :key="tech.type"
@@ -721,6 +741,9 @@ onUnmounted(() => {
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Blue -->
         <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
+          <p v-if="!techniques.length" class="judge-buttons-loading font-mono">
+            MEMUAT TOMBOL SKOR...
+          </p>
           <button
             v-for="tech in techniques"
             :key="tech.type"
@@ -1330,6 +1353,11 @@ onUnmounted(() => {
 }
 
 /* --- Extra-Large Ergonomic Scoring Buttons --- */
+.judge-buttons-loading {
+  margin: auto;
+  font-size: 0.75rem;
+  color: var(--color-neutral-500, #64748b);
+}
 .judge-buttons-list {
   display: flex;
   flex-direction: column;
@@ -1346,6 +1374,10 @@ onUnmounted(() => {
 .judge-buttons-list--dense .judge-btn {
   min-height: clamp(48px, 6vh, 68px);
   padding: clamp(6px, 1vw, 10px) clamp(8px, 1.2vw, 14px);
+}
+/* Jumlah teknik ganjil: tombol terakhir yang berdiri sendiri membentang selebar dua kolom */
+.judge-buttons-list--dense .judge-btn:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 .judge-buttons-list--dense .judge-btn__title {
   font-size: clamp(0.9rem, 1.6vw, 1.15rem);

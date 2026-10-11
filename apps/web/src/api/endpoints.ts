@@ -40,6 +40,9 @@ export const ENDPOINTS = {
     BRACKETS: (compId: string) => `/api/v1/competitions/${compId}/brackets`,
   },
 
+  // Teknik skor menurut ruleset kejuaraan (layar juri sebelum ada partai dimuat)
+  TECHNIQUES: (compId: string) => `/api/v1/competitions/${compId}/techniques`,
+
   // Categories
   CATEGORIES: {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/categories`,
