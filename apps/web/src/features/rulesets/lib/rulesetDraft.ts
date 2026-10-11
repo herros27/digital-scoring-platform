@@ -6,6 +6,7 @@ import type {
   RulesetScoring,
   RulesetTechnique,
 } from '../types'
+import { AGE_BANDS } from '@/features/categories/lib/ageGroups'
 
 /** Kode jenis hasil khusus yang dikenal server. */
 export const OUTCOME_TYPES = ['ko', 'tko', 'walkover', 'withdrawal'] as const
@@ -53,6 +54,53 @@ export interface DraftOutcome {
   enabled: boolean
 }
 
+/** Waktu pertandingan khusus satu golongan umur; hanya dikirim ke server bila `enabled`. */
+export interface DraftAgeTiming {
+  code: string
+  label: string
+  enabled: boolean
+  roundDuration: number
+  breakDuration: number
+  totalRounds: number
+}
+
+/** Usulan IPSI untuk Usia Dini (2 babak × 1,5 menit, istirahat 1 menit); hanya pengisi cepat, nilainya bebas diubah. */
+export const IPSI_YOUTH_SUGGESTION = { roundDuration: 90, breakDuration: 60, totalRounds: 2 }
+export const IPSI_YOUTH_CODES = ['usia_dini_1', 'usia_dini_2']
+
+/** Semua golongan umur yang dikenal (gabungan standar IPSI dan PERSILAT), tanpa duplikat. */
+export function ageGroupOptions(): { code: string; label: string }[] {
+  const seen = new Set<string>()
+  const out: { code: string; label: string }[] = []
+  for (const std of ['ipsi', 'persilat_2026'] as const) {
+    for (const b of AGE_BANDS[std]) {
+      if (seen.has(b.code)) continue
+      seen.add(b.code)
+      out.push({ code: b.code, label: b.label })
+    }
+  }
+  return out
+}
+
+function defaultAgeTimings(
+  main: { roundDuration: number; breakDuration: number; totalRounds: number },
+  saved?: RulesetScoring['age_timings'],
+): DraftAgeTiming[] {
+  return ageGroupOptions().map(({ code, label }) => {
+    const t = saved?.[code]
+    return t
+      ? {
+          code,
+          label,
+          enabled: true,
+          roundDuration: t.round_duration,
+          breakDuration: t.break_duration,
+          totalRounds: t.total_rounds,
+        }
+      : { code, label, enabled: false, ...main }
+  })
+}
+
 /** Keadaan formulir editor: semua bagian eksplisit (tidak ada "kosong = bawaan"). */
 export interface RulesetDraft {
   id?: string
@@ -74,6 +122,8 @@ export interface RulesetDraft {
   }
   outcomes: DraftOutcome[]
   pointGap: { mode: PointGapMode; margin: number; fromRound: number }
+  /** pengecualian waktu per golongan umur (bebas ditentukan panitia) */
+  ageTimings: DraftAgeTiming[]
   /** nilai skalar warisan yang dipertahankan saat menyimpan */
   legacy: { maxPenalties: number; penaltyThreshold: number }
 }
@@ -139,6 +189,7 @@ export function newDraft(): RulesetDraft {
     },
     outcomes: defaultOutcomes(),
     pointGap: { mode: 'auto', margin: 30, fromRound: 2 },
+    ageTimings: defaultAgeTimings({ roundDuration: 120, breakDuration: 60, totalRounds: 3 }),
     legacy: { maxPenalties: 3, penaltyThreshold: 1 },
   }
 }
@@ -209,6 +260,14 @@ export function draftFromRuleset(r: RulesetDTO): RulesetDraft {
           fromRound: s.point_gap.from_round || base.pointGap.fromRound,
         }
       : base.pointGap,
+    ageTimings: defaultAgeTimings(
+      {
+        roundDuration: s.round_duration,
+        breakDuration: s.break_duration,
+        totalRounds: s.total_rounds,
+      },
+      s.age_timings,
+    ),
     legacy: { maxPenalties: s.max_penalties ?? 3, penaltyThreshold: s.penalty_threshold ?? 1 },
   }
   draft.tiebreak.priority = normalizedPriority(draft)
@@ -275,6 +334,22 @@ export function payloadFromDraft(d: RulesetDraft): RulesetPayload {
       : d.pointGap.mode === 'off'
         ? { point_gap: { margin: 0 } }
         : {}),
+    ...(d.ageTimings.some((a) => a.enabled)
+      ? {
+          age_timings: Object.fromEntries(
+            d.ageTimings
+              .filter((a) => a.enabled)
+              .map((a) => [
+                a.code,
+                {
+                  round_duration: a.roundDuration,
+                  break_duration: a.breakDuration,
+                  total_rounds: a.totalRounds,
+                },
+              ]),
+          ),
+        }
+      : {}),
   }
   return { name: d.name.trim(), version: d.version.trim(), status: d.status, scoring }
 }
@@ -345,6 +420,16 @@ export function validateDraft(d: RulesetDraft): Record<string, string> {
     )
       e['pointGap.fromRound'] = 'Babak mulai 1 sampai jumlah babak'
   }
+
+  d.ageTimings.forEach((a, i) => {
+    if (!a.enabled) return
+    if (!Number.isInteger(a.roundDuration) || a.roundDuration <= 0)
+      e[`ageTimings.${i}.roundDuration`] = 'Durasi babak harus lebih dari 0 detik'
+    if (!Number.isInteger(a.breakDuration) || a.breakDuration < 0)
+      e[`ageTimings.${i}.breakDuration`] = 'Istirahat tidak boleh negatif'
+    if (!Number.isInteger(a.totalRounds) || a.totalRounds < 1 || a.totalRounds > 3)
+      e[`ageTimings.${i}.totalRounds`] = 'Jumlah babak 1-3'
+  })
   return e
 }
 
@@ -355,5 +440,7 @@ export function summarize(r: RulesetDTO): string {
   const majority = s.consensus?.majority ?? 2
   const techniques = s.techniques?.length ?? 3
   const penalties = s.penalties?.length ?? 7
-  return `${s.total_rounds} babak × ${Math.round((s.round_duration / 60) * 10) / 10} mnt • ${judges} juri (${majority} sepakat) • ${techniques} teknik • ${penalties} sanksi`
+  const extra = Object.keys(s.age_timings ?? {}).length
+  const age = extra ? ` • ${extra} golongan umur berwaktu khusus` : ''
+  return `${s.total_rounds} babak × ${Math.round((s.round_duration / 60) * 10) / 10} mnt • ${judges} juri (${majority} sepakat) • ${techniques} teknik • ${penalties} sanksi${age}`
 }

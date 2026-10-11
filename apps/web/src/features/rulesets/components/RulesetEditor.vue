@@ -3,6 +3,8 @@ import { computed, reactive, ref } from 'vue'
 import {
   METHOD_LABEL,
   PHASE_LABEL,
+  IPSI_YOUTH_CODES,
+  IPSI_YOUTH_SUGGESTION,
   POINT_GAP_MODE_LABEL,
   TIEBREAK_METHODS,
   normalizedPriority,
@@ -23,6 +25,23 @@ const hasErrors = computed(() => Object.keys(errors.value).length > 0)
 const showError = (key: string) => (submitted.value ? errors.value[key] : undefined)
 
 const isEdit = computed(() => !!d.id)
+
+// Mengaktifkan pengecualian: mulai dari waktu utama agar panitia tinggal mengubah yang berbeda.
+function toggleAge(i: number) {
+  const a = d.ageTimings[i]
+  if (a.enabled) {
+    a.roundDuration = d.roundDuration
+    a.breakDuration = d.breakDuration
+    a.totalRounds = d.totalRounds
+  }
+}
+
+function applyYouthSuggestion() {
+  for (const a of d.ageTimings) {
+    if (IPSI_YOUTH_CODES.includes(a.code))
+      Object.assign(a, { enabled: true }, IPSI_YOUTH_SUGGESTION)
+  }
+}
 const priority = computed(() => normalizedPriority(d))
 const techOf = (code: string) => d.techniques.find((t) => t.type === code)
 
@@ -137,6 +156,64 @@ function submit() {
                 errors.totalRounds
               }}</small>
             </label>
+          </div>
+        </section>
+
+        <!-- Waktu per golongan umur -->
+        <section class="rs-section" data-test="age-timings">
+          <h3>Waktu per Golongan Umur</h3>
+          <p class="rs-hint">
+            Opsional. Golongan yang dicentang memakai waktunya sendiri (bebas ditentukan panitia,
+            mis. 2 babak × 2 menit untuk Usia Dini); golongan lain ikut waktu di atas. Berlaku
+            otomatis menurut golongan umur kategori partai.
+          </p>
+          <button
+            type="button"
+            class="rs-btn"
+            data-test="age-suggest"
+            @click="applyYouthSuggestion"
+          >
+            Isi usulan IPSI untuk Usia Dini (2 babak × 1,5 menit)
+          </button>
+          <div
+            v-for="(a, i) in d.ageTimings"
+            :key="a.code"
+            class="rs-age-row"
+            :data-test="`age-${a.code}`"
+          >
+            <label class="rs-check">
+              <input v-model="a.enabled" type="checkbox" @change="toggleAge(i)" />
+              <span>{{ a.label }}</span>
+            </label>
+            <template v-if="a.enabled">
+              <label class="rs-field">
+                <span>Durasi babak (detik)</span>
+                <input v-model.number="a.roundDuration" type="number" min="1" class="rs-input" />
+                <small v-if="showError(`ageTimings.${i}.roundDuration`)" class="rs-error">{{
+                  errors[`ageTimings.${i}.roundDuration`]
+                }}</small>
+              </label>
+              <label class="rs-field">
+                <span>Istirahat (detik)</span>
+                <input v-model.number="a.breakDuration" type="number" min="0" class="rs-input" />
+                <small v-if="showError(`ageTimings.${i}.breakDuration`)" class="rs-error">{{
+                  errors[`ageTimings.${i}.breakDuration`]
+                }}</small>
+              </label>
+              <label class="rs-field">
+                <span>Jumlah babak</span>
+                <input
+                  v-model.number="a.totalRounds"
+                  type="number"
+                  min="1"
+                  max="3"
+                  class="rs-input"
+                />
+                <small v-if="showError(`ageTimings.${i}.totalRounds`)" class="rs-error">{{
+                  errors[`ageTimings.${i}.totalRounds`]
+                }}</small>
+              </label>
+            </template>
           </div>
         </section>
 
@@ -631,5 +708,21 @@ function submit() {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+.rs-age-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) repeat(3, minmax(90px, 1fr));
+  gap: 10px 12px;
+  align-items: end;
+  padding: 8px 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.rs-age-row > .rs-check {
+  grid-column: 1 / -1;
+}
+@media (min-width: 720px) {
+  .rs-age-row > .rs-check {
+    grid-column: auto;
+  }
 }
 </style>

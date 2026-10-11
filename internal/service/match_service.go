@@ -106,21 +106,28 @@ func (s *MatchService) SetCategoryRulesetLookup(l CategoryRulesetLookup) {
 	s.categoryRulesets = l
 }
 
-// withAgeGapDefault: ruleset tanpa `point_gap` memakai selisih WMP menurut golongan umur kategori partai (usia dini
-// dan pra-remaja 20; selain itu bawaan 30). Mengembalikan salinan karena ruleset dari resolver dipakai bersama.
-func (s *MatchService) withAgeGapDefault(matchID string, r *rules.Ruleset) *rules.Ruleset {
-	if r.Scoring.PointGap != nil || s.categoryRulesets == nil || s.matchRepo == nil {
+// withAgeAdjustments menyesuaikan ruleset dengan golongan umur kategori partai: (1) waktu pertandingan khusus golongan
+// itu bila ruleset mencantumkannya (`age_timings`, bebas ditentukan panitia), dan (2) bila ruleset tanpa `point_gap`,
+// selisih WMP menurut golongan (usia dini dan pra-remaja 20; selain itu bawaan 30). Mengembalikan salinan karena
+// ruleset dari resolver dipakai bersama.
+func (s *MatchService) withAgeAdjustments(matchID string, r *rules.Ruleset) *rules.Ruleset {
+	needGap := r.Scoring.PointGap == nil
+	if (!needGap && len(r.Scoring.AgeTimings) == 0) || s.categoryRulesets == nil || s.matchRepo == nil {
 		return r
 	}
 	m, err := s.matchRepo.GetByID(matchID)
 	if err != nil || m == nil || m.BracketSlotID == "" {
 		return r
 	}
-	if ag, err := s.categoryRulesets.AgeGroupForSlot(m.BracketSlotID); err != nil || !domain.IsYouthAgeGroup(ag) {
+	ag, err := s.categoryRulesets.AgeGroupForSlot(m.BracketSlotID)
+	if err != nil || ag == "" {
 		return r
 	}
 	c := *r
-	c.Scoring.PointGap = &rules.PointGapRule{Margin: rules.PointGapYouthMargin}
+	c.Scoring = c.Scoring.WithAgeTiming(ag)
+	if needGap && domain.IsYouthAgeGroup(ag) {
+		c.Scoring.PointGap = &rules.PointGapRule{Margin: rules.PointGapYouthMargin}
+	}
 	return &c
 }
 
@@ -312,7 +319,7 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	if err != nil {
 		return err
 	}
-	r = s.withAgeGapDefault(matchID, r)
+	r = s.withAgeAdjustments(matchID, r)
 
 	var mStore orchestrator.MatchStore
 	if s.matchStore != nil {

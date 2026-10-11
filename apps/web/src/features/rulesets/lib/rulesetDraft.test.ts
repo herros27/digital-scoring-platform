@@ -115,6 +115,61 @@ describe('WMP (selisih poin)', () => {
   })
 })
 
+describe('waktu per golongan umur', () => {
+  it('bawaan tidak mengirim age_timings (semua golongan ikut waktu utama)', () => {
+    const p = payloadFromDraft({ ...newDraft(), name: 'Tanpa Pengecualian' })
+    expect(p.scoring.age_timings).toBeUndefined()
+    expect(draftFromRuleset(legacy).ageTimings.every((a) => !a.enabled)).toBe(true)
+  })
+
+  it('panitia bebas menentukan waktunya (mis. 2 babak × 2 menit); dikirim dan dibaca kembali', () => {
+    const d = { ...newDraft(), name: 'Kustom' }
+    const dini = d.ageTimings.find((a) => a.code === 'usia_dini_1')!
+    Object.assign(dini, { enabled: true, roundDuration: 120, breakDuration: 30, totalRounds: 2 })
+    const p = payloadFromDraft(d)
+    expect(p.scoring.age_timings).toEqual({
+      usia_dini_1: { round_duration: 120, break_duration: 30, total_rounds: 2 },
+    })
+    const back = draftFromRuleset({ id: 'x', ...p } as RulesetDTO)
+    expect(back.ageTimings.find((a) => a.code === 'usia_dini_1')).toMatchObject({
+      enabled: true,
+      roundDuration: 120,
+      totalRounds: 2,
+    })
+    expect(back.ageTimings.find((a) => a.code === 'dewasa')!.enabled).toBe(false)
+    expect(payloadFromDraft(back)).toEqual(p)
+  })
+
+  it('validasi hanya untuk golongan yang dicentang', () => {
+    const d = { ...newDraft(), name: 'Valid' }
+    const i = d.ageTimings.findIndex((a) => a.code === 'usia_dini_2')
+    Object.assign(d.ageTimings[i], { enabled: false, roundDuration: 0, totalRounds: 9 })
+    expect(validateDraft(d)).toEqual({})
+    Object.assign(d.ageTimings[i], {
+      enabled: true,
+      roundDuration: 0,
+      breakDuration: -1,
+      totalRounds: 9,
+    })
+    expect(Object.keys(validateDraft(d)).sort()).toEqual([
+      `ageTimings.${i}.breakDuration`,
+      `ageTimings.${i}.roundDuration`,
+      `ageTimings.${i}.totalRounds`,
+    ])
+  })
+
+  it('ringkasan menyebut jumlah golongan berwaktu khusus', () => {
+    const r = {
+      ...legacy,
+      scoring: {
+        ...legacy.scoring,
+        age_timings: { usia_dini_1: { round_duration: 90, break_duration: 60, total_rounds: 2 } },
+      },
+    }
+    expect(summarize(r)).toContain('1 golongan umur berwaktu khusus')
+  })
+})
+
 describe('priority', () => {
   it('urut menurut nilai tertinggi', () => {
     // urutan regulasi: 1+3, 3, 1+2, 2, 1+1, 1
