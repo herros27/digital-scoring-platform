@@ -409,7 +409,9 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const start = () =>
     runControl(async () => {
       const id = requireMatch()
-      if (id) await matchService.startMatch(opts.compId, id)
+      if (!id) return
+      await matchService.startMatch(opts.compId, id)
+      ringGong() // hanya jika server menerima mulai; kegagalan dilempar di atas
     }, 'Gagal memulai pertandingan.')
   const pause = () =>
     runControl(async () => {
@@ -419,7 +421,9 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const resume = () =>
     runControl(async () => {
       const id = requireMatch()
-      if (id) await matchService.resumeMatch(opts.compId, id)
+      if (!id) return
+      await matchService.resumeMatch(opts.compId, id)
+      ringGong()
     }, 'Gagal melanjutkan pertandingan.')
   /** `winner` wajib saat skor seri (keputusan wasit). */
   const finish = (winner?: WsTarget, method?: string) =>
