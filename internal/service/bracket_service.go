@@ -226,6 +226,15 @@ func (s *BracketService) generate(competitionID, categoryID, weightClass, gender
 	return slots, nil
 }
 
+// ResetCategoryBracket menghapus bagan satu kategori beserta partai idle-nya. Pemanggil memastikan bagan boleh direset.
+func (s *BracketService) ResetCategoryBracket(competitionID, categoryID string) error {
+	cr, ok := s.repo.(CategoryBracketRepository)
+	if !ok {
+		return errors.New("bracket repository does not support per-category brackets")
+	}
+	return cr.DeleteByCategoryID(competitionID, categoryID)
+}
+
 // GetBracketTreeByCategory mengambil bagan terisolasi milik satu kategori.
 func (s *BracketService) GetBracketTreeByCategory(competitionID, categoryID string) ([]store.BracketSlot, error) {
 	cr, ok := s.repo.(CategoryBracketRepository)

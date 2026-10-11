@@ -73,6 +73,14 @@ export const bracketService = {
   },
 
   /**
+   * DELETE /api/v1/competitions/{comp_id}/categories/{id}/bracket — hapus bagan kategori beserta partai idle-nya.
+   * Ditolak 409 bila draw terkunci atau sudah ada partai yang dimulai.
+   */
+  async resetBracket(compId: string, categoryId: string): Promise<void> {
+    await http.delete<unknown>(ENDPOINTS.BRACKETS.RESET(compId, categoryId))
+  },
+
+  /**
    * GET /api/v1/competitions/{comp_id}/participants
    */
   async getParticipants(compId: string): Promise<ParticipantDTO[]> {

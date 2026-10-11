@@ -171,7 +171,7 @@ describe('Bagan per kategori', () => {
         verifiedAthletes(cat, 1, 'Tunggal')
         generateBracketRaw(token, comp.id, { category_id: cat.id }).then((res) => {
           expect(res.status).to.eq(400)
-          expect(res.body.error?.message).to.match(/at least 2 verified participants/i)
+          expect(res.body.error?.message).to.match(/minimal 2 peserta terverifikasi/i)
         })
       })
     })

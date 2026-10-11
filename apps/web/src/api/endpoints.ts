@@ -113,6 +113,8 @@ export const ENDPOINTS = {
   BRACKETS: {
     TREE: (compId: string) => `/api/v1/competitions/${compId}/brackets`,
     GENERATE: (compId: string) => `/api/v1/competitions/${compId}/brackets/generate`,
+    RESET: (compId: string, categoryId: string) =>
+      `/api/v1/competitions/${compId}/categories/${categoryId}/bracket`,
   },
 
   // Participants

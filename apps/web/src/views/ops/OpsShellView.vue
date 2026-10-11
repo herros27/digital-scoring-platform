@@ -22,6 +22,7 @@ import {
   useBracketTreeQuery,
   useCategoryBracketTreeQuery,
   useGenerateBracketMutation,
+  useResetBracketMutation,
 } from '@/features/tournament/api/bracketQueries'
 import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
 import {
@@ -166,18 +167,47 @@ const categoryOptions = computed<CategoryOption[]>(() => {
   })
 })
 
+// Peserta pada satu opsi kategori (kategori resmi lewat category_id; kelas turunan lewat kelas bobot + gender).
+function participantsOf(o: CategoryOption) {
+  return (rawParticipants.value || []).filter((p) => {
+    if (o.categoryId) return p.category_id === o.categoryId
+    const g = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
+    return (
+      !p.category_id && (p.weight_class || '').toUpperCase() === o.weightClass && g === o.gender
+    )
+  })
+}
+const verifiedCountOf = (o: CategoryOption) =>
+  participantsOf(o).filter((p) => p.registration_status === 'verified').length
+
 // Pilihan awal & pemulihan: bila pilihan sekarang tidak ada di daftar (awal muat, ganti kejuaraan, kategori
-// dihapus/di-reset), pilih opsi pertama supaya dropdown tidak pernah kosong dan bagan yang tampil selalu
-// milik sebuah kategori.
+// dihapus/di-reset), pilih kategori pertama yang punya cukup peserta terverifikasi (bukan sekadar opsi pertama
+// yang bisa kosong), supaya dropdown tidak pernah kosong dan bagan yang tampil milik sebuah kategori.
+// Setelah daftar peserta termuat, pilihan awal dikoreksi sekali; pilihan panitia tidak pernah ditimpa.
+let categoryPicked = false
 watch(
-  categoryOptions,
-  (options) => {
+  [categoryOptions, rawParticipants],
+  ([options, parts]) => {
     if (options.length === 0) return
-    if (!options.some((o) => o.name === selectedCategory.value)) {
-      selectedCategory.value = options[0].name
+    const missing = !options.some((o) => o.name === selectedCategory.value)
+    if (missing || (!categoryPicked && parts !== undefined)) {
+      const best =
+        options.find((o) => verifiedCountOf(o) >= 2) ??
+        options.find((o) => verifiedCountOf(o) > 0) ??
+        options[0]
+      selectedCategory.value = best.name
+      if (parts !== undefined) categoryPicked = true
     }
   },
   { immediate: true },
+)
+
+// Angka di halaman Bagan mengikuti kategori terpilih dan hanya menghitung peserta yang lolos verifikasi.
+const selectedOption = computed(() =>
+  categoryOptions.value.find((c) => c.name === selectedCategory.value),
+)
+const verifiedInCategory = computed(() =>
+  selectedOption.value ? verifiedCountOf(selectedOption.value) : 0,
 )
 
 // Opsi dikelompokkan per golongan umur + gender untuk <optgroup>
@@ -230,6 +260,11 @@ const refetchBracket = () =>
   currentCategoryId.value ? categoryBracket.refetch() : legacyBracket.refetch()
 
 const generateBracketMutation = useGenerateBracketMutation(activeCompId)
+const resetBracketMutation = useResetBracketMutation(activeCompId)
+// Reset hanya untuk bagan kategori resmi yang sudah terbentuk.
+const canResetBracket = computed(
+  () => !!currentCategoryId.value && (rawBracketSlots.value?.length ?? 0) > 0,
+)
 
 // ponytail: default to 'jadwal' for ops overview, or contingent default to 'atlet'
 const NAV_KEYS = [
@@ -400,6 +435,7 @@ function handleArenaSelect(arena: { name: string }) {
 }
 
 function handleCategorySelect(cat: { name: string; weight_class: string }) {
+  categoryPicked = true
   selectedCategory.value = cat.name
   setNav('bagan')
   showToast('Kategori Dipilih', `Menampilkan bagan untuk ${cat.name}`, 'info')
@@ -717,6 +753,14 @@ const queuedMatch = computed(() => {
 
 // Operations Actions
 function handleGenerateDraw() {
+  if (verifiedInCategory.value < 2) {
+    showToast(
+      'Peserta Belum Cukup',
+      `${selectedCategory.value} baru punya ${verifiedInCategory.value} atlet terverifikasi (minimal 2). Verifikasi peserta atau pilih kategori lain.`,
+      'warning',
+    )
+    return
+  }
   if (isLocked.value) {
     showToast(
       'Bagan Terkunci',
@@ -727,9 +771,12 @@ function handleGenerateDraw() {
   }
   modal.value = {
     show: true,
-    title: 'Acak Ulang Bagan Pertandingan?',
-    message: `Generate susunan bagan turnamen untuk ${selectedCategory.value} dari data peserta terverifikasi?`,
-    confirmText: 'Ya, Generate Bagan',
+    title: 'Generate Bagan Pertandingan?',
+    message:
+      `Bagan ${selectedCategory.value} dibuat dari peserta terverifikasi. Pastikan pendaftaran sudah habis (tidak ada pendaftar lagi) ` +
+      'dan tidak ada peserta yang mengundurkan diri. Bila ada peserta mundur, reset bagan lebih dulu lalu generate ulang. ' +
+      'Peserta yang lolos verifikasi setelah bagan ada akan masuk otomatis selama draw belum dikunci.',
+    confirmText: 'Ya, Pendaftar Sudah Lengkap',
     confirmVariant: 'emerald',
     action: async () => {
       try {
@@ -754,6 +801,35 @@ function handleGenerateDraw() {
         showToast(
           'Gagal Generate Bagan',
           getErrorMessage(err, 'Pastikan minimal 2 atlet terverifikasi pada kelas ini.'),
+          'warning',
+        )
+      } finally {
+        modal.value = null
+      }
+    },
+  }
+}
+
+function handleResetBracket() {
+  if (isLocked.value) {
+    showToast('Bagan Terkunci', 'Buka kunci draw terlebih dahulu sebelum mereset bagan.', 'warning')
+    return
+  }
+  modal.value = {
+    show: true,
+    title: 'Reset Bagan Kategori?',
+    message: `Bagan ${selectedCategory.value} dan partainya yang belum dimainkan akan dihapus. Peserta tetap terdaftar dan bagan dapat dibuat ulang lewat Generate Bagan. Reset ditolak bila sudah ada partai yang dimulai.`,
+    confirmText: 'Ya, Reset Bagan',
+    confirmVariant: 'danger',
+    action: async () => {
+      try {
+        await resetBracketMutation.mutateAsync(currentCategoryId.value)
+        await refetchMatches()
+        showToast('Bagan Direset', 'Bagan kategori dihapus. Silakan generate ulang.', 'success')
+      } catch (err) {
+        showToast(
+          'Gagal Reset Bagan',
+          getErrorMessage(err, 'Bagan tidak dapat direset.'),
           'warning',
         )
       } finally {
@@ -1511,6 +1587,16 @@ function handleLoadToMat1() {
                 }}</small>
               </button>
 
+              <button
+                v-if="isAdminOrDewan && canResetBracket"
+                class="ops-action-btn-dark font-mono"
+                title="Hapus bagan kategori ini agar bisa dibuat ulang"
+                data-test="bracket-reset"
+                @click="handleResetBracket"
+              >
+                <span>Reset Bagan</span>
+              </button>
+
               <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
                 <svg
                   width="15"
@@ -1537,7 +1623,11 @@ function handleLoadToMat1() {
             <div class="filter-card">
               <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
               <div class="filter-select-wrapper">
-                <select v-model="selectedCategory" class="filter-select font-mono">
+                <select
+                  v-model="selectedCategory"
+                  class="filter-select font-mono"
+                  @change="categoryPicked = true"
+                >
                   <optgroup v-for="g in categoryOptionGroups" :key="g.label" :label="g.label">
                     <option v-for="c in g.options" :key="c.id" :value="c.name">
                       {{ c.label }}
@@ -1565,8 +1655,8 @@ function handleLoadToMat1() {
                   </svg>
                   <span>Timbang Sah</span>
                 </div>
-                <AppBadge variant="emerald"
-                  >{{ rawParticipants?.length || 0 }} ATLET TERDAFTAR</AppBadge
+                <AppBadge :variant="verifiedInCategory >= 2 ? 'emerald' : 'warning'"
+                  >{{ verifiedInCategory }} ATLET LOLOS VERIFIKASI</AppBadge
                 >
               </div>
             </div>
@@ -1591,9 +1681,9 @@ function handleLoadToMat1() {
           <!-- SUMMARY METRICS BAR -->
           <section class="ops-metrics-bar font-mono">
             <div class="metric-block">
-              <div class="metric-label">TOTAL PESERTA</div>
+              <div class="metric-label">PESERTA TERVERIFIKASI</div>
               <div class="metric-val">
-                {{ rawParticipants?.length || 16 }} <span class="metric-unit">Atlet</span>
+                {{ verifiedInCategory }} <span class="metric-unit">Atlet</span>
               </div>
             </div>
             <div class="metric-block">

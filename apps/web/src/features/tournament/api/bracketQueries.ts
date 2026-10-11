@@ -66,3 +66,17 @@ export function useGenerateBracketMutation(compId: Ref<string>) {
     },
   })
 }
+
+/**
+ * Reset bracket mutation: hapus bagan satu kategori (peserta tetap terdaftar)
+ */
+export function useResetBracketMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (categoryId: string) => bracketService.resetBracket(compId.value, categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bracketKeys.trees() })
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
+    },
+  })
+}

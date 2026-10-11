@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/herros27/digital-scoring/internal/cache"
+	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
 	"github.com/herros27/digital-scoring/internal/store"
 )
@@ -13,6 +15,83 @@ type BracketHandler struct {
 	AthleteService  *service.AthleteService
 	CategoryService *service.CategoryService
 	Cache           *cache.Cache
+}
+
+// redrawBlocked menjelaskan mengapa bagan kategori tidak boleh dibentuk ulang atau direset ("" = boleh).
+// Draw yang dikunci panitia tidak boleh diubah (ditegakkan di server, bukan hanya di tombol UI), dan bagan yang
+// sudah mulai dimainkan tidak boleh dibentuk ulang sama sekali (akan memutus partai dari slotnya).
+func (h *BracketHandler) redrawBlocked(compID string, cat *domain.Category) (status int, code, msg string) {
+	if cat.BracketLocked {
+		return http.StatusConflict, "BRACKET_LOCKED", "draw bagan kategori ini terkunci; buka kunci draw terlebih dahulu"
+	}
+	started, err := h.Service.CategoryBracketStarted(compID, cat.ID)
+	if err != nil {
+		return http.StatusInternalServerError, "INTERNAL_ERROR", err.Error()
+	}
+	if started {
+		return http.StatusConflict, "BRACKET_IN_PROGRESS", "bagan kategori ini sudah mulai dimainkan dan tidak bisa dibentuk ulang atau direset"
+	}
+	return 0, "", ""
+}
+
+// DELETE /api/v1/competitions/{comp_id}/categories/{id}/bracket
+// Menghapus bagan satu kategori beserta partai idle-nya (peserta tetap terdaftar) agar bisa dibuat ulang dari nol,
+// mis. setelah ada peserta mundur. Ditolak bila draw terkunci atau sudah ada partai yang dimulai.
+func (h *BracketHandler) Reset(w http.ResponseWriter, r *http.Request) {
+	compID := r.PathValue("comp_id")
+	cat, err := h.CategoryService.GetCategoryByID(r.PathValue("id"))
+	if err != nil || cat.CompetitionID != compID {
+		Fail(w, http.StatusNotFound, "NOT_FOUND", "category not found in this competition", nil)
+		return
+	}
+	if status, code, msg := h.redrawBlocked(compID, cat); code != "" {
+		Fail(w, status, code, msg, nil)
+		return
+	}
+	if err := h.Service.ResetCategoryBracket(compID, cat.ID); err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	Ok(w, map[string]any{"competition_id": compID, "category_id": cat.ID, "reset": true})
+}
+
+// AutoJoin dipanggil setelah peserta lolos verifikasi: bila kategorinya sudah punya bagan dan draw belum dikunci/dimainkan,
+// bagan dibentuk ulang agar peserta baru ikut. Mengembalikan catatan untuk panitia ("" = tidak ada yang perlu dilaporkan).
+// Kategori tanpa bagan dibiarkan: generate pertama tetap manual.
+func (h *BracketHandler) AutoJoin(compID, categoryID string) string {
+	if categoryID == "" || h.CategoryService == nil || h.AthleteService == nil {
+		return ""
+	}
+	cat, err := h.CategoryService.GetCategoryByID(categoryID)
+	if err != nil || cat.CompetitionID != compID {
+		return ""
+	}
+	if tree, err := h.Service.GetBracketTreeByCategory(compID, categoryID); err != nil || len(tree) == 0 {
+		return ""
+	}
+	if _, code, _ := h.redrawBlocked(compID, cat); code != "" {
+		return "Bagan kategori ini terkunci atau sudah berjalan, peserta belum masuk bagan. Buka kunci atau reset bagan terlebih dahulu."
+	}
+	parts, err := h.AthleteService.ListParticipants(compID, "verified")
+	if err != nil {
+		return ""
+	}
+	var ids []string
+	for _, p := range parts {
+		if p.CategoryID == categoryID {
+			ids = append(ids, p.ID)
+		}
+	}
+	if _, err := h.Service.GenerateCategoryBracket(compID, categoryID, cat.WeightClass, cat.Gender, cat.BracketMode, ids); err != nil {
+		return "Peserta lolos, tetapi bagan belum bisa dibuat ulang otomatis: " + err.Error()
+	}
+	if h.Cache != nil {
+		h.Cache.InvalidateCompetition(compID)
+	}
+	return "Bagan kategori ini dibentuk ulang otomatis dan peserta baru sudah masuk."
 }
 
 // POST /api/v1/competitions/{comp_id}/brackets/generate
@@ -44,17 +123,8 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", "category not found in this competition", nil)
 			return
 		}
-		// Draw yang dikunci panitia tidak boleh diacak ulang (ditegakkan di server, bukan hanya di tombol UI), dan
-		// bagan yang sudah mulai dimainkan tidak boleh dibentuk ulang sama sekali (akan memutus partai dari slotnya).
-		if cat.BracketLocked {
-			Fail(w, http.StatusConflict, "BRACKET_LOCKED", "draw bagan kategori ini terkunci; buka kunci draw terlebih dahulu", nil)
-			return
-		}
-		if started, err := h.Service.CategoryBracketStarted(compID, cat.ID); err != nil {
-			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
-			return
-		} else if started {
-			Fail(w, http.StatusConflict, "BRACKET_IN_PROGRESS", "bagan kategori ini sudah mulai dimainkan dan tidak bisa dibentuk ulang", nil)
+		if status, code, msg := h.redrawBlocked(compID, cat); code != "" {
+			Fail(w, status, code, msg, nil)
 			return
 		}
 		req.WeightClass = cat.WeightClass
@@ -96,7 +166,7 @@ func (h *BracketHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.WeightClass == "" || req.Gender == "" || len(req.ParticipantIDs) < 2 {
-		Fail(w, http.StatusBadRequest, "BAD_REQUEST", "weight_class, gender, and at least 2 verified participants required", nil)
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", fmt.Sprintf("bagan butuh minimal 2 peserta terverifikasi pada kategori ini (saat ini %d); verifikasi peserta atau pilih kategori lain", len(req.ParticipantIDs)), nil)
 		return
 	}
 

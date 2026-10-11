@@ -172,6 +172,7 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optiona
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Delete)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/home-arena", adminOrDewan(http.HandlerFunc(categoryH.SetHomeArena)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock", adminOrDewan(http.HandlerFunc(categoryH.SetBracketLock)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories/{id}/bracket", adminOrDewan(http.HandlerFunc(bracketH.Reset)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 
 	// Athletes & Participants
