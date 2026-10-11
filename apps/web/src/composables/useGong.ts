@@ -4,7 +4,7 @@ let ctx: AudioContext | null = null
  * Bunyikan gong sintetis (Web Audio). Browser memblokir suara sebelum ada interaksi pengguna
  * pada halaman; kegagalan diabaikan agar tidak mengganggu alur pertandingan.
  */
-export function playGong(): void {
+export function playGong(seconds = 2.6): void {
   try {
     const Ctor = window.AudioContext
     if (!Ctor) return
@@ -15,7 +15,7 @@ export function playGong(): void {
     const master = ctx.createGain()
     master.gain.setValueAtTime(0.0001, now)
     master.gain.exponentialRampToValueAtTime(0.7, now + 0.01)
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 2.6)
+    master.gain.exponentialRampToValueAtTime(0.0001, now + seconds)
     master.connect(ctx.destination)
 
     // Gong = nada dasar dengan overtone tidak harmonis yang meluruh pelan
@@ -33,7 +33,7 @@ export function playGong(): void {
       osc.connect(g)
       g.connect(master)
       osc.start(now)
-      osc.stop(now + 2.7)
+      osc.stop(now + seconds + 0.1)
     }
   } catch {
     // suara tidak tersedia
