@@ -1,0 +1,13 @@
+# GitGuardian security scanner configuration
+# https://docs.gitguardian.com/ggshield-docs/configuration/overview
+version: 2
+secret:
+  ignored_paths:
+    - "internal/config/config_test.go"
+    - "tests/**"
+    - "apps/web/test/**"
+    - "apps/web/cypress/**"
+    - "apps/web/playwright/**"
+    - "docs/CREDENTIALS.md"
+    - "internal/store/seed.go"
+    - "cmd/seed/**"
