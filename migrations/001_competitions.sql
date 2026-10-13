@@ -1,4 +1,5 @@
-CREATE TABLE competitions (
+-- +goose Up
+CREATE TABLE IF NOT EXISTS competitions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     location VARCHAR(255),
@@ -8,3 +9,6 @@ CREATE TABLE competitions (
     status VARCHAR(50) NOT NULL DEFAULT 'draft',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS competitions;

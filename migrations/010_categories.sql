@@ -1,4 +1,5 @@
-CREATE TABLE categories (
+-- +goose Up
+CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -7,3 +8,6 @@ CREATE TABLE categories (
     ruleset_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS categories;

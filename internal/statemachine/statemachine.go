@@ -1,6 +1,5 @@
 package statemachine
 
-
 import (
 	"fmt"
 	"sync"
@@ -9,35 +8,38 @@ import (
 type State string
 
 const (
-	StateIdle     State = "idle"
-	StateReady    State = "ready"
-	StateRound1   State = "round_1"
-	StateBreak1   State = "break_1"
-	StateRound2   State = "round_2"
-	StateBreak2   State = "break_2"
-	StateRound3   State = "round_3"
-	StateFinished State = "finished"
+	StateIdle      State = "idle"
+	StateReady     State = "ready"
+	StateRound1    State = "round_1"
+	StateBreak1    State = "break_1"
+	StateRound2    State = "round_2"
+	StateBreak2    State = "break_2"
+	StateRound3    State = "round_3"
+	StateFinished  State = "finished"
+	StateCancelled State = "cancelled"
 )
 
 type Event string
 
 const (
-	EventStart      Event = "start"
-	EventRoundEnd   Event = "round_end"
-	EventBreakEnd   Event = "break_end"
-	EventFinish     Event = "finish"
-	EventReset      Event = "reset"
+	EventStart    Event = "start"
+	EventRoundEnd Event = "round_end"
+	EventBreakEnd Event = "break_end"
+	EventFinish   Event = "finish"
+	EventReset    Event = "reset"
+	EventCancel   Event = "cancel"
 )
 
 var transitions = map[State]map[Event]State{
-	StateIdle:     {EventStart: StateReady},
-	StateReady:    {EventStart: StateRound1},
-	StateRound1:   {EventRoundEnd: StateBreak1, EventFinish: StateFinished},
-	StateBreak1:   {EventBreakEnd: StateRound2},
-	StateRound2:   {EventRoundEnd: StateBreak2, EventFinish: StateFinished},
-	StateBreak2:   {EventBreakEnd: StateRound3},
-	StateRound3:   {EventRoundEnd: StateFinished, EventFinish: StateFinished},
-	StateFinished: {EventReset: StateIdle},
+	StateIdle:      {EventStart: StateReady, EventCancel: StateCancelled},
+	StateReady:     {EventStart: StateRound1, EventFinish: StateFinished, EventCancel: StateCancelled},
+	StateRound1:    {EventRoundEnd: StateBreak1, EventFinish: StateFinished, EventCancel: StateCancelled},
+	StateBreak1:    {EventBreakEnd: StateRound2, EventFinish: StateFinished, EventCancel: StateCancelled},
+	StateRound2:    {EventRoundEnd: StateBreak2, EventFinish: StateFinished, EventCancel: StateCancelled},
+	StateBreak2:    {EventBreakEnd: StateRound3, EventFinish: StateFinished, EventCancel: StateCancelled},
+	StateRound3:    {EventRoundEnd: StateFinished, EventFinish: StateFinished, EventCancel: StateCancelled},
+	StateFinished:  {EventReset: StateIdle},
+	StateCancelled: {EventReset: StateIdle},
 }
 
 type StateMachine struct {
@@ -80,7 +82,8 @@ func (sm *StateMachine) Transition(event Event) error {
 }
 
 func (sm *StateMachine) IsFinished() bool {
-	return sm.Current() == StateFinished
+	s := sm.Current()
+	return s == StateFinished || s == StateCancelled
 }
 
 func (sm *StateMachine) IsInRound() bool {
@@ -94,7 +97,7 @@ func (sm *StateMachine) CurrentRoundNumber() int {
 		return 1
 	case StateRound2, StateBreak2:
 		return 2
-	case StateRound3, StateFinished:
+	case StateRound3, StateFinished, StateCancelled:
 		return 3
 	default:
 		return 0

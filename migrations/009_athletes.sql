@@ -1,7 +1,11 @@
-CREATE TABLE athletes (
+-- +goose Up
+CREATE TABLE IF NOT EXISTS athletes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     gender VARCHAR(20) NOT NULL,
     team VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS athletes;

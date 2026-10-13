@@ -1,0 +1,131 @@
+
+> web@0.0.0 cypress:run
+> cross-env ELECTRON_EXTRA_LAUNCH_ARGS="--no-sandbox --disable-gpu --disable-software-rasterizer" cypress run --spec cypress/e2e/ipsi/06-*
+
+
+Warning: We failed to trash the existing run results.
+
+This error will not affect or change the exit code.
+
+Error: Command failed: C:\Users\kemzz\AppData\Local\Cypress\Cache\16.1.1\Cypress\resources\app\node_modules\trash\lib\windows-trash.exe D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\match
+
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at ChildProcess.exithandler (node:child_process:417:12)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1124:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+
+====================================================================================================
+
+  (Run Starting)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Cypress:        16.1.1                                                                         Γöé
+  Γöé Browser:        Electron 146 (headless) (deprecated)                                           Γöé
+  Γöé Node Version:   v24.19.0 (C:\Users\kemzz\AppData\Local\fnm_multishells\4984_1791556989695\node Γöé
+  Γöé                 .exe)                                                                          Γöé
+  Γöé Specs:          1 found (06-alur-lengkap-registrasi-ke-bagan.cy.ts)                            Γöé
+  Γöé Searched:       D:\Freelance\DigitalScoring\apps\web\cypress\e2e\ipsi\06-*                     Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+Warning: The Electron browser is deprecated as a test browser and will be removed in a future version of Cypress.
+
+Switch to Chrome or another installed browser to avoid a breaking change when you upgrade.
+
+Read more about supported browsers: https://on.cypress.io/launching-browsers
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  06-alur-lengkap-registrasi-ke-bagan.cy.ts                                       (1 of 1)
+
+
+  Alur lengkap: registrasi kontingen sampai bagan
+    ΓêÜ 1. admin menyiapkan kejuaraan dan dua kategori resmi (416ms)
+    ΓêÜ 2. manajer kontingen mendaftarkan 4 atlet dan semuanya berstatus pending (206ms)
+    ΓêÜ 3. bagan belum bisa dibuat sebelum ada peserta terverifikasi (38ms)
+    ΓêÜ 4. admin memverifikasi: dua lolos, satu kelebihan bobot, satu putri lolos dengan surat tidak hamil (134ms)
+    ΓêÜ 5. bagan Remaja Putra berisi tepat 2 peserta lolos dan tanpa peserta overweight (53ms)
+    ΓêÜ 6. kategori Putri dengan satu peserta tidak membentuk bagan (butuh minimal 2) (57ms)
+    1) 7. penonton publik melihat bagan tanpa login, terbatas pada kategorinya
+    ΓêÜ 8. ringkasan laporan kejuaraan dapat diakses publik (53ms)
+    ΓêÜ 9. UI: meja verifikasi dimuat tanpa error untuk admin (2501ms)
+
+
+  8 passing (12s)
+  1 failing
+
+  1) Alur lengkap: registrasi kontingen sampai bagan
+       7. penonton publik melihat bagan tanpa login, terbatas pada kategorinya:
+     CypressError: Timed out retrying after 8000ms: `cy.its()` errored because the property: `body.data` returned a `null` value.
+
+`cy.its()` waited for the specified property `body.data` to become accessible, but it never did.
+
+If you expect the property `body.data` to be `null`, then add an assertion such as:
+
+`cy.wrap({ foo: null }).its('foo').should('be.null')`
+
+https://on.cypress.io/its
+      at <unknown> (http://localhost/__cypress/runner/cypress_runner.js:120864:70)
+      at Object.subjectFn (http://localhost/__cypress/runner/cypress_runner.js:152001:16)
+      at $Cy.verifyUpcomingAssertions (http://localhost/__cypress/runner/cypress_runner.js:151232:31)
+      at onRetry (http://localhost/__cypress/runner/cypress_runner.js:151992:15)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at whenStable (http://localhost/__cypress/runner/cypress_runner.js:151874:70)
+      at <unknown> (http://localhost/__cypress/runner/cypress_runner.js:151774:14)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise._settlePromiseFromHandler (http://localhost/__cypress/runner/cypress_runner.js:1492:31)
+      at Promise._settlePromise (http://localhost/__cypress/runner/cypress_runner.js:1549:18)
+      at Promise._settlePromise0 (http://localhost/__cypress/runner/cypress_runner.js:1594:10)
+      at Promise._settlePromises (http://localhost/__cypress/runner/cypress_runner.js:1674:18)
+      at Promise._fulfill (http://localhost/__cypress/runner/cypress_runner.js:1618:18)
+      at <unknown> (http://localhost/__cypress/runner/cypress_runner.js:5423:46)
+  From Your Spec Code:
+      at eval (webpack://web/./cypress/e2e/ipsi/06-alur-lengkap-registrasi-ke-bagan.cy.ts:131:35)
+  at Array.forEach (<anonymous>)
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/06-alur-lengkap-registrasi-ke-bagan.cy.ts:131:20)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        9                                                                                Γöé
+  Γöé Passing:      8                                                                                Γöé
+  Γöé Failing:      1                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  1                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     12 seconds                                                                       Γöé
+  Γöé Spec Ran:     06-alur-lengkap-registrasi-ke-bagan.cy.ts                                        Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\06-alur-lengkap-registr     (1280x720)
+     asi-ke-bagan.cy.ts\Alur lengkap registrasi kontingen sampai bagan -- 7. penonton               
+      publik melihat bagan tanpa login, terbatas pada kategorinya (failed).png                      
+
+
+====================================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé ├ù  06-alur-lengkap-registrasi-ke-bagan      00:12        9        8        1        -        - Γöé
+  Γöé    .cy.ts                                                                                      Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+    ├ù  1 of 1 failed (100%)                     00:12        9        8        1        -        -  
+

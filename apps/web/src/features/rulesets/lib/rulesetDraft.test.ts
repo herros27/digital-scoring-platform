@@ -1,0 +1,242 @@
+import { describe, expect, it } from 'vitest'
+import type { RulesetDTO } from '../types'
+import {
+  copyDraft,
+  draftFromRuleset,
+  newDraft,
+  normalizedPriority,
+  payloadFromDraft,
+  priorityByValue,
+  summarize,
+  validateDraft,
+} from './rulesetDraft'
+
+const legacy: RulesetDTO = {
+  id: 'r1',
+  name: 'IPSI Lama',
+  version: '1',
+  status: 'active',
+  scoring: {
+    technique_points: 1,
+    knockdown_points: 2,
+    fall_points: 3,
+    max_penalties: 3,
+    penalty_threshold: 1,
+    round_duration: 120,
+    break_duration: 60,
+    total_rounds: 3,
+  },
+}
+
+describe('draftFromRuleset', () => {
+  it('ruleset lama tanpa bagian opsional diisi bawaan yang sama dengan server', () => {
+    const d = draftFromRuleset(legacy)
+    expect(d.techniques.map((t) => t.type)).toEqual(['technique', 'knockdown', 'fall'])
+    expect(d.penalties.find((p) => p.type === 'teguran_2')?.points).toBe(2)
+    expect(d.penalties.find((p) => p.type === 'peringatan_3')?.disqualify).toBe(true)
+    expect(d.consensus).toEqual({ judges: 3, majority: 2, windowMs: 3000 })
+    expect(d.tiebreak.priority).toEqual(['fall', 'knockdown', 'technique'])
+    expect(d.outcomes.every((o) => o.enabled)).toBe(true)
+    expect(validateDraft({ ...d })).toEqual({})
+  })
+
+  it('hasil khusus yang tidak tercantum ditandai nonaktif', () => {
+    const d = draftFromRuleset({
+      ...legacy,
+      scoring: { ...legacy.scoring, outcomes: [{ type: 'ko', label: 'KO', phase: 'in_match' }] },
+    })
+    expect(d.outcomes.filter((o) => o.enabled).map((o) => o.type)).toEqual(['ko'])
+  })
+})
+
+describe('payloadFromDraft', () => {
+  it('menurunkan nilai skalar warisan dari teknik dan menulis semua bagian', () => {
+    const d = newDraft()
+    d.name = 'Kejurda'
+    d.techniques[2].points = 4 // jatuhan 4
+    const p = payloadFromDraft(d)
+    expect(p.scoring.fall_points).toBe(4)
+    expect(p.scoring.techniques).toHaveLength(6)
+    expect(p.scoring.penalties?.at(-1)).toEqual({
+      type: 'peringatan_3',
+      label: 'Peringatan 3',
+      points: 0,
+      action: 'disqualify',
+    })
+    expect(p.scoring.consensus).toEqual({ judges: 3, majority: 2, window_ms: 3000 })
+    expect(p.scoring.tiebreak?.steps).toEqual(['fewest_penalties', 'technique_priority'])
+    expect(p.scoring.outcomes).toHaveLength(4)
+  })
+
+  it('langkah seri dan hasil khusus nonaktif tidak ikut dikirim', () => {
+    const d = newDraft()
+    d.name = 'X1'
+    d.tiebreak.techniquePriority = false
+    d.outcomes[0].enabled = false
+    const p = payloadFromDraft(d)
+    expect(p.scoring.tiebreak?.steps).toEqual(['fewest_penalties'])
+    expect(p.scoring.outcomes?.map((o) => o.type)).not.toContain('ko')
+  })
+
+  it('round-trip: draft -> payload -> draft tidak mengubah isi', () => {
+    const d = newDraft()
+    d.name = 'Round Trip'
+    const back = draftFromRuleset({ id: 'x', ...payloadFromDraft(d) } as RulesetDTO)
+    expect(payloadFromDraft(back)).toEqual(payloadFromDraft(d))
+  })
+})
+
+describe('WMP (selisih poin)', () => {
+  it('bawaan otomatis: tidak mengirim point_gap sehingga server memilih menurut golongan umur', () => {
+    const p = payloadFromDraft({ ...newDraft(), name: 'Otomatis' })
+    expect(p.scoring.point_gap).toBeUndefined()
+    expect(draftFromRuleset(legacy).pointGap.mode).toBe('auto')
+  })
+
+  it('mode atur sendiri dan nonaktif dikirim dan dibaca kembali', () => {
+    const d = { ...newDraft(), name: 'Atur' }
+    d.pointGap = { mode: 'custom', margin: 20, fromRound: 2 }
+    expect(payloadFromDraft(d).scoring.point_gap).toEqual({ margin: 20, from_round: 2 })
+
+    d.pointGap = { mode: 'off', margin: 20, fromRound: 2 }
+    const off = payloadFromDraft(d)
+    expect(off.scoring.point_gap).toEqual({ margin: 0 })
+    const back = draftFromRuleset({ id: 'x', ...off } as RulesetDTO)
+    expect(back.pointGap.mode).toBe('off')
+    expect(payloadFromDraft(back)).toEqual(off)
+  })
+
+  it('validasi hanya berlaku pada mode atur sendiri', () => {
+    const d = { ...newDraft(), name: 'Valid' }
+    d.pointGap = { mode: 'custom', margin: 0, fromRound: 4 }
+    expect(Object.keys(validateDraft(d)).sort()).toEqual(['pointGap.fromRound', 'pointGap.margin'])
+    d.pointGap = { mode: 'off', margin: 0, fromRound: 4 }
+    expect(validateDraft(d)).toEqual({})
+  })
+})
+
+describe('waktu per golongan umur', () => {
+  it('bawaan tidak mengirim age_timings (semua golongan ikut waktu utama)', () => {
+    const p = payloadFromDraft({ ...newDraft(), name: 'Tanpa Pengecualian' })
+    expect(p.scoring.age_timings).toBeUndefined()
+    expect(draftFromRuleset(legacy).ageTimings.every((a) => !a.enabled)).toBe(true)
+  })
+
+  it('panitia bebas menentukan waktunya (mis. 2 babak × 2 menit); dikirim dan dibaca kembali', () => {
+    const d = { ...newDraft(), name: 'Kustom' }
+    const dini = d.ageTimings.find((a) => a.code === 'usia_dini_1')!
+    Object.assign(dini, { enabled: true, roundDuration: 120, breakDuration: 30, totalRounds: 2 })
+    const p = payloadFromDraft(d)
+    expect(p.scoring.age_timings).toEqual({
+      usia_dini_1: { round_duration: 120, break_duration: 30, total_rounds: 2 },
+    })
+    const back = draftFromRuleset({ id: 'x', ...p } as RulesetDTO)
+    expect(back.ageTimings.find((a) => a.code === 'usia_dini_1')).toMatchObject({
+      enabled: true,
+      roundDuration: 120,
+      totalRounds: 2,
+    })
+    expect(back.ageTimings.find((a) => a.code === 'dewasa')!.enabled).toBe(false)
+    expect(payloadFromDraft(back)).toEqual(p)
+  })
+
+  it('validasi hanya untuk golongan yang dicentang', () => {
+    const d = { ...newDraft(), name: 'Valid' }
+    const i = d.ageTimings.findIndex((a) => a.code === 'usia_dini_2')
+    Object.assign(d.ageTimings[i], { enabled: false, roundDuration: 0, totalRounds: 9 })
+    expect(validateDraft(d)).toEqual({})
+    Object.assign(d.ageTimings[i], {
+      enabled: true,
+      roundDuration: 0,
+      breakDuration: -1,
+      totalRounds: 9,
+    })
+    expect(Object.keys(validateDraft(d)).sort()).toEqual([
+      `ageTimings.${i}.breakDuration`,
+      `ageTimings.${i}.roundDuration`,
+      `ageTimings.${i}.totalRounds`,
+    ])
+  })
+
+  it('ringkasan menyebut jumlah golongan berwaktu khusus', () => {
+    const r = {
+      ...legacy,
+      scoring: {
+        ...legacy.scoring,
+        age_timings: { usia_dini_1: { round_duration: 90, break_duration: 60, total_rounds: 2 } },
+      },
+    }
+    expect(summarize(r)).toContain('1 golongan umur berwaktu khusus')
+  })
+})
+
+describe('priority', () => {
+  it('urut menurut nilai tertinggi', () => {
+    // urutan regulasi: 1+3, 3, 1+2, 2, 1+1, 1
+    expect(priorityByValue(newDraft().techniques)).toEqual([
+      'catch_fall',
+      'fall',
+      'combo_1_2',
+      'knockdown',
+      'combo_1_1',
+      'technique',
+    ])
+  })
+  it('membuang kode yang dihapus dan menambah kode baru di akhir', () => {
+    const d = newDraft()
+    d.tiebreak.priority = ['fall', 'hilang', 'technique']
+    expect(normalizedPriority(d)).toEqual([
+      'fall',
+      'technique',
+      'knockdown',
+      'catch_fall',
+      'combo_1_2',
+      'combo_1_1',
+    ])
+  })
+})
+
+describe('validateDraft', () => {
+  const valid = () => ({ ...newDraft(), name: 'Valid' })
+  it('draft bawaan valid', () => expect(validateDraft(valid())).toEqual({}))
+  it('menolak nama pendek, kode ganda, kode dicadangkan, nilai 0, mayoritas > juri, window kecil', () => {
+    const d = valid()
+    d.name = 'x'
+    d.techniques[1].type = 'technique'
+    d.techniques[2].type = 'undo'
+    d.techniques[3].points = 0
+    d.penalties[0].points = -1
+    d.consensus = { judges: 3, majority: 4, windowMs: 100 }
+    const e = validateDraft(d)
+    expect(Object.keys(e).sort()).toEqual(
+      [
+        'consensus.majority',
+        'consensus.windowMs',
+        'name',
+        'penalties.0.points',
+        'techniques.1.type',
+        'techniques.2.type',
+        'techniques.3.points',
+      ].sort(),
+    )
+  })
+  it('kode harus huruf kecil dan diawali huruf', () => {
+    const d = valid()
+    d.techniques[0].type = 'Tendang 1'
+    d.penalties[0].type = '1x'
+    const e = validateDraft(d)
+    expect(e['techniques.0.type']).toBeDefined()
+    expect(e['penalties.0.type']).toBeDefined()
+  })
+})
+
+describe('copyDraft & summarize', () => {
+  it('salinan tanpa id dengan nama berakhiran (salinan)', () => {
+    const c = copyDraft(draftFromRuleset(legacy))
+    expect(c.id).toBeUndefined()
+    expect(c.name).toBe('IPSI Lama (salinan)')
+  })
+  it('ringkasan memuat babak, juri, teknik, sanksi', () => {
+    expect(summarize(legacy)).toBe('3 babak × 2 mnt • 3 juri (2 sepakat) • 3 teknik • 7 sanksi')
+  })
+})

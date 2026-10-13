@@ -19,6 +19,42 @@ func nextPowerOfTwo(n int) int {
 	return p
 }
 
+// seedPositions urutan seed per posisi slot ronde 1 untuk bagan berukuran `size` (pangkat dua): 1 melawan size,
+// 2 melawan size-1, dan seterusnya, dengan seed teratas terpisah ke sisi bagan yang berbeda.
+func seedPositions(size int) []int {
+	seeds := []int{1}
+	for len(seeds) < size {
+		n := len(seeds) * 2
+		next := make([]int, 0, n)
+		for _, s := range seeds {
+			next = append(next, s, n+1-s)
+		}
+		seeds = next
+	}
+	return seeds
+}
+
+// round1Placement indeks peserta (0-based) untuk tiap slot ronde 1; -1 berarti BYE. Bila jumlah peserta pas pangkat
+// dua, urutan masukan dipertahankan. Bila tidak, slot BYE harus tersebar satu per pasangan: menaruhnya berurutan di
+// ujung membuat pasangan BYE lawan BYE, sehingga pemenang pasangan di sebelahnya tidak pernah mendapat lawan.
+func round1Placement(numParticipants, bracketSize int) []int {
+	out := make([]int, bracketSize)
+	if numParticipants == bracketSize {
+		for i := range out {
+			out[i] = i
+		}
+		return out
+	}
+	for i, seed := range seedPositions(bracketSize) {
+		if seed <= numParticipants {
+			out[i] = seed - 1
+		} else {
+			out[i] = -1
+		}
+	}
+	return out
+}
+
 // GenerateSlots menyusun struktur pohon bagan dari ronde 1 hingga Final
 func GenerateSlots(competitionID, weightClass, gender string, participantIDs []string) []store.BracketSlot {
 	numParticipants := len(participantIDs)
@@ -30,6 +66,7 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 	totalRounds := int(math.Log2(float64(bracketSize)))
 
 	var allSlots []store.BracketSlot
+	placement := round1Placement(numParticipants, bracketSize)
 
 	// Map untuk menyimpan slot per ronde agar mudah menghubungkan next_slot_id:
 	// key: "round:slot_index" -> generated UUID
@@ -44,8 +81,8 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 		}
 	}
 
-	// 2. Susun slot dengan relasi next_slot_id
-	for r := 1; r <= totalRounds; r++ {
+	// 2. Susun slot dengan relasi next_slot_id (dari ronde akhir ke ronde 1 agar parent slot ada di DB lebih dulu)
+	for r := totalRounds; r >= 1; r-- {
 		numSlotsInRound := bracketSize / (1 << (r - 1))
 
 		for i := 0; i < numSlotsInRound; i++ {
@@ -72,8 +109,8 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 
 			// Khusus Ronde 1: Masukkan peserta & tentukan BYE
 			if r == 1 {
-				if i < numParticipants {
-					pID := participantIDs[i]
+				if placement[i] >= 0 {
+					pID := participantIDs[placement[i]]
 					slot.ParticipantID = &pID
 				} else {
 					// Slot kosong di ronde 1 dianggap BYE
@@ -94,6 +131,15 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 			for j := 0; j < len(allSlots); j++ {
 				if allSlots[j].Round == 1 && allSlots[j].SlotIndex == opponentIndex && allSlots[j].IsBye {
 					allSlots[i].WinnerID = allSlots[i].ParticipantID
+					if allSlots[i].NextSlotID != nil {
+						nextID := *allSlots[i].NextSlotID
+						for k := 0; k < len(allSlots); k++ {
+							if allSlots[k].ID == nextID {
+								allSlots[k].ParticipantID = allSlots[i].ParticipantID
+								break
+							}
+						}
+					}
 					break
 				}
 			}
@@ -104,5 +150,62 @@ func GenerateSlots(competitionID, weightClass, gender string, participantIDs []s
 }
 
 func slotKey(round, index int) string {
-	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(string(rune(round*1000 + index)))).String()
+	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(string(rune(round*1000+index)))).String()
+}
+
+// pemasalanGroupSize adalah ukuran maksimum satu mini-bracket pemasalan (2 semifinalis + 2 finalis).
+const pemasalanGroupSize = 4
+
+// SplitPemasalanGroups membagi peserta ke mini-bracket (maks 4 per grup) seimbang,
+// sehingga tidak ada grup berisi 1 peserta (mis. 5 peserta -> 3 + 2, bukan 4 + 1).
+func SplitPemasalanGroups(participantIDs []string) [][]string {
+	n := len(participantIDs)
+	if n < 2 {
+		return nil
+	}
+	groups := (n + pemasalanGroupSize - 1) / pemasalanGroupSize
+	base, extra := n/groups, n%groups
+	out := make([][]string, 0, groups)
+	pos := 0
+	for g := 0; g < groups; g++ {
+		size := base
+		if g < extra {
+			size++
+		}
+		out = append(out, participantIDs[pos:pos+size])
+		pos += size
+	}
+	return out
+}
+
+// GenerateMiniSlots menyusun bagan pemasalan: setiap grup (maks 4 peserta) adalah mini-bracket
+// semifinal + final yang berdiri sendiri. Slot_index tiap grup digeser agar tidak bertabrakan:
+// ronde 1 menempati 4*g..4*g+3 dan ronde 2 menempati 2*g..2*g+1, sehingga pasangan (index^1)
+// selalu berada dalam grup yang sama.
+func GenerateMiniSlots(competitionID, weightClass, gender string, participantIDs []string) []store.BracketSlot {
+	var all []store.BracketSlot
+	for g, group := range SplitPemasalanGroups(participantIDs) {
+		slots := GenerateSlots(competitionID, weightClass, gender, group)
+		for i := range slots {
+			switch slots[i].Round {
+			case 1:
+				slots[i].SlotIndex += pemasalanGroupSize * g
+			default:
+				slots[i].SlotIndex += 2 * g
+			}
+		}
+		all = append(all, slots...)
+	}
+	return all
+}
+
+// AssignCategory menandai seluruh slot sebagai milik kategori tertentu.
+func AssignCategory(slots []store.BracketSlot, categoryID string) {
+	if categoryID == "" {
+		return
+	}
+	for i := range slots {
+		id := categoryID
+		slots[i].CategoryID = &id
+	}
 }
