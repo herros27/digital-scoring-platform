@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -22,15 +23,15 @@ type RoundScore struct {
 	BluePenalties int
 }
 
-type BracketAdvancer interface {
-	AdvanceWinner(slotID, winnerID string) error
-}
-
+// MatchStore penyimpanan partai. FinishMatch menutup partai secara atomik (status, pemenang, dan kemajuan bagan
+// dalam satu transaksi) dan mengembalikan id atlet pemenang dari sudut "red"/"blue".
 type MatchStore interface {
 	UpdateStatus(id, status string) error
-	SetWinner(matchID, winnerID string) error
-	GetByID(id string) (*store.Match, error)
+	FinishMatch(matchID, winnerCorner string) (winnerID string, err error)
 }
+
+// ErrResultNotSaved: hasil akhir sudah dihitung tetapi gagal ditulis ke database. Wasit boleh menekan Selesai lagi.
+var ErrResultNotSaved = errors.New("hasil pertandingan belum tersimpan ke database; tekan Selesai lagi untuk mengulang")
 
 type Orchestrator struct {
 	mu      sync.Mutex
@@ -45,7 +46,6 @@ type Orchestrator struct {
 	matchStore   MatchStore
 	eventStore   *store.MatchEventStore
 	scoreStore   *store.MatchScoreStore
-	bracketStore BracketAdvancer
 
 	// skor per ronde: index = round number (1-based, [0] tidak dipakai)
 	scores     [4]RoundScore
@@ -67,6 +67,8 @@ type Orchestrator struct {
 	// pemulihan setelah server restart (lihat runtime.go)
 	runtimeStore RuntimeStore
 	recovered    bool // dipulihkan dari keadaan tersimpan dan belum dilanjutkan wasit
+	// unsavedCorner terisi (red/blue) selama hasil akhir belum berhasil ditulis ke database; lihat saveResultLocked
+	unsavedCorner string
 }
 
 func New(
@@ -77,7 +79,6 @@ func New(
 	matchStore MatchStore,
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
-	bracketStore BracketAdvancer,
 ) *Orchestrator {
 	o := &Orchestrator{
 		matchID:      matchID,
@@ -89,7 +90,6 @@ func New(
 		matchStore:   matchStore,
 		eventStore:   eventStore,
 		scoreStore:   scoreStore,
-		bracketStore: bracketStore,
 		seenEvents:   make(map[string]time.Time),
 		lastInput:    make(map[int]judgeAction),
 		inputCount:   make(map[int]int),
@@ -231,6 +231,11 @@ func (o *Orchestrator) doStart() error {
 	}
 
 	o.recovered = false
+	// Status 'running' disimpan agar daftar partai, badge LIVE, dan penghitung "sedang tanding" di UI
+	// (yang membaca status dari database) benar; sebelumnya partai berjalan tetap tercatat 'idle'.
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, "running")
+	}
 	o.appendEvent("match_started", map[string]any{"round": o.sm.CurrentRoundNumber()}, "")
 	o.startRoundTimer()
 	o.broadcastState()
@@ -251,6 +256,10 @@ func (o *Orchestrator) doPause() error {
 	if o.timer != nil {
 		rem = o.timer.Remaining().Milliseconds()
 	}
+	// Status 'paused' disimpan agar daftar partai di UI panitia menampilkan Lanjutkan (bukan Jeda lagi)
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, "paused")
+	}
 	o.appendEvent("match_paused", map[string]any{
 		"remaining_ms": rem,
 	}, "")
@@ -269,13 +278,14 @@ func (o *Orchestrator) doResume() error {
 		o.timer.Start()
 	}
 	o.recovered = false
+	if o.matchStore != nil {
+		_ = o.matchStore.UpdateStatus(o.matchID, "running")
+	}
 	o.appendEvent("match_resumed", nil, "")
 	o.broadcastState()
 	return nil
 }
 
-// doFinish mengakhiri pertandingan. Bila skor seri, wasit wajib menentukan pemenang
-// (`winner` = "red"/"blue", keputusan wasit); tanpa itu pertandingan tidak diakhiri.
 // doFinish mengakhiri pertandingan. `winner` (keputusan wasit) menimpa hasil; `method` menjelaskan
 // dasar keputusan (kosong = keputusan wasit; selain itu salah satu metode manual ruleset).
 // Tanpa `winner` dan skor seri, aturan seri otomatis dijalankan; bila masih seri, ErrTieNeedsDecision.
@@ -284,7 +294,16 @@ func (o *Orchestrator) doFinish(winner, method string) error {
 	defer o.mu.Unlock()
 
 	if o.sm.IsFinished() {
+		if o.unsavedCorner != "" {
+			return o.retrySaveLocked()
+		}
 		return fmt.Errorf("match is already finished")
+	}
+	// Partai yang belum dimulai tidak boleh "diselesaikan": tanpa pertandingan tidak ada hasil, dan
+	// finalize() akan menetapkan pemenang, memajukan bagan, serta menyiarkan hasil sementara state
+	// machine tetap idle. WO/undur diri sebelum mulai memakai declare_outcome; batal memakai cancel.
+	if o.sm.Current() == statemachine.StateIdle {
+		return fmt.Errorf("cannot finish match in idle state: match has not started (use declare_outcome for walkover or cancel)")
 	}
 	if winner != "" {
 		if !validTarget(winner) {
@@ -312,6 +331,9 @@ func (o *Orchestrator) doFinish(winner, method string) error {
 		o.forceTiebreakLocked(res)
 	}
 	o.finalize()
+	if o.unsavedCorner != "" {
+		return ErrResultNotSaved
+	}
 	return nil
 }
 
@@ -322,15 +344,21 @@ func (o *Orchestrator) doCancel() error {
 	if o.sm.IsFinished() {
 		return fmt.Errorf("cannot cancel finished match")
 	}
+	// Status ditulis lebih dulu dan kegagalannya dikembalikan: dari semua keadaan yang belum selesai pembatalan selalu
+	// sah, jadi partai tetap utuh (jam, pemulihan) dan wasit bisa mengulang, tidak berakhir "dibatalkan" di layar tetapi
+	// "running" di database tanpa jalan pemulihan.
+	if o.matchStore != nil {
+		if err := o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateCancelled)); err != nil {
+			log.Printf("[orch:%s] cancel gagal disimpan: %v", o.matchID, err)
+			return fmt.Errorf("pembatalan belum tersimpan ke database, coba lagi: %w", err)
+		}
+	}
 	if o.timer != nil {
 		o.timer.Stop()
 	}
 	if err := o.sm.Transition(statemachine.EventCancel); err != nil {
 		log.Printf("[orch:%s] cancel transition error: %v", o.matchID, err)
 		return err
-	}
-	if o.matchStore != nil {
-		_ = o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateCancelled))
 	}
 	o.appendEvent("match_cancelled", nil, "")
 	o.broadcastState()
@@ -347,21 +375,51 @@ type judgeInputPayload struct {
 	Round          int    `json:"round"`
 }
 
+// scoringOpen nil bila skor juri boleh masuk: babak berjalan dan jam tidak sedang dijeda. Partai yang dijeda
+// (atau baru dipulihkan setelah restart) menolak input agar skor tidak masuk saat wasit menghentikan laga.
+func (o *Orchestrator) scoringOpen() error {
+	if !o.sm.IsInRound() {
+		return fmt.Errorf("scoring not allowed in state %s", o.sm.Current())
+	}
+	o.mu.Lock()
+	t := o.timer
+	o.mu.Unlock()
+	if t != nil && !t.IsRunning() {
+		return fmt.Errorf("pertandingan sedang dijeda")
+	}
+	return nil
+}
+
+// firstTime mencatat kunci idempotensi dan mengembalikan false bila kunci itu sudah pernah masuk (kiriman ulang
+// tablet atau klien REST). Kunci lebih tua dari 5 menit dibuang agar peta tidak tumbuh selama partai berlangsung.
+func (o *Orchestrator) firstTime(key string) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if _, exists := o.seenEvents[key]; exists {
+		return false
+	}
+	o.seenEvents[key] = time.Now()
+	if len(o.seenEvents) > 500 {
+		cutoff := time.Now().Add(-5 * time.Minute)
+		for k, t := range o.seenEvents {
+			if t.Before(cutoff) {
+				delete(o.seenEvents, k)
+			}
+		}
+	}
+	return true
+}
+
 func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	// hanya judge yang boleh submit skor
-	// if client.Role != hub.RoleJudge {
-	// 	o.sendError(client, "FORBIDDEN", "only judges can submit scores")
-	// 	return
-	// }
-
 	if !client.Role.IsJudge() {
 		o.sendError(client, "FORBIDDEN", "only judges can submit scores")
 		return
 	}
 
 	// scoring hanya boleh di state ROUND
-	if !o.sm.IsInRound() {
-		o.sendError(client, "SCORING_NOT_ALLOWED", fmt.Sprintf("state is %s", o.sm.Current()))
+	if err := o.scoringOpen(); err != nil {
+		o.sendError(client, "SCORING_NOT_ALLOWED", err.Error())
 		return
 	}
 
@@ -380,23 +438,14 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 	if key == "" {
 		key = p.IdempotencyKey
 	}
-	if key != "" {
-		o.mu.Lock()
-		if _, exists := o.seenEvents[key]; exists {
-			o.mu.Unlock()
-			log.Printf("[orch:%s] duplicate score event ignored by idempotency key: %s", o.matchID, key)
-			return
-		}
-		o.seenEvents[key] = time.Now()
-		if len(o.seenEvents) > 500 {
-			cutoff := time.Now().Add(-5 * time.Minute)
-			for k, t := range o.seenEvents {
-				if t.Before(cutoff) {
-					delete(o.seenEvents, k)
-				}
-			}
-		}
-		o.mu.Unlock()
+	if key != "" && !o.firstTime(key) {
+		log.Printf("[orch:%s] duplicate score event ignored by idempotency key: %s", o.matchID, key)
+		return
+	}
+
+	if p.ScoreType == undoScoreType {
+		o.handleUndo(client, p)
+		return
 	}
 
 	input := consensus.JudgeInput{
@@ -437,21 +486,18 @@ func (o *Orchestrator) handleJudgeInput(client *hub.Client, msg hub.Message) {
 
 // SubmitJudgeInput memungkinkan pengiriman scoring event via REST dengan idempotency key check
 func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyKey string) (*consensus.ConsensusResult, bool, error) {
-	if !o.sm.IsInRound() {
-		return nil, false, fmt.Errorf("scoring not allowed in state %s", o.sm.Current())
+	if err := o.scoringOpen(); err != nil {
+		return nil, false, err
+	}
+	if input.ScoreType == undoScoreType {
+		return nil, false, fmt.Errorf("pembatalan hanya tersedia lewat WebSocket tablet juri")
 	}
 	if !o.validScoreType(string(input.ScoreType)) {
 		return nil, false, fmt.Errorf("score_type %q tidak dikenal pada ruleset ini", input.ScoreType)
 	}
 
-	if idempotencyKey != "" {
-		o.mu.Lock()
-		if _, exists := o.seenEvents[idempotencyKey]; exists {
-			o.mu.Unlock()
-			return nil, true, nil
-		}
-		o.seenEvents[idempotencyKey] = time.Now()
-		o.mu.Unlock()
+	if idempotencyKey != "" && !o.firstTime(idempotencyKey) {
+		return nil, true, nil
 	}
 
 	input.MatchID = o.matchID
@@ -477,6 +523,45 @@ func (o *Orchestrator) SubmitJudgeInput(input consensus.JudgeInput, idempotencyK
 	return result, false, nil
 }
 
+const undoScoreType = "undo"
+
+// handleUndo membatalkan input juri ini yang masih menunggu juri lain (belum jadi poin) pada sudut tertentu.
+// Poin yang sudah terkonfirmasi tidak dibatalkan dari tablet; itu wewenang wasit. Tanpa input yang bisa
+// dibatalkan, juri mendapat UNDO_NOT_POSSIBLE agar tidak mengira pembatalan berhasil.
+func (o *Orchestrator) handleUndo(client *hub.Client, p judgeInputPayload) {
+	target := consensus.Target(p.Target)
+	if target != consensus.TargetRed && target != consensus.TargetBlue {
+		o.sendError(client, "BAD_PAYLOAD", "target pembatalan harus red atau blue")
+		return
+	}
+	retracted, ok := o.engine.Retract(client.ID, target, o.sm.CurrentRoundNumber())
+	if !ok {
+		o.sendError(client, "UNDO_NOT_POSSIBLE", "tidak ada input yang menunggu juri lain; poin terkonfirmasi tidak dapat dibatalkan dari tablet")
+		return
+	}
+	o.mu.Lock()
+	o.appendEvent("judge_undo", map[string]any{
+		"judge_id":    client.ID,
+		"seat_number": client.SeatNumber,
+		"score_type":  retracted.ScoreType,
+		"target":      retracted.Target,
+		"round":       retracted.Round,
+	}, client.ID)
+	o.mu.Unlock()
+	// count 0 memadamkan lampu konsensus di tablet; count>0 menurunkan hitungan juri yang tersisa
+	o.h.SendToRole(hub.RoleJudge, hub.Message{
+		Type: hub.MsgConsensusProgress,
+		Payload: map[string]any{
+			"target":     retracted.Target,
+			"score_type": retracted.ScoreType,
+			"round":      retracted.Round,
+			"count":      retracted.Remaining,
+			"needed":     o.engine.Majority(),
+			"window_ms":  o.engine.Window().Milliseconds(),
+		},
+	})
+}
+
 // notifyConsensusProgress memberi tahu tablet juri berapa juri yang sudah menekan teknik dan sudut
 // yang sama dalam window (anonim: tanpa identitas kursi, agar juri tidak saling terpengaruh).
 func (o *Orchestrator) notifyConsensusProgress(res *consensus.ConsensusResult) {
@@ -499,6 +584,12 @@ func (o *Orchestrator) notifyConsensusProgress(res *consensus.ConsensusResult) {
 func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+
+	// Pemeriksaan scoringOpen dilakukan sebelum kunci diambil; bila bel ronde sempat menutup babak atau partai di
+	// sela itu, poin yang terlambat tidak boleh mengubah skor yang sudah menentukan pemenang.
+	if !o.sm.IsInRound() {
+		return
+	}
 
 	round := result.Round
 	pts := o.pointsFor(result.ScoreType)
@@ -551,7 +642,7 @@ func (o *Orchestrator) applyScore(result *consensus.ConsensusResult) {
 	o.broadcastScoreUpdate(round)
 
 	// cek win condition (KO, point difference)
-	o.checkMidMatchWin(round)
+	o.checkPointGapLocked()
 }
 
 // pointsFor nilai teknik menurut ruleset; 0 untuk jenis yang tidak dikenal (mis. "undo").
@@ -582,7 +673,7 @@ func (o *Orchestrator) handleSyncRequest(client *hub.Client) {
 	payload := o.snapshotLocked()
 	o.mu.Unlock()
 
-	o.h.SendToClient(client.ID, hub.Message{
+	o.h.SendToConn(client, hub.Message{
 		Type:    hub.MsgSyncResponse,
 		Payload: payload,
 	})
@@ -607,7 +698,7 @@ func (o *Orchestrator) snapshotLocked() map[string]any {
 		"match_id":    o.matchID,
 		"arena_id":    o.arenaID,
 		"state":       string(o.sm.Current()),
-		"round":       o.sm.CurrentRoundNumber(),
+		"round":       o.roundNumberLocked(),
 		"scores":      o.scores[1:4],
 		"red_total":   redTotal,
 		"blue_total":  blueTotal,
@@ -628,25 +719,44 @@ func (o *Orchestrator) startRoundTimer() {
 	o.timer.Start()
 }
 
+// isFinalRoundLocked true bila ronde yang berjalan adalah ronde terakhir menurut ruleset:
+// 3 babak (default) atau 2 babak (mis. Usia Dini, total_rounds=2). Pemanggil memegang o.mu.
+func (o *Orchestrator) isFinalRoundLocked() bool {
+	cur := o.sm.Current()
+	if cur == statemachine.StateRound3 {
+		return true
+	}
+	return cur == statemachine.StateRound2 && o.ruleset.Scoring.TotalRounds == 2
+}
+
+// roundNumberLocked nomor ronde yang ditampilkan, dibatasi total_rounds ruleset
+// (pertandingan 2 babak yang selesai tidak dilaporkan sebagai ronde 3).
+func (o *Orchestrator) roundNumberLocked() int {
+	n := o.sm.CurrentRoundNumber()
+	if tr := o.ruleset.Scoring.TotalRounds; tr > 0 && n > tr {
+		return tr
+	}
+	return n
+}
+
 func (o *Orchestrator) onRoundExpired() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	cur := o.sm.Current()
-
-	// Ronde 3 selesai → langsung finish, kecuali skor seri: pertandingan menunggu keputusan wasit
-	if cur == statemachine.StateRound3 {
+	// Ronde terakhir selesai → langsung finish, kecuali skor seri: pertandingan menunggu keputusan wasit
+	if o.isFinalRoundLocked() {
+		finalRound := o.roundNumberLocked()
 		if o.tiedLocked() {
 			res, ok := o.resolveTiebreakLocked()
 			if !ok {
-				o.appendEvent("tie_pending", map[string]any{"round": 3}, "")
+				o.appendEvent("tie_pending", map[string]any{"round": finalRound}, "")
 				o.broadcastState()
 				return
 			}
 			o.forceTiebreakLocked(res)
 		}
 		o.sm.Transition(statemachine.EventFinish)
-		o.appendEvent("round_ended", map[string]any{"round": 3}, "")
+		o.appendEvent("round_ended", map[string]any{"round": finalRound}, "")
 		o.finalize()
 		return
 	}
@@ -655,13 +765,14 @@ func (o *Orchestrator) onRoundExpired() {
 	roundNum := o.sm.CurrentRoundNumber()
 	o.sm.Transition(statemachine.EventRoundEnd)
 	o.appendEvent("round_ended", map[string]any{"round": roundNum}, "")
-	o.broadcastState()
 
-	// Setelah break, mulai ronde berikutnya otomatis
+	// Setelah break, mulai ronde berikutnya otomatis. Timer istirahat dibuat SEBELUM siaran agar
+	// state_change break_N membawa hitung mundur istirahat (sisa waktu + tenggat); bila disiarkan lebih
+	// dulu, semua layar menerima timer ronde yang sudah habis (0 dan tidak berjalan) sampai timer_sync berikutnya.
 	breakDur := time.Duration(o.ruleset.Scoring.BreakDuration) * time.Second
 	o.timer = o.newTimer(breakDur, o.onBreakExpired)
 	o.timer.Start()
-	o.persistLocked() // simpan lagi: siaran di atas terjadi sebelum timer istirahat dibuat
+	o.broadcastState()
 }
 
 func (o *Orchestrator) onBreakExpired() {
@@ -674,20 +785,33 @@ func (o *Orchestrator) onBreakExpired() {
 	o.broadcastState()
 }
 
-// Cek KO / point difference di tengah pertandingan
-func (o *Orchestrator) checkMidMatchWin(round int) {
-	sc := o.scores[round]
-	// point difference threshold (hardcode 30, nanti ambil dari ruleset kalau ada)
-	redTotal := sc.RedTechnical - sc.RedPenalties
-	blueTotal := sc.BlueTechnical - sc.BluePenalties
-	diff := redTotal - blueTotal
+// checkPointGapLocked WMP (Wasit Menghentikan Pertandingan): bila selisih total poin kedua sudut (setelah sanksi)
+// mencapai batas ruleset pada babak yang ditentukan, pertandingan dihentikan dan sudut yang unggul menang.
+// Dipanggil setelah poin atau sanksi berubah. Pemanggil memegang o.mu.
+func (o *Orchestrator) checkPointGapLocked() {
+	gap := o.ruleset.Scoring.EffectivePointGap()
+	if gap.Margin <= 0 || !o.sm.IsInRound() || o.sm.CurrentRoundNumber() < gap.FromRound {
+		return
+	}
+	var red, blue int
+	for i := 1; i <= 3; i++ {
+		red += o.scores[i].RedTechnical - o.scores[i].RedPenalties
+		blue += o.scores[i].BlueTechnical - o.scores[i].BluePenalties
+	}
+	diff := red - blue
+	if diff > -gap.Margin && diff < gap.Margin {
+		return
+	}
+	corner := "red"
 	if diff < 0 {
-		diff = -diff
+		corner = "blue"
 	}
-	if diff >= 30 {
-		o.sm.Transition(statemachine.EventFinish)
-		o.finalize()
-	}
+	o.forced = &forcedResult{Corner: corner, ResultType: resultWMP}
+	o.appendEvent("wmp", map[string]any{
+		"winner_corner": corner, "red_total": red, "blue_total": blue, "margin": gap.Margin,
+	}, "")
+	_ = o.sm.Transition(statemachine.EventFinish)
+	o.finalize()
 }
 
 // finalize dipanggil saat match benar-benar selesai
@@ -704,29 +828,7 @@ func (o *Orchestrator) finalize() {
 	if o.forced != nil {
 		winnerCorner, resultType = o.forced.Corner, o.forced.ResultType
 	}
-	winnerID := winnerCorner
-
-	if o.matchStore != nil {
-		_ = o.matchStore.UpdateStatus(o.matchID, string(statemachine.StateFinished))
-		m, err := o.matchStore.GetByID(o.matchID)
-		if err == nil && m != nil {
-			if winnerCorner == "red" && m.AthleteRedID != "" {
-				winnerID = m.AthleteRedID
-			} else if winnerCorner == "blue" && m.AthleteBlueID != "" {
-				winnerID = m.AthleteBlueID
-			}
-			_ = o.matchStore.SetWinner(o.matchID, winnerID)
-
-			// Otomatisasi Bracket Advancement: majukan pemenang ke slot berikutnya
-			if m.BracketSlotID != "" && o.bracketStore != nil {
-				if err := o.bracketStore.AdvanceWinner(m.BracketSlotID, winnerID); err != nil {
-					log.Printf("[orch:%s] failed to advance bracket winner: %v", o.matchID, err)
-				}
-			}
-		} else {
-			_ = o.matchStore.SetWinner(o.matchID, winnerID)
-		}
-	}
+	winnerID, saved := o.saveResultLocked(winnerCorner)
 
 	o.appendEvent("match_finished", map[string]any{
 		"winner":      winnerID,
@@ -739,6 +841,10 @@ func (o *Orchestrator) finalize() {
 		"corner":      winnerCorner,
 		"result_type": resultType,
 	}
+	// Siarkan juga state_change "finished" (timer berhenti) sebelum hasil: layar juri hanya mengikuti
+	// state_change, jadi tanpa ini tablet juri tetap menampilkan "BERJALAN" dan tombol skor tetap aktif
+	// setelah partai ditutup.
+	o.broadcastState()
 	o.h.Broadcast(hub.Message{
 		Type: hub.MsgMatchResult,
 		Payload: map[string]any{
@@ -748,7 +854,44 @@ func (o *Orchestrator) finalize() {
 			"scores":      o.scores[1:4],
 		},
 	})
+	if saved {
+		o.clearRuntimeLocked()
+		return
+	}
+	// Keadaan pemulihan sengaja dipertahankan: baris partai di database tidak berubah (transaksi dibatalkan), jadi
+	// setelah restart partai kembali dijeda dan wasit dapat menutupnya lagi.
+	msg := hub.Message{Type: hub.MsgError, Payload: map[string]string{"code": "RESULT_NOT_SAVED", "message": ErrResultNotSaved.Error()}}
+	o.h.SendToRole(hub.RoleReferee, msg)
+	o.h.SendToRole(hub.RoleAdmin, msg)
+}
+
+// saveResultLocked menulis hasil akhir ke database (satu transaksi) dan mengembalikan id pemenang. Gagal berarti tidak
+// ada yang berubah: unsavedCorner terisi dan wasit bisa mengulang lewat doFinish. Pemanggil memegang o.mu.
+func (o *Orchestrator) saveResultLocked(corner string) (winnerID string, saved bool) {
+	if o.matchStore == nil {
+		return corner, true
+	}
+	id, err := o.matchStore.FinishMatch(o.matchID, corner)
+	if err != nil {
+		log.Printf("[orch:%s] hasil akhir gagal disimpan: %v", o.matchID, err)
+		o.unsavedCorner = corner
+		return corner, false
+	}
+	o.unsavedCorner = ""
+	return id, true
+}
+
+// retrySaveLocked mengulang penulisan hasil akhir yang gagal tadi. Pemanggil memegang o.mu.
+func (o *Orchestrator) retrySaveLocked() error {
+	winnerID, saved := o.saveResultLocked(o.unsavedCorner)
+	if !saved {
+		return ErrResultNotSaved
+	}
+	if o.result != nil {
+		o.result["winner"] = winnerID
+	}
 	o.clearRuntimeLocked()
+	return nil
 }
 
 // Hitung total skor semua ronde, tentukan pemenang
@@ -795,7 +938,7 @@ func (o *Orchestrator) broadcastScoreUpdate(round int) {
 }
 
 func (o *Orchestrator) sendError(client *hub.Client, code, message string) {
-	o.h.SendToClient(client.ID, hub.Message{
+	o.h.SendToConn(client, hub.Message{
 		Type: hub.MsgError,
 		Payload: map[string]string{
 			"code":    code,

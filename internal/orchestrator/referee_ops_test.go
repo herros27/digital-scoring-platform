@@ -29,7 +29,7 @@ func newRig(t *testing.T) *testRig {
 func newRigWith(t *testing.T, rs *rules.Ruleset) *testRig {
 	t.Helper()
 	h := hub.NewHub("arena-1")
-	o := New("match-1", "arena-1", statemachine.New("match-1"), rs, h, nil, nil, nil, nil)
+	o := New("match-1", "arena-1", statemachine.New("match-1"), rs, h, nil, nil, nil)
 
 	r := &testRig{o: o, h: h}
 	r.referee, r.refCh = hub.NewClient("ref-1", hub.RoleReferee, "arena-1")

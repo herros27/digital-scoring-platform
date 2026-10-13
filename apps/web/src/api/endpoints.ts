@@ -3,14 +3,22 @@
  * 100% Complete Mapping matching OpenAPI 3.0 Documentation (docs/openapi.yaml)
  */
 export const ENDPOINTS = {
+  // Bagan publik (penonton, tanpa login) — hanya kejuaraan aktif, hanya nama & kontingen atlet
+  PUBLIC: {
+    COMPETITIONS: '/api/v1/public/competitions',
+    BRACKETS: (compId: string) => `/api/v1/public/competitions/${compId}/brackets`,
+    BRACKET: (compId: string, categoryId: string) =>
+      `/api/v1/public/competitions/${compId}/brackets/${categoryId}`,
+  },
+
   // Authentication
   AUTH: {
     OFFICIAL_LOGIN: '/api/v1/auth/login',
     JUDGE_LOGIN: '/api/v1/auth/judge-login',
-    PIN_LOGIN: '/api/v1/auth/pin',
     CONTINGENT_REGISTER: '/api/v1/auth/contingent/register',
     CONTINGENT_LOGIN: '/api/v1/auth/contingent/login',
     LOGOUT: '/api/v1/auth/logout',
+    CHANGE_PASSWORD: '/api/v1/auth/change-password',
     CREATE_PIN: '/api/v1/auth/create-pin',
     PINS: '/api/v1/auth/pins',
   },
@@ -18,6 +26,7 @@ export const ENDPOINTS = {
   // Competitions
   COMPETITIONS: {
     LIST: '/api/v1/competitions',
+    STATS: '/api/v1/competitions/stats',
     CREATE: '/api/v1/competitions',
     DETAIL: (id: string) => `/api/v1/competitions/${id}`,
     UPDATE: (id: string) => `/api/v1/competitions/${id}`,
@@ -31,10 +40,19 @@ export const ENDPOINTS = {
     BRACKETS: (compId: string) => `/api/v1/competitions/${compId}/brackets`,
   },
 
+  // Teknik skor menurut ruleset kejuaraan (layar juri sebelum ada partai dimuat)
+  TECHNIQUES: (compId: string) => `/api/v1/competitions/${compId}/techniques`,
+
   // Categories
   CATEGORIES: {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/categories`,
     CREATE: (compId: string) => `/api/v1/competitions/${compId}/categories`,
+    RESET: (compId: string) => `/api/v1/competitions/${compId}/categories`,
+    HOME_ARENA: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/categories/${id}/home-arena`,
+    BRACKET_LOCK: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/categories/${id}/bracket-lock`,
+    ASSIGN_RULESETS: (compId: string) => `/api/v1/competitions/${compId}/categories/ruleset`,
     DETAIL: (compId: string, id: string) => `/api/v1/competitions/${compId}/categories/${id}`,
   },
 
@@ -46,14 +64,19 @@ export const ENDPOINTS = {
     BY_COMPETITION: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     REGISTER_TO_COMP: (compId: string) => `/api/v1/competitions/${compId}/athletes`,
     PARTICIPANTS: (compId: string) => `/api/v1/competitions/${compId}/participants`,
+    PARTICIPANT: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}`,
     VERIFY_PARTICIPANT: (compId: string, id: string) =>
       `/api/v1/competitions/${compId}/participants/${id}/verify`,
+    PARTICIPANT_CATEGORY: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/participants/${id}/category`,
   },
 
   // Contingents
   CONTINGENTS: {
     LIST: '/api/v1/contingents',
     DETAIL: (id: string) => `/api/v1/contingents/${id}`,
+    PASSWORD: (id: string) => `/api/v1/contingents/${id}/password`,
   },
 
   // Arenas
@@ -61,6 +84,8 @@ export const ENDPOINTS = {
     LIST: (compId: string) => `/api/v1/competitions/${compId}/arenas`,
     CREATE: (compId: string) => `/api/v1/competitions/${compId}/arenas`,
     DETAIL: (compId: string, id: string) => `/api/v1/competitions/${compId}/arenas/${id}`,
+    PRESENCE: (compId: string, id: string) =>
+      `/api/v1/competitions/${compId}/arenas/${id}/presence`,
     UPDATE: (compId: string, id: string) => `/api/v1/competitions/${compId}/arenas/${id}`,
     DELETE: (compId: string, id: string) => `/api/v1/competitions/${compId}/arenas/${id}`,
   },
@@ -90,6 +115,8 @@ export const ENDPOINTS = {
   BRACKETS: {
     TREE: (compId: string) => `/api/v1/competitions/${compId}/brackets`,
     GENERATE: (compId: string) => `/api/v1/competitions/${compId}/brackets/generate`,
+    RESET: (compId: string, categoryId: string) =>
+      `/api/v1/competitions/${compId}/categories/${categoryId}/bracket`,
   },
 
   // Participants
@@ -115,6 +142,7 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/api/v1/officials/${id}`,
     UPDATE: (id: string) => `/api/v1/officials/${id}`,
     DELETE: (id: string) => `/api/v1/officials/${id}`,
+    PASSWORD: (id: string) => `/api/v1/officials/${id}/password`,
   },
 
   // Reports

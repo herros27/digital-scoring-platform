@@ -115,7 +115,7 @@ function enter() {
         :disabled="!(compId || pickComp) || !(arenaId || pickArena)"
         @click="enter"
       >
-        Masuk Konsol Wasit
+        Masuk Konsol Meja
       </button>
     </div>
   </div>

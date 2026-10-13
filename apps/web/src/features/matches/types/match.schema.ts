@@ -1,14 +1,3 @@
-import { z } from 'zod'
-
-export const createMatchSchema = z.object({
-  arena_id: z.string().min(1, 'Pilih gelanggang pertandingan'),
-  athlete_red_id: z.string().min(1, 'Pilih atlet sudut merah'),
-  athlete_blue_id: z.string().min(1, 'Pilih atlet sudut biru'),
-  current_round: z.number().int().min(1).max(5).default(1),
-})
-
-export type CreateMatchFormValues = z.infer<typeof createMatchSchema>
-
 export type MatchStatus =
   'idle' | 'ready' | 'running' | 'paused' | 'break' | 'finished' | 'cancelled'
 

@@ -1,3 +1,4 @@
+import { getDeviceId } from '@/lib/deviceId'
 import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
 import type {
@@ -28,7 +29,9 @@ export const authService = {
    * Judge PIN Login
    */
   async judgeLogin(payload: JudgeLoginFormValues): Promise<JudgeLoginResponse> {
-    const res = await http.post<JudgeLoginResponse>(ENDPOINTS.AUTH.JUDGE_LOGIN, payload)
+    const res = await http.post<JudgeLoginResponse>(ENDPOINTS.AUTH.JUDGE_LOGIN, payload, {
+      headers: { 'X-Device-Id': getDeviceId() },
+    })
     return res.data
   },
 

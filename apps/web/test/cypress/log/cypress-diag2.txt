@@ -1,0 +1,163 @@
+﻿
+Warning: The allowCypressEnv configuration option is enabled. This allows any browser code to read values from Cypress.env(). This is insecure and will be removed in a future major version.
+
+1. Replace Cypress.env() calls with cy.env() (for sensitive values) or Cypress.expose() (for public configuration)
+2. Set allowCypressEnv: false in your Cypress configuration to disable Cypress.env()
+
+Learn more: https://on.cypress.io/cypress-env-migration
+
+
+====================================================================================================
+
+  (Run Starting)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Cypress:        15.21.1                                                                        Γöé
+  Γöé Browser:        Chrome 154 (headless)                                                          Γöé
+  Γöé Node Version:   v22.17.0 (C:\Users\kemzz\AppData\Local\fnm_multishells\29612_1791486338374\nod Γöé
+  Γöé                 e.exe)                                                                         Γöé
+  Γöé Specs:          1 found (a.cy.js)                                                              Γöé
+  Γöé Searched:       cypress/e2e/**/*.cy.js                                                         Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  a.cy.js                                                                         (1 of 1)
+
+
+  ΓêÜ ok (42ms)
+
+  1 passing (81ms)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        1                                                                                Γöé
+  Γöé Passing:      1                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     0 seconds                                                                        Γöé
+  Γöé Spec Ran:     a.cy.js                                                                          Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+====================================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé ΓêÜ  a.cy.js                                   83ms        1        1        -        -        - Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+    ΓêÜ  All specs passed!                         83ms        1        1        -        -        -  
+
+
+exit=0
+
+=== electron+logging ===
+
+node.exe : 
+At C:\Users\kemzz\AppData\Local\fnm_multishells\29612_1791486338374\npx.ps1:16 char:5
++     & "$basedir/node$exe"  "$basedir/node_modules/npm/bin/npx-cli.js" ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+DevTools listening on ws://127.0.0.1:52188/devtools/browser/6fc1bfd0-0bde-4942-8a47-a0ef5d45e7b3
+[27940:1009/020807.462:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020807.462:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 1 time(s)
+[27940:1009/020807.614:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020807.614:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 2 time(s)
+[27940:1009/020807.781:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020807.781:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 3 time(s)
+[27940:1009/020807.946:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020807.946:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 4 time(s)
+[27940:1009/020808.138:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020808.138:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 5 time(s)
+[27940:1009/020808.320:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020808.320:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 6 time(s)
+[27940:1009/020808.478:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020808.478:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 7 time(s)
+[27940:1009/020808.639:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020808.639:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 8 time(s)
+[27940:1009/020808.790:ERROR:content\browser\gpu\gpu_process_host.cc:957] GPU process exited 
+unexpectedly: exit_code=-2147483645
+[27940:1009/020808.790:WARNING:content\browser\gpu\gpu_process_host.cc:1398] The GPU process has 
+crashed 9 time(s)
+[27940:1009/020808.790:FATAL:content\browser\gpu\gpu_data_manager_impl_private.cc:415] GPU 
+process isn't usable. Goodbye.
+Received fatal exception EXCEPTION_BREAKPOINT
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6450ad48b+19366347]
+	uv_os_getpid [0x0x7ff64007c7ce+481918]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6450ad499+19366361]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6442e9a6e+4933550]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6442e8559+4928153]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6442e9a7d+4933565]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6442e816b+4927147]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6442eb80f+4941135]
+	v8::internal::compiler::CompilationDependencies::PrepareInstallPredictable 
+[0x0x7ff6442ebc70+4942256]
+	v8::internal::compiler::CompilationDependencies::DependOnInitialMapInstanceSizePrediction 
+[0x0x7ff63f4ea030+1934544]
+	IsSandboxedProcess [0x0x7ff6403ef30d+2595725]
+	IsSandboxedProcess [0x0x7ff64018beaf+91951]
+	IsSandboxedProcess [0x0x7ff6403ea3fb+2575483]
+	IsSandboxedProcess [0x0x7ff6403ec17a+2583034]
+	IsSandboxedProcess [0x0x7ff6401928f4+119156]
+	v8::ArrayBuffer::Allocator::MaxAllocationSize [0x0x7ff641b36ac5+5397]
+	Cr_z_crc32 [0x0x7ff6427161fc+288668]
+	v8::internal::compiler::CompilationDependencies::FieldTypeDependencyOffTheRecord 
+[0x0x7ff64268f9ed+4683565]
+	v8::internal::compiler::CompilationDependencies::FieldTypeDependencyOffTheRecord 
+[0x0x7ff64268a59d+4661981]
+	v8::internal::compiler::CompilationDependencies::FieldTypeDependencyOffTheRecord 
+[0x0x7ff642663c2d+4503917]
+	uv_os_getpid [0x0x7ff64000b10d+17341]
+	uv_os_getpid [0x0x7ff640044f8e+254526]
+	uv_os_getpid [0x0x7ff64005c1df+349327]
+	v8::internal::compiler::CompilationDependencies::DependOnInitialMapInstanceSizePrediction 
+[0x0x7ff63f5069b2+2051666]
+	v8::internal::compiler::CompilationDependencies::DependOnInitialMapInstanceSizePrediction 
+[0x0x7ff63f508531+2058705]
+	v8::internal::compiler::CompilationDependencies::DependOnInitialMapInstanceSizePrediction 
+[0x0x7ff63f503d5f+2040319]
+	v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase [0x0x7ff63e7ed4fb+439739]
+	v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase [0x0x7ff63e7ee6bf+444287]
+	v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase [0x0x7ff63e7ee4db+443803]
+	v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase [0x0x7ff63e7eccf1+437681]
+	v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase [0x0x7ff63e7ece9d+438109]
+	node::FreePlatform [0x0x7ff63e187e38+24008]
+	Cr_z_crc32 [0x0x7ff642ca1262+6100994]
+	BaseThreadInitThunk [0x0x7ffee81bcdf7+23]
+	RtlUserThreadStart [0x0x7ffee91fee4c+44]
+
+exit=-2147483645

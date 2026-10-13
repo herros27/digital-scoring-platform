@@ -3,6 +3,9 @@ package hub
 import (
 	"encoding/json"
 	"log"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -28,19 +31,52 @@ func NewClient(id string, role Role, arenaID string) (*Client, <-chan Message) {
 	}, ch
 }
 
+// Keepalive WebSocket: server mengirim ping tiap pingPeriod dan memutus koneksi yang tidak membalas pong dalam
+// pongWait. Tanpa ini tablet yang kehilangan jaringan tanpa menutup soket tetap tercatat "online" di panel wasit
+// dan menghalangi sambung ulang kursi yang sama. Dapat diubah lewat WS_PONG_WAIT_MS (ping = 9/10 dari itu).
+var (
+	pongWait   = envDuration("WS_PONG_WAIT_MS", 60*time.Second)
+	pingPeriod = pongWait * 9 / 10
+	writeWait  = 10 * time.Second
+)
+
+// maxMessageSize batas satu pesan masuk; pesan juri/wasit hanya JSON kecil.
+const maxMessageSize = 64 << 10
+
+func envDuration(key string, def time.Duration) time.Duration {
+	if v, err := strconv.Atoi(os.Getenv(key)); err == nil && v > 0 {
+		return time.Duration(v) * time.Millisecond
+	}
+	return def
+}
+
 func (c *Client) writePump() {
+	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+		ticker.Stop()
 		c.conn.Close()
 	}()
 
-	for msg := range c.send {
-		data, err := json.Marshal(msg)
-		if err != nil {
-			log.Printf("marshal error: %v", err)
-			continue
-		}
-		if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
-			return
+	for {
+		select {
+		case msg, ok := <-c.send:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("marshal error: %v", err)
+				continue
+			}
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				return
+			}
+		case <-ticker.C:
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
 		}
 	}
 }
@@ -50,6 +86,13 @@ func (c *Client) readPump() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
+
+	// Penonton publik tanpa token boleh terhubung; tanpa batas, satu pesan raksasa dibaca penuh ke memori.
+	c.conn.SetReadLimit(maxMessageSize)
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
 
 	for {
 		_, data, err := c.conn.ReadMessage()

@@ -18,7 +18,12 @@ import (
 )
 
 // NewRouter merakit seluruh rute. metricsToken (METRICS_TOKEN) kosong = /metrics hanya dari loopback.
-func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Handler {
+func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string, optionalInviteCode ...string) http.Handler {
+	var inviteCode string
+	if len(optionalInviteCode) > 0 {
+		inviteCode = optionalInviteCode[0]
+	}
+
 	// in-memory cache (Otter S3-FIFO)
 	appCache := cache.MustNew(10_000)
 
@@ -38,13 +43,18 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// services
 	compService := service.NewCompetitionService(compRepo)
 	arenaService := service.NewArenaService(arenaRepo, compRepo)
-	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo, bracketRepo)
-	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo)
-	categoryService := service.NewCategoryService(categoryRepo)
-	athleteService := service.NewAthleteService(athleteRepo)
+	matchService := service.NewMatchService(matchRepo, compRepo, hubManager, &store.MatchEventStore{DB: db}, scoreRepo, matchRepo)
+	bracketService := service.NewBracketService(bracketRepo).WithMatchStore(matchRepo).WithArenaStore(arenaRepo).WithCategoryArenas(categoryRepo)
+	categoryService := service.NewCategoryService(categoryRepo).WithRulesetLookup(func(id string) bool {
+		rs, err := rulesetRepo.GetByID(id)
+		return err == nil && rs != nil
+	})
+	athleteService := service.NewAthleteService(athleteRepo).WithCategoryRepo(categoryRepo)
 	rulesetService := service.NewRulesetService(rulesetRepo)
 	matchService.SetRulesetResolver(rulesetService)
+	matchService.SetCategoryRulesetLookup(categoryRepo)
 	matchService.SetArenaStore(arenaRepo)
+	matchService.SetParticipantLookup(athleteRepo.GetParticipantByID)
 	matchService.SetRuntimeStore(&store.MatchRuntimeStore{DB: db})
 	if n, err := matchService.RestoreActiveMatches(); err != nil {
 		log.Printf("[match] pemulihan partai gagal: %v", err)
@@ -58,20 +68,28 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// handlers
 	authH := &handler.AuthHandler{
 		Pins: pinRepo,
-		// PIN salah 5x beruntun dalam 15 menit -> IP dikunci 15 menit (PIN 6-8 digit, login tanpa ID).
-		Lockout:   auth.NewAttemptLimiter(5, 15*time.Minute, 15*time.Minute),
-		ClientKey: ClientIP,
+		// Tebak-PIN dilindungi tiga lapis (perangkat 5x, IP 25x, global 200x per 15 menit): satu tablet yang salah PIN
+		// tidak mengunci tablet lain di IP yang sama (Docker Desktop/proxy), tetapi penebakan tetap terbatas.
+		Guard:    auth.NewPinGuard(auth.DefaultPinGuardConfig()),
+		ClientIP: ClientIP,
 	}
-	compH := &handler.CompetitionHandler{Service: compService}
-	arenaH := &handler.ArenaHandler{Service: arenaService}
+	compH := &handler.CompetitionHandler{Service: compService, Cache: appCache}
+	arenaH := &handler.ArenaHandler{Service: arenaService, Hubs: hubManager}
 	matchH := &handler.MatchHandler{Service: matchService, HubManager: hubManager, Cache: appCache}
+	publicBracketH := &handler.PublicBracketHandler{
+		Competitions: compService,
+		Categories:   categoryService,
+		Brackets:     bracketService,
+		Participants: athleteService,
+	}
 	liveH := &handler.LiveHandler{ScoreStore: scoreRepo, MatchStore: matchRepo, Matches: matchService}
-	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, Cache: appCache}
+	bracketH := &handler.BracketHandler{Service: bracketService, AthleteService: athleteService, CategoryService: categoryService, Cache: appCache}
 	categoryH := &handler.CategoryHandler{Service: categoryService}
-	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache}
-	rulesetH := &handler.RulesetHandler{Service: rulesetService}
+	athleteH := &handler.AthleteHandler{Service: athleteService, Cache: appCache, Competition: compService}
+	athleteH.OnVerified = bracketH.AutoJoin
+	rulesetH := &handler.RulesetHandler{Service: rulesetService, Competitions: compService}
 	officialH := &handler.OfficialHandler{Service: officialService}
-	contingentH := &handler.ContingentHandler{Service: contingentService}
+	contingentH := &handler.ContingentHandler{Service: contingentService, InviteCode: inviteCode}
 	reportH := &handler.ReportHandler{Service: reportService}
 
 	mux := http.NewServeMux()
@@ -89,12 +107,15 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// Rate limiters:
 	// Auth endpoints: 10 req/min, burst 10 per IP (brute force mitigation for PIN & password)
 	authLimiter := RateLimit(rate.Every(6*time.Second), 10)
+	// Login PIN: batas laju hanya untuk banjir permintaan (1/dtk, burst 60 per IP); perlindungan tebak-PIN yang
+	// sebenarnya ada di AuthHandler.Guard dan hanya menghitung PIN SALAH. Batas 10/menit sebelumnya menghitung login
+	// berhasil juga, sehingga banyak tablet di satu IP saling memblokir saat mulai bersamaan.
+	pinLimiter := RateLimit(rate.Every(time.Second), 60)
 	// Global: 60 req/sec, burst 100 per IP (DoS/flood protection)
 	globalLimiter := RateLimit(rate.Limit(60), 100)
 
 	// === Public endpoints (no auth) ===
-	mux.Handle("POST /api/v1/auth/judge-login", authLimiter(http.HandlerFunc(authH.JudgeLogin)))
-	mux.Handle("POST /api/v1/auth/pin", authLimiter(http.HandlerFunc(authH.JudgeLogin)))
+	mux.Handle("POST /api/v1/auth/judge-login", pinLimiter(http.HandlerFunc(authH.JudgeLogin)))
 	mux.Handle("POST /api/v1/auth/login", authLimiter(http.HandlerFunc(officialH.Login)))
 	mux.Handle("POST /api/v1/auth/contingent/register", authLimiter(http.HandlerFunc(contingentH.Register)))
 	mux.Handle("POST /api/v1/auth/contingent/login", authLimiter(http.HandlerFunc(contingentH.Login)))
@@ -103,6 +124,13 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	mux.HandleFunc("GET /api/v1/live/schedule", liveH.Schedule)
 	mux.HandleFunc("GET /api/v1/live/scoreboard/{arena_id}", liveH.Scoreboard)
 
+	// === Bagan publik (penonton, tanpa login) ===
+	// Hanya kejuaraan berstatus active, hanya nama+kontingen atlet. Respons identik untuk semua pemanggil,
+	// jadi aman di-cache; kunci memuat comp_id sehingga ikut dibersihkan InvalidateCompetition.
+	mux.HandleFunc("GET /api/v1/public/competitions", appCache.Handler(10*time.Second, publicBracketH.ListCompetitions))
+	mux.HandleFunc("GET /api/v1/public/competitions/{comp_id}/brackets", appCache.Handler(10*time.Second, publicBracketH.ListBrackets))
+	mux.HandleFunc("GET /api/v1/public/competitions/{comp_id}/brackets/{category_id}", appCache.Handler(10*time.Second, publicBracketH.GetBracket))
+
 	// === Public cached tournament views (Otter in-memory cache) ===
 	// ponytail: 10s TTL absorbs high-concurrency bursts from spectators & contingents during tournaments.
 	// Auto-invalidated on match finish & bracket generate, fallback to 10s TTL.
@@ -110,16 +138,16 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/medals", appCache.Handler(10*time.Second, reportH.Medals))
 	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/report/export", appCache.Handler(10*time.Second, reportH.Export))
 	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/brackets", appCache.Handler(10*time.Second, bracketH.GetTree))
-	mux.HandleFunc("GET /api/v1/competitions/{comp_id}/athletes", appCache.Handler(15*time.Second, athleteH.ListByCompetition))
-	mux.HandleFunc("GET /api/v1/athletes", appCache.Handler(15*time.Second, athleteH.List))
 
 	// === Protected endpoints (JWT required) ===
 	protected := http.NewServeMux()
 
 	// RBAC roles
 	adminOrDewan := RequireRole("admin", "dewan")
+	changePasswordRoles := RequireRole("admin", "dewan", "wasit", "operator", "juri", "contingent")
 	matchOperators := RequireRole("admin", "dewan", "wasit")
 	canRegisterAthlete := RequireRole("admin", "dewan", "contingent")
+	athleteViewers := RequireRole("admin", "dewan", "operator", "contingent")
 
 	// Auth & PIN (Admin only)
 	protected.Handle("GET /api/v1/auth/pins", adminOrDewan(http.HandlerFunc(authH.ListPINs)))
@@ -127,11 +155,11 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 
 	// Competitions
 	protected.HandleFunc("GET /api/v1/competitions", compH.List)
+	protected.HandleFunc("GET /api/v1/competitions/stats", compH.Stats)
 	protected.Handle("POST /api/v1/competitions", adminOrDewan(http.HandlerFunc(compH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{id}", compH.Get)
 	protected.Handle("PUT /api/v1/competitions/{id}", adminOrDewan(http.HandlerFunc(compH.Update)))
 	protected.Handle("PUT /api/v1/competitions/{id}/activate", adminOrDewan(http.HandlerFunc(compH.Activate)))
-	protected.Handle("POST /api/v1/competitions/{id}/activate", adminOrDewan(http.HandlerFunc(compH.Activate)))
 	protected.Handle("POST /api/v1/competitions/{id}/pause", adminOrDewan(http.HandlerFunc(compH.Pause)))
 	protected.Handle("POST /api/v1/competitions/{id}/finish", adminOrDewan(http.HandlerFunc(compH.Finish)))
 	protected.Handle("POST /api/v1/competitions/{id}/cancel", adminOrDewan(http.HandlerFunc(compH.Cancel)))
@@ -140,18 +168,33 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories", categoryH.List)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/categories/{id}", categoryH.Get)
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories", adminOrDewan(http.HandlerFunc(categoryH.Reset)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Update)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories/{id}", adminOrDewan(http.HandlerFunc(categoryH.Delete)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/home-arena", adminOrDewan(http.HandlerFunc(categoryH.SetHomeArena)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock", adminOrDewan(http.HandlerFunc(categoryH.SetBracketLock)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/categories/{id}/bracket", adminOrDewan(http.HandlerFunc(bracketH.Reset)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/categories/ruleset", adminOrDewan(http.HandlerFunc(categoryH.AssignRulesets)))
 
 	// Athletes & Participants
+	// Data atlet memuat tanggal lahir & NIK, jadi TIDAK publik dan TIDAK lewat cache bersama (kunci cache hanya
+	// method+URL, sedangkan hasilnya berbeda per peran: kontingen hanya melihat atletnya sendiri).
+	protected.Handle("GET /api/v1/athletes", adminOrDewan(http.HandlerFunc(athleteH.List)))
+	protected.Handle("GET /api/v1/competitions/{comp_id}/athletes", athleteViewers(http.HandlerFunc(athleteH.ListByCompetition)))
 	protected.Handle("POST /api/v1/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.Create)))
 	protected.HandleFunc("GET /api/v1/athletes/{id}", athleteH.Get)
+	protected.Handle("PUT /api/v1/athletes/{id}", canRegisterAthlete(http.HandlerFunc(athleteH.UpdateProfile)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/athletes", canRegisterAthlete(http.HandlerFunc(athleteH.RegisterToCompetition)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/participants", athleteH.ListParticipants)
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/verify", adminOrDewan(http.HandlerFunc(athleteH.VerifyParticipant)))
+	protected.Handle("PUT /api/v1/competitions/{comp_id}/participants/{id}/category", canRegisterAthlete(http.HandlerFunc(athleteH.ChangeParticipantCategory)))
+	protected.Handle("DELETE /api/v1/competitions/{comp_id}/participants/{id}", canRegisterAthlete(http.HandlerFunc(athleteH.UnregisterParticipant)))
 
 	// Arenas
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas", arenaH.List)
 	protected.Handle("POST /api/v1/competitions/{comp_id}/arenas", adminOrDewan(http.HandlerFunc(arenaH.Create)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/arenas/{id}", arenaH.Get)
+	protected.Handle("GET /api/v1/competitions/{comp_id}/arenas/{id}/presence", adminOrDewan(http.HandlerFunc(arenaH.Presence)))
 	protected.Handle("PUT /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Update)))
 	protected.Handle("DELETE /api/v1/competitions/{comp_id}/arenas/{id}", adminOrDewan(http.HandlerFunc(arenaH.Delete)))
 
@@ -168,10 +211,12 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/cancel", matchOperators(http.HandlerFunc(matchH.Cancel)))
 	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/reschedule", matchOperators(http.HandlerFunc(matchH.Reschedule)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.GetScores)
-	protected.HandleFunc("POST /api/v1/competitions/{comp_id}/matches/{id}/scores", matchH.SubmitScore)
+	// Skor REST hanya untuk juri (PIN); identitas diambil dari token (lihat MatchHandler.SubmitScore).
+	protected.Handle("POST /api/v1/competitions/{comp_id}/matches/{id}/scores", RequireRole("judge")(http.HandlerFunc(matchH.SubmitScore)))
 	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/matches/{id}/events", matchH.GetEvents)
 
 	// Rulesets
+	protected.HandleFunc("GET /api/v1/competitions/{comp_id}/techniques", rulesetH.CompetitionTechniques)
 	protected.HandleFunc("GET /api/v1/rulesets", rulesetH.List)
 	protected.Handle("POST /api/v1/rulesets", adminOrDewan(http.HandlerFunc(rulesetH.Create)))
 	protected.HandleFunc("GET /api/v1/rulesets/{id}", rulesetH.Get)
@@ -187,6 +232,16 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	protected.Handle("GET /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Get)))
 	protected.Handle("PUT /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Update)))
 	protected.Handle("DELETE /api/v1/officials/{id}", adminOrDewan(http.HandlerFunc(officialH.Delete)))
+	protected.Handle("PUT /api/v1/officials/{id}/password", adminOrDewan(http.HandlerFunc(officialH.ResetPassword)))
+	protected.Handle("PUT /api/v1/contingents/{id}/password", adminOrDewan(http.HandlerFunc(contingentH.ResetPassword)))
+	// Ganti password sendiri: petugas dan manajer kontingen memakai satu endpoint; peran token menentukan akun mana.
+	protected.Handle("POST /api/v1/auth/change-password", changePasswordRoles(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if c := ClaimsFrom(r); c != nil && c.Role == "contingent" {
+			contingentH.ChangePassword(w, r)
+			return
+		}
+		officialH.ChangePassword(w, r)
+	})))
 
 	// Contingents Management
 	protected.Handle("GET /api/v1/contingents", adminOrDewan(http.HandlerFunc(contingentH.List)))
@@ -198,6 +253,6 @@ func NewRouter(db *sql.DB, hubManager *hub.Manager, metricsToken string) http.Ha
 	// === WebSocket (auth via query param) ===
 	mux.HandleFunc("GET /ws/arena/{arena_id}", matchH.HandleWS)
 
-	// Apply CORS, Metrics & Global Rate Limiting ke semua
-	return Chain(mux, CORSMiddleware, MetricsMiddleware, globalLimiter)
+	// Apply Metrics & Global Rate Limiting ke semua
+	return Chain(mux, MetricsMiddleware, globalLimiter)
 }

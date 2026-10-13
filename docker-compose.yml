@@ -5,8 +5,15 @@ services:
       dockerfile: Dockerfile
     container_name: scoring-backend
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
-      - "${APP_PORT:-8080}:8080"
+      # Loopback saja: klien harus lewat nginx, yang menimpa X-Forwarded-For. Port terbuka ke LAN membuat IP palsu
+      # melewati pembatas login/PIN.
+      - "127.0.0.1:${PORT:-8080}:8080"
     # Berkas .env.prod WAJIB ada (cp .env.example .env.prod, lalu isi JWT_SECRET dll.): compose berhenti bila
     # tidak ditemukan. Seluruh isinya menjadi environment backend (JWT_SECRET, AUTO_MIGRATE, SEED_DATA, ...).
     # Jalankan selalu dengan:  docker compose --env-file .env.prod up -d --build
@@ -18,7 +25,9 @@ services:
       - PORT=8080 # nginx dan pemetaan port menuju 8080 di dalam container
       - ENV=production # jalur Docker = produksi; development memakai `go run` dengan .env
       # .env berisi DB_URL untuk `go run` di host (localhost); di dalam container database bernama `postgres`
-      - DB_URL=postgres://${POSTGRES_USER:-scoring_user}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
+      # Password database wajib (POSTGRES_PASSWORD di .env.prod). Pakai hex/base64url (openssl rand -hex 24): karakter
+      # seperti @ : / # di password merusak URL ini.
+      - DB_URL=postgres://${POSTGRES_USER:-scoring_user}:${POSTGRES_PASSWORD:?set_in_env_file}@postgres:5432/${POSTGRES_DB:-digital_scoring}?sslmode=disable
       # JWT_SECRET sengaja tidak ditulis di sini: nilainya datang dari .env.prod (env_file). Backend menolak
       # start bila kosong, masih nilai contoh, atau < 32 karakter (ENV=production).
     depends_on:
@@ -32,22 +41,68 @@ services:
       dockerfile: Dockerfile
     container_name: scoring-web
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "${WEB_PORT:-80}:80"
     depends_on:
       - app
 
+  # HTTPS Lokal via Caddy (opsional untuk tablet PWA di venue).
+  # Opsional: docker compose --env-file .env.prod --profile https up -d
+  # Petunjuk lengkap: docs/PWA.md. Port 80 dipakai Caddy, jadi pindahkan `web` ke loopback: WEB_PORT=127.0.0.1:8081
+  caddy:
+    profiles: ["https"]
+    build: ./deploy/caddy # caddy:2-alpine + modul DNS Cloudflare (sertifikat lewat tantangan DNS)
+    container_name: scoring-https
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Resolver eksplisit untuk Let's Encrypt dan API Cloudflare: host dengan systemd-resolved/Tailscale MagicDNS
+    # bisa mewariskan 127.0.0.53 yang tidak terjangkau dari container. Nama layanan (web) tetap lewat DNS Docker.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost} # isi domain/IP di .env.prod; "localhost" hanya agar compose tetap valid
+      TLS_DIRECTIVE: ${TLS_DIRECTIVE:-}
+      ACME_DNS: ${ACME_DNS:-} # mis. "acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}"; kosong = tantangan HTTP biasa
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # sertifikat dan root CA internal: simpan agar tidak diterbitkan ulang
+      - caddy_config:/config
+    depends_on:
+      - web
+
   postgres:
     image: postgres:16-alpine
     container_name: scoring-postgres
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-digital_scoring}
       POSTGRES_USER: ${POSTGRES_USER:-scoring_user}
-      POSTGRES_PASSWORD: ""
-      POSTGRES_HOST_AUTH_METHOD: trust
+      # Password hanya dibaca saat volume postgres_data pertama dibuat. Volume lama yang dibuat dengan `trust` tidak
+      # berubah: hapus dulu (`docker compose --env-file .env.prod down -v`, SEMUA DATA HILANG) atau migrasi manual.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set_in_env_file (openssl rand -hex 24)}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback saja: database tidak perlu terjangkau dari jaringan; backend memakai jaringan Docker.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -59,3 +114,5 @@ services:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

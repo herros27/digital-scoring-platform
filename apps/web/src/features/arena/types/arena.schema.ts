@@ -76,3 +76,13 @@ export interface LiveScoreboardSnapshot {
   red_athlete?: string
   blue_athlete?: string
 }
+
+/** Kehadiran perangkat yang benar-benar terhubung (WebSocket) di satu gelanggang. */
+export interface ArenaPresence {
+  arena_id: string
+  /** Nomor kursi juri yang online, terurut */
+  judge_seats: number[]
+  referees: number
+  scoreboards: number
+  admins: number
+}

@@ -1,5 +1,5 @@
 /**
- * Normalized API Error interface according to FRONTEND_SPECIFICATION.md
+ * Normalized API Error interface
  */
 export interface NormalizedApiError {
   statusCode: number

@@ -53,6 +53,16 @@ export const competitionFilterSchema = z.object({
   limit: z.number().int().positive().max(100).default(20),
 })
 
+export const competitionStatsSchema = z.object({
+  total: z.number(),
+  draft: z.number(),
+  active: z.number(),
+  paused: z.number(),
+  completed: z.number(),
+  cancelled: z.number(),
+})
+export type CompetitionStats = z.infer<typeof competitionStatsSchema>
+
 export type CompetitionStatus = z.infer<typeof competitionStatusSchema>
 export type Competition = z.infer<typeof competitionSchema>
 export type CreateCompetitionFormValues = z.infer<typeof createCompetitionSchema>

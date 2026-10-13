@@ -1,0 +1,1735 @@
+
+> web@0.0.0 cypress:run
+> cross-env ELECTRON_EXTRA_LAUNCH_ARGS="--no-sandbox --disable-gpu --disable-software-rasterizer" cypress run
+
+
+Warning: We failed to trash the existing run results.
+
+This error will not affect or change the exit code.
+
+Error: Command failed: C:\Users\kemzz\AppData\Local\Cypress\Cache\16.1.1\Cypress\resources\app\node_modules\trash\lib\windows-trash.exe D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\10-umur-dan-bobot-data-lama.cy.ts
+
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at ChildProcess.exithandler (node:child_process:417:12)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1124:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+
+====================================================================================================
+
+  (Run Starting)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Cypress:        16.1.1                                                                         Γöé
+  Γöé Browser:        Electron 146 (headless) (deprecated)                                           Γöé
+  Γöé Node Version:   v24.19.0 (C:\Users\kemzz\AppData\Local\fnm_multishells\33316_1791578833478\nod Γöé
+  Γöé                 e.exe)                                                                         Γöé
+  Γöé Specs:          29 found (admin_flow.cy.ts, auth_login.cy.ts, contingent_access.cy.ts, judge_p Γöé
+  Γöé                 in_login.cy.ts, public_scoreboard.cy.ts, ipsi/01-kategori-ipsi.cy.ts, ipsi/02- Γöé
+  Γöé                 registrasi-atlet.cy.ts, ipsi/03-verifikasi-timbang.cy.ts, ipsi/04-bagan-per-ka Γöé
+  Γöé                 tegori.cy.ts, ipsi/05-m...)                                                    Γöé
+  Γöé Searched:       cypress/e2e/**/*.cy.ts                                                         Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+Warning: The Electron browser is deprecated as a test browser and will be removed in a future version of Cypress.
+
+Switch to Chrome or another installed browser to avoid a breaking change when you upgrade.
+
+Read more about supported browsers: https://on.cypress.io/launching-browsers
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  admin_flow.cy.ts                                                               (1 of 29)
+
+
+  Admin - operasi kejuaraan
+    ΓêÜ menu "Kompetisi" terbuka dan memuat halamannya dari backend (2366ms)
+    ΓêÜ menu "Gelanggang" terbuka dan memuat halamannya dari backend (543ms)
+    ΓêÜ menu "Kategori Tanding" terbuka dan memuat halamannya dari backend (385ms)
+    ΓêÜ menu "Data Atlet" terbuka dan memuat halamannya dari backend (468ms)
+    ΓêÜ menu "Verifikasi Peserta" terbuka dan memuat halamannya dari backend (294ms)
+    ΓêÜ menu "Jadwal Pertandingan" terbuka dan memuat halamannya dari backend (430ms)
+    ΓêÜ menu "Bagan Pertandingan" terbuka dan memuat halamannya dari backend (396ms)
+    ΓêÜ menu "Perangkat & PIN" terbuka dan memuat halamannya dari backend (301ms)
+    ΓêÜ menu "Regulasi & Ruleset" terbuka dan memuat halamannya dari backend (301ms)
+    ΓêÜ menu "Laporan & Ekspor" terbuka dan memuat halamannya dari backend (353ms)
+    ΓêÜ daftar kompetisi menampilkan kejuaraan hasil seed (645ms)
+    ΓêÜ tab Kategori Tanding menyediakan aksi manajemen kategori (446ms)
+    ΓêÜ tab Kategori Tanding: dialog Tambah Kategori bisa dibuka dan ditutup tanpa menyimpan (526ms)
+    ΓêÜ tab Perangkat & PIN menampilkan kontrol akses dan format juri (317ms)
+    ΓêÜ tab Perangkat & PIN: berganti format juri ke 3 lalu kembali ke 5 (723ms)
+    ΓêÜ tab Bagan Pertandingan menampilkan filter kategori (400ms)
+    ΓêÜ refresh halaman tidak mengeluarkan admin dari sesi (472ms)
+
+
+  17 passing (10s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        17                                                                               Γöé
+  Γöé Passing:      17                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     10 seconds                                                                       Γöé
+  Γöé Spec Ran:     admin_flow.cy.ts                                                                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  auth_login.cy.ts                                                               (2 of 29)
+
+
+  Login email (backend nyata)
+    ΓêÜ admin bisa masuk dengan akun seed dan diarahkan ke panel operasional (1164ms)
+    ΓêÜ dewan bisa masuk dan melihat menu manajemen (556ms)
+    ΓêÜ manajer kontingen bisa masuk dan diarahkan ke Data Atlet (701ms)
+    ΓêÜ password salah ditolak dan pengguna tetap di halaman login (555ms)
+    ΓêÜ form kosong menampilkan pesan validasi tanpa memanggil server (165ms)
+    ΓêÜ pengguna yang belum login dialihkan dari /ops ke /login (123ms)
+    1) logout mengakhiri sesi dan token dihapus
+
+
+  6 passing (5s)
+  1 failing
+
+  1) Login email (backend nyata)
+       logout mengakhiri sesi dan token dihapus:
+     CypressError: `cy.click()` can only be called on a single element. Your subject contained 2 elements. Pass `{ multiple: true }` if you want to serially click each element.
+
+https://on.cypress.io/click
+      at mouseAction (http://localhost/__cypress/runner/cypress_runner.js:112590:68)
+      at Context.click (http://localhost/__cypress/runner/cypress_runner.js:112757:14)
+      at wrapped (http://localhost/__cypress/runner/cypress_runner.js:146077:19)
+      at <unknown> (http://localhost/__cypress/runner/cypress_runner.js:152154:15)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise._settlePromiseFromHandler (http://localhost/__cypress/runner/cypress_runner.js:1492:31)
+      at Promise._settlePromise (http://localhost/__cypress/runner/cypress_runner.js:1549:18)
+      at Promise._settlePromiseCtx (http://localhost/__cypress/runner/cypress_runner.js:1586:10)
+      at _drainQueueStep (http://localhost/__cypress/runner/cypress_runner.js:2384:12)
+      at _drainQueue (http://localhost/__cypress/runner/cypress_runner.js:2373:9)
+      at Async._drainQueues (http://localhost/__cypress/runner/cypress_runner.js:2389:5)
+      at Async.drainQueues (http://localhost/__cypress/runner/cypress_runner.js:2259:14)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        7                                                                                Γöé
+  Γöé Passing:      6                                                                                Γöé
+  Γöé Failing:      1                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  1                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     4 seconds                                                                        Γöé
+  Γöé Spec Ran:     auth_login.cy.ts                                                                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\auth_login.cy.ts\Login      (1280x720)
+     email (backend nyata) -- logout mengakhiri sesi dan token dihapus (failed).png                 
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  contingent_access.cy.ts                                                        (3 of 29)
+
+
+  Manajer kontingen - hak akses nyata
+    ΓêÜ melihat menu yang relevan untuk kontingen (1559ms)
+    ΓêÜ tidak melihat menu khusus admin/dewan (222ms)
+    ΓêÜ membuka ?tab=pin langsung tidak memberi akses ke halaman PIN (608ms)
+    ΓêÜ tidak bisa membuka konsol wasit (492ms)
+
+
+  4 passing (3s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        4                                                                                Γöé
+  Γöé Passing:      4                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     3 seconds                                                                        Γöé
+  Γöé Spec Ran:     contingent_access.cy.ts                                                          Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  judge_pin_login.cy.ts                                                          (4 of 29)
+
+
+  Login tablet dengan PIN (backend nyata)
+    ΓêÜ juri kursi 1 masuk dengan PIN dan masuk ke layar penilaian (1813ms)
+    ΓêÜ wasit masuk dengan PIN dan masuk ke konsol wasit (1246ms)
+    ΓêÜ PIN yang terlalu pendek ditolak di sisi klien tanpa memanggil server (411ms)
+    ΓêÜ PIN salah ditolak dan tidak membuat sesi (682ms)
+    ΓêÜ juri tanpa login tidak bisa membuka layar penilaian (117ms)
+
+
+  5 passing (4s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        5                                                                                Γöé
+  Γöé Passing:      5                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     4 seconds                                                                        Γöé
+  Γöé Spec Ran:     judge_pin_login.cy.ts                                                            Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  public_scoreboard.cy.ts                                                        (5 of 29)
+
+
+  Penonton publik (tanpa login)
+    ΓêÜ daftar scoreboard live terbuka tanpa login (515ms)
+    ΓêÜ tautan Akses Petugas membawa pengguna ke halaman login (210ms)
+    ΓêÜ tautan login tablet membawa ke keypad PIN (204ms)
+    ΓêÜ scoreboard gelanggang bisa dibuka penonton tanpa login (167ms)
+    ΓêÜ halaman pendaftaran kontingen terbuka tanpa login (90ms)
+
+
+  5 passing (1s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        5                                                                                Γöé
+  Γöé Passing:      5                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 second                                                                         Γöé
+  Γöé Spec Ran:     public_scoreboard.cy.ts                                                          Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/01-kategori-ipsi.cy.ts                                                    (6 of 29)
+
+
+  Kategori IPSI - pembuatan & validasi
+    ΓêÜ memakai default IPSI, golongan Dewasa, dan bagan gugur tunggal bila tidak diisi (536ms)
+    ΓêÜ menyimpan golongan umur serta batas bobot desimal apa adanya (123ms)
+    ΓêÜ kelas OPEN tanpa batas atas diperbolehkan (hanya min_weight) (66ms)
+    ΓêÜ menerima alias gender putra/putri (56ms)
+    ΓêÜ menolak min_weight lebih besar dari max_weight (400) (34ms)
+    ΓêÜ menolak min_weight negatif (400) (54ms)
+    ΓêÜ menolak max_weight nol (400) (52ms)
+    ΓêÜ menolak golongan umur milik PERSILAT dipakai pada preset IPSI (400) (31ms)
+    ΓêÜ menolak golongan umur tidak dikenal (400) (34ms)
+    ΓêÜ menolak preset_standard tidak dikenal (400) (35ms)
+    ΓêÜ menolak bracket_mode tidak dikenal (400) (34ms)
+    ΓêÜ menolak nama terlalu pendek (400) (33ms)
+    ΓêÜ menolak gender tidak valid (400) (21ms)
+    ΓêÜ menolak weight_class kosong (400) (27ms)
+    ΓêÜ kategori yang ditolak tidak tersimpan (69ms)
+
+  Kategori IPSI - satu standar per kejuaraan
+    ΓêÜ PERSILAT 2026 menerima golongan umur khasnya (Singa/Macan/Pre-Teen) (128ms)
+    ΓêÜ menolak mencampur IPSI dengan PERSILAT dalam satu kejuaraan (409) (21ms)
+    ΓêÜ reset kategori menghapus semuanya sehingga standar bisa diganti (79ms)
+    ΓêÜ reset ditolak (409) bila kategori masih dipakai peserta (100ms)
+
+  Kategori IPSI - isolasi antar kejuaraan & akses
+    ΓêÜ daftar kategori hanya berisi milik kejuaraannya (142ms)
+    ΓêÜ mengambil kategori dengan id yang tidak ada memberi 404 tanpa membocorkan pesan SQL (28ms)
+    ΓêÜ id kategori berformat salah memberi 400 tanpa membocorkan pesan SQL (27ms)
+    ΓêÜ tanpa token ditolak 401 (40ms)
+
+
+  23 passing (2s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        23                                                                               Γöé
+  Γöé Passing:      23                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     2 seconds                                                                        Γöé
+  Γöé Spec Ran:     ipsi/01-kategori-ipsi.cy.ts                                                      Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/02-registrasi-atlet.cy.ts                                                 (7 of 29)
+
+
+  Registrasi atlet - golongan umur otomatis (batas usia IPSI)
+    ΓêÜ ulang tahun tepat di hari pertama kejuaraan sudah dihitung genap (17 -> 18 = Dewasa) (377ms)
+    ΓêÜ sehari sebelum ulang tahun ke-18 masih Remaja (66ms)
+    ΓêÜ tanggal acuan memakai tanggal mulai kejuaraan (2026-06-01), bukan tanggal hari ini (61ms)
+    Pra Usia Dini (0-5 tahun)
+      ΓêÜ menerima usia batas bawah 0 (41ms)
+      ΓêÜ menerima usia batas atas 5 (43ms)
+      ΓêÜ menolak usia 6 (satu tahun di atas batas) (38ms)
+    Usia Dini 1 (6-8 tahun)
+      ΓêÜ menerima usia batas bawah 6 (49ms)
+      ΓêÜ menerima usia batas atas 8 (56ms)
+      ΓêÜ menolak usia 5 (satu tahun di bawah batas) (32ms)
+      ΓêÜ menolak usia 9 (satu tahun di atas batas) (32ms)
+    Usia Dini 2 (9-11 tahun)
+      ΓêÜ menerima usia batas bawah 9 (70ms)
+      ΓêÜ menerima usia batas atas 11 (27ms)
+      ΓêÜ menolak usia 8 (satu tahun di bawah batas) (31ms)
+      ΓêÜ menolak usia 12 (satu tahun di atas batas) (33ms)
+    Pra Remaja (12-14 tahun)
+      ΓêÜ menerima usia batas bawah 12 (39ms)
+      ΓêÜ menerima usia batas atas 14 (46ms)
+      ΓêÜ menolak usia 11 (satu tahun di bawah batas) (31ms)
+      ΓêÜ menolak usia 15 (satu tahun di atas batas) (32ms)
+    Remaja (15-17 tahun)
+      ΓêÜ menerima usia batas bawah 15 (52ms)
+      ΓêÜ menerima usia batas atas 17 (33ms)
+      ΓêÜ menolak usia 14 (satu tahun di bawah batas) (32ms)
+      ΓêÜ menolak usia 18 (satu tahun di atas batas) (32ms)
+    Dewasa (18-35 tahun)
+      ΓêÜ menerima usia batas bawah 18 (37ms)
+      ΓêÜ menerima usia batas atas 35 (50ms)
+      ΓêÜ menolak usia 17 (satu tahun di bawah batas) (30ms)
+      ΓêÜ menolak usia 36 (satu tahun di atas batas) (57ms)
+    Master A (36-45 tahun)
+      ΓêÜ menerima usia batas bawah 36 (64ms)
+      ΓêÜ menerima usia batas atas 45 (61ms)
+      ΓêÜ menolak usia 35 (satu tahun di bawah batas) (43ms)
+      ΓêÜ menolak usia 46 (satu tahun di atas batas) (46ms)
+    Master B (46+ tahun)
+      ΓêÜ menerima usia batas bawah 46 (51ms)
+      ΓêÜ menerima usia batas atas 80 (46ms)
+      ΓêÜ menolak usia 45 (satu tahun di bawah batas) (35ms)
+
+  Registrasi atlet - validasi input
+    ΓêÜ menolak gender atlet yang tidak sesuai kategori (126ms)
+    ΓêÜ menerima alias putra/putri yang setara dengan male/female (78ms)
+    ΓêÜ birth_date wajib untuk kategori berbasis golongan umur (31ms)
+    ΓêÜ menolak format tanggal lahir selain YYYY-MM-DD (25ms)
+    ΓêÜ menolak tanggal lahir di masa depan (31ms)
+    ΓêÜ menolak NIK lebih dari 50 karakter (51ms)
+    ΓêÜ menolak kategori yang tidak ada (38ms)
+    ΓêÜ menolak pendaftaran tanpa category_id maupun weight_class (32ms)
+    ΓêÜ pendaftaran yang ditolak tidak meninggalkan peserta (37ms)
+    ΓêÜ menolak mendaftarkan atlet yang sama dua kali ke kejuaraan yang sama (409) (66ms)
+
+  Registrasi atlet - peran pendaftar
+    ΓêÜ pendaftaran oleh admin langsung berstatus "registered" tanpa kontingen (171ms)
+    ΓêÜ pendaftaran oleh manajer kontingen berstatus "pending" dan terikat kontingennya (29ms)
+    ΓêÜ daftar peserta menampilkan kategori, golongan umur, dan tanggal lahir (27ms)
+    ΓêÜ peserta berstatus pending belum muncul pada filter status=verified (23ms)
+    ΓêÜ tanpa token ditolak 401 (30ms)
+
+
+  48 passing (4s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        48                                                                               Γöé
+  Γöé Passing:      48                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     3 seconds                                                                        Γöé
+  Γöé Spec Ran:     ipsi/02-registrasi-atlet.cy.ts                                                   Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/03-verifikasi-timbang.cy.ts                                               (8 of 29)
+
+
+  Verifikasi peserta - berkas & timbang badan
+    berkas wajib
+      ΓêÜ menolak verifikasi bila tidak ada berkas dicentang, dan menyebut berkas yang kurang (358ms)
+      ΓêÜ hanya menyebut berkas yang benar-benar kurang (86ms)
+      ΓêÜ surat izin orang tua tidak disyaratkan (tidak pernah memblokir) (88ms)
+      ΓêÜ putri Dewasa wajib surat pernyataan tidak hamil (105ms)
+      ΓêÜ putri Remaja wajib surat pernyataan tidak hamil (79ms)
+      ΓêÜ putri Pra Remaja TIDAK wajib surat tidak hamil (98ms)
+      ΓêÜ putra Dewasa TIDAK wajib surat tidak hamil (86ms)
+      ΓêÜ berkas yang sudah dicentang tersimpan dan dikembalikan di daftar peserta (92ms)
+    timbang badan tanpa toleransi (kelas 39-43 kg)
+      ΓêÜ 38.99 kg => underweight (kurang 0,01 kg dari batas bawah) (91ms)
+      ΓêÜ 39 kg => verified (tepat batas bawah (inklusif)) (82ms)
+      ΓêÜ 41 kg => verified (di tengah kelas) (77ms)
+      ΓêÜ 43 kg => verified (tepat batas atas (inklusif)) (77ms)
+      ΓêÜ 43.01 kg => overweight (lebih 0,01 kg dari batas atas) (63ms)
+      ΓêÜ 43.1 kg => overweight (lebih 0,1 kg - tidak ada toleransi) (111ms)
+      ΓêÜ hasil timbang wajib diisi untuk kategori bertingkat bobot (73ms)
+      ΓêÜ peserta overweight bisa ditimbang ulang dan menjadi verified (koreksi) (120ms)
+      ΓêÜ Usia Dini 1 tanpa kelas bobot lolos tanpa angka timbangan (114ms)
+      ΓêÜ menolak actual_weight tidak masuk akal (0 kg) (96ms)
+      ΓêÜ menolak actual_weight tidak masuk akal (-5 kg) (72ms)
+      ΓêÜ menolak actual_weight tidak masuk akal (301 kg) (75ms)
+    status akhir & penolakan
+      ΓêÜ penolakan (rejected) tidak mensyaratkan berkas maupun timbangan (89ms)
+      ΓêÜ menolak nilai status di luar verified/rejected (75ms)
+      ΓêÜ peserta yang tidak ada memberi 404 (48ms)
+      ΓêÜ id peserta berformat salah memberi 400 tanpa membocorkan pesan SQL (29ms)
+      ΓêÜ filter ?status= hanya mengembalikan peserta dengan status tersebut (365ms)
+    hak akses
+      ΓêÜ manajer kontingen tidak boleh memverifikasi (403) (93ms)
+      ΓêÜ tanpa token ditolak (401) (61ms)
+
+
+  27 passing (3s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        27                                                                               Γöé
+  Γöé Passing:      27                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     3 seconds                                                                        Γöé
+  Γöé Spec Ran:     ipsi/03-verifikasi-timbang.cy.ts                                                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/04-bagan-per-kategori.cy.ts                                               (9 of 29)
+
+
+  Bagan per kategori
+    struktur bagan menurut jumlah peserta
+      (Attempt 1 of 2) 2 peserta terverifikasi
+      1) 2 peserta terverifikasi
+      (Attempt 1 of 2) 3 peserta terverifikasi
+      2) 3 peserta terverifikasi
+      (Attempt 1 of 2) 4 peserta terverifikasi
+      3) 4 peserta terverifikasi
+      (Attempt 1 of 2) 5 peserta terverifikasi
+      4) 5 peserta terverifikasi
+      (Attempt 1 of 2) 8 peserta terverifikasi
+      5) 8 peserta terverifikasi
+      (Attempt 1 of 2) 9 peserta terverifikasi
+      6) 9 peserta terverifikasi
+    hanya peserta terverifikasi yang masuk bagan
+      (Attempt 1 of 2) mengecualikan pending, overweight, underweight, rejected, dan registered
+      7) mengecualikan pending, overweight, underweight, rejected, dan registered
+      ΓêÜ menolak (400) bila peserta terverifikasi kurang dari 2 (252ms)
+      ΓêÜ kategori tanpa peserta ditolak dengan pesan jelas, bukan 5xx (54ms)
+    isolasi antar kategori
+      (Attempt 1 of 2) bagan kategori A dan B tidak saling berisi peserta
+      8) bagan kategori A dan B tidak saling berisi peserta
+      (Attempt 1 of 2) generate ulang menggantikan bagan lama (tidak menggandakan slot)
+      9) generate ulang menggantikan bagan lama (tidak menggandakan slot)
+      ΓêÜ kategori dari kejuaraan lain ditolak (404) (250ms)
+    hak akses
+      ΓêÜ manajer kontingen tidak boleh membuat bagan (403) (572ms)
+      (Attempt 1 of 2) tanpa token tidak bisa membuat bagan (401), tetapi bagan bisa dilihat publik
+      10) tanpa token tidak bisa membuat bagan (401), tetapi bagan bisa dilihat publik
+
+
+  4 passing (1m)
+  10 failing
+
+  1) Bagan per kategori
+       struktur bagan menurut jumlah peserta
+         2 peserta terverifikasi:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:82:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  2) Bagan per kategori
+       struktur bagan menurut jumlah peserta
+         3 peserta terverifikasi:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:82:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  3) Bagan per kategori
+       struktur bagan menurut jumlah peserta
+         4 peserta terverifikasi:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:82:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  4) Bagan per kategori
+       struktur bagan menurut jumlah peserta
+         5 peserta terverifikasi:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:82:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  5) Bagan per kategori
+       struktur bagan menurut jumlah peserta
+         8 peserta terverifikasi:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:82:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  6) Bagan per kategori
+       struktur bagan menurut jumlah peserta
+         9 peserta terverifikasi:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:82:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  7) Bagan per kategori
+       hanya peserta terverifikasi yang masuk bagan
+         mengecualikan pending, overweight, underweight, rejected, dan registered:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:158:34)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  8) Bagan per kategori
+       isolasi antar kategori
+         bagan kategori A dan B tidak saling berisi peserta:
+
+      Timed out retrying after 8000ms
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:196:17)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+      at wrapped (http://localhost/__cypress/runner/cypress_runner.js:146077:19)
+
+  9) Bagan per kategori
+       isolasi antar kategori
+         generate ulang menggantikan bagan lama (tidak menggandakan slot):
+
+      Timed out retrying after 8000ms
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:229:82)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+      at wrapped (http://localhost/__cypress/runner/cypress_runner.js:146077:19)
+
+  10) Bagan per kategori
+       hak akses
+         tanpa token tidak bisa membuat bagan (401), tetapi bagan bisa dilihat publik:
+
+      Timed out retrying after 8000ms
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/04-bagan-per-kategori.cy.ts:273:82)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+      at wrapped (http://localhost/__cypress/runner/cypress_runner.js:146077:19)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        14                                                                               Γöé
+  Γöé Passing:      4                                                                                Γöé
+  Γöé Failing:      10                                                                               Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  20                                                                               Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 minute, 3 seconds                                                              Γöé
+  Γöé Spec Ran:     ipsi/04-bagan-per-kategori.cy.ts                                                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 2 peser               
+     ta terverifikasi (failed) (2).png                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 2 peser               
+     ta terverifikasi (failed) (attempt 2) (2).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 3 peser               
+     ta terverifikasi (failed) (2).png                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 3 peser               
+     ta terverifikasi (failed) (attempt 2) (2).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 4 peser               
+     ta terverifikasi (failed) (2).png                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 4 peser               
+     ta terverifikasi (failed) (attempt 2) (2).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 5 peser               
+     ta terverifikasi (failed) (2).png                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 5 peser               
+     ta terverifikasi (failed) (attempt 2) (2).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 8 peser               
+     ta terverifikasi (failed) (2).png                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 8 peser               
+     ta terverifikasi (failed) (attempt 2) (2).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 9 peser               
+     ta terverifikasi (failed) (2).png                                                              
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- struktur bagan menurut jumlah peserta -- 9 peser               
+     ta terverifikasi (failed) (attempt 2) (2).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- hanya peserta terverifikasi yang masuk bagan --                
+     mengecualikan pending, overweight, underweight, rejected, dan registered (failed               
+     ) (2).png                                                                                      
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- hanya peserta terverifikasi yang masuk bagan --                
+     mengecualikan pending, overweight, underweight, rejected, dan registered (failed               
+     ) (attempt 2) (2).png                                                                          
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- isolasi antar kategori -- bagan kategori A dan B               
+      tidak saling berisi peserta (failed) (3).png                                                  
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- isolasi antar kategori -- bagan kategori A dan B               
+      tidak saling berisi peserta (failed) (attempt 2) (3).png                                      
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- isolasi antar kategori -- generate ulang menggan               
+     tikan bagan lama (tidak menggandakan slot) (failed) (2).png                                    
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- isolasi antar kategori -- generate ulang menggan               
+     tikan bagan lama (tidak menggandakan slot) (failed) (attempt 2) (2).png                        
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- hak akses -- tanpa token tidak bisa membuat baga               
+     n (401), tetapi bagan bisa dilihat publik (failed) (1).png                                     
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\04-bagan-per-kateg     (1280x720)
+     ori.cy.ts\Bagan per kategori -- hak akses -- tanpa token tidak bisa membuat baga               
+     n (401), tetapi bagan bisa dilihat publik (failed) (attempt 2) (1).png                         
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/05-matriks-hak-akses.cy.ts                                               (10 of 29)
+
+
+  Matriks hak akses - kategori, registrasi, verifikasi, bagan
+    GET daftar kategori
+      ΓêÜ anonim => 401 Unauthorized (369ms)
+      ΓêÜ kontingen => diizinkan (45ms)
+      ΓêÜ dewan => diizinkan (52ms)
+      ΓêÜ admin => diizinkan (70ms)
+    POST buat kategori
+      ΓêÜ anonim => 401 Unauthorized (51ms)
+      ΓêÜ kontingen => 403 Forbidden (45ms)
+      ΓêÜ dewan => diizinkan (32ms)
+      ΓêÜ admin => diizinkan (47ms)
+    DELETE reset kategori (kejuaraan kosong)
+      ΓêÜ anonim => 401 Unauthorized (109ms)
+      ΓêÜ kontingen => 403 Forbidden (86ms)
+      ΓêÜ dewan => diizinkan (79ms)
+      ΓêÜ admin => diizinkan (92ms)
+    POST daftarkan atlet
+      ΓêÜ anonim => 401 Unauthorized (26ms)
+      ΓêÜ kontingen => diizinkan (45ms)
+      ΓêÜ dewan => diizinkan (42ms)
+      ΓêÜ admin => diizinkan (31ms)
+    PUT verifikasi peserta
+      ΓêÜ anonim => 401 Unauthorized (26ms)
+      ΓêÜ kontingen => 403 Forbidden (25ms)
+      ΓêÜ dewan => diizinkan (42ms)
+      ΓêÜ admin => diizinkan (29ms)
+    POST generate bagan
+      ΓêÜ anonim => 401 Unauthorized (26ms)
+      ΓêÜ kontingen => 403 Forbidden (23ms)
+      ΓêÜ dewan => diizinkan (28ms)
+      ΓêÜ admin => diizinkan (29ms)
+
+
+  24 passing (2s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        24                                                                               Γöé
+  Γöé Passing:      24                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 second                                                                         Γöé
+  Γöé Spec Ran:     ipsi/05-matriks-hak-akses.cy.ts                                                  Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/06-alur-lengkap-registrasi-ke-bagan.cy.ts                                (11 of 29)
+
+
+  Alur lengkap: registrasi kontingen sampai bagan
+    ΓêÜ 1. admin menyiapkan kejuaraan dan dua kategori resmi (204ms)
+    ΓêÜ 2. manajer kontingen mendaftarkan 4 atlet dan semuanya berstatus pending (191ms)
+    ΓêÜ 3. bagan belum bisa dibuat sebelum ada peserta terverifikasi (34ms)
+    ΓêÜ 4. admin memverifikasi: dua lolos, satu kelebihan bobot, satu putri lolos dengan surat tidak hamil (137ms)
+    1) 5. bagan Remaja Putra berisi tepat 2 peserta lolos dan tanpa peserta overweight
+    ΓêÜ 6. kategori Putri dengan satu peserta tidak membentuk bagan (butuh minimal 2) (27ms)
+    2) 7. penonton publik melihat bagan tanpa login, terbatas pada kategorinya
+    ΓêÜ 8. ringkasan laporan kejuaraan dapat diakses publik (29ms)
+    ΓêÜ 9. UI: meja verifikasi dimuat tanpa error untuk admin (351ms)
+
+
+  7 passing (2s)
+  2 failing
+
+  1) Alur lengkap: registrasi kontingen sampai bagan
+       5. bagan Remaja Putra berisi tepat 2 peserta lolos dan tanpa peserta overweight:
+
+      AssertionError: expected 400 to equal 201
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/06-alur-lengkap-registrasi-ke-bagan.cy.ts:116:28)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+  2) Alur lengkap: registrasi kontingen sampai bagan
+       7. penonton publik melihat bagan tanpa login, terbatas pada kategorinya:
+     AssertionError: expected [] to have a length of 2 but got 0
+      at Context.eval (webpack://web/./cypress/e2e/ipsi/06-alur-lengkap-registrasi-ke-bagan.cy.ts:130:36)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        9                                                                                Γöé
+  Γöé Passing:      7                                                                                Γöé
+  Γöé Failing:      2                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  2                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 second                                                                         Γöé
+  Γöé Spec Ran:     ipsi/06-alur-lengkap-registrasi-ke-bagan.cy.ts                                   Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\06-alur-lengkap-re     (1280x720)
+     gistrasi-ke-bagan.cy.ts\Alur lengkap registrasi kontingen sampai bagan -- 5. bag               
+     an Remaja Putra berisi tepat 2 peserta lolos dan tanpa peserta overweight (faile               
+     d) (1).png                                                                                     
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\06-alur-lengkap-re     (1280x720)
+     gistrasi-ke-bagan.cy.ts\Alur lengkap registrasi kontingen sampai bagan -- 7. pen               
+     onton publik melihat bagan tanpa login, terbatas pada kategorinya (failed) (2).p               
+     ng                                                                                             
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/07-isolasi-data-kontingen.cy.ts                                          (12 of 29)
+
+
+  Isolasi data antar kontingen
+    daftar peserta
+      ΓêÜ kontingen hanya melihat peserta miliknya beserta status verifikasinya (451ms)
+      ΓêÜ kontingen lain tidak melihat peserta k1 (dan sebaliknya) (36ms)
+      ΓêÜ peserta yang didaftarkan admin tidak tampil bagi kontingen mana pun (45ms)
+      ΓêÜ filter ?status= tidak membuka data milik kontingen lain (36ms)
+      ΓêÜ pemilik melihat status terbaru setelah admin memverifikasi (73ms)
+      ΓêÜ admin tetap melihat semua peserta (32ms)
+    daftar atlet kejuaraan (halaman Data Atlet)
+      ΓêÜ tanpa login ditolak 401 (data atlet memuat tanggal lahir & NIK) (49ms)
+      ΓêÜ kontingen hanya menerima atlet kontingennya sendiri (50ms)
+      ΓêÜ respons admin tidak bocor ke kontingen lewat cache (urutan admin -> kontingen) (42ms)
+      ΓêÜ admin melihat atlet semua kontingen (45ms)
+      ΓêÜ daftar master /athletes hanya untuk admin/dewan (kontingen 403) (51ms)
+    detail atlet
+      ΓêÜ kontingen boleh membuka atlet miliknya (30ms)
+      ΓêÜ atlet kontingen lain dan atlet buatan admin disamarkan sebagai 404 (45ms)
+      ΓêÜ admin boleh membuka atlet kontingen mana pun (28ms)
+    pendaftaran & pembuatan data
+      ΓêÜ kontingen tidak bisa mendaftarkan atlet milik kontingen lain (404) (41ms)
+      ΓêÜ contingent_id pada body POST /athletes diabaikan: atlet selalu milik pembuat (55ms)
+      ΓêÜ pendaftaran kontingen tetap berstatus pending dan terikat kontingennya (41ms)
+    profil kontingen
+      ΓêÜ kontingen boleh membaca profilnya sendiri tetapi tidak profil kontingen lain (403) (60ms)
+
+
+  18 passing (2s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        18                                                                               Γöé
+  Γöé Passing:      18                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 second                                                                         Γöé
+  Γöé Spec Ran:     ipsi/07-isolasi-data-kontingen.cy.ts                                             Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/08-bagan-publik.cy.ts                                                    (13 of 29)
+
+
+  Bagan publik
+    1) "before all" hook for "bagan disamarkan 404 dan kejuaraan tidak muncul di daftar publik"
+
+
+  0 passing (721ms)
+  1 failing
+
+  1) Bagan publik
+       sebelum kejuaraan diaktifkan (draft)
+         "before all" hook for "bagan disamarkan 404 dan kejuaraan tidak muncul di daftar publik":
+
+      generate bagan "Dewasa Putra Publik"
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/support/api.ts:414:62)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        16                                                                               Γöé
+  Γöé Passing:      0                                                                                Γöé
+  Γöé Failing:      1                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      15                                                                               Γöé
+  Γöé Screenshots:  1                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     0 seconds                                                                        Γöé
+  Γöé Spec Ran:     ipsi/08-bagan-publik.cy.ts                                                       Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\08-bagan-publik.cy     (1280x720)
+     .ts\Bagan publik -- bagan disamarkan 404 dan kejuaraan tidak muncul di daftar pu               
+     blik -- before all hook (failed) (1).png                                                       
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/09-bagan-ops-kategori.cy.ts                                              (14 of 29)
+
+
+  Admin - Bagan Pertandingan per kategori
+    1) "before all" hook for "dropdown kategori terisi otomatis dengan kategori pertama (tidak kosong)"
+
+
+  0 passing (741ms)
+  1 failing
+
+  1) Admin - Bagan Pertandingan per kategori
+       "before all" hook for "dropdown kategori terisi otomatis dengan kategori pertama (tidak kosong)":
+
+      generate bagan "Tanding Dewasa Putra - Kelas A"
+      + expected - actual
+
+      -400
+      +201
+      
+      at Context.eval (webpack://web/./cypress/support/api.ts:414:62)
+      at getRet (http://localhost/__cypress/runner/cypress_runner.js:120751:20)
+      at tryCatcher (http://localhost/__cypress/runner/cypress_runner.js:1780:23)
+      at Promise.attempt.Promise.try (http://localhost/__cypress/runner/cypress_runner.js:4288:29)
+      at Context.thenFn (http://localhost/__cypress/runner/cypress_runner.js:120763:66)
+      at Context.then (http://localhost/__cypress/runner/cypress_runner.js:121014:21)
+
+
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        3                                                                                Γöé
+  Γöé Passing:      0                                                                                Γöé
+  Γöé Failing:      1                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      2                                                                                Γöé
+  Γöé Screenshots:  1                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     0 seconds                                                                        Γöé
+  Γöé Spec Ran:     ipsi/09-bagan-ops-kategori.cy.ts                                                 Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+  (Screenshots)
+
+  -  D:\Freelance\DigitalScoring\apps\web\cypress\screenshots\ipsi\09-bagan-ops-kateg     (1280x720)
+     ori.cy.ts\Admin - Bagan Pertandingan per kategori -- dropdown kategori terisi ot               
+     omatis dengan kategori pertama (tidak kosong) -- before all hook (failed) (1).pn               
+     g                                                                                              
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  ipsi/10-umur-dan-bobot-data-lama.cy.ts                                        (15 of 29)
+
+
+  Peninjauan umur peserta (age_check)
+    ΓêÜ atlet dengan tanggal lahir sesuai golongan tidak diberi tanda (252ms)
+    ΓêÜ tanggal lahir yang keliru memunculkan age_mismatch dan memblokir verifikasi (164ms)
+    ΓêÜ memperbaiki tanggal lahir menghapus tanda dan membuka kembali verifikasi (302ms)
+    PUT /athletes/{id}
+      ΓêÜ menolak body kosong, format tanggal salah, tanggal masa depan, dan NIK terlalu panjang (159ms)
+      ΓêÜ menyimpan NIK tanpa mengubah tanggal lahir (104ms)
+      ΓêÜ atlet yang tidak ada memberi 404 dan tanpa token 401 (72ms)
+      ΓêÜ manajer kontingen hanya boleh mengubah atlet miliknya (185ms)
+    antarmuka Verifikasi Peserta
+      ΓêÜ peserta bertanda umur menampilkan peninjauan; tanggal lahir yang benar menghapusnya (1544ms)
+
+  Kelengkapan data seed (kejuaraan Menpora)
+    ΓêÜ kategori Tanding Dewasa punya batas bobot sesuai rentang di namanya (inklusif, tanpa toleransi) (123ms)
+    ΓêÜ peserta seed bertanggal lahir dan tidak ada yang ditandai age_check (50ms)
+    ΓêÜ peserta seed tertaut ke kategori (bukan bagan jalur lama) (35ms)
+
+
+  11 passing (3s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        11                                                                               Γöé
+  Γöé Passing:      11                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     3 seconds                                                                        Γöé
+  Γöé Spec Ran:     ipsi/10-umur-dan-bobot-data-lama.cy.ts                                           Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/01-wasit-kontrol-pertandingan.cy.ts                                     (16 of 29)
+
+
+  Wasit - kontrol pertandingan
+    memuat partai
+      ΓêÜ semua perangkat menerima snapshot idle yang konsisten dengan ruleset (4383ms)
+      ΓêÜ partai tersimpan idle di database sebelum dimulai (1701ms)
+    memulai pertandingan
+      ΓêÜ wasit memulai: REST 200 dan semua perangkat menerima state_change round_1 dengan tenggat yang sama (1688ms)
+      ΓêÜ status partai di database menjadi berjalan setelah dimulai (1658ms)
+      ΓêÜ memulai untuk kedua kali ditolak (INVALID_STATE_TRANSITION) tanpa siaran tambahan (2394ms)
+      ΓêÜ memulai partai yang belum dimuat ke gelanggang ditolak (1814ms)
+    validasi perubahan status sebelum partai dimulai
+      ΓêÜ pause saat idle ditolak dan state tetap idle (1651ms)
+      ΓêÜ resume saat idle ditolak dan state tetap idle (1678ms)
+      ΓêÜ finish saat idle ditolak: partai yang belum dimulai tidak boleh diberi pemenang (2240ms)
+    timer
+      ΓêÜ berjalan mundur, beku saat dijeda, dan berlanjut saat dilanjutkan (3695ms)
+      ΓêÜ wasit mengoreksi waktu (-2 detik): semua perangkat menerima sisa waktu baru (1753ms)
+      ΓêÜ server menyiarkan timer_sync berkala ke semua perangkat selama timer berjalan (6746ms)
+    pergantian ronde otomatis
+      ΓêÜ ronde 1 habis ΓåÆ istirahat ΓåÆ ronde 2, dengan urutan state identik di semua perangkat (12721ms)
+      ΓêÜ babak terakhir habis dengan skor unggul ΓåÆ partai selesai otomatis dan hasil disiarkan ke semua (20670ms)
+    mengakhiri pertandingan
+      ΓêÜ skor seri tanpa pemenang ditolak (TIE_NEEDS_DECISION), wasit lalu memutuskan pemenang (1686ms)
+      ΓêÜ skor unggul tanpa pemenang eksplisit: hasil mengikuti poin sah juri (1752ms)
+      ΓêÜ finish kedua kali ditolak dan tidak menyiarkan hasil kedua (2204ms)
+      ΓêÜ setelah selesai: start/pause/resume/cancel ditolak dan gelanggang bebas untuk partai berikutnya (1878ms)
+      ΓêÜ wasit membatalkan partai berjalan: semua perangkat menerima state cancelled dan start sesudahnya ditolak (1657ms)
+    hasil khusus & sanksi (WebSocket wasit)
+      ΓêÜ walkover sebelum mulai menyelesaikan partai dan hasilnya disiarkan ke semua perangkat (1666ms)
+      ΓêÜ KO sebelum partai dimulai ditolak (hanya valid dalam pertandingan) (1631ms)
+      ΓêÜ sanksi dari wasit mengubah skor dan daftar sanksi di semua perangkat; sanksi ganda ditolak (1955ms)
+      ΓêÜ sinyal gong dan medic dari wasit disiarkan ke seluruh perangkat (1770ms)
+    log kejadian (audit)
+      ΓêÜ GET events memuat match_started dan match_paused berurutan (1674ms)
+
+
+  24 passing (1m)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        24                                                                               Γöé
+  Γöé Passing:      24                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 minute, 24 seconds                                                             Γöé
+  Γöé Spec Ran:     match/01-wasit-kontrol-pertandingan.cy.ts                                        Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/02-juri-sinkronisasi-realtime.cy.ts                                     (17 of 29)
+
+
+  Juri - sinkronisasi realtime lintas role
+    informasi yang diterima setiap juri
+      ΓêÜ juri kursi 1 login PIN: token terikat ke gelanggang, role judge, dan kursi benar (4092ms)
+      ΓêÜ juri kursi 2 login PIN: token terikat ke gelanggang, role judge, dan kursi benar (1603ms)
+      ΓêÜ juri kursi 3 login PIN: token terikat ke gelanggang, role judge, dan kursi benar (1626ms)
+      ΓêÜ ketiga juri menerima snapshot yang identik (ruleset, teknik, konsensus, partai) dan wasit melihat ketiganya online (1687ms)
+    aksi wasit tersinkron ke seluruh juri
+      ΓêÜ start ΓåÆ pause ΓåÆ resume: ketiga juri menerima urutan dan nilai state_change yang sama persis (1757ms)
+      ΓêÜ jam hitung mundur tiap juri konsisten: tenggat absolut sama dan sisa waktu Γëê selisih terhadap jam server (1667ms)
+      ΓêÜ perubahan ronde otomatis (istirahat) sampai ke tiap juri dengan hitung mundur istirahat yang berjalan (9702ms)
+      ΓêÜ partai selesai: tiap juri menerima match_result yang sama dan snapshot berstatus finished (1665ms)
+    konsensus juri (2 dari 3 dalam 3 detik)
+      ΓêÜ satu juri saja belum menghasilkan poin: juri lain melihat kemajuan anonim (1 dari 2), wasit tidak (2151ms)
+      ΓêÜ juri 1 + juri 2 sepakat ΓåÆ poin sah dan semua perangkat menerima score_confirmed + score_update (1734ms)
+      ΓêÜ juri 2 + juri 3 sepakat ΓåÆ poin sah dan semua perangkat menerima score_confirmed + score_update (1755ms)
+      ΓêÜ juri 1 + juri 3 sepakat ΓåÆ poin sah dan semua perangkat menerima score_confirmed + score_update (1788ms)
+      ΓêÜ poin berbeda per teknik: pukulan 1, tendangan 2, jatuhan 3 terakumulasi pada sudut yang benar (1732ms)
+      ΓêÜ juri tidak sepakat (merah vs biru) ΓåÆ tidak ada poin dan tidak ada siaran skor (2375ms)
+      ΓêÜ dua juri menekan di luar jendela 3 detik ΓåÆ tidak menjadi konsensus (5457ms)
+      ΓêÜ juri yang sama menekan dua kali (event berbeda atau event_id sama) hanya dihitung satu suara (2339ms)
+      ΓêÜ jenis skor yang tidak ada di ruleset ditolak hanya ke juri pengirim (BAD_PAYLOAD) (2200ms)
+    batas waktu input juri
+      ΓêÜ sebelum partai dimulai: input ditolak (SCORING_NOT_ALLOWED) hanya ke pengirim (1919ms)
+      ΓêÜ saat istirahat: input ditolak (SCORING_NOT_ALLOWED) dan skor tidak berubah (9616ms)
+      ΓêÜ setelah partai selesai: input ditolak dan tidak mengubah hasil akhir (1736ms)
+    hak akses juri di WebSocket
+      ΓêÜ juri tidak boleh mengirim state_change "start": FORBIDDEN ke pengirim, state tidak berubah (2182ms)
+      ΓêÜ juri tidak boleh mengirim state_change "pause": FORBIDDEN ke pengirim, state tidak berubah (2164ms)
+      ΓêÜ juri tidak boleh mengirim state_change "resume": FORBIDDEN ke pengirim, state tidak berubah (2142ms)
+      ΓêÜ juri tidak boleh mengirim state_change "finish": FORBIDDEN ke pengirim, state tidak berubah (2210ms)
+      ΓêÜ juri tidak boleh mengirim state_change "cancel": FORBIDDEN ke pengirim, state tidak berubah (2146ms)
+      ΓêÜ juri tidak boleh mengirim state_change "adjust_time": FORBIDDEN ke pengirim, state tidak berubah (2189ms)
+      ΓêÜ juri tidak boleh mengirim state_change "reset_round": FORBIDDEN ke pengirim, state tidak berubah (2159ms)
+      ΓêÜ juri tidak boleh menjatuhkan sanksi atau mengirim sinyal arena (2297ms)
+    audit input juri
+      ΓêÜ setiap input juri tercatat sebagai kejadian dengan kursi dan jenis teknik (1639ms)
+    skor saat dijeda dan pembatalan (BATAL)
+      ΓêÜ partai dijeda: input juri ditolak SCORING_NOT_ALLOWED dan tidak masuk ke skor, lalu diterima lagi setelah dilanjutkan (2108ms)
+      ΓêÜ REST skor juri juga ditolak (409) saat dijeda (1696ms)
+      ΓêÜ BATAL menarik input yang menunggu: lampu padam (count 0) dan juri lain sendirian tidak cukup untuk poin (2142ms)
+      ΓêÜ BATAL tanpa input menunggu ΓåÆ UNDO_NOT_POSSIBLE (bukan diam); target tidak valid ΓåÆ BAD_PAYLOAD (1715ms)
+      ΓêÜ poin yang sudah terkonfirmasi tidak dapat dibatalkan juri (UNDO_NOT_POSSIBLE) dan skor tetap (1732ms)
+
+
+  34 passing (1m)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        34                                                                               Γöé
+  Γöé Passing:      34                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 minute, 29 seconds                                                             Γöé
+  Γöé Spec Ran:     match/02-juri-sinkronisasi-realtime.cy.ts                                        Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/03-otorisasi-role.cy.ts                                                 (18 of 29)
+
+
+  Otorisasi role - pertandingan
+    REST: kontrol partai
+      ΓêÜ start oleh tanpa login ΓåÆ 401 dan state partai tidak berubah (5030ms)
+      ΓêÜ start oleh juri (PIN) ΓåÆ 403 dan state partai tidak berubah (2015ms)
+      ΓêÜ start oleh operator (email) ΓåÆ 403 dan state partai tidak berubah (2107ms)
+      ΓêÜ start oleh manajer kontingen ΓåÆ 403 dan state partai tidak berubah (2076ms)
+      ΓêÜ start oleh wasit gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2129ms)
+      ΓêÜ start oleh juri gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2155ms)
+      ΓêÜ pause oleh tanpa login ΓåÆ 401 dan state partai tidak berubah (2087ms)
+      ΓêÜ pause oleh juri (PIN) ΓåÆ 403 dan state partai tidak berubah (2012ms)
+      ΓêÜ pause oleh operator (email) ΓåÆ 403 dan state partai tidak berubah (1994ms)
+      ΓêÜ pause oleh manajer kontingen ΓåÆ 403 dan state partai tidak berubah (2045ms)
+      ΓêÜ pause oleh wasit gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2078ms)
+      ΓêÜ pause oleh juri gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2028ms)
+      ΓêÜ resume oleh tanpa login ΓåÆ 401 dan state partai tidak berubah (2025ms)
+      ΓêÜ resume oleh juri (PIN) ΓåÆ 403 dan state partai tidak berubah (1993ms)
+      ΓêÜ resume oleh operator (email) ΓåÆ 403 dan state partai tidak berubah (2009ms)
+      ΓêÜ resume oleh manajer kontingen ΓåÆ 403 dan state partai tidak berubah (2057ms)
+      ΓêÜ resume oleh wasit gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2063ms)
+      ΓêÜ resume oleh juri gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2024ms)
+      ΓêÜ finish oleh tanpa login ΓåÆ 401 dan state partai tidak berubah (1990ms)
+      ΓêÜ finish oleh juri (PIN) ΓåÆ 403 dan state partai tidak berubah (2009ms)
+      ΓêÜ finish oleh operator (email) ΓåÆ 403 dan state partai tidak berubah (2033ms)
+      ΓêÜ finish oleh manajer kontingen ΓåÆ 403 dan state partai tidak berubah (2074ms)
+      ΓêÜ finish oleh wasit gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (2048ms)
+      ΓêÜ finish oleh juri gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (1992ms)
+      ΓêÜ cancel oleh tanpa login ΓåÆ 401 dan state partai tidak berubah (1999ms)
+      ΓêÜ cancel oleh juri (PIN) ΓåÆ 403 dan state partai tidak berubah (1993ms)
+      ΓêÜ cancel oleh operator (email) ΓåÆ 403 dan state partai tidak berubah (2044ms)
+      ΓêÜ cancel oleh manajer kontingen ΓåÆ 403 dan state partai tidak berubah (2055ms)
+      ΓêÜ cancel oleh wasit gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (1992ms)
+      ΓêÜ cancel oleh juri gelanggang lain (PIN) ΓåÆ 403 dan state partai tidak berubah (1999ms)
+      ΓêÜ load-arena oleh role tak berhak ΓåÆ 401/403 dan partai tidak dimuat (1804ms)
+      ΓêÜ outcome (WO/KO) oleh role tak berhak ΓåÆ ditolak (1680ms)
+      ΓêÜ membuat partai hanya untuk admin/dewan (wasit, juri, kontingen, tanpa login ditolak) (1682ms)
+    REST: role yang berhak mengontrol
+      ΓêÜ wasit (PIN), dewan, dan admin masing-masing dapat memegang kendali partai yang sama (1668ms)
+    REST: input skor juri
+      ΓêÜ hanya juri yang boleh: wasit, dewan, admin, operator, kontingen, tanpa login ditolak (2003ms)
+      ΓêÜ juri gelanggang lain tidak boleh menilai partai ini (403) (1705ms)
+      ΓêÜ juri sah: suara tercatat atas identitas token; judge_id palsu pada body diabaikan (tidak bisa menggandakan suara) (2284ms)
+      ΓêÜ Idempotency-Key yang sama tidak menggandakan suara (duplicate_ignored) (1696ms)
+      ΓêÜ saat partai belum dimulai: skor REST ditolak (SCORING_ERROR) (1730ms)
+    WebSocket: handshake
+      ΓêÜ token PIN sah (wasit dan setiap juri) diterima (3127ms)
+      ΓêÜ token acak/rusak ditolak (2256ms)
+      ΓêÜ token PIN gelanggang lain ditolak (juri dan wasit) (2597ms)
+      ΓêÜ login email tanpa arena: admin dan dewan diterima; operator dan kontingen ditolak (2920ms)
+      ΓêÜ penonton tanpa token diterima bila gelanggang punya partai aktif, ditolak bila tidak ada hub (2284ms)
+    WebSocket: perintah per role
+      ΓêÜ penonton: menerima siaran tetapi semua perintah ditolak (FORBIDDEN) (2724ms)
+      ΓêÜ wasit tidak boleh mengirim input juri (FORBIDDEN) dan skor tidak berubah (2072ms)
+      ΓêÜ admin (login email) dapat mengontrol lewat WebSocket, dewan juga (2345ms)
+      ΓêÜ wasit mengirim aksi tak dikenal / payload rusak ΓåÆ error ke pengirim saja, partai tetap normal (2252ms)
+
+
+  48 passing (2m)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        48                                                                               Γöé
+  Γöé Passing:      48                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 minute, 47 seconds                                                             Γöé
+  Γöé Spec Ran:     match/03-otorisasi-role.cy.ts                                                    Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/04-ketahanan-dan-kasus-tepi.cy.ts                                       (19 of 29)
+
+
+  Ketahanan & kasus tepi pertandingan
+    gagal memulai pertandingan
+      ΓêÜ id partai tidak dikenal atau berformat salah ΓåÆ 400 tanpa merusak partai yang sedang dimuat (4082ms)
+      ΓêÜ ruleset tidak ada ΓåÆ load-arena gagal dan partai tetap tidak dapat dimulai (1838ms)
+      ΓêÜ arena_id wajib pada load-arena (400) (1719ms)
+      ΓêÜ partai yang sama dimuat dua kali ditolak; partai kedua ke gelanggang yang sedang dipakai ΓåÆ 409 ARENA_BUSY (1737ms)
+      ΓêÜ setelah partai pertama selesai, gelanggang bebas: partai kedua dimuat, dimulai, dan semua juri berpindah ke partai baru (1831ms)
+      ΓêÜ partai dibatalkan ΓåÆ dijadwalkan ulang (idle) ΓåÆ dimuat ulang dan dapat dimulai dari 0-0 (1730ms)
+    aksi berulang dan balapan
+      ΓêÜ lima permintaan start bersamaan: tepat satu berhasil dan hanya satu siaran round_1 (2149ms)
+      ΓêÜ tiga permintaan finish bersamaan: satu hasil resmi, satu match_result per perangkat (2191ms)
+      ΓêÜ pause dua kali: tetap dijeda dan sisa waktu tidak berubah; resume dua kali: tenggat tidak bergeser (2466ms)
+      ΓêÜ cancel dua kali: kedua kali ditolak/diabaikan tanpa mengubah state akhir cancelled (1645ms)
+    kegagalan koneksi dan pemulihan
+      ΓêÜ juri terputus: wasit melihat kursinya offline; saat tersambung ulang menerima snapshot terkini dan dapat menilai lagi (2352ms)
+      ΓêÜ perubahan state saat juri offline tidak hilang: snapshot setelah sambung ulang mencerminkan keadaan terbaru (2458ms)
+      ΓêÜ semua perangkat terputus bersamaan: timer tetap berjalan di server dan semua kembali sinkron setelah tersambung ulang (3834ms)
+      ΓêÜ wasit terputus lalu tersambung ulang: kontrol REST dan siaran ke juri tetap berfungsi (2330ms)
+      ΓêÜ dua tablet memakai PIN juri yang sama: keduanya menerima siaran dan kursi tetap online sampai keduanya putus (2476ms)
+      ΓêÜ pesan rusak (bukan JSON) dan tipe tak dikenal tidak memutus koneksi maupun mengganggu partai (2055ms)
+    konsistensi antar kanal (WebSocket vs endpoint publik)
+      ΓêÜ scoreboard publik (REST) menampilkan state, ronde, skor, dan nama atlet yang sama dengan WebSocket (1671ms)
+      ΓêÜ daftar gelanggang live memuat gelanggang saat partai berjalan dan tidak lagi setelah selesai (1683ms)
+      ΓêÜ endpoint kesehatan dan origin aplikasi tersedia (prasyarat suite) (1618ms)
+    daftar partai mencerminkan status berjalan
+      ΓêÜ GET matches?status=running memuat partai yang sedang berjalan dan tidak memuatnya setelah selesai (1653ms)
+
+
+  20 passing (45s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        20                                                                               Γöé
+  Γöé Passing:      20                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     45 seconds                                                                       Γöé
+  Γöé Spec Ran:     match/04-ketahanan-dan-kasus-tepi.cy.ts                                          Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/05-format-5-juri.cy.ts                                                  (20 of 29)
+
+
+  Format 5 juri - konsensus 3 dari 5
+    ΓêÜ kelima juri online dan menerima aturan konsensus 3 dari 5 di snapshot (5700ms)
+    ΓêÜ dua juri saja belum cukup: progres 1/3 lalu 2/3 tampil di tablet juri, tanpa poin (2874ms)
+    ΓêÜ tiga juri mana pun (kursi 2, 4, 5) sepakat ΓåÆ satu poin sah, kelima juri dan wasit menerimanya (2320ms)
+    ΓêÜ juri keempat dan kelima yang menyusul setelah konsensus tidak menambah poin kedua (2874ms)
+    ΓêÜ tiga juri menekan sudut berbeda tidak membentuk konsensus (2960ms)
+    ΓêÜ suara di luar window 3 detik tidak digabung (6138ms)
+
+
+  6 passing (23s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        6                                                                                Γöé
+  Γöé Passing:      6                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     23 seconds                                                                       Γöé
+  Γöé Spec Ran:     match/05-format-5-juri.cy.ts                                                     Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/06-pemulihan-restart-server.cy.ts                                       (21 of 29)
+
+
+  Pemulihan setelah restart server
+[restart-backend] restart kontainer scoring-backend ...
+[restart-backend] siap di http://127.0.0.1:8080 (kontainer scoring-backend)
+    ΓêÜ partai berjalan dengan skor 2-0: setelah restart tetap di babak 1 dengan skor sama, dijeda, dan dapat dilanjutkan sampai selesai (8053ms)
+
+
+  1 passing (8s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        1                                                                                Γöé
+  Γöé Passing:      1                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     8 seconds                                                                        Γöé
+  Γöé Spec Ran:     match/06-pemulihan-restart-server.cy.ts                                          Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/07-kompetisi-penuh.cy.ts                                                (22 of 29)
+
+
+  Kompetisi penuh: dari pendaftaran sampai juara
+    ΓêÜ 1. empat atlet dari tiga kontingen terdaftar dan lolos verifikasi/timbang (2888ms)
+    ΓêÜ 2. bagan dibentuk: 4 peserta di babak 1, final kosong, dan 2 partai semifinal siap (belum ada final) (103ms)
+    ΓêÜ 3. bagan publik tersembunyi sebelum kejuaraan diaktifkan, lalu terbuka (tanpa login) dengan empat atlet (75ms)
+    ΓêÜ 4. semifinal 1: merah unggul ΓåÆ wasit menyelesaikan, pemenang tercatat dan maju ke final (1297ms)
+    ΓêÜ 5. semifinal 2: biru unggul ΓåÆ final otomatis terbentuk dengan kedua pemenang (1592ms)
+    ΓêÜ 6. final dua babak habis waktu: skor babak 1 + babak 2 dijumlah dan pemenang ditentukan otomatis (19609ms)
+    ΓêÜ 7. bagan akhir: juara tercatat, ketiga partai selesai, tidak ada partai tersisa (66ms)
+    ΓêÜ 8. klasemen medali kontingen: tepat 1 emas (juara), 1 perak (finalis), 2 perunggu (kalah di semifinal) (30ms)
+
+
+  8 passing (26s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        8                                                                                Γöé
+  Γöé Passing:      8                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     25 seconds                                                                       Γöé
+  Γöé Spec Ran:     match/07-kompetisi-penuh.cy.ts                                                   Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/08-kompetisi-8-peserta.cy.ts                                            (23 of 29)
+
+
+  Kompetisi 8 peserta: perempat final sampai juara
+    ΓêÜ 1. delapan atlet dari delapan kontingen terverifikasi dan bagan terbentuk dengan 4 perempat final (3011ms)
+    ΓêÜ 2. seluruh partai dimainkan babak demi babak (merah selalu unggul): 4 perempat ΓåÆ 2 semi ΓåÆ 1 final (10920ms)
+    ΓêÜ 3. juara tercatat di bagan akhir (25ms)
+    ΓêÜ 4. medali: 1 emas (juara), 1 perak (finalis), 2 perunggu (kalah semifinal); babak perempat tanpa medali (59ms)
+
+
+  4 passing (14s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        4                                                                                Γöé
+  Γöé Passing:      4                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     14 seconds                                                                       Γöé
+  Γöé Spec Ran:     match/08-kompetisi-8-peserta.cy.ts                                               Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/09-kompetisi-bye.cy.ts                                                  (24 of 29)
+
+
+  Kompetisi 3 peserta (BYE): dimainkan sampai juara
+    ΓêÜ bagan: setiap peserta tepat sekali di ronde 1 dan tidak ada pasangan BYE lawan BYE (2927ms)
+    ΓêÜ seluruh partai terbentuk dan dimainkan sampai habis: total N-1 partai, tidak ada yang macet (2967ms)
+    ΓêÜ juara tercatat di bagan dan medali: 1 emas, 1 perak, perunggu = yang kalah di semifinal (65ms)
+
+  Kompetisi 5 peserta (BYE): dimainkan sampai juara
+    ΓêÜ bagan: setiap peserta tepat sekali di ronde 1 dan tidak ada pasangan BYE lawan BYE (2990ms)
+    ΓêÜ seluruh partai terbentuk dan dimainkan sampai habis: total N-1 partai, tidak ada yang macet (6572ms)
+    ΓêÜ juara tercatat di bagan dan medali: 1 emas, 1 perak, perunggu = yang kalah di semifinal (59ms)
+
+  Kompetisi 6 peserta (BYE): dimainkan sampai juara
+    ΓêÜ bagan: setiap peserta tepat sekali di ronde 1 dan tidak ada pasangan BYE lawan BYE (3024ms)
+    ΓêÜ seluruh partai terbentuk dan dimainkan sampai habis: total N-1 partai, tidak ada yang macet (8062ms)
+    ΓêÜ juara tercatat di bagan dan medali: 1 emas, 1 perak, perunggu = yang kalah di semifinal (75ms)
+
+  Kompetisi 7 peserta (BYE): dimainkan sampai juara
+    ΓêÜ bagan: setiap peserta tepat sekali di ronde 1 dan tidak ada pasangan BYE lawan BYE (3078ms)
+    ΓêÜ seluruh partai terbentuk dan dimainkan sampai habis: total N-1 partai, tidak ada yang macet (9607ms)
+    ΓêÜ juara tercatat di bagan dan medali: 1 emas, 1 perak, perunggu = yang kalah di semifinal (73ms)
+
+  Kompetisi 9 peserta (BYE): dimainkan sampai juara
+    ΓêÜ bagan: setiap peserta tepat sekali di ronde 1 dan tidak ada pasangan BYE lawan BYE (2978ms)
+    ΓêÜ seluruh partai terbentuk dan dimainkan sampai habis: total N-1 partai, tidak ada yang macet (12737ms)
+    ΓêÜ juara tercatat di bagan dan medali: 1 emas, 1 perak, perunggu = yang kalah di semifinal (75ms)
+
+  Kompetisi 12 peserta (BYE): dimainkan sampai juara
+    ΓêÜ bagan: setiap peserta tepat sekali di ronde 1 dan tidak ada pasangan BYE lawan BYE (3132ms)
+    ΓêÜ seluruh partai terbentuk dan dimainkan sampai habis: total N-1 partai, tidak ada yang macet (17507ms)
+    ΓêÜ juara tercatat di bagan dan medali: 1 emas, 1 perak, perunggu = yang kalah di semifinal (67ms)
+
+
+  18 passing (1m)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        18                                                                               Γöé
+  Γöé Passing:      18                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 minute, 16 seconds                                                             Γöé
+  Γöé Spec Ran:     match/09-kompetisi-bye.cy.ts                                                     Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/10-beberapa-kategori-gelanggang.cy.ts                                   (25 of 29)
+
+
+  Dua kategori di dua gelanggang berjalan bersamaan
+    ΓêÜ 1. bagan tiap kategori terisolasi: hanya berisi pesertanya sendiri, masing-masing 2 semifinal (4613ms)
+    ΓêÜ 2. semifinal Putra di gelanggang utama dan semifinal Putri di gelanggang lain berlangsung SERENTAK (3214ms)
+    ΓêÜ 3. final tetap di gelanggang asal kategori (Putra di utama, Putri di gelanggang lain) dan juga serentak (1663ms)
+    ΓêÜ 4. masing-masing kategori punya juara sendiri di bagannya (43ms)
+    ΓêÜ 5. medali kontingen dijumlah dari KEDUA kategori: 2 emas, 2 perak, 4 perunggu di seluruh tim (37ms)
+    ΓêÜ 6. bagan publik: kejuaraan aktif menampilkan dua bagan, masing-masing hanya berisi atletnya (98ms)
+
+
+  6 passing (10s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        6                                                                                Γöé
+  Γöé Passing:      6                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     9 seconds                                                                        Γöé
+  Γöé Spec Ran:     match/10-beberapa-kategori-gelanggang.cy.ts                                      Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/11-pembatas-login-pin.cy.ts                                             (26 of 29)
+
+
+  Pelindung tebak-PIN: satu tablet tidak mengunci tablet lain
+    ΓêÜ tablet A salah PIN 5x terkunci (walau lalu memakai PIN benar), tablet B di IP yang sama tetap bisa login (3355ms)
+    ΓêÜ mengganti-ganti ID perangkat tidak menembus: 25 PIN salah dari satu IP mengunci IP itu, IP lain tetap normal (724ms)
+    ΓêÜ login berhasil di tengah tebakan tidak menghapus hitungan IP (penyerang dengan satu PIN sah tidak bisa menebak tanpa batas) (648ms)
+    ΓêÜ ID perangkat yang tidak valid diabaikan: klien tanpa ID dikunci per IP seperti perangkat tunggal (94ms)
+
+
+  4 passing (5s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        4                                                                                Γöé
+  Γöé Passing:      4                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     4 seconds                                                                        Γöé
+  Γöé Spec Ran:     match/11-pembatas-login-pin.cy.ts                                                Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/12-kunci-draw-bagan.cy.ts                                               (27 of 29)
+
+
+  Kunci draw bagan ditegakkan server
+    ΓêÜ kategori baru terbuka; generate dan acak ulang diizinkan (2915ms)
+    ΓêÜ dikunci: status tersimpan di server dan generate (walau lewat API langsung) ditolak 409 tanpa mengubah bagan (114ms)
+    ΓêÜ hanya admin/dewan yang boleh mengubah kunci; wasit, juri, anonim, dan kategori kejuaraan lain ditolak (112ms)
+    ΓêÜ kunci tidak menghalangi pertandingan: partai di bagan terkunci tetap bisa dimainkan dan pemenang maju (1620ms)
+    ΓêÜ bagan yang sudah dimainkan tidak bisa dibentuk ulang walau kunci dibuka (BRACKET_IN_PROGRESS), dan hasil tetap utuh (164ms)
+
+
+  5 passing (5s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        5                                                                                Γöé
+  Γöé Passing:      5                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     5 seconds                                                                        Γöé
+  Γöé Spec Ran:     match/12-kunci-draw-bagan.cy.ts                                                  Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/ui-05-layar-juri.cy.ts                                                  (28 of 29)
+
+
+  Layar juri (UI) - sinkronisasi realtime per kursi
+    juri kursi 1
+      ΓêÜ menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload (7914ms)
+      ΓêÜ tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat (17761ms)
+      ΓêÜ wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (1809ms)
+    juri kursi 2
+      ΓêÜ menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload (4974ms)
+      ΓêÜ tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat (17758ms)
+      ΓêÜ wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (1817ms)
+    juri kursi 3
+      ΓêÜ menampilkan identitas, atlet, dan status partai dari server, lalu mengikuti start/jeda/lanjut tanpa reload (5093ms)
+      ΓêÜ tap juri di layar + juri lain lewat soket ΓåÆ konsensus terlihat di layar dan di wasit; layar terkunci saat istirahat (17748ms)
+      ΓêÜ wasit menyelesaikan partai ΓåÆ layar menampilkan SELESAI dan tidak ada hasil ganda (1759ms)
+    dijeda dan BATAL
+      ΓêÜ saat wasit menjeda: tombol skor terkunci dan ada keterangan; setelah dilanjutkan tombol aktif lagi (1793ms)
+      ΓêÜ BATAL menarik tekanan yang menunggu (lampu padam); BATAL lagi tanpa input menampilkan pesan, bukan diam (1933ms)
+    koneksi dan akses
+      ΓêÜ wasit melihat tablet juri yang terbuka online di meja pengawas (kehadiran perangkat) (1665ms)
+      ΓêÜ tablet juri tanpa sesi diarahkan ke login PIN, dan wasit tidak dapat membuka layar juri (1535ms)
+
+
+  13 passing (1m)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        13                                                                               Γöé
+  Γöé Passing:      13                                                                               Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     1 minute, 25 seconds                                                             Γöé
+  Γöé Spec Ran:     match/ui-05-layar-juri.cy.ts                                                     Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+                                                                                                    
+  Running:  match/ui-06-konsol-wasit.cy.ts                                                (29 of 29)
+
+
+  Konsol wasit (UI) - memulai dan mengendalikan pertandingan
+    ΓêÜ menampilkan partai yang dimuat, atlet, dan kehadiran tiga juri (5331ms)
+    ΓêÜ MULAI RONDE di layar memulai partai di server: seluruh juri menerima round_1 dengan tenggat yang sama (3770ms)
+    ΓêÜ JEDA lalu LANJUTKAN di layar: juri menerima timer berhenti kemudian berjalan lagi (2371ms)
+    ΓêÜ poin konsensus dari juri tampil pada skor sudut dan SELESAIKAN menutup partai untuk semua perangkat (2329ms)
+    ΓêÜ partai yang dimulai pihak lain lebih dulu: konsol ikut berubah tanpa aksi, dan MULAI tidak bisa dipakai lagi (2199ms)
+    ΓêÜ wasit gelanggang lain melihat konsol kosong: tidak ada partai dari gelanggang ini (2077ms)
+    ΓêÜ akses halaman: juri tidak dapat membuka konsol wasit (1750ms)
+
+
+  7 passing (21s)
+
+
+  (Results)
+
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé Tests:        7                                                                                Γöé
+  Γöé Passing:      7                                                                                Γöé
+  Γöé Failing:      0                                                                                Γöé
+  Γöé Pending:      0                                                                                Γöé
+  Γöé Skipped:      0                                                                                Γöé
+  Γöé Screenshots:  0                                                                                Γöé
+  Γöé Video:        false                                                                            Γöé
+  Γöé Duration:     20 seconds                                                                       Γöé
+  Γöé Spec Ran:     match/ui-06-konsol-wasit.cy.ts                                                   Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+
+====================================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+  Γöé ΓêÜ  admin_flow.cy.ts                         00:10       17       17        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ├ù  auth_login.cy.ts                         00:04        7        6        1        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  contingent_access.cy.ts                  00:03        4        4        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  judge_pin_login.cy.ts                    00:04        5        5        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  public_scoreboard.cy.ts                  00:01        5        5        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  ipsi/01-kategori-ipsi.cy.ts              00:02       23       23        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  ipsi/02-registrasi-atlet.cy.ts           00:03       48       48        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  ipsi/03-verifikasi-timbang.cy.ts         00:03       27       27        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ├ù  ipsi/04-bagan-per-kategori.cy.ts         01:03       14        4       10        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  ipsi/05-matriks-hak-akses.cy.ts          00:01       24       24        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ├ù  ipsi/06-alur-lengkap-registrasi-ke-      00:01        9        7        2        -        - Γöé
+  Γöé    bagan.cy.ts                                                                                 Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  ipsi/07-isolasi-data-kontingen.cy.t      00:01       18       18        -        -        - Γöé
+  Γöé    s                                                                                           Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ├ù  ipsi/08-bagan-publik.cy.ts               721ms       16        -        1        -       15 Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ├ù  ipsi/09-bagan-ops-kategori.cy.ts         739ms        3        -        1        -        2 Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  ipsi/10-umur-dan-bobot-data-lama.cy      00:03       11       11        -        -        - Γöé
+  Γöé    .ts                                                                                         Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/01-wasit-kontrol-pertandingan      01:24       24       24        -        -        - Γöé
+  Γöé    .cy.ts                                                                                      Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/02-juri-sinkronisasi-realtime      01:29       34       34        -        -        - Γöé
+  Γöé    .cy.ts                                                                                      Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/03-otorisasi-role.cy.ts            01:47       48       48        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/04-ketahanan-dan-kasus-tepi.c      00:45       20       20        -        -        - Γöé
+  Γöé    y.ts                                                                                        Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/05-format-5-juri.cy.ts             00:23        6        6        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/06-pemulihan-restart-server.c      00:08        1        1        -        -        - Γöé
+  Γöé    y.ts                                                                                        Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/07-kompetisi-penuh.cy.ts           00:25        8        8        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/08-kompetisi-8-peserta.cy.ts       00:14        4        4        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/09-kompetisi-bye.cy.ts             01:16       18       18        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/10-beberapa-kategori-gelangga      00:09        6        6        -        -        - Γöé
+  Γöé    ng.cy.ts                                                                                    Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/11-pembatas-login-pin.cy.ts        00:04        4        4        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/12-kunci-draw-bagan.cy.ts          00:05        5        5        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/ui-05-layar-juri.cy.ts             01:25       13       13        -        -        - Γöé
+  Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+  Γöé ΓêÜ  match/ui-06-konsol-wasit.cy.ts           00:20        7        7        -        -        - Γöé
+  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+    ├ù  5 of 29 failed (17%)                     11:46      429      397       15        -       17  
+

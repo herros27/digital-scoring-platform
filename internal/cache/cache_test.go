@@ -72,7 +72,7 @@ func TestCache_HandlerWrapper(t *testing.T) {
 		val := atomic.AddInt64(&counter, 1)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`{"count":%d}`, val)))
+		fmt.Fprintf(w, `{"count":%d}`, val)
 	}
 
 	cachedHandler := c.Handler(500*time.Millisecond, handlerFunc)
@@ -148,5 +148,31 @@ func TestCache_HandlerNon200NotCached(t *testing.T) {
 	// Since 404 is not cached, counter must be 2
 	if atomic.LoadInt64(&counter) != 2 {
 		t.Errorf("expected error not to be cached, counter=%d", counter)
+	}
+}
+func TestInvalidateKeysContaining(t *testing.T) {
+	c := MustNew(100)
+	item := &Item{StatusCode: 200, Body: []byte("x")}
+	for _, k := range []string{
+		"GET:/api/v1/public/competitions",
+		"GET:/api/v1/public/competitions/abc/brackets",
+		"GET:/api/v1/competitions/abc/report/summary",
+	} {
+		c.Set(k, item, time.Minute)
+	}
+
+	c.InvalidateKeysContaining("") // no-op
+	if _, ok := c.Get("GET:/api/v1/public/competitions"); !ok {
+		t.Fatal("substring kosong tidak boleh menghapus apa pun")
+	}
+
+	c.InvalidateKeysContaining("/api/v1/public/competitions")
+	for _, k := range []string{"GET:/api/v1/public/competitions", "GET:/api/v1/public/competitions/abc/brackets"} {
+		if _, ok := c.Get(k); ok {
+			t.Fatalf("%s seharusnya sudah dibuang", k)
+		}
+	}
+	if _, ok := c.Get("GET:/api/v1/competitions/abc/report/summary"); !ok {
+		t.Fatal("entri lain tidak boleh ikut terhapus")
 	}
 }

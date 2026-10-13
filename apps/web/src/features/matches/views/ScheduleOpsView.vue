@@ -15,6 +15,7 @@ import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useAuthStore } from '@/stores/auth'
 import type { MatchDTO } from '../api/matchService'
+import MatchScoreDialog from '../components/MatchScoreDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -122,7 +123,7 @@ async function handleStartMatch(m: MatchDTO) {
   actionLoadingId.value = m.id
   try {
     await startMatchMutation.mutateAsync(m.id)
-    showToast('Pertandingan Dimulai', 'Timer dan konsol wasit telah diaktifkan.', 'success')
+    showToast('Pertandingan Dimulai', 'Timer dan konsol meja telah diaktifkan.', 'success')
   } catch (err) {
     showToast('Gagal Memulai', getErrorMessage(err, 'Gagal memulai pertandingan.'), 'danger')
   } finally {
@@ -167,6 +168,9 @@ async function handleFinishMatch(m: MatchDTO) {
   }
 }
 
+// Rincian skor
+const scoreMatch = ref<MatchDTO | null>(null)
+
 // External Links
 function openScoreboard(arenaId?: string) {
   const url = arenaId ? `/scoreboard/${arenaId}` : '/scoreboard'
@@ -178,12 +182,13 @@ function openRefereeConsole() {
 }
 
 // Stats
+// Partai yang sedang dijeda masih "live" (belum selesai, sudah di gelanggang): tidak masuk antrean
+const isLive = (status: string) => status === 'running' || status === 'paused'
+
 const stats = computed(() => {
   const all = matches.value
-  const running = all.filter((m) => m.status === 'running').length
-  const ready = all.filter(
-    (m) => m.status === 'ready' || m.status === 'idle' || m.status === 'paused',
-  ).length
+  const running = all.filter((m) => isLive(m.status)).length
+  const ready = all.filter((m) => m.status === 'ready' || m.status === 'idle').length
   const finished = all.filter((m) => m.status === 'finished').length
   return {
     total: all.length,
@@ -199,9 +204,9 @@ const filteredMatches = computed(() => {
 
   // Status Filter
   if (activeStatusFilter.value === 'running') {
-    list = list.filter((m) => m.status === 'running')
+    list = list.filter((m) => isLive(m.status))
   } else if (activeStatusFilter.value === 'ready') {
-    list = list.filter((m) => m.status === 'ready' || m.status === 'idle' || m.status === 'paused')
+    list = list.filter((m) => m.status === 'ready' || m.status === 'idle')
   } else if (activeStatusFilter.value === 'finished') {
     list = list.filter((m) => m.status === 'finished')
   }
@@ -539,7 +544,7 @@ const filteredMatches = computed(() => {
           </div>
 
           <div class="sch-status-pill" :class="`sch-status-pill--${m.status}`">
-            <span v-if="m.status === 'running'" class="sch-pulse-dot-live" />
+            <span v-if="isLive(m.status)" class="sch-pulse-dot-live" />
             <span>
               {{
                 m.status === 'running'
@@ -700,6 +705,15 @@ const filteredMatches = computed(() => {
             <button
               type="button"
               class="sch-link-btn"
+              title="Lihat skor per babak dan riwayat kejadian"
+              data-test="match-scores"
+              @click="scoreMatch = m"
+            >
+              Rincian Skor
+            </button>
+            <button
+              type="button"
+              class="sch-link-btn"
               title="Buka Scoreboard Gelanggang"
               @click="openScoreboard(m.arena_id)"
             >
@@ -709,15 +723,25 @@ const filteredMatches = computed(() => {
               v-if="canControlMatch"
               type="button"
               class="sch-link-btn"
-              title="Buka Konsol Wasit"
+              title="Buka Konsol Meja"
               @click="openRefereeConsole"
             >
-              Konsol Wasit
+              Konsol Meja
             </button>
           </div>
         </footer>
       </article>
     </div>
+
+    <MatchScoreDialog
+      :open="!!scoreMatch"
+      :competition-id="activeCompId"
+      :match="scoreMatch"
+      :red-name="participantMap[scoreMatch?.athlete_red_id ?? '']?.name || 'Pesilat Merah'"
+      :blue-name="participantMap[scoreMatch?.athlete_blue_id ?? '']?.name || 'Pesilat Biru'"
+      :arena-name="arenaMap[scoreMatch?.arena_id ?? '']"
+      @close="scoreMatch = null"
+    />
   </div>
 </template>
 

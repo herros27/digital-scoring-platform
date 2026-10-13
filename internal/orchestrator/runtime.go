@@ -98,7 +98,6 @@ func Restore(
 	matchStore MatchStore,
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
-	bracketStore BracketAdvancer,
 	rs RuntimeStore,
 ) (*Orchestrator, error) {
 	var d runtimeData
@@ -113,7 +112,7 @@ func Restore(
 
 	sm := statemachine.NewWithState(rec.MatchID, state)
 	ruleset := d.Ruleset
-	o := New(rec.MatchID, rec.ArenaID, sm, &ruleset, h, matchStore, eventStore, scoreStore, bracketStore)
+	o := New(rec.MatchID, rec.ArenaID, sm, &ruleset, h, matchStore, eventStore, scoreStore)
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -138,6 +137,9 @@ func Restore(
 	case sm.IsInRound():
 		o.timer = o.newTimer(remaining, o.onRoundExpired) // sengaja tidak dijalankan: dipulihkan dijeda
 		o.recovered = true
+		if matchStore != nil {
+			_ = matchStore.UpdateStatus(rec.MatchID, "paused") // daftar partai di UI menampilkan Lanjutkan
+		}
 	case state == statemachine.StateBreak1 || state == statemachine.StateBreak2:
 		o.timer = o.newTimer(remaining, o.onBreakExpired)
 		o.timer.Start()

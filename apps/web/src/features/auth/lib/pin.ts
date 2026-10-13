@@ -39,8 +39,12 @@ export function formatPin(raw: string): string {
 export function pinLoginErrorMessage(error: unknown): string {
   if (error instanceof AppApiError) {
     if (error.code === 'INVALID_PIN') return 'PIN salah atau sudah kedaluwarsa.'
-    if (error.code === 'TOO_MANY_ATTEMPTS')
-      return 'Terlalu banyak PIN salah. Coba lagi beberapa menit lagi.'
+    // pesan server membedakan "perangkat ini" (tablet ini saja) dan "jaringan ini" (batas IP/global)
+    if (error.code === 'TOO_MANY_ATTEMPTS') {
+      const msg = error.message.trim().replace(/[.,\s]+$/, '')
+      const head = msg.length > 8 ? msg[0].toUpperCase() + msg.slice(1) : 'Terlalu banyak PIN salah'
+      return `${head}. Minta panitia memeriksa PIN bila terus gagal.`
+    }
   }
   return getErrorMessage(error, 'Tidak dapat terhubung ke server. Periksa jaringan lalu coba lagi.')
 }

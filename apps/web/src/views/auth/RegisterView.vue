@@ -12,6 +12,7 @@ const form = ref({
   pic_name: '',
   email: '',
   phone: '',
+  invite_code: '',
   password: '',
   confirmPassword: '',
 })
@@ -19,6 +20,9 @@ const form = ref({
 const isLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 
 async function handleRegister() {
   errorMessage.value = ''
@@ -35,8 +39,8 @@ async function handleRegister() {
     return
   }
 
-  if (form.value.password.length < 6) {
-    errorMessage.value = 'Kata sandi minimal 6 karakter.'
+  if (form.value.password.length < 8) {
+    errorMessage.value = 'Kata sandi minimal 8 karakter.'
     return
   }
 
@@ -53,6 +57,7 @@ async function handleRegister() {
       pic_name: form.value.pic_name.trim(),
       email: form.value.email.trim(),
       phone: form.value.phone.trim(),
+      invite_code: form.value.invite_code.trim(),
       password: form.value.password,
     })
 
@@ -181,17 +186,40 @@ async function handleRegister() {
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="reg-invite">Kode undangan pendaftaran</label>
+          <AppInput
+            id="reg-invite"
+            v-model="form.invite_code"
+            placeholder="Diberikan oleh panitia pelaksana (bila dibatasi)"
+            :disabled="isLoading"
+          />
+        </div>
+
         <div class="form-row">
           <div class="form-group flex-1">
             <label class="form-label" for="reg-password">Kata sandi</label>
             <AppInput
               id="reg-password"
               v-model="form.password"
-              type="password"
+              :type="showPassword ? 'text' : 'password'"
               placeholder="Min. 6 karakter"
               :disabled="isLoading"
+              autocomplete="new-password"
               required
-            />
+            >
+              <template #suffix>
+                <button
+                  type="button"
+                  class="toggle-pwd-btn"
+                  :aria-label="showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                  @click="showPassword = !showPassword"
+                  tabindex="-1"
+                >
+                  {{ showPassword ? 'Sembunyikan' : 'Lihat' }}
+                </button>
+              </template>
+            </AppInput>
           </div>
 
           <div class="form-group flex-1">
@@ -199,13 +227,30 @@ async function handleRegister() {
             <AppInput
               id="reg-confirm"
               v-model="form.confirmPassword"
-              type="password"
+              :type="showConfirmPassword ? 'text' : 'password'"
               placeholder="Ulangi kata sandi"
               :disabled="isLoading"
+              autocomplete="new-password"
               required
-            />
+            >
+              <template #suffix>
+                <button
+                  type="button"
+                  class="toggle-pwd-btn"
+                  :aria-label="showConfirmPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                  tabindex="-1"
+                >
+                  {{ showConfirmPassword ? 'Sembunyikan' : 'Lihat' }}
+                </button>
+              </template>
+            </AppInput>
           </div>
         </div>
+
+        <p class="privacy-note">
+          <strong>Pemberitahuan Privasi:</strong> Data pendaftaran kontingen dan atlet digunakan khusus untuk verifikasi dan pelaksanaan kejuaraan pencak silat sesuai ketentuan panitia pelaksana.
+        </p>
 
         <AppButton type="submit" variant="primary" size="lg" full-width :loading="isLoading">
           Daftarkan Kontingen
@@ -229,52 +274,62 @@ async function handleRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: clamp(16px, 4vw, 32px);
+  padding-top: max(clamp(16px, 4vw, 32px), env(safe-area-inset-top));
+  padding-bottom: max(clamp(16px, 4vw, 32px), env(safe-area-inset-bottom));
+  padding-left: max(clamp(16px, 4vw, 32px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 4vw, 32px), env(safe-area-inset-right));
   background-color: var(--color-neutral-950, #090d16);
+  box-sizing: border-box;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 500px;
   background: var(--color-neutral-900, #0f172a);
   border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 12px;
-  padding: 32px 28px;
+  border-radius: var(--radius-lg, 16px);
+  padding: clamp(20px, 5vw, 32px) clamp(16px, 4.5vw, 28px);
   box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.4),
-    0 2px 4px -2px rgba(0, 0, 0, 0.4),
+    0 10px 25px -5px rgba(0, 0, 0, 0.5),
+    0 8px 10px -6px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+  margin: auto;
 }
 
 .brand-header {
   text-align: center;
-  margin-bottom: 22px;
+  margin-bottom: clamp(18px, 4vw, 24px);
 }
 
 .brand-logo {
-  width: 48px;
-  height: 48px;
+  width: clamp(42px, 8vw, 48px);
+  height: clamp(42px, 8vw, 48px);
   margin: 0 auto 12px auto;
-  border-radius: 10px;
+  border-radius: var(--radius-md, 12px);
   background: #059669;
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
 }
 
 .brand-title {
-  font-size: 1.25rem;
+  font-size: clamp(1.125rem, 4vw, 1.35rem);
   font-weight: 700;
   color: #ffffff;
   margin-bottom: 4px;
   text-wrap: balance;
+  line-height: 1.3;
 }
 
 .brand-subtitle {
-  font-size: 0.8125rem;
+  font-size: clamp(0.75rem, 2.8vw, 0.8125rem);
   color: #94a3b8;
   text-wrap: pretty;
+  line-height: 1.45;
 }
 
 .success-banner {
@@ -282,12 +337,14 @@ async function handleRegister() {
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #a7f3d0;
   padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 0.8125rem;
+  border-radius: 8px;
+  font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
   margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 10px;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .error-banner {
@@ -295,18 +352,25 @@ async function handleRegister() {
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: #fca5a5;
   padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 0.8125rem;
+  border-radius: 8px;
+  font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
   margin-bottom: 16px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.error-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: clamp(12px, 3vw, 16px);
 }
 
 .form-group {
@@ -319,30 +383,54 @@ async function handleRegister() {
   display: flex;
   gap: 12px;
 }
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .form-row {
     flex-direction: column;
+    gap: 12px;
   }
 }
 
 .flex-1 {
   flex: 1;
+  min-width: 0;
 }
 
 .form-label {
-  font-size: 0.8125rem;
+  font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
   font-weight: 500;
   color: #cbd5e1;
 }
 
+.toggle-pwd-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: clamp(0.6875rem, 2.4vw, 0.75rem);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  touch-action: manipulation;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+.toggle-pwd-btn:hover {
+  color: #f1f5f9;
+}
+
 .auth-footer {
-  margin-top: 20px;
+  margin-top: clamp(16px, 3.5vw, 22px);
   text-align: center;
 }
 
 .login-prompt {
-  font-size: 0.8125rem;
+  font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
   color: #94a3b8;
+  line-height: 1.4;
 }
 
 .link-primary {
@@ -350,8 +438,50 @@ async function handleRegister() {
   font-weight: 600;
   text-decoration: none;
   margin-left: 4px;
+  display: inline-block;
+  padding: 2px 4px;
 }
 .link-primary:hover {
   text-decoration: underline;
+}
+
+.privacy-note {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  margin-top: 4px;
+}
+
+/* Compact screens / Landscape mobile orientation */
+@media (max-height: 640px) {
+  .auth-page {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .brand-header {
+    margin-bottom: 14px;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 8px;
+  }
+  .brand-logo svg {
+    width: 20px;
+    height: 20px;
+  }
+  .auth-card {
+    padding: 18px 16px;
+  }
+  .auth-form {
+    gap: 10px;
+  }
+  .auth-footer {
+    margin-top: 14px;
+  }
 }
 </style>

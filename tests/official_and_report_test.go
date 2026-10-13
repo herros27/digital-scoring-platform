@@ -65,6 +65,21 @@ func (m *mockOfficialRepo) Update(o *domain.Official) error {
 	return nil
 }
 
+func (m *mockOfficialRepo) UpdatePassword(id, passwordHash string) error {
+	m.passwords[id] = passwordHash
+	return nil
+}
+
+func (m *mockOfficialRepo) CountByRole(role string) (int, error) {
+	n := 0
+	for _, o := range m.officials {
+		if o.Role == role {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (m *mockOfficialRepo) Delete(id string) error {
 	delete(m.officials, id)
 	delete(m.passwords, id)
@@ -130,6 +145,23 @@ func TestOfficialService_CRUDAndLogin(t *testing.T) {
 		t.Errorf("ListOfficials failed: len=%d err=%v", len(list), err)
 	}
 
+	// 7b. Token lama dicabut saat perannya diubah lewat UpdateOfficialBy, dan saat akun dihapus
+	oldToken, _, err := svc.Login("dewan@silat.id", "mock_secret_1")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	oldClaims, _ := auth.ParseToken(oldToken)
+	if auth.Revoked(oldClaims) {
+		t.Fatal("token tidak boleh dicabut sebelum ada perubahan")
+	}
+	admin := service.Actor{ID: "admin-lain", Role: "admin"}
+	if _, err := svc.UpdateOfficialBy(admin, created.ID, "", "wasit"); err != nil {
+		t.Fatalf("UpdateOfficialBy failed: %v", err)
+	}
+	if !auth.Revoked(oldClaims) {
+		t.Error("token lama harus dicabut setelah peran diubah")
+	}
+
 	// 7. Update Official
 	updated, err := svc.UpdateOfficial(created.ID, "Dewan Utama", "admin")
 	if err != nil {
@@ -139,9 +171,12 @@ func TestOfficialService_CRUDAndLogin(t *testing.T) {
 		t.Errorf("updated fields mismatch: %+v", updated)
 	}
 
-	// 8. Delete Official
-	if err := svc.DeleteOfficial(created.ID); err != nil {
-		t.Fatalf("DeleteOfficial failed: %v", err)
+	// 8. Delete Official (oleh admin lain; admin terakhir tidak boleh dihapus, jadi turunkan dulu perannya)
+	if _, err := svc.UpdateOfficial(created.ID, "", "wasit"); err != nil {
+		t.Fatalf("UpdateOfficial failed: %v", err)
+	}
+	if err := svc.DeleteOfficialBy(service.Actor{ID: "admin-lain", Role: "admin"}, created.ID); err != nil {
+		t.Fatalf("DeleteOfficialBy failed: %v", err)
 	}
 	_, errDel := svc.GetOfficialByID(created.ID)
 	if errDel != domain.ErrNotFound {
@@ -150,7 +185,12 @@ func TestOfficialService_CRUDAndLogin(t *testing.T) {
 }
 
 type mockReportMatchRepo struct {
-	matches []store.Match
+	matches    []store.Match
+	placements []store.MedalPlacement
+}
+
+func (m *mockReportMatchRepo) MedalPlacements(string) ([]store.MedalPlacement, error) {
+	return m.placements, nil
 }
 
 func (m *mockReportMatchRepo) ListByCompetition(competitionID string) ([]store.Match, error) {
@@ -253,6 +293,11 @@ func TestReportService_SummaryAndMedalsAndExport(t *testing.T) {
 	_ = athleteRepo.Create(ath2)
 
 	matchRepo := &mockReportMatchRepo{
+		// hasil bagan: final dimenangkan Jatim atas Jabar, dua tim lain kalah di semifinal
+		placements: []store.MedalPlacement{
+			{Team: "Kontingen Jatim", Medal: "gold"},
+			{Team: "Kontingen Jabar", Medal: "silver"},
+		},
 		matches: []store.Match{
 			{
 				ID:            "m-1",
@@ -329,6 +374,7 @@ func TestOfficialHandler_HTTP(t *testing.T) {
 	createBody := strings.NewReader(`{"name":"Operator 1","email":"op1@silat.id","password":"test_password_1","role":"operator"}`)
 	req := httptest.NewRequest("POST", "/api/v1/officials", createBody)
 	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(auth.ContextWithClaims(req.Context(), &auth.Claims{JudgePinID: "admin-x", Role: "admin"}))
 	w := httptest.NewRecorder()
 	h.Create(w, req)
 
@@ -426,5 +472,37 @@ func TestReportHandler_HTTP(t *testing.T) {
 	h.Export(wExport, reqExport)
 	if wExport.Code != http.StatusOK {
 		t.Errorf("expected 200 OK for export, got %d: %s", wExport.Code, wExport.Body.String())
+	}
+}
+
+// firstID ID akun pertama yang ada (dipakai tes yang membuat akun lewat service).
+func (m *mockOfficialRepo) firstID() string {
+	for id := range m.officials {
+		return id
+	}
+	return ""
+}
+
+func TestOfficialService_LoginLockout(t *testing.T) {
+	repo := newMockOfficialRepo()
+	svc := service.NewOfficialService(repo)
+
+	_, err := svc.CreateOfficial("Admin Test", "admin-lockout@silat.id", "test_correct_pass_1", "admin")
+	if err != nil {
+		t.Fatalf("CreateOfficial failed: %v", err)
+	}
+
+	// 5 failed login attempts
+	for i := 0; i < 5; i++ {
+		_, _, err := svc.Login("admin-lockout@silat.id", "wrongPass")
+		if err == nil {
+			t.Fatalf("attempt %d: expected error on wrong password", i+1)
+		}
+	}
+
+	// 6th attempt with CORRECT password must be rejected due to account lockout
+	_, _, err = svc.Login("admin-lockout@silat.id", "test_correct_pass_1")
+	if err == nil {
+		t.Fatalf("expected 6th attempt with correct password to be locked out")
 	}
 }

@@ -82,13 +82,6 @@ func (h *Hub) Release(owner any) {
 	h.mu.Unlock()
 }
 
-// SetOnPresence memasang callback perubahan kehadiran (aman dipanggil saat hub berjalan).
-func (h *Hub) SetOnPresence(fn func()) {
-	h.mu.Lock()
-	h.onPresence = fn
-	h.mu.Unlock()
-}
-
 func (h *Hub) notifyPresence() {
 	h.mu.RLock()
 	fn := h.onPresence
@@ -148,37 +141,43 @@ func (h *Hub) Run() {
 
 // Broadcast ke semua client di arena
 func (h *Hub) Broadcast(msg Message) {
+	h.sendWhere(msg, func(*Client) bool { return true })
+}
+
+// Send ke role tertentu saja
+func (h *Hub) SendToRole(role Role, msg Message) {
+	h.sendWhere(msg, func(c *Client) bool { return c.Role == role })
+}
+
+// sendWhere mengirim ke klien yang cocok. Klien yang antreannya penuh (jaringan macet) diputus; karena jalur ini
+// tidak lewat unregister, kehadiran diperbarui di sini supaya panel wasit tidak menampilkan perangkat itu online.
+// Callback kehadiran dijalankan di goroutine sendiri: pemanggil Broadcast bisa sedang memegang kunci orchestrator
+// yang juga dipakai callback itu.
+func (h *Hub) sendWhere(msg Message, match func(*Client) bool) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	dropped := false
 	for client := range h.clients {
+		if !match(client) {
+			continue
+		}
 		select {
 		case client.send <- msg:
 		default:
 			close(client.send)
 			delete(h.clients, client)
 			metrics.DecWSConnections(h.ArenaID, string(client.Role))
+			dropped = true
 		}
+	}
+	h.mu.Unlock()
+	if dropped {
+		go h.notifyPresence()
 	}
 }
 
-// Send ke role tertentu saja
-func (h *Hub) SendToRole(role Role, msg Message) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for client := range h.clients {
-		if client.Role == role {
-			select {
-			case client.send <- msg:
-			default:
-				close(client.send)
-				delete(h.clients, client)
-				metrics.DecWSConnections(h.ArenaID, string(client.Role))
-			}
-		}
-	}
-}
-
-// Send ke client tertentu
+// SendToClient mengirim ke SEMUA koneksi dengan ID tersebut. Satu PIN dapat punya lebih dari satu koneksi
+// (tablet kembar, atau sambung ulang saat koneksi lama belum dibuang server), jadi berhenti di koneksi pertama
+// bisa menjatuhkan pesan ke koneksi mati. Untuk balasan atas sebuah permintaan pakai SendToConn.
 func (h *Hub) SendToClient(clientID string, msg Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -188,8 +187,21 @@ func (h *Hub) SendToClient(clientID string, msg Message) {
 			case client.send <- msg:
 			default:
 			}
-			return
 		}
+	}
+}
+
+// SendToConn membalas tepat ke koneksi yang meminta (mis. sync_response dan error), tidak ke koneksi lain
+// yang kebetulan memakai ID yang sama. Diabaikan bila koneksi itu sudah dilepas dari hub.
+func (h *Hub) SendToConn(c *Client, msg Message) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if !h.clients[c] {
+		return
+	}
+	select {
+	case c.send <- msg:
+	default:
 	}
 }
 
@@ -198,11 +210,6 @@ func (h *Hub) Register(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[client] = true
-}
-
-// HandleWS — HTTP handler untuk upgrade ke WebSocket
-func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request, clientID string, role Role) {
-	h.HandleWSWithSeat(w, r, clientID, role, 0)
 }
 
 // HandleWSWithSeat — HTTP handler untuk upgrade ke WebSocket dengan nomor kursi

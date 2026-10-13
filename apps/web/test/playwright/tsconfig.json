@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "../../playwright.pwa.config.ts",
+    "./**/*.ts",
+    "../../playwright.config.ts",
+    "../cypress/support/match/*.ts",
+    "../cypress/support/accounts.ts"
+  ]
+}

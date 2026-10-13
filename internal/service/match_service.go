@@ -21,7 +21,7 @@ type MatchRepository interface {
 	Create(m *store.Match) error
 	GetByID(id string) (*store.Match, error)
 	UpdateStatus(id, status string) error
-	SetWinner(matchID, winnerID string) error
+	FinishMatch(matchID, winnerCorner string) (winnerID string, err error)
 }
 
 type RulesetResolver interface {
@@ -29,17 +29,19 @@ type RulesetResolver interface {
 }
 
 type MatchService struct {
-	mu              sync.RWMutex
-	matchRepo       MatchRepository
-	compRepo        CompetitionRepository
-	hubManager      *hub.Manager
-	eventStore      *store.MatchEventStore
-	scoreStore      *store.MatchScoreStore
-	matchStore      *store.MatchStore
-	bracketStore    orchestrator.BracketAdvancer
-	rulesetResolver RulesetResolver
-	arenaStore      *store.ArenaStore
-	runtimeStore    *store.MatchRuntimeStore
+	mu               sync.RWMutex
+	matchRepo        MatchRepository
+	compRepo         CompetitionRepository
+	hubManager       *hub.Manager
+	eventStore       *store.MatchEventStore
+	scoreStore       *store.MatchScoreStore
+	matchStore       *store.MatchStore
+	rulesetResolver  RulesetResolver
+	categoryRulesets CategoryRulesetLookup
+	arenaStore       *store.ArenaStore
+	runtimeStore     *store.MatchRuntimeStore
+	// participantLookup opsional: memvalidasi peserta saat partai dibuat manual (ada, sekejuaraan, terverifikasi).
+	participantLookup func(id string) (*domain.Participant, error)
 
 	// activeOrchestrators menyimpan match yang sedang live di arena: map[matchID]*Orchestrator
 	activeOrchestrators map[string]*orchestrator.Orchestrator
@@ -88,6 +90,47 @@ func (s *MatchService) ArenaName(arenaID string) string {
 // SetArenaStore memungkinkan daftar scoreboard publik menampilkan nama gelanggang.
 func (s *MatchService) SetArenaStore(a *store.ArenaStore) { s.arenaStore = a }
 
+// SetParticipantLookup mengaktifkan validasi peserta pada pembuatan partai manual.
+func (s *MatchService) SetParticipantLookup(f func(id string) (*domain.Participant, error)) {
+	s.participantLookup = f
+}
+
+// CategoryRulesetLookup mencari ruleset khusus kategori dari slot bagan sebuah partai.
+type CategoryRulesetLookup interface {
+	RulesetIDForSlot(slotID string) (string, error)
+	AgeGroupForSlot(slotID string) (string, error)
+}
+
+// SetCategoryRulesetLookup mengaktifkan ruleset khusus per kategori (menimpa ruleset kejuaraan).
+func (s *MatchService) SetCategoryRulesetLookup(l CategoryRulesetLookup) {
+	s.categoryRulesets = l
+}
+
+// withAgeAdjustments menyesuaikan ruleset dengan golongan umur kategori partai: (1) waktu pertandingan khusus golongan
+// itu bila ruleset mencantumkannya (`age_timings`, bebas ditentukan panitia), dan (2) bila ruleset tanpa `point_gap`,
+// selisih WMP menurut golongan (usia dini dan pra-remaja 20; selain itu bawaan 30). Mengembalikan salinan karena
+// ruleset dari resolver dipakai bersama.
+func (s *MatchService) withAgeAdjustments(matchID string, r *rules.Ruleset) *rules.Ruleset {
+	needGap := r.Scoring.PointGap == nil
+	if (!needGap && len(r.Scoring.AgeTimings) == 0) || s.categoryRulesets == nil || s.matchRepo == nil {
+		return r
+	}
+	m, err := s.matchRepo.GetByID(matchID)
+	if err != nil || m == nil || m.BracketSlotID == "" {
+		return r
+	}
+	ag, err := s.categoryRulesets.AgeGroupForSlot(m.BracketSlotID)
+	if err != nil || ag == "" {
+		return r
+	}
+	c := *r
+	c.Scoring = c.Scoring.WithAgeTiming(ag)
+	if needGap && domain.IsYouthAgeGroup(ag) {
+		c.Scoring.PointGap = &rules.PointGapRule{Margin: rules.PointGapYouthMargin}
+	}
+	return &c
+}
+
 func (s *MatchService) SetRulesetResolver(resolver RulesetResolver) {
 	s.rulesetResolver = resolver
 }
@@ -99,7 +142,6 @@ func NewMatchService(
 	eventStore *store.MatchEventStore,
 	scoreStore *store.MatchScoreStore,
 	matchStore *store.MatchStore,
-	bracketStore orchestrator.BracketAdvancer,
 ) *MatchService {
 	return &MatchService{
 		matchRepo:           matchRepo,
@@ -108,7 +150,6 @@ func NewMatchService(
 		eventStore:          eventStore,
 		scoreStore:          scoreStore,
 		matchStore:          matchStore,
-		bracketStore:        bracketStore,
 		activeOrchestrators: make(map[string]*orchestrator.Orchestrator),
 	}
 }
@@ -192,7 +233,24 @@ func (s *MatchService) CreateMatch(m *store.Match) error {
 		return errors.New("both athletes (red and blue) must be specified")
 	}
 	if m.AthleteRedID == m.AthleteBlueID {
-		return errors.New("athlete red and blue cannot be the same person")
+		return fmt.Errorf("%w: peserta merah dan biru tidak boleh sama", domain.ErrInvalidInput)
+	}
+	if s.participantLookup != nil {
+		for corner, id := range map[string]string{"merah": m.AthleteRedID, "biru": m.AthleteBlueID} {
+			p, err := s.participantLookup(id)
+			if err != nil || p == nil || p.CompetitionID != m.CompetitionID {
+				return fmt.Errorf("%w: peserta sudut %s tidak ditemukan pada kejuaraan ini", domain.ErrInvalidInput, corner)
+			}
+			if p.RegistrationStatus != "verified" {
+				return fmt.Errorf("%w: peserta sudut %s (%s) belum terverifikasi", domain.ErrInvalidInput, corner, p.Name)
+			}
+		}
+	}
+	if s.arenaStore != nil && m.ArenaID != "" {
+		a, err := s.arenaStore.GetByID(m.ArenaID)
+		if err != nil || a == nil || a.CompetitionID != m.CompetitionID {
+			return fmt.Errorf("%w: gelanggang tidak ditemukan pada kejuaraan ini", domain.ErrInvalidInput)
+		}
 	}
 	m.Status = "idle"
 	m.CurrentRound = 1
@@ -204,9 +262,20 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// 0. Partai hanya boleh dimuat di gelanggang tempat ia dijadwalkan. Tanpa ini wasit gelanggang lain bisa "menarik"
+	// partai dan memindahkannya diam-diam. Perpindahan resmi lewat gelanggang asal kategori.
+	if s.matchRepo != nil {
+		if m, err := s.matchRepo.GetByID(matchID); err == nil && m != nil && m.ArenaID != arenaID {
+			if m.ArenaID == "" {
+				return fmt.Errorf("%w: partai ini belum punya gelanggang", domain.ErrForbidden)
+			}
+			return fmt.Errorf("%w: partai ini dijadwalkan di gelanggang lain", domain.ErrForbidden)
+		}
+	}
+
 	// 1. Cek apakah match sudah aktif di arena
 	if existing, ok := s.activeOrchestrators[matchID]; ok && existing.IsActive() {
-		return errors.New("match already loaded to arena")
+		return errors.New("partai ini sudah dimuat ke gelanggang")
 	}
 
 	// 2. Cek apakah arena sedang digunakan oleh match aktif lain (ARENA_BUSY)
@@ -222,11 +291,19 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	// Jika rulesetPath kosong, coba ambil ruleset_id dari competition
 	if rulesetPath == "" && s.matchRepo != nil && s.compRepo != nil {
 		if m, errMatch := s.matchRepo.GetByID(matchID); errMatch == nil && m != nil {
-			if comp, errComp := s.compRepo.GetByID(m.CompetitionID); errComp == nil && comp != nil {
-				if comp.RulesetID != nil && *comp.RulesetID != "" {
-					rulesetPath = *comp.RulesetID
-				} else if comp.RulesetName != "" {
-					rulesetPath = comp.RulesetName
+			// Prioritas: ruleset khusus kategori (mis. durasi Usia Dini), lalu ruleset kejuaraan.
+			if m.BracketSlotID != "" && s.categoryRulesets != nil {
+				if rid, errCat := s.categoryRulesets.RulesetIDForSlot(m.BracketSlotID); errCat == nil && rid != "" {
+					rulesetPath = rid
+				}
+			}
+			if rulesetPath == "" {
+				if comp, errComp := s.compRepo.GetByID(m.CompetitionID); errComp == nil && comp != nil {
+					if comp.RulesetID != nil && *comp.RulesetID != "" {
+						rulesetPath = *comp.RulesetID
+					} else if comp.RulesetName != "" {
+						rulesetPath = comp.RulesetName
+					}
 				}
 			}
 		}
@@ -242,6 +319,7 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 	if err != nil {
 		return err
 	}
+	r = s.withAgeAdjustments(matchID, r)
 
 	var mStore orchestrator.MatchStore
 	if s.matchStore != nil {
@@ -250,11 +328,16 @@ func (s *MatchService) LoadMatchToArena(matchID, arenaID, rulesetPath string) er
 		mStore = s.matchRepo
 	}
 
-	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore)
+	orch := orchestrator.New(matchID, arenaID, sm, r, s.hubManager.GetOrCreate(arenaID), mStore, s.eventStore, s.scoreStore)
 	if s.runtimeStore != nil {
 		orch.SetRuntimeStore(s.runtimeStore)
 	}
 	s.activeOrchestrators[matchID] = orch
+	if s.matchStore != nil {
+		if err := s.matchStore.SetArena(matchID, arenaID); err != nil {
+			log.Printf("[match] gagal mencatat gelanggang partai %s: %v", matchID, err)
+		}
+	}
 	// beri tahu layar yang sudah tersambung (scoreboard, tablet, konsol) bahwa partai baru dimuat
 	orch.BroadcastSnapshot()
 	return nil
@@ -294,7 +377,7 @@ func (s *MatchService) RestoreActiveMatches() (int, error) {
 		} else if s.matchRepo != nil {
 			mStore = s.matchRepo
 		}
-		orch, err := orchestrator.Restore(rec, s.hubManager.GetOrCreate(rec.ArenaID), mStore, s.eventStore, s.scoreStore, s.bracketStore, s.runtimeStore)
+		orch, err := orchestrator.Restore(rec, s.hubManager.GetOrCreate(rec.ArenaID), mStore, s.eventStore, s.scoreStore, s.runtimeStore)
 		if err != nil {
 			log.Printf("[match] gagal memulihkan partai %s: %v", rec.MatchID, err)
 			_ = s.runtimeStore.Delete(rec.MatchID)
@@ -316,6 +399,24 @@ func (s *MatchService) GetOrchestrator(matchID string) (*orchestrator.Orchestrat
 		return nil, errors.New("match not loaded to arena")
 	}
 	return o, nil
+}
+
+// ArenaForMatch gelanggang tempat partai berada: gelanggang orchestrator bila sedang dimuat, selain itu
+// gelanggang pada data partai. Kosong bila partai tidak diketahui. Dipakai untuk membatasi token PIN
+// (terikat satu gelanggang) agar tidak mengontrol partai di gelanggang lain.
+func (s *MatchService) ArenaForMatch(matchID string) string {
+	s.mu.RLock()
+	o, ok := s.activeOrchestrators[matchID]
+	s.mu.RUnlock()
+	if ok {
+		return o.GetArenaID()
+	}
+	if s.matchRepo != nil {
+		if m, err := s.matchRepo.GetByID(matchID); err == nil && m != nil {
+			return m.ArenaID
+		}
+	}
+	return ""
 }
 
 func (s *MatchService) StartMatch(matchID string) error {

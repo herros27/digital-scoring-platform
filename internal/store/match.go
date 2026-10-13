@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type MatchStore struct {
 	DB *sql.DB
@@ -69,14 +72,59 @@ func (s *MatchStore) GetByID(id string) (*Match, error) {
 	return m, nil
 }
 
-func (s *MatchStore) UpdateStatus(id, status string) error {
-	_, err := s.DB.Exec(`UPDATE matches SET status = $1 WHERE id = $2`, status, id)
+// SetArena memindahkan partai ke gelanggang tempat ia dimuat. Partai dibuat dengan gelanggang bergilir saat bagan
+// dibentuk, sedangkan panitia boleh memainkannya di gelanggang mana pun; tanpa ini antrean per gelanggang dan nomor
+// partai di scoreboard tetap menunjuk gelanggang lama.
+func (s *MatchStore) SetArena(matchID, arenaID string) error {
+	_, err := s.DB.Exec(`UPDATE matches SET arena_id = $2 WHERE id = $1`, matchID, arenaID)
 	return err
 }
 
-func (s *MatchStore) SetWinner(matchID, winnerID string) error {
-	_, err := s.DB.Exec(`UPDATE matches SET winner_id = $1, status = 'finished', finished_at = NOW() WHERE id = $2`, winnerID, matchID)
+func (s *MatchStore) UpdateStatus(id, status string) error {
+	// started_at diisi sekali saat partai mulai berjalan (tidak ditimpa bila dilanjutkan/dipulihkan).
+	_, err := s.DB.Exec(`UPDATE matches
+		SET status = $1::text,
+		    started_at = CASE WHEN $1::text = 'running' THEN COALESCE(started_at, NOW()) ELSE started_at END
+		WHERE id = $2`, status, id)
 	return err
+}
+
+// FinishMatch menutup partai dalam satu transaksi: status, pemenang, dan kemajuan bagan (termasuk membuat partai
+// babak berikutnya) tersimpan semuanya atau tidak sama sekali. winnerCorner "red" atau "blue"; mengembalikan id atlet
+// pemenang. Bila gagal, partai di database tetap seperti sebelumnya sehingga penutupan bisa diulang.
+func (s *MatchStore) FinishMatch(matchID, winnerCorner string) (string, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	var red, blue string
+	var slotID sql.NullString
+	if err := tx.QueryRow(`SELECT athlete_red_id, athlete_blue_id, bracket_slot_id FROM matches WHERE id = $1 FOR UPDATE`,
+		matchID).Scan(&red, &blue, &slotID); err != nil {
+		return "", err
+	}
+	var winnerID string
+	switch winnerCorner {
+	case "red":
+		winnerID = red
+	case "blue":
+		winnerID = blue
+	default:
+		return "", fmt.Errorf("sudut pemenang %q tidak dikenal", winnerCorner)
+	}
+
+	if _, err := tx.Exec(`UPDATE matches SET winner_id = $1, status = 'finished', finished_at = NOW() WHERE id = $2`,
+		winnerID, matchID); err != nil {
+		return "", err
+	}
+	if slotID.Valid && slotID.String != "" {
+		if err := advanceWinner(tx, slotID.String, winnerID); err != nil {
+			return "", err
+		}
+	}
+	return winnerID, tx.Commit()
 }
 
 const matchColumns = `id, competition_id, arena_id, bracket_slot_id, athlete_red_id, athlete_blue_id, current_round, status, winner_id, created_at, started_at, finished_at`
@@ -230,4 +278,49 @@ func (s *MatchStore) Reschedule(id string) (bool, error) {
 		return false, err
 	}
 	return true, tx.Commit()
+}
+
+// MedalPlacement satu medali yang diperoleh sebuah tim dari hasil bagan.
+type MedalPlacement struct {
+	Team  string
+	Medal string // gold | silver | bronze
+}
+
+// MedalPlacements menurunkan medali dari struktur bagan: pemenang final emas, yang kalah di final perak, dan yang
+// kalah di semifinal (partai yang pemenangnya melaju ke final) perunggu. Hanya partai berbagan yang selesai dan
+// berpemenang yang dihitung; babak sebelum semifinal tidak memberi medali. Tim diambil dari atlet milik peserta
+// (match menyimpan ID peserta, bukan ID atlet).
+func (s *MatchStore) MedalPlacements(competitionID string) ([]MedalPlacement, error) {
+	rows, err := s.DB.Query(`
+		WITH decided AS (
+			SELECT m.winner_id AS winner,
+			       CASE WHEN m.winner_id = m.athlete_red_id THEN m.athlete_blue_id ELSE m.athlete_red_id END AS loser,
+			       CASE WHEN sl.next_slot_id IS NULL THEN 'final'
+			            WHEN nx.next_slot_id IS NULL THEN 'semi' END AS stage
+			FROM matches m
+			JOIN bracket_slots sl ON sl.id = m.bracket_slot_id
+			LEFT JOIN bracket_slots nx ON nx.id = sl.next_slot_id
+			WHERE m.competition_id = $1 AND m.status = 'finished' AND m.winner_id IS NOT NULL
+		), placed AS (
+			SELECT winner AS participant, 'gold' AS medal FROM decided WHERE stage = 'final'
+			UNION ALL SELECT loser, 'silver' FROM decided WHERE stage = 'final'
+			UNION ALL SELECT loser, 'bronze' FROM decided WHERE stage = 'semi'
+		)
+		SELECT COALESCE(NULLIF(a.team, ''), 'Independen'), pl.medal
+		FROM placed pl
+		JOIN participants p ON p.id = pl.participant
+		JOIN athletes a ON a.id = p.athlete_id`, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MedalPlacement
+	for rows.Next() {
+		var mp MedalPlacement
+		if err := rows.Scan(&mp.Team, &mp.Medal); err != nil {
+			return nil, err
+		}
+		out = append(out, mp)
+	}
+	return out, rows.Err()
 }

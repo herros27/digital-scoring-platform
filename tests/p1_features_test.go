@@ -82,12 +82,14 @@ func TestAutomaticBracketAdvancement(t *testing.T) {
 	hubMgr := hub.NewManager()
 	bracketAdvancer := newMockBracketAdvancer()
 
-	svc := service.NewMatchService(matchRepo, compRepo, hubMgr, nil, nil, nil, bracketAdvancer)
+	matchRepo.onFinish = func(slotID, winnerID string) { _ = bracketAdvancer.AdvanceWinner(slotID, winnerID) }
+	svc := service.NewMatchService(matchRepo, compRepo, hubMgr, nil, nil, nil)
 
 	// Create match linked to a bracket slot
 	match := &store.Match{
 		ID:            "match-bracket-1",
 		CompetitionID: "comp-1",
+		ArenaID:       "arena-bracket",
 		BracketSlotID: "slot-round1-A",
 		AthleteRedID:  "athlete-101",
 		AthleteBlueID: "athlete-102",
@@ -193,7 +195,7 @@ func TestRulesetService_ListingAndRetrieval(t *testing.T) {
 }
 
 func TestMatchEvents_QueryService(t *testing.T) {
-	svc := service.NewMatchService(newMockMatchRepo(), &mockCompRepo{}, hub.NewManager(), nil, nil, nil, nil)
+	svc := service.NewMatchService(newMockMatchRepo(), &mockCompRepo{}, hub.NewManager(), nil, nil, nil)
 
 	// Valid ID with nil store returns empty list gracefully
 	events, err := svc.GetMatchEvents("match-1")
@@ -216,7 +218,7 @@ func TestWebSocket_SyncRequest(t *testing.T) {
 	sm := statemachine.New("match-sync")
 	ruleset, _ := rules.LoadRuleset("ipsi")
 
-	_ = orchestrator.New("match-sync", "arena-sync-test", sm, ruleset, h, nil, nil, nil, nil)
+	_ = orchestrator.New("match-sync", "arena-sync-test", sm, ruleset, h, nil, nil, nil)
 
 	// Setup mock client using NewClient and register into hub
 	client, received := hub.NewClient("judge-tablet-1", hub.RoleJudge, "arena-sync-test")

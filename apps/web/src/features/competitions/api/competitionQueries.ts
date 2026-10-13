@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { competitionService } from './competitionService'
 import type {
@@ -14,6 +14,7 @@ export const competitionKeys = {
   all: ['competitions'] as const,
   lists: () => [...competitionKeys.all, 'list'] as const,
   list: (filters: CompetitionFilterValues) => [...competitionKeys.lists(), filters] as const,
+  stats: () => [...competitionKeys.all, 'stats'] as const,
   details: () => [...competitionKeys.all, 'detail'] as const,
   detail: (id: string) => [...competitionKeys.details(), id] as const,
 }
@@ -26,6 +27,18 @@ export function useCompetitionsQuery(filters: Ref<CompetitionFilterValues>) {
     queryKey: computed(() => competitionKeys.list(filters.value)),
     queryFn: () => competitionService.getCompetitions(filters.value),
     staleTime: 1000 * 30, // 30s
+    placeholderData: keepPreviousData, // pindah halaman/filter tanpa daftar berkedip kosong
+  })
+}
+
+/**
+ * Hitungan kejuaraan per status (global). Ikut di-invalidate bersama daftar karena berada di bawah competitionKeys.all.
+ */
+export function useCompetitionStatsQuery() {
+  return useQuery({
+    queryKey: competitionKeys.stats(),
+    queryFn: () => competitionService.getStats(),
+    staleTime: 1000 * 30,
   })
 }
 
@@ -50,6 +63,7 @@ export function useCreateCompetitionMutation() {
       competitionService.createCompetition(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: competitionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: competitionKeys.stats() })
     },
   })
 }
@@ -64,6 +78,7 @@ export function useUpdateCompetitionMutation() {
       competitionService.updateCompetition(id, payload),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: competitionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: competitionKeys.stats() })
       queryClient.invalidateQueries({ queryKey: competitionKeys.detail(variables.id) })
     },
   })
@@ -78,6 +93,7 @@ export function useActivateCompetitionMutation() {
     mutationFn: (id: string) => competitionService.activateCompetition(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: competitionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: competitionKeys.stats() })
       queryClient.invalidateQueries({ queryKey: competitionKeys.detail(id) })
     },
   })
@@ -92,6 +108,7 @@ export function usePauseCompetitionMutation() {
     mutationFn: (id: string) => competitionService.pauseCompetition(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: competitionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: competitionKeys.stats() })
       queryClient.invalidateQueries({ queryKey: competitionKeys.detail(id) })
     },
   })
@@ -106,6 +123,7 @@ export function useFinishCompetitionMutation() {
     mutationFn: (id: string) => competitionService.finishCompetition(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: competitionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: competitionKeys.stats() })
       queryClient.invalidateQueries({ queryKey: competitionKeys.detail(id) })
     },
   })
@@ -120,6 +138,7 @@ export function useCancelCompetitionMutation() {
     mutationFn: (id: string) => competitionService.cancelCompetition(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: competitionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: competitionKeys.stats() })
       queryClient.invalidateQueries({ queryKey: competitionKeys.detail(id) })
     },
   })

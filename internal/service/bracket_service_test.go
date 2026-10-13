@@ -119,7 +119,8 @@ func TestGenerateBracket_AutoSyncMatches(t *testing.T) {
 	if m2.AthleteRedID != "p3" || m2.AthleteBlueID != "p4" {
 		t.Errorf("match 2 athletes mismatch: red=%s blue=%s", m2.AthleteRedID, m2.AthleteBlueID)
 	}
-	if m2.ArenaID != "arena-b" {
-		t.Errorf("expected arena-b for match 2, got %s", m2.ArenaID)
+	// Semua partai satu bagan memakai gelanggang yang sama (gelanggang asal), bukan bergilir.
+	if m2.ArenaID != "arena-a" {
+		t.Errorf("expected arena-a for match 2, got %s", m2.ArenaID)
 	}
 }

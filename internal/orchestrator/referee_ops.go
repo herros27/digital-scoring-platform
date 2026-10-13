@@ -42,7 +42,7 @@ const (
 )
 
 // ErrTieNeedsDecision: skor seri, wasit harus menentukan pemenang (keputusan wasit).
-var ErrTieNeedsDecision = fmt.Errorf("skor seri: tentukan pemenang sebagai keputusan wasit")
+var ErrTieNeedsDecision = fmt.Errorf("skor seri: tentukan pemenang sebagai keputusan operator meja")
 
 // tiedLocked true bila total skor bersih kedua sudut sama. Pemanggil memegang o.mu.
 func (o *Orchestrator) tiedLocked() bool {
@@ -56,7 +56,7 @@ func (o *Orchestrator) tiedLocked() bool {
 
 // tiePendingLocked true saat waktu ronde terakhir habis dengan skor seri dan menunggu keputusan wasit.
 func (o *Orchestrator) tiePendingLocked() bool {
-	if o.sm.Current() != statemachine.StateRound3 ||
+	if !o.isFinalRoundLocked() ||
 		o.timer == nil || o.timer.Remaining() > 0 || o.timer.IsRunning() || !o.tiedLocked() {
 		return false
 	}
@@ -182,6 +182,7 @@ func (o *Orchestrator) handlePenalty(client *hub.Client, msg hub.Message) {
 		}, client.ID)
 		o.finalize()
 	}
+	o.checkPointGapLocked() // sanksi mengurangi nilai sudut yang dikenai, sehingga selisih bisa mencapai batas
 }
 
 // handlePenaltyRevoke: {"target":"red"} membatalkan sanksi TERAKHIR pada sudut itu.
@@ -336,6 +337,9 @@ func (o *Orchestrator) doDeclareOutcome(outcome, winner, note string) error {
 		"outcome": rule.Type, "label": rule.Label, "winner_corner": winner, "note": note,
 	}, "")
 	o.finalize()
+	if o.unsavedCorner != "" {
+		return ErrResultNotSaved
+	}
 	return nil
 }
 
@@ -427,6 +431,7 @@ func (o *Orchestrator) extraSnapshotLocked() map[string]any {
 		"judge_count":       o.ruleset.Scoring.EffectiveConsensus().Judges,
 		"consensus":         o.ruleset.Scoring.EffectiveConsensus(),
 		"tiebreak":          o.tiebreakSnapshotLocked(),
+		"point_gap":         o.ruleset.Scoring.EffectivePointGap(),
 		"recovered":         o.recovered,
 		"outcomes":          o.ruleset.Scoring.EffectiveOutcomes(),
 		"medic_active":      o.medicActive,

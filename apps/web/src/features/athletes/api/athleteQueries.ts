@@ -94,19 +94,81 @@ export function useRegisterToCompetitionMutation(compId: Ref<string>) {
 /**
  * Verify / Reject participant mutation
  */
+/** Lengkapi/perbaiki tanggal lahir atlet lalu muat ulang daftar peserta (flag umur dihitung server). */
+export function useUpdateAthleteProfileMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      athleteId,
+      name,
+      team,
+      birth_date,
+      nik,
+    }: {
+      athleteId: string
+      name?: string
+      team?: string
+      birth_date?: string
+      nik?: string
+    }) => athleteService.updateAthleteProfile(athleteId, { name, team, birth_date, nik }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
+      queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+    },
+  })
+}
+
+/** Pindahkan peserta ke kategori lain, lalu muat ulang daftar peserta dan bagan. */
+export function useChangeParticipantCategoryMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ participantId, categoryId }: { participantId: string; categoryId: string }) =>
+      athleteService.changeParticipantCategory(compId.value, participantId, categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
+      queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}
+
+/** Batalkan pendaftaran peserta dari kejuaraan, lalu muat ulang daftar atlet dan peserta. */
+export function useUnregisterParticipantMutation(compId: Ref<string>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ participantId, purge }: { participantId: string; purge?: boolean }) =>
+      athleteService.unregisterParticipant(compId.value, participantId, purge),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
+      queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+    },
+  })
+}
+
 export function useVerifyParticipantMutation(compId: Ref<string>) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       participantId,
       status,
+      actual_weight,
+      docs_verified,
     }: {
       participantId: string
       status: 'verified' | 'rejected'
-    }) => athleteService.verifyParticipant(compId.value, participantId, status),
+      actual_weight?: number
+      docs_verified?: Record<string, boolean>
+    }) =>
+      athleteService.verifyParticipant(compId.value, participantId, status, {
+        actual_weight,
+        docs_verified,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitions', compId.value, 'participants'] })
       queryClient.invalidateQueries({ queryKey: athleteKeys.compAthletes(compId.value) })
+      queryClient.invalidateQueries({ queryKey: ['brackets'] })
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
     },
   })
 }

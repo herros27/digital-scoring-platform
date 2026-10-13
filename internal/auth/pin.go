@@ -187,15 +187,25 @@ func (s *PinStore) CreatePINWithSeat(competitionID, arenaID, role string, seatNu
 	lookup := PinLookup(pin)
 	expiresAt := time.Now().Add(ttl)
 
+	// Hapus PIN lama dan sisipkan yang baru dalam satu transaksi: bila PIN baru ditolak (bentrok dengan kursi lain),
+	// PIN lama kursi ini tetap berlaku, bukan hilang.
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	// Hapus PIN lama pada kursi/role ini di arena yang sama agar tidak menumpuk duplikat,
 	// dan PIN kedaluwarsa dengan nilai yang sama agar tidak menghalangi indeks unik.
-	_, _ = s.DB.Exec(`
+	if _, err := tx.Exec(`
         DELETE FROM judge_pins
         WHERE (competition_id = $1 AND arena_id = $2 AND role = $3 AND COALESCE(seat_number, 0) = $4)
            OR (pin_lookup = $5 AND expires_at <= NOW())`,
-		competitionID, arenaID, role, seatNumber, lookup)
+		competitionID, arenaID, role, seatNumber, lookup); err != nil {
+		return nil, err
+	}
 
-	r, err := scanPin(s.DB.QueryRow(`
+	r, err := scanPin(tx.QueryRow(`
         INSERT INTO judge_pins (competition_id, arena_id, role, seat_number, raw_pin, pin_hash, pin_lookup, expires_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING `+pinColumns,
@@ -205,6 +215,9 @@ func (s *PinStore) CreatePINWithSeat(competitionID, arenaID, role string, seatNu
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return nil, ErrPinTaken
 		}
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &r, nil

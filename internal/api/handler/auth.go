@@ -3,7 +3,9 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/auth"
@@ -12,10 +14,32 @@ import (
 type AuthHandler struct {
 	Pins *auth.PinStore
 
-	// Lockout (opsional) mengunci klien setelah beberapa kali PIN salah beruntun.
-	// ClientKey menentukan kunci klien (biasanya IP); keduanya harus diisi agar aktif.
-	Lockout   *auth.AttemptLimiter
-	ClientKey func(*http.Request) string
+	// Guard (opsional) mengunci penebak PIN secara berlapis: per perangkat, per IP, dan global. ClientIP menentukan
+	// IP klien (bawaan: alamat sambungan). Lihat auth.PinGuard untuk alasan tiap lapisan.
+	Guard    *auth.PinGuard
+	ClientIP func(*http.Request) string
+}
+
+// deviceIDPattern bentuk ID perangkat yang diterima dari header X-Device-Id (UUID acak yang dibuat tablet sekali).
+// ID ini hanya untuk keadilan antar tablet di IP yang sama, bukan batas keamanan (klien bisa menggantinya).
+var deviceIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{8,64}$`)
+
+func deviceID(r *http.Request) string {
+	if id := r.Header.Get("X-Device-Id"); deviceIDPattern.MatchString(id) {
+		return id
+	}
+	return ""
+}
+
+func (h *AuthHandler) clientIP(r *http.Request) string {
+	if h.ClientIP != nil {
+		return h.ClientIP(r)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // POST /api/v1/auth/judge-login
@@ -29,12 +53,16 @@ func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var clientKey string
-	if h.Lockout != nil && h.ClientKey != nil {
-		clientKey = h.ClientKey(r)
-		if locked, retryAfter := h.Lockout.Check(clientKey); locked {
+	var ip, device string
+	if h.Guard != nil {
+		ip, device = h.clientIP(r), deviceID(r)
+		if locked, retryAfter, scope := h.Guard.Check(ip, device); locked {
 			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())+1))
-			Fail(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "terlalu banyak PIN salah, coba lagi nanti", nil)
+			msg := "terlalu banyak PIN salah dari perangkat ini, coba lagi nanti"
+			if scope != "device" {
+				msg = "terlalu banyak PIN salah dari jaringan ini, coba lagi nanti"
+			}
+			Fail(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", msg, map[string]any{"scope": scope})
 			return
 		}
 	}
@@ -42,8 +70,8 @@ func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
 	token, record, err := h.Pins.LoginWithPIN(req.PIN)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidPIN) {
-			if clientKey != "" {
-				h.Lockout.Fail(clientKey)
+			if h.Guard != nil {
+				h.Guard.Fail(ip, device)
 			}
 			Fail(w, http.StatusUnauthorized, "INVALID_PIN", "pin not found or expired", nil)
 			return
@@ -51,8 +79,8 @@ func (h *AuthHandler) JudgeLogin(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "login gagal", nil)
 		return
 	}
-	if clientKey != "" {
-		h.Lockout.Reset(clientKey)
+	if h.Guard != nil {
+		h.Guard.Succeed(ip, device)
 	}
 
 	res := map[string]any{
@@ -73,7 +101,7 @@ func (h *AuthHandler) CreatePIN(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CompetitionID string `json:"competition_id" validate:"required"`
 		ArenaID       string `json:"arena_id" validate:"required"`
-		Role          string `json:"role" validate:"required,oneof=wasit juri dewan admin operator"`
+		Role          string `json:"role" validate:"required,oneof=wasit juri judge"`
 		SeatNumber    int    `json:"seat_number" validate:"min=0,max=10"`
 		PIN           string `json:"pin" validate:"omitempty,numeric,min=6,max=8"`
 		TTLHours      int    `json:"ttl_hours" validate:"min=0,max=720"`

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -106,8 +107,14 @@ func Validate(dst any) error {
 	return err
 }
 
+// maxBodyBytes batas isi permintaan JSON. Payload terbesar (ruleset lengkap, daftar peserta bagan) jauh di bawah
+// ini; batas ada agar klien tanpa login tidak bisa memaksa server membaca isi tanpa akhir (nginx sudah membatasi
+// 1 MB, tetapi deploy langsung di belakang Caddy tidak).
+const maxBodyBytes = 1 << 20
+
 // Decode decodes the JSON request body and validates the destination struct.
 func Decode(r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		return err
 	}
@@ -128,14 +135,27 @@ func Bind(w http.ResponseWriter, r *http.Request, dst any) bool {
 	return true
 }
 
+// emptyIfNilSlice mengubah slice nil menjadi slice kosong agar daftar kosong terkirim sebagai [] (bukan null).
+// []byte dan json.RawMessage dibiarkan karena penyandiannya berbeda.
+func emptyIfNilSlice(data any) any {
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Slice && v.IsNil() && v.Type().Elem().Kind() != reflect.Uint8 {
+		return reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	}
+	return data
+}
+
 func Ok(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": data})
+	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": emptyIfNilSlice(data)})
 }
 
 func Fail(w http.ResponseWriter, status int, code, message string, details any) {
-	if logger.Log != nil {
-		logger.Log.Warn("API Error", "status", status, "code", code, "message", message)
+	if status >= 500 {
+		// ponytail: jangan bocorkan SQL/constraint internal ke publik; simpan hanya di server log
+		log.Printf("[%s] %s (details: %v)", code, message, details)
+		message = "terjadi kesalahan pada server"
+		details = nil
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -179,7 +199,7 @@ func OkPaged(w http.ResponseWriter, data any, page, limit, total int) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"success": true,
-		"data":    data,
+		"data":    emptyIfNilSlice(data),
 		"pagination": Pagination{
 			Page:  page,
 			Limit: limit,

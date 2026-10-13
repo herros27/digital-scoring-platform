@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/herros27/digital-scoring/internal/domain"
@@ -16,7 +18,14 @@ type AthleteRepository interface {
 }
 
 type AthleteService struct {
-	repo AthleteRepository
+	repo         AthleteRepository
+	categoryRepo CategoryRepository
+}
+
+// WithCategoryRepo mengaktifkan validasi kategori (umur/gender/bobot) pada pendaftaran & verifikasi.
+func (s *AthleteService) WithCategoryRepo(r CategoryRepository) *AthleteService {
+	s.categoryRepo = r
+	return s
 }
 
 func NewAthleteService(repo AthleteRepository) *AthleteService {
@@ -29,6 +38,13 @@ func (s *AthleteService) CreateAthlete(a *domain.Athlete) error {
 	}
 	if a.Gender == "" {
 		return errors.New("gender is required")
+	}
+	a.BirthDate = strings.TrimSpace(a.BirthDate)
+	a.NIK = strings.TrimSpace(a.NIK)
+	if a.BirthDate != "" {
+		if _, err := domain.ParseBirthDate(a.BirthDate); err != nil {
+			return err
+		}
 	}
 	a.CreatedAt = time.Now()
 	return s.repo.Create(a)
@@ -139,4 +155,314 @@ func (s *AthleteService) ListAthletesByCompetition(competitionID string) ([]doma
 		return nil, domain.ErrInvalidInput
 	}
 	return s.repo.ListByCompetition(competitionID)
+}
+
+// ---------- Kategori, timbang badan, & verifikasi berkas ----------
+
+// CategoryParticipantManager adalah kemampuan opsional repo atlet untuk fitur kategori IPSI.
+type CategoryParticipantManager interface {
+	RegisterParticipantInCategory(competitionID, athleteID, contingentID, categoryID, weightClass, gender, status string) error
+	GetParticipantByID(id string) (*domain.Participant, error)
+	SaveVerification(participantID, status string, actualWeight *float64, docs map[string]bool) error
+}
+
+// RegisterParticipantToCategory mendaftarkan atlet ke kategori resmi setelah memvalidasi gender &
+// golongan umur pada tanggal acuan (hari pertama kejuaraan). Mengembalikan kategori yang dipakai.
+func (s *AthleteService) RegisterParticipantToCategory(competitionID, athleteID, contingentID, categoryID, status string, ref time.Time) (*domain.Category, error) {
+	if competitionID == "" || athleteID == "" || categoryID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if s.categoryRepo == nil {
+		return nil, errors.New("category validation is not configured")
+	}
+	cm, ok := s.repo.(CategoryParticipantManager)
+	if !ok {
+		return nil, errors.New("athlete repository does not support category registration")
+	}
+	athlete, err := s.GetAthleteByID(athleteID)
+	if err != nil {
+		return nil, err
+	}
+	cat, err := s.CheckCategoryEligibility(competitionID, categoryID, athlete, ref)
+	if err != nil {
+		return nil, err
+	}
+	if err := cm.RegisterParticipantInCategory(competitionID, athleteID, contingentID, cat.ID, cat.WeightClass, domain.NormalizeGender(athlete.Gender), status); err != nil {
+		return nil, err
+	}
+	return cat, nil
+}
+
+// CheckCategoryEligibility memastikan kategori milik kompetisi dan atlet (gender + golongan umur)
+// sah untuk kategori itu, tanpa menyimpan apa pun. Dipanggil sebelum atlet baru dibuat agar tidak ada data yatim.
+func (s *AthleteService) CheckCategoryEligibility(competitionID, categoryID string, a *domain.Athlete, ref time.Time) (*domain.Category, error) {
+	if s.categoryRepo == nil {
+		return nil, errors.New("category validation is not configured")
+	}
+	cat, err := s.categoryRepo.GetByID(categoryID)
+	if err != nil {
+		return nil, errors.New("category not found")
+	}
+	if cat == nil || cat.CompetitionID != competitionID {
+		return nil, errors.New("category not found in this competition")
+	}
+	if err := domain.CheckEligibility(a, cat, ref); err != nil {
+		return nil, err
+	}
+	return cat, nil
+}
+
+// VerifyInput data meja verifikasi: hasil timbang aktual + checklist berkas.
+type VerifyInput struct {
+	Status       string
+	ActualWeight *float64
+	Docs         map[string]bool
+	// Ref tanggal acuan umur (hari pertama kejuaraan); nol = hari ini.
+	Ref time.Time
+}
+
+// VerifyResult hasil akhir verifikasi (status bisa berbeda dari yang diminta bila bobot tidak sah).
+type VerifyResult struct {
+	Status     string
+	Reason     string
+	CategoryID string // kategori peserta; dipakai pemanggil untuk memasukkan peserta lolos ke bagan yang sudah ada
+}
+
+// VerifyParticipantDetailed menerapkan aturan resmi: tanpa toleransi bobot (0 kg) dan
+// berkas perlindungan atlet di bawah umur harus lengkap sebelum status VERIFIED.
+func (s *AthleteService) VerifyParticipantDetailed(competitionID, participantID string, in VerifyInput) (*VerifyResult, error) {
+	if participantID == "" || (in.Status != "verified" && in.Status != "rejected") {
+		return nil, domain.ErrInvalidInput
+	}
+	if in.ActualWeight != nil && (*in.ActualWeight <= 0 || *in.ActualWeight > 300) {
+		return nil, errors.New("actual_weight must be between 0 and 300 kg")
+	}
+	cm, ok := s.repo.(CategoryParticipantManager)
+	if !ok {
+		// Repo lama tanpa dukungan kategori: perilaku verifikasi sederhana.
+		return &VerifyResult{Status: in.Status}, s.VerifyParticipant(participantID, in.Status)
+	}
+	part, err := cm.GetParticipantByID(participantID)
+	if err != nil {
+		return nil, err
+	}
+	// Peserta kejuaraan lain dijawab tidak ditemukan: URL kejuaraan A tidak boleh memverifikasi peserta kejuaraan B.
+	if part == nil || part.CompetitionID != competitionID {
+		return nil, domain.ErrNotFound
+	}
+
+	docs := part.DocsVerified
+	if in.Docs != nil {
+		docs = in.Docs
+	}
+	weight := part.ActualWeight
+	if in.ActualWeight != nil {
+		weight = in.ActualWeight
+	}
+
+	result := &VerifyResult{Status: in.Status, CategoryID: part.CategoryID}
+	if in.Status == "verified" && part.CategoryID != "" && s.categoryRepo != nil {
+		cat, err := s.categoryRepo.GetByID(part.CategoryID)
+		if err != nil {
+			return nil, err
+		}
+		ref := in.Ref
+		if ref.IsZero() {
+			ref = time.Now()
+		}
+		switch domain.AgeCheck(part.BirthDate, cat.AgeGroup, cat.PresetStandard, ref) {
+		case domain.AgeCheckMissing:
+			return nil, errors.New("tanggal lahir atlet belum diisi; lengkapi dahulu untuk memastikan golongan umur")
+		case domain.AgeCheckMismatch:
+			return nil, errors.New("usia atlet tidak sesuai golongan umur kategori; periksa tanggal lahir atau pindahkan ke kategori yang tepat")
+		}
+		if missing := domain.MissingDocs(cat.AgeGroup, part.Gender, docs); len(missing) > 0 {
+			return nil, errors.New("berkas belum lengkap: " + strings.Join(missing, ", "))
+		}
+		if cat.HasWeightBounds() {
+			if weight == nil {
+				return nil, errors.New("hasil timbang badan (actual_weight) wajib diisi untuk kategori bertingkat bobot")
+			}
+			switch cat.CheckWeight(*weight) {
+			case domain.WeightOver:
+				result.Status = domain.ParticipantOverweight
+				result.Reason = "bobot melebihi batas kelas (tanpa toleransi)"
+			case domain.WeightUnder:
+				result.Status = domain.ParticipantUnderweight
+				result.Reason = "bobot di bawah batas kelas (tanpa toleransi)"
+			}
+		}
+	}
+
+	if err := cm.SaveVerification(participantID, result.Status, in.ActualWeight, docs); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// AthleteProfileUpdater kemampuan opsional repo atlet untuk melengkapi tanggal lahir/NIK.
+type AthleteProfileUpdater interface {
+	UpdateProfile(id string, birthDate, nik *string) error
+}
+
+// UpdateAthleteProfile melengkapi/memperbaiki tanggal lahir dan NIK atlet (field nil tidak diubah).
+// Dipakai untuk data lama yang belum punya tanggal lahir agar golongan umur bisa diperiksa.
+func (s *AthleteService) UpdateAthleteProfile(id string, birthDate, nik *string) (*domain.Athlete, error) {
+	if id == "" || (birthDate == nil && nik == nil) {
+		return nil, domain.ErrInvalidInput
+	}
+	if birthDate != nil {
+		v := strings.TrimSpace(*birthDate)
+		if _, err := domain.ParseBirthDate(v); err != nil {
+			return nil, err
+		}
+		birthDate = &v
+	}
+	if nik != nil {
+		v := strings.TrimSpace(*nik)
+		if len(v) > 50 {
+			return nil, errors.New("nik must be at most 50 characters")
+		}
+		nik = &v
+	}
+	up, ok := s.repo.(AthleteProfileUpdater)
+	if !ok {
+		return nil, errors.New("athlete repository does not support profile updates")
+	}
+	if err := up.UpdateProfile(id, birthDate, nik); err != nil {
+		return nil, err
+	}
+	return s.GetAthleteByID(id)
+}
+
+// AthleteIdentityUpdater kemampuan opsional repo atlet untuk mengubah nama/perguruan.
+type AthleteIdentityUpdater interface {
+	UpdateIdentity(id string, name, team *string) error
+}
+
+// UpdateAthleteIdentity mengubah nama dan/atau perguruan atlet (field nil tidak diubah).
+func (s *AthleteService) UpdateAthleteIdentity(id string, name, team *string) error {
+	if id == "" || (name == nil && team == nil) {
+		return domain.ErrInvalidInput
+	}
+	if name != nil {
+		v := strings.TrimSpace(*name)
+		if len(v) < 2 || len(v) > 100 {
+			return fmt.Errorf("%w: nama atlet harus 2-100 karakter", domain.ErrInvalidInput)
+		}
+		name = &v
+	}
+	if team != nil {
+		v := strings.TrimSpace(*team)
+		if len(v) < 1 || len(v) > 100 {
+			return fmt.Errorf("%w: perguruan harus 1-100 karakter", domain.ErrInvalidInput)
+		}
+		team = &v
+	}
+	up, ok := s.repo.(AthleteIdentityUpdater)
+	if !ok {
+		return errors.New("athlete repository does not support identity updates")
+	}
+	return up.UpdateIdentity(id, name, team)
+}
+
+// ParticipantCategoryChanger kemampuan opsional repo atlet untuk memindahkan peserta ke kategori lain.
+type ParticipantCategoryChanger interface {
+	ChangeParticipantCategory(competitionID, participantID, categoryID, weightClass string) error
+}
+
+// ChangeParticipantCategory memindahkan peserta ke kategori lain setelah memvalidasi gender & golongan umur atlet.
+// Izin sama dengan UnregisterParticipant: manajer kontingen hanya untuk pesertanya sendiri yang belum diverifikasi.
+func (s *AthleteService) ChangeParticipantCategory(competitionID, participantID, categoryID, contingentScope string, restricted bool, ref time.Time) error {
+	if competitionID == "" || participantID == "" || categoryID == "" {
+		return domain.ErrInvalidInput
+	}
+	cm, ok := s.repo.(CategoryParticipantManager)
+	ch, ok2 := s.repo.(ParticipantCategoryChanger)
+	if !ok || !ok2 {
+		return errors.New("athlete repository does not support changing participant category")
+	}
+	part, err := cm.GetParticipantByID(participantID)
+	if err != nil || part == nil || part.CompetitionID != competitionID {
+		return domain.ErrNotFound
+	}
+	if restricted {
+		if contingentScope == "" || part.ContingentID != contingentScope {
+			return domain.ErrNotFound
+		}
+		if part.RegistrationStatus == "verified" {
+			return fmt.Errorf("%w: peserta sudah diverifikasi; hubungi panitia untuk memindahkan kategori", domain.ErrForbidden)
+		}
+	}
+	if part.CategoryID == categoryID {
+		return nil
+	}
+	athlete, err := s.GetAthleteByID(part.AthleteID)
+	if err != nil {
+		return err
+	}
+	cat, err := s.CheckCategoryEligibility(competitionID, categoryID, athlete, ref)
+	if err != nil {
+		return err
+	}
+	return ch.ChangeParticipantCategory(competitionID, participantID, cat.ID, cat.WeightClass)
+}
+
+// AthletePurger kemampuan opsional repo atlet untuk menghapus data atlet yang tidak dipakai lagi.
+type AthletePurger interface {
+	DeleteAthleteIfUnused(id string) error
+}
+
+// RemoveParticipant membatalkan pendaftaran peserta; dengan purge, data atlet ikut dihapus bila tidak terdaftar di
+// kejuaraan lain. Aturan izin dan penolakan (bagan/partai) sama dengan UnregisterParticipant.
+func (s *AthleteService) RemoveParticipant(competitionID, participantID, contingentScope string, restricted, purge bool) error {
+	athleteID := ""
+	if purge {
+		if cm, ok := s.repo.(CategoryParticipantManager); ok {
+			if part, err := cm.GetParticipantByID(participantID); err == nil && part != nil && part.CompetitionID == competitionID {
+				athleteID = part.AthleteID
+			}
+		}
+	}
+	if err := s.UnregisterParticipant(competitionID, participantID, contingentScope, restricted); err != nil {
+		return err
+	}
+	if athleteID != "" {
+		if p, ok := s.repo.(AthletePurger); ok {
+			return p.DeleteAthleteIfUnused(athleteID)
+		}
+	}
+	return nil
+}
+
+// ParticipantRemover kemampuan opsional repo atlet untuk membatalkan pendaftaran peserta.
+type ParticipantRemover interface {
+	DeleteParticipant(competitionID, participantID string) error
+}
+
+// UnregisterParticipant membatalkan pendaftaran peserta dari kejuaraan. Admin/dewan boleh kapan saja (selama peserta
+// belum masuk bagan/partai). Manajer kontingen (restricted) hanya boleh membatalkan peserta kontingennya sendiri yang
+// belum diverifikasi; peserta kontingen lain dijawab ErrNotFound agar keberadaannya tidak bocor.
+func (s *AthleteService) UnregisterParticipant(competitionID, participantID, contingentScope string, restricted bool) error {
+	if competitionID == "" || participantID == "" {
+		return domain.ErrInvalidInput
+	}
+	rm, ok := s.repo.(ParticipantRemover)
+	if !ok {
+		return errors.New("athlete repository does not support unregistering participants")
+	}
+	if restricted {
+		cm, ok := s.repo.(CategoryParticipantManager)
+		if !ok {
+			return errors.New("athlete repository does not support participant lookup")
+		}
+		part, err := cm.GetParticipantByID(participantID)
+		if err != nil || part == nil || part.CompetitionID != competitionID || contingentScope == "" || part.ContingentID != contingentScope {
+			return domain.ErrNotFound
+		}
+		if part.RegistrationStatus == "verified" {
+			return fmt.Errorf("%w: peserta sudah diverifikasi; hubungi panitia untuk membatalkan pendaftaran", domain.ErrForbidden)
+		}
+	}
+	return rm.DeleteParticipant(competitionID, participantID)
 }

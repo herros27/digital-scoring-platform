@@ -51,7 +51,7 @@ func restoreFrom(t *testing.T, rs *memRuntimeStore) (*Orchestrator, *testRig) {
 		t.Fatal("tidak ada keadaan tersimpan untuk match-1")
 	}
 	h := hub.NewHub("arena-1")
-	o, err := Restore(rec, h, nil, nil, nil, nil, rs)
+	o, err := Restore(rec, h, nil, nil, nil, rs)
 	if err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
@@ -201,11 +201,11 @@ func TestRuntime_NotStartedAndBreakAndTerminalStates(t *testing.T) {
 	// partai selesai tidak dapat dipulihkan
 	rec, _ := mem2.get("match-1")
 	rec.State = string(statemachine.StateFinished)
-	if _, err := Restore(rec, hub.NewHub("arena-1"), nil, nil, nil, nil, mem2); err == nil {
+	if _, err := Restore(rec, hub.NewHub("arena-1"), nil, nil, nil, mem2); err == nil {
 		t.Fatal("partai selesai tidak boleh dipulihkan")
 	}
 	rec.State, rec.Data = "round_1", []byte("{rusak")
-	if _, err := Restore(rec, hub.NewHub("arena-1"), nil, nil, nil, nil, mem2); err == nil {
+	if _, err := Restore(rec, hub.NewHub("arena-1"), nil, nil, nil, mem2); err == nil {
 		t.Fatal("data rusak harus ditolak")
 	}
 }

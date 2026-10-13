@@ -19,6 +19,9 @@ import { DEFAULT_OUTCOMES, DEFAULT_TECHNIQUES } from '@/composables/techniques'
 import { playGong } from '@/composables/useGong'
 import { matchStatusFromState, type MatchStatus } from '@/composables/matchStatus'
 import { arenaService } from '@/features/arena/api/arenaService'
+import type { Arena } from '@/features/arena/types/arena.schema'
+import { categoryService } from '@/features/categories/api/categoryService'
+import type { Category } from '@/features/categories/types/category.schema'
 import { competitionService } from '@/features/competitions/api/competitionService'
 import { matchService, type MatchDTO } from '@/features/matches/api/matchService'
 import {
@@ -97,6 +100,10 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const queueMatches = ref<MatchDTO[]>([])
   const events = shallowRef<RawMatchEvent[]>([])
   const bracketSlots = ref<BracketSlotRecord[]>([])
+  const categories = ref<Category[]>([])
+  const arenas = ref<Arena[]>([])
+  const allMatches = ref<MatchDTO[]>([])
+  let bracketCategoryId = ''
   const latencyMs = ref<number | null>(null)
   const busy = ref(false)
   const toasts = ref<ConsoleToast[]>([])
@@ -235,13 +242,17 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
 
   async function loadContext() {
     if (!opts.compId) return
-    const [arenas, comp, people] = await Promise.allSettled([
+    const [arenaList, comp, people, cats] = await Promise.allSettled([
       arenaService.getArenas(opts.compId),
       competitionService.getCompetition(opts.compId),
       bracketService.getParticipants(opts.compId),
+      categoryService.getCategories(opts.compId),
     ])
-    if (arenas.status === 'fulfilled')
-      arenaName.value = arenas.value.find((a) => a.id === opts.arenaId)?.name ?? ''
+    if (arenaList.status === 'fulfilled') {
+      arenas.value = arenaList.value
+      arenaName.value = arenaList.value.find((a) => a.id === opts.arenaId)?.name ?? ''
+    }
+    if (cats.status === 'fulfilled') categories.value = cats.value
     if (comp.status === 'fulfilled') {
       competitionName.value = comp.value.name
       if (!rulesetName.value) rulesetName.value = comp.value.ruleset_name
@@ -254,19 +265,32 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     if (!opts.compId) return
     try {
       queueMatches.value = await matchService.getArenaQueue(opts.compId, opts.arenaId)
+      if (bracketCategoryId) void loadCategoryBracket(bracketCategoryId) // bagan ikut mutakhir (pemenang maju)
     } catch (err) {
       notify('error', getErrorMessage(err, 'Gagal memuat antrean partai.'))
     }
   }
 
-  async function loadBracket(weightClass: string, gender: string) {
-    if (!opts.compId) return
+  /** Bagan satu kategori (semua gelanggang) beserta seluruh partai kejuaraan untuk label gelanggang. */
+  async function loadCategoryBracket(categoryId: string) {
+    if (!opts.compId || !categoryId) return
+    bracketCategoryId = categoryId
     try {
-      bracketSlots.value = await bracketService.getBracketTree(opts.compId, weightClass, gender)
+      const [slots, matches] = await Promise.all([
+        bracketService.getBracketTreeByCategory(opts.compId, categoryId),
+        matchService.getMatches(opts.compId),
+      ])
+      if (bracketCategoryId !== categoryId) return // pilihan sudah berganti
+      bracketSlots.value = slots
+      allMatches.value = matches
     } catch (err) {
       bracketSlots.value = []
       notify('error', getErrorMessage(err, 'Gagal memuat bagan.'))
     }
+  }
+
+  function refreshBracket() {
+    return loadCategoryBracket(bracketCategoryId)
   }
 
   // --- pesan WebSocket ---
@@ -385,7 +409,9 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const start = () =>
     runControl(async () => {
       const id = requireMatch()
-      if (id) await matchService.startMatch(opts.compId, id)
+      if (!id) return
+      await matchService.startMatch(opts.compId, id)
+      ringGong() // hanya jika server menerima mulai; kegagalan dilempar di atas
     }, 'Gagal memulai pertandingan.')
   const pause = () =>
     runControl(async () => {
@@ -395,7 +421,9 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
   const resume = () =>
     runControl(async () => {
       const id = requireMatch()
-      if (id) await matchService.resumeMatch(opts.compId, id)
+      if (!id) return
+      await matchService.resumeMatch(opts.compId, id)
+      ringGong()
     }, 'Gagal melanjutkan pertandingan.')
   /** `winner` wajib saat skor seri (keputusan wasit). */
   const finish = (winner?: WsTarget, method?: string) =>
@@ -545,6 +573,10 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     logEntries,
     techniques,
     bracketSlots,
+    arenaId: opts.arenaId,
+    categories,
+    arenas,
+    allMatches,
     competitors,
     toasts,
     busy,
@@ -581,7 +613,8 @@ export function useRefereeConsole(opts: RefereeConsoleOptions) {
     toggleVar,
     loadMatch,
     refreshQueue,
-    loadBracket,
+    loadCategoryBracket,
+    refreshBracket,
   })
 }
 

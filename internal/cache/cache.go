@@ -67,8 +67,17 @@ func (c *Cache) InvalidateCompetition(compID string) {
 	if compID == "" {
 		return
 	}
+	c.InvalidateKeysContaining(compID)
+}
+
+// InvalidateKeysContaining purges every cached entry whose key contains substr (no-op for empty substr).
+// Dipakai untuk daftar yang kuncinya tidak memuat comp_id, mis. daftar kejuaraan publik.
+func (c *Cache) InvalidateKeysContaining(substr string) {
+	if substr == "" {
+		return
+	}
 	c.inner.DeleteByFunc(func(key string, _ *Item) bool {
-		return strings.Contains(key, compID)
+		return strings.Contains(key, substr)
 	})
 }
 

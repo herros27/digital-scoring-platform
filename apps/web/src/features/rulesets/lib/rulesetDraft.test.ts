@@ -86,6 +86,90 @@ describe('payloadFromDraft', () => {
   })
 })
 
+describe('WMP (selisih poin)', () => {
+  it('bawaan otomatis: tidak mengirim point_gap sehingga server memilih menurut golongan umur', () => {
+    const p = payloadFromDraft({ ...newDraft(), name: 'Otomatis' })
+    expect(p.scoring.point_gap).toBeUndefined()
+    expect(draftFromRuleset(legacy).pointGap.mode).toBe('auto')
+  })
+
+  it('mode atur sendiri dan nonaktif dikirim dan dibaca kembali', () => {
+    const d = { ...newDraft(), name: 'Atur' }
+    d.pointGap = { mode: 'custom', margin: 20, fromRound: 2 }
+    expect(payloadFromDraft(d).scoring.point_gap).toEqual({ margin: 20, from_round: 2 })
+
+    d.pointGap = { mode: 'off', margin: 20, fromRound: 2 }
+    const off = payloadFromDraft(d)
+    expect(off.scoring.point_gap).toEqual({ margin: 0 })
+    const back = draftFromRuleset({ id: 'x', ...off } as RulesetDTO)
+    expect(back.pointGap.mode).toBe('off')
+    expect(payloadFromDraft(back)).toEqual(off)
+  })
+
+  it('validasi hanya berlaku pada mode atur sendiri', () => {
+    const d = { ...newDraft(), name: 'Valid' }
+    d.pointGap = { mode: 'custom', margin: 0, fromRound: 4 }
+    expect(Object.keys(validateDraft(d)).sort()).toEqual(['pointGap.fromRound', 'pointGap.margin'])
+    d.pointGap = { mode: 'off', margin: 0, fromRound: 4 }
+    expect(validateDraft(d)).toEqual({})
+  })
+})
+
+describe('waktu per golongan umur', () => {
+  it('bawaan tidak mengirim age_timings (semua golongan ikut waktu utama)', () => {
+    const p = payloadFromDraft({ ...newDraft(), name: 'Tanpa Pengecualian' })
+    expect(p.scoring.age_timings).toBeUndefined()
+    expect(draftFromRuleset(legacy).ageTimings.every((a) => !a.enabled)).toBe(true)
+  })
+
+  it('panitia bebas menentukan waktunya (mis. 2 babak × 2 menit); dikirim dan dibaca kembali', () => {
+    const d = { ...newDraft(), name: 'Kustom' }
+    const dini = d.ageTimings.find((a) => a.code === 'usia_dini_1')!
+    Object.assign(dini, { enabled: true, roundDuration: 120, breakDuration: 30, totalRounds: 2 })
+    const p = payloadFromDraft(d)
+    expect(p.scoring.age_timings).toEqual({
+      usia_dini_1: { round_duration: 120, break_duration: 30, total_rounds: 2 },
+    })
+    const back = draftFromRuleset({ id: 'x', ...p } as RulesetDTO)
+    expect(back.ageTimings.find((a) => a.code === 'usia_dini_1')).toMatchObject({
+      enabled: true,
+      roundDuration: 120,
+      totalRounds: 2,
+    })
+    expect(back.ageTimings.find((a) => a.code === 'dewasa')!.enabled).toBe(false)
+    expect(payloadFromDraft(back)).toEqual(p)
+  })
+
+  it('validasi hanya untuk golongan yang dicentang', () => {
+    const d = { ...newDraft(), name: 'Valid' }
+    const i = d.ageTimings.findIndex((a) => a.code === 'usia_dini_2')
+    Object.assign(d.ageTimings[i], { enabled: false, roundDuration: 0, totalRounds: 9 })
+    expect(validateDraft(d)).toEqual({})
+    Object.assign(d.ageTimings[i], {
+      enabled: true,
+      roundDuration: 0,
+      breakDuration: -1,
+      totalRounds: 9,
+    })
+    expect(Object.keys(validateDraft(d)).sort()).toEqual([
+      `ageTimings.${i}.breakDuration`,
+      `ageTimings.${i}.roundDuration`,
+      `ageTimings.${i}.totalRounds`,
+    ])
+  })
+
+  it('ringkasan menyebut jumlah golongan berwaktu khusus', () => {
+    const r = {
+      ...legacy,
+      scoring: {
+        ...legacy.scoring,
+        age_timings: { usia_dini_1: { round_duration: 90, break_duration: 60, total_rounds: 2 } },
+      },
+    }
+    expect(summarize(r)).toContain('1 golongan umur berwaktu khusus')
+  })
+})
+
 describe('priority', () => {
   it('urut menurut nilai tertinggi', () => {
     // urutan regulasi: 1+3, 3, 1+2, 2, 1+1, 1

@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 design
+test/cypress/screenshots
+# keluaran Playwright
+test-results/
+playwright-report/

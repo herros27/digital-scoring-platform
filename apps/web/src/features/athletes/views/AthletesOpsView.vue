@@ -1,13 +1,31 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/api/error'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { AppButton } from '@/components/ui'
 import {
   useCompetitionAthletesQuery,
   useContingentsQuery,
+  useParticipantsQuery,
   useRegisterToCompetitionMutation,
+  useChangeParticipantCategoryMutation,
+  useUnregisterParticipantMutation,
+  useUpdateAthleteProfileMutation,
 } from '../api/athleteQueries'
+import {
+  canUnregister,
+  participantStatusLabel,
+  participantStatusTone,
+} from '../lib/participantStatus'
+import type { Athlete, Participant } from '../types/athlete.schema'
 import { createAthleteSchema } from '../types/athlete.schema'
+import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
+import { useCompetitionQuery } from '@/features/competitions/api/competitionQueries'
+import {
+  ageGroupForAge,
+  ageGroupLabel,
+  ageOn,
+  isEligible,
+} from '@/features/categories/lib/ageGroups'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -23,6 +41,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'navigateVerification'): void
+  (e: 'navigateCategories'): void
 }>()
 
 const activeCompId = computed(() => props.competitionId || 'b26d7145-d341-4795-ac58-bff86d13cbf8')
@@ -37,7 +56,66 @@ const {
 } = useCompetitionAthletesQuery(activeCompId)
 const { data: rawContingents } = useContingentsQuery()
 
+const { data: rawCategories } = useCategoriesQuery(activeCompId)
+const { data: competition } = useCompetitionQuery(activeCompId)
+const categories = computed(() => rawCategories.value || [])
+
 const registerMutation = useRegisterToCompetitionMutation(activeCompId)
+const unregisterMutation = useUnregisterParticipantMutation(activeCompId)
+const updateMutation = useUpdateAthleteProfileMutation(activeCompId)
+const changeCategoryMutation = useChangeParticipantCategoryMutation(activeCompId)
+
+// Status pendaftaran nyata tiap atlet (manajer kontingen hanya menerima pesertanya sendiri dari server).
+const { data: rawParticipants } = useParticipantsQuery(activeCompId)
+const participantByAthlete = computed(() => {
+  const map = new Map<string, Participant>()
+  for (const p of rawParticipants.value || []) map.set(p.athlete_id, p)
+  return map
+})
+
+// Batal daftar
+const cancelTarget = ref<{ participant: Participant; athlete: Athlete } | null>(null)
+const cancelError = ref('')
+// true = "Hapus": data atlet ikut dihapus bila tidak terdaftar di kejuaraan lain.
+const cancelPurge = ref(false)
+
+function openCancelDialog(athlete: Athlete, purge = false) {
+  const participant = participantByAthlete.value.get(athlete.id)
+  if (!participant) return
+  cancelTarget.value = { participant, athlete }
+  cancelPurge.value = purge
+  cancelError.value = ''
+}
+
+async function confirmCancelRegistration() {
+  if (!cancelTarget.value) return
+  cancelError.value = ''
+  try {
+    await unregisterMutation.mutateAsync({
+      participantId: cancelTarget.value.participant.id,
+      purge: cancelPurge.value,
+    })
+    showToast(
+      cancelPurge.value ? 'Peserta Dihapus' : 'Pendaftaran Dibatalkan',
+      cancelPurge.value
+        ? `${cancelTarget.value.athlete.name} dihapus dari kejuaraan ini.`
+        : `${cancelTarget.value.athlete.name} dikeluarkan dari kejuaraan ini.`,
+      'success',
+    )
+    cancelTarget.value = null
+  } catch (err) {
+    cancelError.value = getErrorMessage(
+      err,
+      cancelPurge.value ? 'Peserta tidak dapat dihapus.' : 'Pendaftaran tidak dapat dibatalkan.',
+    )
+  }
+}
+
+// Tanggal acuan umur = hari pertama kejuaraan (fallback hari ini).
+const ageReferenceDate = computed(() => {
+  const d = competition.value?.start_date
+  return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(0, 10) : new Date()
+})
 
 const athletes = computed(() => rawAthletes.value || [])
 const contingents = computed(() => rawContingents.value || [])
@@ -69,27 +147,88 @@ function showToast(
 // Modal Form State (Register New Athlete)
 const isModalOpen = ref(false)
 const formErrors = ref<Record<string, string>>({})
-const formState = ref<{
+interface AthleteFormState {
   name: string
   gender: 'male' | 'female' | 'putra' | 'putri'
   team: string
-  weight_class: string
-}>({
+  birth_date: string
+  nik: string
+  category_id: string
+}
+const emptyForm = (team = ''): AthleteFormState => ({
   name: '',
   gender: 'male',
-  team: '',
-  weight_class: 'A',
+  team,
+  birth_date: '',
+  nik: '',
+  category_id: '',
+})
+const formState = ref<AthleteFormState>(emptyForm())
+
+// Usia & golongan umur dihitung otomatis (standar IPSI) dari tanggal lahir.
+const formAge = computed(() =>
+  formState.value.birth_date ? ageOn(formState.value.birth_date, ageReferenceDate.value) : null,
+)
+const formAgeGroupLabel = computed(() => {
+  if (formAge.value === null) return null
+  const g = ageGroupForAge(formAge.value, 'ipsi')
+  return g ? ageGroupLabel(g, 'ipsi') : null
 })
 
-function openCreateModal() {
+// Dropdown hanya menampilkan kelas yang sah untuk gender + umur atlet.
+const eligibleCategories = computed(() => {
+  if (!formState.value.birth_date || formAge.value === null) return []
+  return categories.value
+    .filter((c) =>
+      isEligible(
+        { gender: formState.value.gender, birth_date: formState.value.birth_date },
+        c,
+        ageReferenceDate.value,
+      ),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+})
+
+// Reset pilihan kelas bila tidak lagi sah setelah gender / tanggal lahir berubah.
+watch(eligibleCategories, (list) => {
+  if (formState.value.category_id && !list.some((c) => c.id === formState.value.category_id)) {
+    formState.value.category_id = ''
+  }
+})
+
+// Mode edit: form yang sama dipakai tanpa jenis kelamin (mengubahnya = hapus lalu daftarkan ulang).
+const editTarget = ref<Athlete | null>(null)
+const canEditAthlete = computed(() =>
+  ['admin', 'dewan', 'contingent'].includes(authStore.role || ''),
+)
+
+function openEditModal(athlete: Athlete) {
+  editTarget.value = athlete
   formState.value = {
-    name: '',
-    gender: 'male',
-    team: contingents.value.length > 0 ? contingents.value[0].name : '',
-    weight_class: 'A',
+    name: athlete.name,
+    gender: athlete.gender as AthleteFormState['gender'],
+    team: athlete.team || '',
+    birth_date: athlete.birth_date || '',
+    nik: athlete.nik || '',
+    category_id: participantByAthlete.value.get(athlete.id)?.category_id || '',
   }
   formErrors.value = {}
   isModalOpen.value = true
+}
+
+function openCreateModal() {
+  editTarget.value = null
+  formState.value = emptyForm(contingents.value.length > 0 ? contingents.value[0].name : '')
+  formErrors.value = {}
+  isModalOpen.value = true
+}
+
+function athleteAgeLabel(birthDate?: string): string {
+  if (!birthDate) return 'Tanggal lahir belum diisi'
+  const age = ageOn(birthDate, ageReferenceDate.value)
+  if (age === null) return birthDate
+  const g = ageGroupForAge(age, 'ipsi')
+  return `${age} th · ${g ? ageGroupLabel(g, 'ipsi') : 'di luar golongan'}`
 }
 
 async function handleSubmitAthlete() {
@@ -98,15 +237,65 @@ async function handleSubmitAthlete() {
     name: formState.value.name,
     gender: formState.value.gender,
     team: formState.value.team,
+    birth_date: formState.value.birth_date,
+    nik: formState.value.nik.trim() || undefined,
   })
 
+  const errors: Record<string, string> = {}
   if (!parseResult.success) {
-    const errors: Record<string, string> = {}
     for (const issue of parseResult.error.issues) {
       const field = issue.path[0] as string
       if (!errors[field]) errors[field] = issue.message
     }
+  }
+  if (formAge.value !== null && formAge.value < 0) {
+    errors.birth_date = 'Tanggal lahir tidak boleh di masa depan'
+  }
+  if (!formState.value.category_id) {
+    errors.category_id = 'Pilih kategori yang sesuai umur & jenis kelamin atlet'
+  }
+  if (Object.keys(errors).length > 0) {
     formErrors.value = errors
+    return
+  }
+
+  if (editTarget.value) {
+    try {
+      await updateMutation.mutateAsync({
+        athleteId: editTarget.value.id,
+        name: formState.value.name.trim(),
+        team: formState.value.team.trim(),
+        birth_date: formState.value.birth_date,
+        nik: formState.value.nik.trim(),
+      })
+      isModalOpen.value = false
+    } catch (err) {
+      showToast('Gagal Memperbarui', getErrorMessage(err, 'Terjadi kesalahan sistem.'), 'danger')
+      return
+    }
+    // Kategori dipindah setelah profil tersimpan: umur baru bisa membuat kategori lain menjadi sah.
+    const participant = participantByAthlete.value.get(editTarget.value.id)
+    if (participant && participant.category_id !== formState.value.category_id) {
+      try {
+        await changeCategoryMutation.mutateAsync({
+          participantId: participant.id,
+          categoryId: formState.value.category_id,
+        })
+        showToast(
+          'Data Atlet Diperbarui',
+          'Kategori dipindah. Peserta yang sudah diverifikasi perlu diverifikasi ulang.',
+          'success',
+        )
+      } catch (err) {
+        showToast(
+          'Kategori Tidak Dipindah',
+          getErrorMessage(err, 'Data atlet tersimpan, tetapi kategori tidak dapat dipindah.'),
+          'danger',
+        )
+      }
+      return
+    }
+    showToast('Data Atlet Diperbarui', `${formState.value.name} berhasil diperbarui.`, 'success')
     return
   }
 
@@ -116,7 +305,9 @@ async function handleSubmitAthlete() {
       name: formState.value.name.trim(),
       gender: formState.value.gender,
       team: formState.value.team.trim(),
-      weight_class: formState.value.weight_class.trim().toUpperCase(),
+      birth_date: formState.value.birth_date,
+      nik: formState.value.nik.trim() || undefined,
+      category_id: formState.value.category_id,
     })
 
     isModalOpen.value = false
@@ -541,6 +732,7 @@ function isMaleGender(gender: string): boolean {
         <!-- Card Content -->
         <div class="atl-card__content">
           <h3 class="atl-card__title">{{ athlete.name }}</h3>
+          <p class="atl-card__age font-mono">{{ athleteAgeLabel(athlete.birth_date) }}</p>
 
           <div class="atl-card__team-box font-mono">
             <span class="atl-team-label">PERGURUAN / KONTINGEN:</span>
@@ -550,10 +742,63 @@ function isMaleGender(gender: string): boolean {
 
         <!-- Card Footer -->
         <footer class="atl-card__footer">
-          <div class="atl-card__status-row font-mono">
-            <span class="atl-status-dot" />
-            <span class="atl-status-text">TERDAFTAR RESMI</span>
+          <div class="atl-card__status-row font-mono" data-test="athlete-status">
+            <span
+              class="atl-status-dot"
+              :class="`atl-status-dot--${participantStatusTone(participantByAthlete.get(athlete.id)?.registration_status ?? 'registered')}`"
+            />
+            <span
+              class="atl-status-text"
+              :class="`atl-status-text--${participantStatusTone(participantByAthlete.get(athlete.id)?.registration_status ?? 'registered')}`"
+              >{{
+                participantStatusLabel(
+                  participantByAthlete.get(athlete.id)?.registration_status ?? 'registered',
+                )
+              }}</span
+            >
           </div>
+          <button
+            v-if="
+              participantByAthlete.get(athlete.id) &&
+              canUnregister(
+                authStore.role || '',
+                participantByAthlete.get(athlete.id)!.registration_status,
+              )
+            "
+            type="button"
+            class="atl-cancel-link font-mono"
+            :aria-label="`Batal daftar ${athlete.name}`"
+            data-test="athlete-unregister"
+            @click="openCancelDialog(athlete)"
+          >
+            Batal Daftar
+          </button>
+          <button
+            v-if="canEditAthlete"
+            type="button"
+            class="atl-cancel-link font-mono"
+            :aria-label="`Edit ${athlete.name}`"
+            data-test="athlete-edit"
+            @click="openEditModal(athlete)"
+          >
+            Edit
+          </button>
+          <button
+            v-if="
+              participantByAthlete.get(athlete.id) &&
+              canUnregister(
+                authStore.role || '',
+                participantByAthlete.get(athlete.id)!.registration_status,
+              )
+            "
+            type="button"
+            class="atl-cancel-link font-mono"
+            :aria-label="`Hapus ${athlete.name}`"
+            data-test="athlete-delete"
+            @click="openCancelDialog(athlete, true)"
+          >
+            Hapus
+          </button>
           <button
             v-if="authStore.isAdminOrDewan"
             type="button"
@@ -577,6 +822,61 @@ function isMaleGender(gender: string): boolean {
       </article>
     </div>
 
+    <!-- Konfirmasi batal daftar -->
+    <div
+      v-if="cancelTarget"
+      class="atl-modal-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="atl-cancel-title"
+      data-test="unregister-dialog"
+      @click.self="cancelTarget = null"
+    >
+      <div class="atl-modal">
+        <header class="atl-modal__header">
+          <div>
+            <div class="atl-modal__tag font-mono">
+              {{ cancelPurge ? 'HAPUS PESERTA' : 'BATAL PENDAFTARAN' }}
+            </div>
+            <h3 id="atl-cancel-title" class="atl-modal__title">
+              {{ cancelPurge ? 'Hapus Peserta?' : 'Batalkan Pendaftaran?' }}
+            </h3>
+          </div>
+        </header>
+        <div class="atl-modal__body">
+          <p v-if="cancelPurge" class="atl-form-help">
+            <strong>{{ cancelTarget.athlete.name }}</strong> akan dihapus dari kejuaraan ini beserta
+            data atletnya (kecuali masih terdaftar di kejuaraan lain). Tindakan ini tidak dapat
+            dibatalkan. Peserta yang sudah masuk bagan atau partai tidak dapat dihapus; reset bagan
+            kategorinya terlebih dahulu.
+          </p>
+          <p v-else class="atl-form-help">
+            <strong>{{ cancelTarget.athlete.name }}</strong> akan dikeluarkan dari kejuaraan ini.
+            Data atlet tetap tersimpan dan dapat didaftarkan lagi. Peserta yang sudah masuk bagan
+            atau partai tidak dapat dibatalkan; reset bagan kategorinya terlebih dahulu.
+          </p>
+          <p v-if="cancelError" class="atl-form-error" role="alert" data-test="unregister-error">
+            {{ cancelError }}
+          </p>
+          <footer class="atl-modal__footer font-mono">
+            <AppButton type="button" variant="secondary" size="md" @click="cancelTarget = null">
+              Kembali
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="md"
+              :loading="unregisterMutation.isPending.value"
+              data-test="unregister-confirm"
+              @click="confirmCancelRegistration"
+            >
+              {{ cancelPurge ? 'Ya, Hapus Peserta' : 'Batalkan Pendaftaran' }}
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Form (Daftarkan Atlet Baru) -->
     <div
       v-if="isModalOpen"
@@ -589,8 +889,12 @@ function isMaleGender(gender: string): boolean {
       <div class="atl-modal">
         <header class="atl-modal__header">
           <div>
-            <div class="atl-modal__tag font-mono">REGISTRASI PESERTA TURNAMEN</div>
-            <h3 id="atl-modal-title" class="atl-modal__title">Daftarkan Atlet Baru</h3>
+            <div class="atl-modal__tag font-mono">
+              {{ editTarget ? 'UBAH DATA ATLET' : 'REGISTRASI PESERTA TURNAMEN' }}
+            </div>
+            <h3 id="atl-modal-title" class="atl-modal__title">
+              {{ editTarget ? 'Edit Atlet' : 'Daftarkan Atlet Baru' }}
+            </h3>
           </div>
           <button class="atl-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
@@ -616,7 +920,7 @@ function isMaleGender(gender: string): boolean {
           </div>
 
           <!-- Gender Toggle -->
-          <div class="atl-form-group">
+          <div v-if="!editTarget" class="atl-form-group">
             <label class="atl-form-label font-mono">
               GOLONGAN & JENIS KELAMIN <span class="atl-req">*</span>
             </label>
@@ -631,7 +935,7 @@ function isMaleGender(gender: string): boolean {
                 <input v-model="formState.gender" type="radio" value="male" class="sr-only" />
                 <span class="atl-radio-indicator atl-radio-indicator--male" />
                 <div class="atl-radio-text">
-                  <strong>DEWASA PUTRA</strong>
+                  <strong>PUTRA</strong>
                   <span class="atl-sub font-mono">Sudut Merah</span>
                 </div>
               </label>
@@ -646,7 +950,7 @@ function isMaleGender(gender: string): boolean {
                 <input v-model="formState.gender" type="radio" value="female" class="sr-only" />
                 <span class="atl-radio-indicator atl-radio-indicator--female" />
                 <div class="atl-radio-text">
-                  <strong>DEWASA PUTRI</strong>
+                  <strong>PUTRI</strong>
                   <span class="atl-sub font-mono">Sudut Biru</span>
                 </div>
               </label>
@@ -674,28 +978,81 @@ function isMaleGender(gender: string): boolean {
             <span v-if="formErrors.team" class="atl-form-error">{{ formErrors.team }}</span>
           </div>
 
-          <!-- Weight Class -->
+          <!-- Tanggal Lahir & NIK -->
           <div class="atl-form-group">
-            <label for="atl-weight-class-input" class="atl-form-label font-mono">
-              KELAS TANDING (IPSI 2023) <span class="atl-req">*</span>
+            <label for="atl-birth-input" class="atl-form-label font-mono">
+              TANGGAL LAHIR <span class="atl-req">*</span>
+            </label>
+            <input
+              id="atl-birth-input"
+              v-model="formState.birth_date"
+              type="date"
+              class="atl-form-input font-mono"
+              :class="{ 'atl-form-input--error': formErrors.birth_date }"
+              required
+            />
+            <span v-if="formErrors.birth_date" class="atl-form-error">{{
+              formErrors.birth_date
+            }}</span>
+            <span v-else-if="formAge !== null" class="atl-form-help">
+              Usia {{ formAge }} tahun
+              <template v-if="formAgeGroupLabel">· golongan {{ formAgeGroupLabel }}</template>
+              <template v-else>· di luar golongan umur standar</template>
+            </span>
+          </div>
+
+          <div class="atl-form-group">
+            <label for="atl-nik-input" class="atl-form-label font-mono">
+              NIK (KK / KIA / AKTA KELAHIRAN)
+            </label>
+            <input
+              id="atl-nik-input"
+              v-model="formState.nik"
+              type="text"
+              inputmode="numeric"
+              maxlength="50"
+              class="atl-form-input font-mono"
+              :class="{ 'atl-form-input--error': formErrors.nik }"
+              placeholder="NIK pada Kartu Keluarga / KIA / Akta Kelahiran"
+            />
+            <span v-if="formErrors.nik" class="atl-form-error">{{ formErrors.nik }}</span>
+          </div>
+
+          <!-- Kategori (kelas sah berdasarkan umur & gender) -->
+          <div class="atl-form-group">
+            <label for="atl-category-input" class="atl-form-label font-mono">
+              KATEGORI TANDING <span class="atl-req">*</span>
             </label>
             <select
-              id="atl-weight-class-input"
-              v-model="formState.weight_class"
+              id="atl-category-input"
+              v-model="formState.category_id"
               class="atl-form-select font-mono"
+              :class="{ 'atl-form-input--error': formErrors.category_id }"
+              :disabled="eligibleCategories.length === 0"
             >
-              <option value="A">Kelas A (45–50 Kg)</option>
-              <option value="B">Kelas B (50–55 Kg)</option>
-              <option value="C">Kelas C (55–60 Kg)</option>
-              <option value="D">Kelas D (60–65 Kg)</option>
-              <option value="E">Kelas E (65–70 Kg)</option>
-              <option value="F">Kelas F (70–75 Kg)</option>
-              <option value="G">Kelas G (75–80 Kg)</option>
-              <option value="H">Kelas H (80–85 Kg)</option>
-              <option value="I">Kelas I (85–90 Kg)</option>
-              <option value="J">Kelas J (90–95 Kg)</option>
-              <option value="OPEN">Kelas Bebas</option>
+              <option value="">
+                {{
+                  !formState.birth_date
+                    ? '— Isi tanggal lahir terlebih dahulu —'
+                    : eligibleCategories.length === 0
+                      ? '— Tidak ada kategori yang sah —'
+                      : '— Pilih kategori —'
+                }}
+              </option>
+              <option v-for="c in eligibleCategories" :key="c.id" :value="c.id">
+                {{ c.name }}
+              </option>
             </select>
+            <span v-if="formErrors.category_id" class="atl-form-error">{{
+              formErrors.category_id
+            }}</span>
+            <span
+              v-else-if="formState.birth_date && eligibleCategories.length === 0"
+              class="atl-form-help"
+            >
+              Belum ada kategori untuk golongan umur / jenis kelamin ini. Buat atau terapkan standar
+              kategori terlebih dahulu di menu Kategori.
+            </span>
           </div>
 
           <footer class="atl-modal__footer font-mono">
@@ -706,9 +1063,13 @@ function isMaleGender(gender: string): boolean {
               type="submit"
               variant="emerald"
               size="md"
-              :loading="registerMutation.isPending.value"
+              :loading="
+                registerMutation.isPending.value ||
+                updateMutation.isPending.value ||
+                changeCategoryMutation.isPending.value
+              "
             >
-              Simpan & Daftarkan
+              {{ editTarget ? 'Simpan Perubahan' : 'Simpan & Daftarkan' }}
             </AppButton>
           </footer>
         </form>
@@ -1215,11 +1576,35 @@ function isMaleGender(gender: string): boolean {
   border-radius: 50%;
   background-color: var(--color-emerald-400, #34d399);
 }
+.atl-status-dot--wait {
+  background-color: #fbbf24;
+}
+.atl-status-dot--bad {
+  background-color: #f87171;
+}
 .atl-status-text {
   font-size: 0.625rem;
   color: var(--color-emerald-400, #34d399);
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+.atl-status-text--wait {
+  color: #fbbf24;
+}
+.atl-status-text--bad {
+  color: #f87171;
+}
+.atl-cancel-link {
+  background: none;
+  border: none;
+  color: #fca5a5;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.atl-cancel-link:hover {
+  color: #ef4444;
+  text-decoration: underline;
 }
 .atl-verify-link {
   display: inline-flex;
@@ -1347,8 +1732,12 @@ function isMaleGender(gender: string): boolean {
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
 }
 .atl-modal__header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1376,6 +1765,10 @@ function isMaleGender(gender: string): boolean {
   font-size: 1.25rem;
 }
 .atl-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
@@ -1493,5 +1886,27 @@ function isMaleGender(gender: string): boolean {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+.atl-card__age {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.atl-form-help {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.atl-link-btn {
+  display: block;
+  margin-top: 0.35rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-emerald-500, #10b981);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>

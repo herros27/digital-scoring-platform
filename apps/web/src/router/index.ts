@@ -19,6 +19,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false, layout: 'KioskLayout' },
   },
   {
+    path: '/bagan',
+    name: 'bagan-list',
+    component: () => import('../views/bagan/BaganListView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
+    path: '/bagan/:comp_id/:category_id',
+    name: 'bagan',
+    component: () => import('../views/bagan/BaganView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/judge',
     name: 'judge',
     component: () => import('../views/judge/JudgeScoringView.vue'),
@@ -60,23 +72,19 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    redirect: '/admin/competitions',
-  },
-  {
-    path: '/admin/pins',
-    name: 'admin-pins',
-    component: () => import('../views/admin/DevicePinManager.vue'),
-    meta: { requiresAuth: true, allowedRoles: ['admin', 'dewan'], layout: 'AdminLayout' },
+    redirect: '/ops?tab=kompetisi',
   },
   {
     path: '/admin/competitions',
-    name: 'admin-competitions',
-    component: () => import('../features/competitions/views/CompetitionsView.vue'),
-    meta: { requiresAuth: true, allowedRoles: ['admin', 'dewan'], layout: 'AdminLayout' },
+    redirect: '/ops?tab=kompetisi',
+  },
+  {
+    path: '/admin/pins',
+    redirect: '/ops?tab=pin',
   },
   {
     path: '/competitions',
-    redirect: '/admin/competitions',
+    redirect: '/ops?tab=kompetisi',
   },
 ]
 

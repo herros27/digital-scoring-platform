@@ -32,6 +32,13 @@ export interface RulesetScoring {
   consensus?: { judges: number; majority: number; window_ms: number }
   tiebreak?: { steps?: string[]; technique_priority?: string[]; manual_methods?: string[] }
   outcomes?: RulesetOutcome[]
+  /** WMP: tidak ada = otomatis menurut golongan umur (30; usia dini & pra-remaja 20); margin 0 = nonaktif */
+  point_gap?: { margin: number; from_round?: number }
+  /** Waktu khusus per golongan umur (kunci = kode golongan); yang tidak tercantum ikut waktu utama. */
+  age_timings?: Record<
+    string,
+    { round_duration: number; break_duration: number; total_rounds: number }
+  >
 }
 
 export interface RulesetDTO {

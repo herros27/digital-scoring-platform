@@ -103,13 +103,13 @@ func TestBracketGenerator_WithByes_ThreeParticipants(t *testing.T) {
 		t.Errorf("expected exactly 1 BYE slot, got %d", byesCount)
 	}
 
-	// The participant paired with the BYE slot (index 2 paired with index 3) must be auto-advanced
+	// Seed teratas (p1) mendapat BYE dan otomatis maju
 	var autoAdvancedSlotFound bool
 	for _, s := range r1Slots {
 		if s.ParticipantID != nil && s.WinnerID != nil && *s.WinnerID == *s.ParticipantID {
 			autoAdvancedSlotFound = true
-			if *s.ParticipantID != "p3" {
-				t.Errorf("expected p3 to be auto-advanced, got %s", *s.ParticipantID)
+			if *s.ParticipantID != "p1" {
+				t.Errorf("expected p1 (seed teratas) to be auto-advanced, got %s", *s.ParticipantID)
 			}
 		}
 	}
@@ -148,4 +148,123 @@ func filterSlotsByRound(slots []store.BracketSlot, round int) []store.BracketSlo
 		}
 	}
 	return res
+}
+
+func TestSplitPemasalanGroups(t *testing.T) {
+	ids := func(n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = string(rune('a' + i))
+		}
+		return out
+	}
+	cases := map[int][]int{2: {2}, 3: {3}, 4: {4}, 5: {3, 2}, 7: {4, 3}, 9: {3, 3, 3}}
+	for n, want := range cases {
+		groups := SplitPemasalanGroups(ids(n))
+		if len(groups) != len(want) {
+			t.Fatalf("n=%d groups=%d want %d", n, len(groups), len(want))
+		}
+		for i, g := range groups {
+			if len(g) != want[i] {
+				t.Errorf("n=%d group %d size %d want %d", n, i, len(g), want[i])
+			}
+		}
+	}
+	if SplitPemasalanGroups(ids(1)) != nil {
+		t.Error("single participant must yield no groups")
+	}
+}
+
+func TestGenerateMiniSlots_IsolatedGroups(t *testing.T) {
+	ids := []string{"a", "b", "c", "d", "e", "f", "g"} // 4 + 3
+	slots := GenerateMiniSlots("comp", "A", "male", ids)
+	AssignCategory(slots, "cat-1")
+
+	seen := map[[2]int]bool{}
+	parts := 0
+	for _, s := range slots {
+		key := [2]int{s.Round, s.SlotIndex}
+		if seen[key] {
+			t.Fatalf("duplicate slot round=%d index=%d", s.Round, s.SlotIndex)
+		}
+		seen[key] = true
+		if s.CategoryID == nil || *s.CategoryID != "cat-1" {
+			t.Fatal("slot missing category")
+		}
+		if s.Round == 1 && s.ParticipantID != nil {
+			parts++
+		}
+	}
+	if parts != 7 {
+		t.Errorf("round-1 participants=%d want 7", parts)
+	}
+	// Setiap slot ronde 1 harus menunjuk parent dalam grup yang sama (index/2 dalam grup).
+	byID := map[string]store.BracketSlot{}
+	for _, s := range slots {
+		byID[s.ID] = s
+	}
+	for _, s := range slots {
+		if s.Round == 1 && s.NextSlotID != nil {
+			parent := byID[*s.NextSlotID]
+			if s.SlotIndex/4 != parent.SlotIndex/2 {
+				t.Errorf("slot %d leaks into group of parent %d", s.SlotIndex, parent.SlotIndex)
+			}
+		}
+	}
+}
+
+// Untuk jumlah peserta berapa pun, BYE tidak boleh berpasangan dengan BYE (pemenang pasangan di sebelahnya tidak
+// akan pernah punya lawan), setiap peserta tepat satu kali di ronde 1, dan hanya peserta berpasangan BYE yang maju
+// otomatis ke ronde 2.
+func TestBracketGenerator_ByesNeverPairWithByes(t *testing.T) {
+	for n := 2; n <= 40; n++ {
+		ids := make([]string, n)
+		for i := range ids {
+			ids[i] = fmt.Sprintf("p%d", i+1)
+		}
+		slots := GenerateSlots("c", "A", "male", ids)
+		size := nextPowerOfTwo(n)
+		byIndex := map[int]store.BracketSlot{}
+		for _, s := range filterSlotsByRound(slots, 1) {
+			byIndex[s.SlotIndex] = s
+		}
+		if len(byIndex) != size {
+			t.Fatalf("n=%d: %d slot ronde 1, want %d", n, len(byIndex), size)
+		}
+
+		seen := map[string]int{}
+		realMatches, autoAdvanced := 0, 0
+		for i := 0; i < size; i += 2 {
+			a, b := byIndex[i], byIndex[i+1]
+			if a.IsBye && b.IsBye {
+				t.Fatalf("n=%d: pasangan %d/%d BYE lawan BYE", n, i, i+1)
+			}
+			if !a.IsBye && !b.IsBye {
+				realMatches++
+			} else {
+				autoAdvanced++
+				for _, s := range []store.BracketSlot{a, b} {
+					if !s.IsBye && (s.WinnerID == nil || *s.WinnerID != *s.ParticipantID) {
+						t.Fatalf("n=%d: peserta berpasangan BYE tidak otomatis maju", n)
+					}
+				}
+			}
+			for _, s := range []store.BracketSlot{a, b} {
+				if s.ParticipantID != nil {
+					seen[*s.ParticipantID]++
+				}
+			}
+		}
+		if len(seen) != n {
+			t.Fatalf("n=%d: %d peserta tampil di ronde 1", n, len(seen))
+		}
+		for id, c := range seen {
+			if c != 1 {
+				t.Fatalf("n=%d: %s tampil %d kali", n, id, c)
+			}
+		}
+		if byes := size - n; autoAdvanced != byes || realMatches != n-size/2 {
+			t.Fatalf("n=%d: partai nyata %d (want %d), lolos BYE %d (want %d)", n, realMatches, n-size/2, autoAdvanced, byes)
+		}
+	}
 }

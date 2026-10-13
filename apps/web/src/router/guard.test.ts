@@ -22,6 +22,11 @@ describe('router guard', () => {
     expect((await visit('/scoreboard')).name).toBe('scoreboard-list')
   })
 
+  it('halaman bagan publik terbuka tanpa token', async () => {
+    expect((await visit('/bagan')).name).toBe('bagan-list')
+    expect((await visit('/bagan/c1/k1')).name).toBe('bagan')
+  })
+
   it('base URL diarahkan ke daftar scoreboard live', async () => {
     expect((await visit('/')).name).toBe('scoreboard-list')
   })
@@ -53,8 +58,8 @@ describe('router guard', () => {
     expect((await visit('/referee')).path).toBe('/judge')
   })
 
-  it('/admin/pins ditolak untuk kontingen', async () => {
-    login('contingent')
+  it('/admin/pins diarahkan ke /ops?tab=pin', async () => {
+    login('admin')
     expect((await visit('/admin/pins')).path).toBe('/ops')
   })
 

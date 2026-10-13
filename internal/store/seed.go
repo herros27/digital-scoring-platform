@@ -8,7 +8,7 @@ import (
 	"github.com/herros27/digital-scoring/internal/rules"
 	"time"
 
-	"github.com/herros27/digital-scoring/internal/auth"
+	// "github.com/herros27/digital-scoring/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -74,7 +74,7 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	}{
 		{Name: "Administrator Utama", Email: "admin@silat.id", Role: "admin", Password: "DemoPass_2026"},
 		{Name: "Ketua Dewan Juri", Email: "dewan@silat.id", Role: "dewan", Password: "DemoPass_2026"},
-		{Name: "Wasit Utama", Email: "wasit@silat.id", Role: "wasit", Password: "DemoPass_2026"},
+		{Name: "Operator Meja Utama", Email: "wasit@silat.id", Role: "wasit", Password: "DemoPass_2026"},
 		{Name: "Operator Gelanggang", Email: "operator@silat.id", Role: "operator", Password: "DemoPass_2026"},
 	}
 
@@ -143,7 +143,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to query competition: %w", err)
 	} else {
-		_, _ = tx.ExecContext(ctx, `UPDATE competitions SET ruleset_id = $1, status = 'active' WHERE id = $2`, rulesetIPSIID, compID)
+		// ponytail: perbarui created_at saat re-seed agar kejuaraan seed selalu masuk halaman 1 (ORDER BY created_at DESC)
+		_, _ = tx.ExecContext(ctx, `UPDATE competitions SET ruleset_id = $1, status = 'active', created_at = CURRENT_TIMESTAMP WHERE id = $2`, rulesetIPSIID, compID)
 	}
 	summary.CompetitionID = compID
 
@@ -175,51 +176,64 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		Gender      string
 		WeightClass string
 	}{
-		{Name: "Tanding Dewasa Putra - Kelas A (45-50 Kg)", Gender: "male", WeightClass: "A"},
-		{Name: "Tanding Dewasa Putra - Kelas B (50-55 Kg)", Gender: "male", WeightClass: "B"},
-		{Name: "Tanding Dewasa Putra - Kelas C (55-60 Kg)", Gender: "male", WeightClass: "C"},
-		{Name: "Tanding Dewasa Putra - Kelas D (60-65 Kg)", Gender: "male", WeightClass: "D"},
-		{Name: "Tanding Dewasa Putra - Kelas E (65-70 Kg)", Gender: "male", WeightClass: "E"},
-		{Name: "Tanding Dewasa Putra - Kelas F (70-75 Kg)", Gender: "male", WeightClass: "F"},
-		{Name: "Tanding Dewasa Putra - Kelas G (75-80 Kg)", Gender: "male", WeightClass: "G"},
-		{Name: "Tanding Dewasa Putra - Kelas H (80-85 Kg)", Gender: "male", WeightClass: "H"},
-		{Name: "Tanding Dewasa Putra - Kelas I (85-90 Kg)", Gender: "male", WeightClass: "I"},
-		{Name: "Tanding Dewasa Putra - Kelas J (90-95 Kg)", Gender: "male", WeightClass: "J"},
-		{Name: "Tanding Dewasa Putri - Kelas A (45-50 Kg)", Gender: "female", WeightClass: "A"},
-		{Name: "Tanding Dewasa Putri - Kelas B (50-55 Kg)", Gender: "female", WeightClass: "B"},
-		{Name: "Tanding Dewasa Putri - Kelas C (55-60 Kg)", Gender: "female", WeightClass: "C"},
-		{Name: "Tanding Dewasa Putri - Kelas D (60-65 Kg)", Gender: "female", WeightClass: "D"},
-		{Name: "Tanding Dewasa Putri - Kelas E (65-70 Kg)", Gender: "female", WeightClass: "E"},
-		{Name: "Tanding Dewasa Putri - Kelas F (70-75 Kg)", Gender: "female", WeightClass: "F"},
+		{Name: "Tanding Dewasa Putra - Kelas A (45–50 Kg)", Gender: "male", WeightClass: "A"},
+		{Name: "Tanding Dewasa Putra - Kelas B (50–55 Kg)", Gender: "male", WeightClass: "B"},
+		{Name: "Tanding Dewasa Putra - Kelas C (55–60 Kg)", Gender: "male", WeightClass: "C"},
+		{Name: "Tanding Dewasa Putra - Kelas D (60–65 Kg)", Gender: "male", WeightClass: "D"},
+		{Name: "Tanding Dewasa Putra - Kelas E (65–70 Kg)", Gender: "male", WeightClass: "E"},
+		{Name: "Tanding Dewasa Putra - Kelas F (70–75 Kg)", Gender: "male", WeightClass: "F"},
+		{Name: "Tanding Dewasa Putra - Kelas G (75–80 Kg)", Gender: "male", WeightClass: "G"},
+		{Name: "Tanding Dewasa Putra - Kelas H (80–85 Kg)", Gender: "male", WeightClass: "H"},
+		{Name: "Tanding Dewasa Putra - Kelas I (85–90 Kg)", Gender: "male", WeightClass: "I"},
+		{Name: "Tanding Dewasa Putra - Kelas J (90–95 Kg)", Gender: "male", WeightClass: "J"},
+		{Name: "Tanding Dewasa Putri - Kelas A (45–50 Kg)", Gender: "female", WeightClass: "A"},
+		{Name: "Tanding Dewasa Putri - Kelas B (50–55 Kg)", Gender: "female", WeightClass: "B"},
+		{Name: "Tanding Dewasa Putri - Kelas C (55–60 Kg)", Gender: "female", WeightClass: "C"},
+		{Name: "Tanding Dewasa Putri - Kelas D (60–65 Kg)", Gender: "female", WeightClass: "D"},
+		{Name: "Tanding Dewasa Putri - Kelas E (65–70 Kg)", Gender: "female", WeightClass: "E"},
+		{Name: "Tanding Dewasa Putri - Kelas F (70–75 Kg)", Gender: "female", WeightClass: "F"},
 	}
 	for _, cat := range categories {
+		// Tabel Dewasa PB IPSI: kelas A = 45-50 kg, B = 50-55, ... (lebar 5 kg), batas inklusif seperti preset UI.
+		minW := 45 + 5*float64(cat.WeightClass[0]-'A')
+		maxW := minW + 5
 		var catID string
-		err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND name = $2 LIMIT 1`, compID, cat.Name).Scan(&catID)
+		err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND translate(name, '–—−', '---') = translate($2, '–—−', '---') LIMIT 1`, compID, cat.Name).Scan(&catID)
 		if err == sql.ErrNoRows {
 			_, err = tx.ExecContext(ctx, `
-				INSERT INTO categories (competition_id, name, gender, weight_class, ruleset_id)
-				VALUES ($1, $2, $3, $4, $5)`,
-				compID, cat.Name, cat.Gender, cat.WeightClass, rulesetIPSIID)
+				INSERT INTO categories (competition_id, name, gender, weight_class, ruleset_id, age_group, preset_standard, min_weight, max_weight)
+				VALUES ($1, $2, $3, $4, $5, 'dewasa', 'ipsi', $6, $7)`,
+				compID, cat.Name, cat.Gender, cat.WeightClass, rulesetIPSIID, minW, maxW)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert category %s: %w", cat.Name, err)
 			}
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to query category %s: %w", cat.Name, err)
+		} else if _, err = tx.ExecContext(ctx, `
+			UPDATE categories SET min_weight = $2, max_weight = $3
+			WHERE id = $1 AND min_weight IS NULL AND max_weight IS NULL`, catID, minW, maxW); err != nil {
+			// Seed lama membuat kategori tanpa batas bobot; lengkapi tanpa menimpa batas yang sudah diisi.
+			return nil, fmt.Errorf("failed to set weight bounds for %s: %w", cat.Name, err)
 		}
 	}
 
 	// 7. Athletes
+	// Tanggal lahir contoh berada di golongan Dewasa (18-35 th) pada tanggal kejuaraan mana pun yang wajar,
+	// sehingga lolos pemeriksaan umur kategori Dewasa.
 	athletesSeed := []struct {
 		Name           string
 		Gender         string
 		ContingentMail string
+		BirthDate      string
 	}{
-		{Name: "Eko Prasetyo", Gender: "male", ContingentMail: "tapaksuci@contingent.id"},
-		{Name: "Fajar Nugroho", Gender: "male", ContingentMail: "psht@contingent.id"},
-		{Name: "Gilang Ramadhan", Gender: "male", ContingentMail: "merpatiputih@contingent.id"},
-		{Name: "Hendra Setiawan", Gender: "male", ContingentMail: "perisaidiri@contingent.id"},
-		{Name: "Ilham Maulana", Gender: "male", ContingentMail: "tapaksuci@contingent.id"},
-		{Name: "Joko Susilo", Gender: "male", ContingentMail: "psht@contingent.id"},
-		{Name: "Siti Rahmawati", Gender: "female", ContingentMail: "merpatiputih@contingent.id"},
-		{Name: "Dewi Sartika", Gender: "female", ContingentMail: "perisaidiri@contingent.id"},
+		{Name: "Eko Prasetyo", Gender: "male", ContingentMail: "tapaksuci@contingent.id", BirthDate: "1998-03-12"},
+		{Name: "Fajar Nugroho", Gender: "male", ContingentMail: "psht@contingent.id", BirthDate: "1997-07-21"},
+		{Name: "Gilang Ramadhan", Gender: "male", ContingentMail: "merpatiputih@contingent.id", BirthDate: "1999-11-02"},
+		{Name: "Hendra Setiawan", Gender: "male", ContingentMail: "perisaidiri@contingent.id", BirthDate: "1996-05-30"},
+		{Name: "Ilham Maulana", Gender: "male", ContingentMail: "tapaksuci@contingent.id", BirthDate: "2000-01-15"},
+		{Name: "Joko Susilo", Gender: "male", ContingentMail: "psht@contingent.id", BirthDate: "1995-09-09"},
+		{Name: "Siti Rahmawati", Gender: "female", ContingentMail: "merpatiputih@contingent.id", BirthDate: "1998-12-01"},
+		{Name: "Dewi Sartika", Gender: "female", ContingentMail: "perisaidiri@contingent.id", BirthDate: "1999-04-18"},
 	}
 
 	athleteIDs := make(map[string]string)
@@ -229,14 +243,17 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		err = tx.QueryRowContext(ctx, `SELECT id FROM athletes WHERE name = $1 AND contingent_id = $2 LIMIT 1`, ath.Name, cID).Scan(&aID)
 		if err == sql.ErrNoRows {
 			err = tx.QueryRowContext(ctx, `
-				INSERT INTO athletes (name, gender, team, contingent_id)
-				VALUES ($1, $2, (SELECT name FROM contingents WHERE id = $3), $3)
-				RETURNING id`, ath.Name, ath.Gender, cID).Scan(&aID)
+				INSERT INTO athletes (name, gender, team, contingent_id, birth_date)
+				VALUES ($1, $2, (SELECT name FROM contingents WHERE id = $3), $3, $4::date)
+				RETURNING id`, ath.Name, ath.Gender, cID, ath.BirthDate).Scan(&aID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert athlete %s: %w", ath.Name, err)
 			}
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to query athlete %s: %w", ath.Name, err)
+		} else if _, err = tx.ExecContext(ctx, `UPDATE athletes SET birth_date = $2::date WHERE id = $1 AND birth_date IS NULL`, aID, ath.BirthDate); err != nil {
+			// Seed lama membuat atlet tanpa tanggal lahir; lengkapi tanpa menimpa yang sudah diisi.
+			return nil, fmt.Errorf("failed to set birth date for %s: %w", ath.Name, err)
 		}
 		athleteIDs[ath.Name] = aID
 		summary.Athletes++
@@ -254,6 +271,13 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		{AthleteName: "Hendra Setiawan", SeedNumber: 4, ContingentMail: "perisaidiri@contingent.id"},
 	}
 
+	// Kategori resmi tempat peserta & bagan seed ditautkan (bagan terisolasi per category_id).
+	var seedCategoryID string
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM categories WHERE competition_id = $1 AND translate(name, '–—−', '---') = translate($2, '–—−', '---') LIMIT 1`,
+		compID, "Tanding Dewasa Putra - Kelas A (45–50 Kg)").Scan(&seedCategoryID); err != nil {
+		return nil, fmt.Errorf("failed to load seed category: %w", err)
+	}
+
 	participantIDs := make(map[string]string)
 	for _, p := range participantsSeed {
 		athID := athleteIDs[p.AthleteName]
@@ -262,14 +286,18 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		err = tx.QueryRowContext(ctx, `SELECT id FROM participants WHERE competition_id = $1 AND athlete_id = $2 LIMIT 1`, compID, athID).Scan(&partID)
 		if err == sql.ErrNoRows {
 			err = tx.QueryRowContext(ctx, `
-				INSERT INTO participants (competition_id, name, weight_class, gender, athlete_id, seed, registration_status, contingent_id)
-				VALUES ($1, $2, 'A', 'male', $3, $4, 'verified', $5)
-				RETURNING id`, compID, p.AthleteName, athID, p.SeedNumber, cID).Scan(&partID)
+				INSERT INTO participants (competition_id, name, weight_class, gender, athlete_id, seed, registration_status, contingent_id, category_id)
+				VALUES ($1, $2, 'A', 'male', $3, $4, 'verified', $5, $6)
+				RETURNING id`, compID, p.AthleteName, athID, p.SeedNumber, cID, seedCategoryID).Scan(&partID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert participant %s: %w", p.AthleteName, err)
 			}
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to query participant %s: %w", p.AthleteName, err)
+		}
+		// Seed lama (sebelum kategori) bisa tersisa tanpa category_id: tautkan tanpa mengubah data lain.
+		if _, err = tx.ExecContext(ctx, `UPDATE participants SET category_id = $1 WHERE id = $2 AND category_id IS NULL`, seedCategoryID, partID); err != nil {
+			return nil, fmt.Errorf("failed to link participant %s to category: %w", p.AthleteName, err)
 		}
 		participantIDs[p.AthleteName] = partID
 		summary.Participants++
@@ -284,9 +312,9 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		compID).Scan(&finalSlotID)
 	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, is_bye, next_slot_id)
-			VALUES ($1, 'A', 'male', 2, 1, false, NULL)
-			RETURNING id`, compID).Scan(&finalSlotID)
+			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, is_bye, next_slot_id, category_id)
+			VALUES ($1, 'A', 'male', 2, 1, false, NULL, $2)
+			RETURNING id`, compID, seedCategoryID).Scan(&finalSlotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert final bracket slot: %w", err)
 		}
@@ -301,9 +329,9 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		compID).Scan(&semi1SlotID)
 	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id)
-			VALUES ($1, 'A', 'male', 1, 1, $2, false, $3)
-			RETURNING id`, compID, p1ID, finalSlotID).Scan(&semi1SlotID)
+			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id, category_id)
+			VALUES ($1, 'A', 'male', 1, 1, $2, false, $3, $4)
+			RETURNING id`, compID, p1ID, finalSlotID, seedCategoryID).Scan(&semi1SlotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert semi 1 bracket slot: %w", err)
 		}
@@ -318,12 +346,18 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		compID).Scan(&semi2SlotID)
 	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id)
-			VALUES ($1, 'A', 'male', 1, 2, $2, false, $3)
-			RETURNING id`, compID, p3ID, finalSlotID).Scan(&semi2SlotID)
+			INSERT INTO bracket_slots (competition_id, weight_class, gender, round, slot_index, participant_id, is_bye, next_slot_id, category_id)
+			VALUES ($1, 'A', 'male', 1, 2, $2, false, $3, $4)
+			RETURNING id`, compID, p3ID, finalSlotID, seedCategoryID).Scan(&semi2SlotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert semi 2 bracket slot: %w", err)
 		}
+	}
+
+	// Bagan seed lama tanpa category_id ikut ditautkan ke kategorinya.
+	if _, err = tx.ExecContext(ctx, `UPDATE bracket_slots SET category_id = $1
+		WHERE competition_id = $2 AND weight_class = 'A' AND gender = 'male' AND category_id IS NULL`, seedCategoryID, compID); err != nil {
+		return nil, fmt.Errorf("failed to link seed bracket to category: %w", err)
 	}
 
 	// 10. Matches
@@ -361,7 +395,8 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		summary.Matches++
 	}
 
-	// 11. Judge & Referee PINs (Valid for 365 days)
+	// 11. Judge & Referee PINs (Dinonaktifkan: PIN tidak di-seed dari database, di-generate langsung dari UI/web)
+	/*
 	// Gelanggang A PINs: Wasit=11110001, Juri 1=123001, Juri 2=123002, Juri 3=123003
 	// Gelanggang B PINs: Wasit=22220001, Juri 1=234001, Juri 2=234002, Juri 3=234003
 	pinsToSeed := []struct {
@@ -410,6 +445,7 @@ func SeedData(db *sql.DB) (*SeedSummary, error) {
 		}
 		summary.JudgePins++
 	}
+	*/
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)

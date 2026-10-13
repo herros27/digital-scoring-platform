@@ -41,11 +41,6 @@ type Message struct {
 	From    string      `json:"from,omitempty"` // judge_id
 }
 
-type OutboundMessage struct {
-	msg        Message
-	targetRole Role // kosong = broadcast ke semua
-}
-
 // Tambahkan method ini di package hub
 func (r Role) IsJudge() bool {
 	return strings.HasPrefix(string(r), "judge")

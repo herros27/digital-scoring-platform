@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -266,7 +267,7 @@ func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 	}
 
 	hubMgr := hub.NewManager()
-	matchSvc := service.NewMatchService(matchRepo, compRepo, hubMgr, nil, nil, nil, nil)
+	matchSvc := service.NewMatchService(matchRepo, compRepo, hubMgr, nil, nil, nil)
 	matchSvc.SetRulesetResolver(rulesetSvc)
 
 	// Load match to arena dengan rulesetPath kosong -> otomatis mengambil dari comp.RulesetID!
@@ -280,5 +281,122 @@ func TestMatchService_DynamicRulesetLoading(t *testing.T) {
 	}
 	if orch == nil {
 		t.Fatalf("orchestrator is nil")
+	}
+}
+
+type fakeCategoryRulesets map[string]string // slotID -> rulesetID
+
+func (f fakeCategoryRulesets) RulesetIDForSlot(slotID string) (string, error) { return f[slotID], nil }
+func (f fakeCategoryRulesets) AgeGroupForSlot(string) (string, error)        { return "", nil }
+
+// Ruleset khusus kategori (mis. Usia Dini 2 babak x 1,5 menit) menimpa ruleset kejuaraan;
+// partai tanpa ruleset kategori tetap memakai ruleset kejuaraan.
+func TestMatchService_CategoryRulesetOverridesCompetition(t *testing.T) {
+	repo := newMemoryRulesetRepo()
+	rulesetSvc := service.NewRulesetService(repo)
+
+	mk := func(name, version string, rounds, dur int) *domain.Ruleset {
+		r, err := rulesetSvc.CreateRuleset(service.CreateRulesetInput{
+			Name: name, Version: version,
+			Scoring: rules.ScoringRule{TechniquePoints: 1, KnockdownPoints: 2, RoundDuration: dur, BreakDuration: 60, TotalRounds: rounds},
+		})
+		if err != nil {
+			t.Fatalf("CreateRuleset %s: %v", name, err)
+		}
+		return r
+	}
+	standard := mk("Standar 3x2", "1.0", 3, 120)
+	usiaDini := mk("Usia Dini 2x1,5", "2.0", 2, 90)
+
+	matchRepo := newMockMatchRepo()
+	compRepo := &mockCompRepoWithRuleset{comps: map[string]*domain.Competition{
+		"comp-1": {ID: "comp-1", Name: "Kejurda", RulesetID: &standard.ID},
+	}}
+	matchRepo.matches["m-ud"] = &store.Match{ID: "m-ud", CompetitionID: "comp-1", ArenaID: "arena-1", BracketSlotID: "slot-ud", Status: "idle"}
+	matchRepo.matches["m-dw"] = &store.Match{ID: "m-dw", CompetitionID: "comp-1", ArenaID: "arena-2", BracketSlotID: "slot-dw", Status: "idle"}
+
+	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil)
+	svc.SetRulesetResolver(rulesetSvc)
+	svc.SetCategoryRulesetLookup(fakeCategoryRulesets{"slot-ud": usiaDini.ID}) // slot-dw: tanpa override
+
+	check := func(matchID, arena, wantName string, wantRounds, wantDurMs int) {
+		t.Helper()
+		if err := svc.LoadMatchToArena(matchID, arena, ""); err != nil {
+			t.Fatalf("load %s: %v", matchID, err)
+		}
+		orch, _ := svc.GetOrchestrator(matchID)
+		snap := orch.Snapshot()
+		if snap["ruleset_name"] != wantName || snap["total_rounds"] != wantRounds || snap["round_duration_ms"] != int64(wantDurMs) {
+			t.Errorf("%s: ruleset=%v rounds=%v duration=%v, want %s/%d/%d",
+				matchID, snap["ruleset_name"], snap["total_rounds"], snap["round_duration_ms"], wantName, wantRounds, wantDurMs)
+		}
+	}
+	check("m-ud", "arena-1", "Usia Dini 2x1,5", 2, 90000)
+	check("m-dw", "arena-2", "Standar 3x2", 3, 120000)
+}
+
+type fakeAgeLookup struct {
+	rulesets map[string]string // slotID -> rulesetID
+	ages     map[string]string // slotID -> golongan umur
+}
+
+func (f fakeAgeLookup) RulesetIDForSlot(slotID string) (string, error) { return f.rulesets[slotID], nil }
+func (f fakeAgeLookup) AgeGroupForSlot(slotID string) (string, error)  { return f.ages[slotID], nil }
+
+// Selisih WMP bawaan mengikuti golongan umur kategori (usia dini dan pra-remaja 20, selain itu 30), kecuali
+// ruleset menetapkan point_gap sendiri.
+func TestMatchService_PointGapDefaultFollowsAgeGroup(t *testing.T) {
+	repo := newMemoryRulesetRepo()
+	rulesetSvc := service.NewRulesetService(repo)
+	scoring := rules.ScoringRule{TechniquePoints: 1, KnockdownPoints: 2, RoundDuration: 120, BreakDuration: 60, TotalRounds: 3}
+	standard, err := rulesetSvc.CreateRuleset(service.CreateRulesetInput{Name: "Standar", Version: "1.0", Scoring: scoring})
+	if err != nil {
+		t.Fatal(err)
+	}
+	custom := scoring
+	custom.PointGap = &rules.PointGapRule{Margin: 25, FromRound: 3}
+	own, err := rulesetSvc.CreateRuleset(service.CreateRulesetInput{Name: "Atur Sendiri", Version: "3.0", Scoring: custom})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matchRepo := newMockMatchRepo()
+	compRepo := &mockCompRepoWithRuleset{comps: map[string]*domain.Competition{
+		"comp-1": {ID: "comp-1", Name: "Kejurda", RulesetID: &standard.ID},
+	}}
+	ages := map[string]string{}
+	rulesetOf := map[string]string{"slot-own": own.ID}
+	for i, c := range []struct{ id, age string }{
+		{"dewasa", domain.AgeDewasa}, {"remaja", domain.AgeRemaja}, {"dini", domain.AgeUsiaDini2},
+		{"pra-dini", domain.AgePraUsiaDini}, {"pra-remaja", domain.AgePraRemaja}, {"own", domain.AgeUsiaDini1},
+	} {
+		slot := "slot-" + c.id
+		ages[slot] = c.age
+		matchRepo.matches["m-"+c.id] = &store.Match{ID: "m-" + c.id, CompetitionID: "comp-1", ArenaID: fmt.Sprintf("arena-%d", i), BracketSlotID: slot, Status: "idle"}
+	}
+
+	svc := service.NewMatchService(matchRepo, compRepo, hub.NewManager(), nil, nil, nil)
+	svc.SetRulesetResolver(rulesetSvc)
+	svc.SetCategoryRulesetLookup(fakeAgeLookup{rulesets: rulesetOf, ages: ages})
+
+	want := map[string]rules.PointGapRule{
+		"dewasa":     {Margin: 30, FromRound: 2},
+		"remaja":     {Margin: 30, FromRound: 2},
+		"dini":       {Margin: 20, FromRound: 2},
+		"pra-dini":   {Margin: 20, FromRound: 2},
+		"pra-remaja": {Margin: 20, FromRound: 2},
+		"own":        {Margin: 25, FromRound: 3}, // ditetapkan ruleset: tidak ditimpa bawaan golongan umur
+	}
+	for id, w := range want {
+		if err := svc.LoadMatchToArena("m-"+id, matchRepo.matches["m-"+id].ArenaID, ""); err != nil {
+			t.Fatalf("load %s: %v", id, err)
+		}
+		orch, _ := svc.GetOrchestrator("m-" + id)
+		if got := orch.Snapshot()["point_gap"]; got != w {
+			t.Errorf("%s: point_gap = %v, want %v", id, got, w)
+		}
+	}
+	if got, _ := rulesetSvc.ResolveRuleset(standard.ID); got.Scoring.PointGap != nil {
+		t.Error("ruleset bersama tidak boleh berubah (harus disalin)")
 	}
 }

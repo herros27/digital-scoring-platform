@@ -14,14 +14,23 @@ import ParticipantVerificationView from '@/features/athletes/views/ParticipantVe
 import ScheduleOpsView from '@/features/matches/views/ScheduleOpsView.vue'
 import ReportsOpsView from '@/features/reports/views/ReportsOpsView.vue'
 import RulesetsOpsView from '@/features/rulesets/views/RulesetsOpsView.vue'
+import OfficialsOpsView from '@/features/officials/views/OfficialsOpsView.vue'
+import ChangeOwnPasswordDialog from '@/features/officials/components/ChangeOwnPasswordDialog.vue'
 import { matchService } from '@/features/matches/api/matchService'
 import type { BracketSlotRecord } from '@/features/tournament/api/bracketService'
 import {
   useBracketTreeQuery,
+  useCategoryBracketTreeQuery,
   useGenerateBracketMutation,
+  useResetBracketMutation,
 } from '@/features/tournament/api/bracketQueries'
-import { useCategoriesQuery } from '@/features/categories/api/categoryQueries'
-import { useArenasQuery } from '@/features/arena/api/arenaQueries'
+import TournamentTreeBracket from '@/features/tournament/components/TournamentTreeBracket.vue'
+import {
+  useCategoriesQuery,
+  useSetBracketLockMutation,
+} from '@/features/categories/api/categoryQueries'
+import { AGE_BANDS, ageGroupLabel } from '@/features/categories/lib/ageGroups'
+import { useArenasQuery, useCompetitionPresence } from '@/features/arena/api/arenaQueries'
 import { useParticipantsQuery } from '@/features/athletes/api/athleteQueries'
 import { useMatchesQuery } from '@/features/matches/api/matchQueries'
 import { useCompetitionsQuery } from '@/features/competitions/api/competitionQueries'
@@ -85,76 +94,177 @@ const { data: rawArenas } = useArenasQuery(activeCompId)
 const { data: rawParticipants } = useParticipantsQuery(activeCompId)
 const { data: rawMatches, refetch: refetchMatches } = useMatchesQuery(activeCompId)
 
-// Selected category & weight class
-const selectedCategory = ref('Tanding Dewasa Putra - Kelas A (45 - 50 Kg)')
+// Selected category & weight class. Kosong sampai daftar kategori dimuat; lalu otomatis menunjuk kategori
+// pertama yang benar-benar ada (lihat watch(categoryOptions) di bawah), bukan teks tetap yang bisa tidak
+// cocok dengan nama kategori sehingga dropdown kosong dan halaman jatuh ke bagan lama tanpa kategori.
+const selectedCategory = ref('')
 
-const categoryOptions = computed(() => {
-  const map = new Map<
-    string,
-    { id: string; name: string; weightClass: string; gender: 'male' | 'female' }
-  >()
+interface CategoryOption {
+  /** id kategori resmi; kosong untuk kelas turunan dari peserta lama tanpa kategori */
+  categoryId: string
+  id: string
+  name: string
+  weightClass: string
+  gender: 'male' | 'female'
+  /** Label bagan terkelompok: "[Usia Dini 2 Putra] - Kelas A" */
+  label: string
+  /** Kunci grup <optgroup> */
+  groupLabel: string
+  ageOrder: number
+}
 
-  // 1. Ambil dari master categories database
+const categoryOptions = computed<CategoryOption[]>(() => {
+  const list: CategoryOption[] = []
+  const coveredLegacy = new Set<string>()
+
+  // 1. Setiap kategori resmi punya bagan sendiri (terisolasi per category_id)
   for (const c of rawCategories.value || []) {
     const g: 'male' | 'female' = c.gender === 'female' || c.gender === 'putri' ? 'female' : 'male'
     const wc = (c.weight_class || 'A').toUpperCase()
-    const key = `${g}-${wc}`
-    map.set(key, {
+    const age = ageGroupLabel(c.age_group ?? 'dewasa', c.preset_standard)
+    const groupLabel = `${age} ${g === 'female' ? 'Putri' : 'Putra'}`
+    const order = AGE_BANDS.ipsi.findIndex((x) => x.code === (c.age_group ?? 'dewasa'))
+    list.push({
+      categoryId: c.id,
       id: c.id,
       name: c.name,
       weightClass: wc,
       gender: g,
+      label: `[${groupLabel}] - Kelas ${wc}`,
+      groupLabel,
+      ageOrder: order === -1 ? 99 : order,
     })
+    if (!c.age_group || c.age_group === 'dewasa') coveredLegacy.add(`${g}-${wc}`)
   }
 
-  // 2. Tambahkan kelas yang memiliki peserta terdaftar/terverifikasi jika belum ada di master
+  // 2. Peserta lama tanpa category_id: tetap bisa dibuatkan bagan per kelas bobot + gender
+  const legacySeen = new Set<string>()
   for (const p of rawParticipants.value || []) {
-    if (!p.weight_class) continue
+    if (!p.weight_class || p.category_id) continue
     const g: 'male' | 'female' = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
     const wc = p.weight_class.toUpperCase()
     const key = `${g}-${wc}`
-    if (!map.has(key)) {
-      const genderLabel = g === 'female' ? 'Putri' : 'Putra'
-      map.set(key, {
-        id: `derived-${key}`,
-        name: `Tanding Dewasa ${genderLabel} - Kelas ${wc}`,
-        weightClass: wc,
-        gender: g,
-      })
-    }
+    if (legacySeen.has(key) || coveredLegacy.has(key)) continue
+    legacySeen.add(key)
+    const genderLabel = g === 'female' ? 'Putri' : 'Putra'
+    list.push({
+      categoryId: '',
+      id: `derived-${key}`,
+      name: `Tanding Dewasa ${genderLabel} - Kelas ${wc}`,
+      weightClass: wc,
+      gender: g,
+      label: `[Dewasa ${genderLabel}] - Kelas ${wc}`,
+      groupLabel: `Dewasa ${genderLabel}`,
+      ageOrder: AGE_BANDS.ipsi.findIndex((x) => x.code === 'dewasa'),
+    })
   }
 
-  // Urutkan: Putra dulu, lalu Putri, kemudian abjad kelas A, B, C...
-  return Array.from(map.values()).sort((a, b) => {
+  // Urutkan: golongan umur, Putra dulu lalu Putri, kemudian kelas A, B, C...
+  return list.sort((a, b) => {
+    if (a.ageOrder !== b.ageOrder) return a.ageOrder - b.ageOrder
     if (a.gender !== b.gender) return a.gender === 'male' ? -1 : 1
     return a.weightClass.localeCompare(b.weightClass, undefined, { numeric: true })
   })
 })
 
+// Peserta pada satu opsi kategori (kategori resmi lewat category_id; kelas turunan lewat kelas bobot + gender).
+function participantsOf(o: CategoryOption) {
+  return (rawParticipants.value || []).filter((p) => {
+    if (o.categoryId) return p.category_id === o.categoryId
+    const g = p.gender === 'female' || p.gender === 'putri' ? 'female' : 'male'
+    return (
+      !p.category_id && (p.weight_class || '').toUpperCase() === o.weightClass && g === o.gender
+    )
+  })
+}
+const verifiedCountOf = (o: CategoryOption) =>
+  participantsOf(o).filter((p) => p.registration_status === 'verified').length
+
+// Pilihan awal & pemulihan: bila pilihan sekarang tidak ada di daftar (awal muat, ganti kejuaraan, kategori
+// dihapus/di-reset), pilih kategori pertama yang punya cukup peserta terverifikasi (bukan sekadar opsi pertama
+// yang bisa kosong), supaya dropdown tidak pernah kosong dan bagan yang tampil milik sebuah kategori.
+// Setelah daftar peserta termuat, pilihan awal dikoreksi sekali; pilihan panitia tidak pernah ditimpa.
+let categoryPicked = false
+watch(
+  [categoryOptions, rawParticipants],
+  ([options, parts]) => {
+    if (options.length === 0) return
+    const missing = !options.some((o) => o.name === selectedCategory.value)
+    if (missing || (!categoryPicked && parts !== undefined)) {
+      const best =
+        options.find((o) => verifiedCountOf(o) >= 2) ??
+        options.find((o) => verifiedCountOf(o) > 0) ??
+        options[0]
+      selectedCategory.value = best.name
+      if (parts !== undefined) categoryPicked = true
+    }
+  },
+  { immediate: true },
+)
+
+// Angka di halaman Bagan mengikuti kategori terpilih dan hanya menghitung peserta yang lolos verifikasi.
+const selectedOption = computed(() =>
+  categoryOptions.value.find((c) => c.name === selectedCategory.value),
+)
+const verifiedInCategory = computed(() =>
+  selectedOption.value ? verifiedCountOf(selectedOption.value) : 0,
+)
+
+// Opsi dikelompokkan per golongan umur + gender untuk <optgroup>
+const categoryOptionGroups = computed(() => {
+  const groups: { label: string; options: CategoryOption[] }[] = []
+  for (const o of categoryOptions.value) {
+    const last = groups[groups.length - 1]
+    if (last && last.label === o.groupLabel) last.options.push(o)
+    else groups.push({ label: o.groupLabel, options: [o] })
+  }
+  return groups
+})
+
 const parsedClass = computed(() => {
   const selected = categoryOptions.value.find((c) => c.name === selectedCategory.value)
   if (selected) {
-    return { gender: selected.gender, weightClass: selected.weightClass }
+    return {
+      gender: selected.gender,
+      weightClass: selected.weightClass,
+      categoryId: selected.categoryId,
+    }
   }
   const catStr = selectedCategory.value || ''
   const isFemale = /putri/i.test(catStr)
   const gender: 'male' | 'female' = isFemale ? 'female' : 'male'
   const match = catStr.match(/Kelas\s+([A-Za-z0-9_-]+)/i)
   const weightClass = match ? match[1].toUpperCase() : 'A'
-  return { gender, weightClass }
+  return { gender, weightClass, categoryId: '' }
 })
 
 const currentWeightClass = computed(() => parsedClass.value.weightClass)
 const currentGender = computed(() => parsedClass.value.gender)
+const currentCategoryId = computed(() => parsedClass.value.categoryId)
 
-// Real Bracket Tree Query
-const { data: rawBracketSlots, refetch: refetchBracket } = useBracketTreeQuery(
+// Real Bracket Tree Query — bagan terisolasi per kategori; fallback per kelas bobot untuk data lama
+const legacyBracket = useBracketTreeQuery(
   activeCompId,
-  currentWeightClass,
+  // Jalur lama (per kelas bobot) hanya untuk opsi turunan tanpa kategori resmi, dan baru setelah ada pilihan:
+  // sebelum daftar kategori dimuat, tidak ada permintaan bagan sama sekali (hindari kilasan bagan lama).
+  computed(() =>
+    currentCategoryId.value || !selectedCategory.value ? '' : currentWeightClass.value,
+  ),
   currentGender,
 )
+const categoryBracket = useCategoryBracketTreeQuery(activeCompId, currentCategoryId)
+const rawBracketSlots = computed(() =>
+  currentCategoryId.value ? categoryBracket.data.value : legacyBracket.data.value,
+)
+const refetchBracket = () =>
+  currentCategoryId.value ? categoryBracket.refetch() : legacyBracket.refetch()
 
 const generateBracketMutation = useGenerateBracketMutation(activeCompId)
+const resetBracketMutation = useResetBracketMutation(activeCompId)
+// Reset hanya untuk bagan kategori resmi yang sudah terbentuk.
+const canResetBracket = computed(
+  () => !!currentCategoryId.value && (rawBracketSlots.value?.length ?? 0) > 0,
+)
 
 // ponytail: default to 'jadwal' for ops overview, or contingent default to 'atlet'
 const NAV_KEYS = [
@@ -167,6 +277,7 @@ const NAV_KEYS = [
   'bagan',
   'pin',
   'regulasi',
+  'petugas',
   'laporan',
 ] as const
 type NavKey = (typeof NAV_KEYS)[number]
@@ -186,6 +297,7 @@ function canAccessTab(tab: NavKey): boolean {
     case 'verifikasi':
     case 'pin':
     case 'regulasi':
+    case 'petugas':
       return isAdminOrDewan.value
     case 'gelanggang':
       return !isContingent.value
@@ -211,11 +323,21 @@ const resolveDefaultNav = (): NavKey => {
 }
 
 const activeNav = ref<NavKey>(resolveDefaultNav())
+const isMobileSidebarOpen = ref(false)
+
+function toggleMobileSidebar() {
+  isMobileSidebarOpen.value = !isMobileSidebarOpen.value
+}
+
+function closeMobileSidebar() {
+  isMobileSidebarOpen.value = false
+}
 
 function setNav(tab: typeof activeNav.value) {
   if (!canAccessTab(tab)) return
   activeNav.value = tab
   router.replace({ query: { ...route.query, tab } })
+  closeMobileSidebar()
 }
 
 watch(
@@ -276,12 +398,17 @@ const navConfig = {
   },
   pin: {
     title: 'PERANGKAT & PIN JURI',
-    sub: 'OTORISASI TABLET JURI & WASIT PER ARENA',
+    sub: 'OTORISASI TABLET JURI & OPERATOR MEJA PER ARENA',
     hasArena: false,
   },
   regulasi: {
     title: 'REGULASI & RULESET',
     sub: 'NILAI TEKNIK, SANKSI, KONSENSUS JURI, ATURAN SERI',
+    hasArena: false,
+  },
+  petugas: {
+    title: 'AKUN PETUGAS',
+    sub: 'ADMIN, PENGAWAS PERTANDINGAN, OPERATOR MEJA, STAF ADMINISTRASI & KEAMANAN PASSWORD',
     hasArena: false,
   },
   laporan: {
@@ -308,6 +435,7 @@ function handleArenaSelect(arena: { name: string }) {
 }
 
 function handleCategorySelect(cat: { name: string; weight_class: string }) {
+  categoryPicked = true
   selectedCategory.value = cat.name
   setNav('bagan')
   showToast('Kategori Dipilih', `Menampilkan bagan untuk ${cat.name}`, 'info')
@@ -352,6 +480,8 @@ const userInitials = computed(() => {
   return n.slice(0, 2).toUpperCase()
 })
 
+const ownPasswordOpen = ref(false)
+
 function triggerLogoutPrompt() {
   modal.value = {
     show: true,
@@ -377,9 +507,18 @@ function handleProfileClick() {
 }
 
 // Draw & Locking State
-const isLocked = ref(true)
+// Kunci draw disimpan di SERVER per kategori (kolom bracket_locked); tombol hanya memintanya diubah.
+// Kelas turunan dari peserta lama tanpa kategori resmi tidak punya kunci.
+const lockMutation = useSetBracketLockMutation(activeCompId)
+const currentCategory = computed(() =>
+  (rawCategories.value || []).find((c) => c.id === currentCategoryId.value),
+)
+const isLocked = computed(() => currentCategory.value?.bracket_locked === true)
 const drawHash = ref('#IPSI-2025-CL-A-9941')
-const telemetryMs = ref(12)
+// Telemetri NYATA: latensi dari polling kehadiran ke server dan jumlah juri yang benar-benar terhubung
+const { data: presence, isError: serverUnreachable } = useCompetitionPresence(activeCompId)
+const telemetryMs = computed(() => (presence.value ? String(presence.value.rttMs) : '–'))
+const judgesOnline = computed(() => presence.value?.judgesOnline ?? 0)
 
 // Notification / Toast
 const toast = ref<{
@@ -416,6 +555,9 @@ interface AthleteEntry {
 
 interface MatchCard {
   id: string
+  /** id partai nyata (tabel matches) dan gelanggangnya; kosong bila partai belum terbentuk (menunggu pemenang babak lalu) */
+  matchId?: string
+  arenaId?: string
   partaiNumber: number
   arenaLabel: string
   status: 'selesai' | 'live' | 'ready' | 'waiting'
@@ -504,22 +646,24 @@ function buildMatchesForRound(roundNum: number): MatchCard[] {
 
     result.push({
       id: `slot-${slotRed?.id || i}`,
+      matchId: matchedMatch?.id,
+      arenaId: matchedMatch?.arena_id,
       partaiNumber: pairIndex,
       arenaLabel: arenaLabel,
-      status: isFinished ? 'selesai' : matchedMatch?.status === 'running' ? 'live' : 'ready',
+      status: isFinished ? 'selesai' : isLiveMatch(matchedMatch?.status) ? 'live' : 'ready',
       statusBadge: isFinished
         ? 'SELESAI'
-        : matchedMatch?.status === 'running'
+        : isLiveMatch(matchedMatch?.status)
           ? 'LIVE'
           : hasRedBye || hasBlueBye
             ? 'BYE'
             : 'SIAP',
       statusVariant: isFinished
         ? 'neutral'
-        : matchedMatch?.status === 'running'
+        : isLiveMatch(matchedMatch?.status)
           ? 'emerald'
           : 'neutral',
-      isLive: matchedMatch?.status === 'running',
+      isLive: isLiveMatch(matchedMatch?.status),
       red: {
         name:
           redParticipant?.name ||
@@ -584,8 +728,20 @@ const bracketRounds = computed<BracketRoundDisplay[]>(() => {
   return list
 })
 
-// Current queued match for bottom dock
+// Partai live = berjalan atau sedang dijeda (belum selesai)
+const isLiveMatch = (status?: string) => status === 'running' || status === 'paused'
+
+// Current selected or queued match for bottom dock
+const selectedBracketMatch = ref<MatchCard | null>(null)
+// Mobile dock collapse state (collapsed by default on mobile to prevent blocking tournament bracket)
+const isDockCollapsed = ref(true)
+
+function handleSelectBracketMatch(match: MatchCard) {
+  selectedBracketMatch.value = match
+}
+
 const queuedMatch = computed(() => {
+  if (selectedBracketMatch.value) return selectedBracketMatch.value
   for (const round of bracketRounds.value) {
     const readyMatch = round.matches.find(
       (m) =>
@@ -602,6 +758,14 @@ const queuedMatch = computed(() => {
 
 // Operations Actions
 function handleGenerateDraw() {
+  if (verifiedInCategory.value < 2) {
+    showToast(
+      'Peserta Belum Cukup',
+      `${selectedCategory.value} baru punya ${verifiedInCategory.value} atlet terverifikasi (minimal 2). Verifikasi peserta atau pilih kategori lain.`,
+      'warning',
+    )
+    return
+  }
   if (isLocked.value) {
     showToast(
       'Bagan Terkunci',
@@ -612,17 +776,24 @@ function handleGenerateDraw() {
   }
   modal.value = {
     show: true,
-    title: 'Acak Ulang Bagan Pertandingan?',
-    message: `Generate susunan bagan turnamen untuk Kelas ${currentWeightClass.value} (${currentGender.value === 'male' ? 'Putra' : 'Putri'}) dari data peserta terverifikasi?`,
-    confirmText: 'Ya, Generate Bagan',
+    title: 'Generate Bagan Pertandingan?',
+    message:
+      `Bagan ${selectedCategory.value} dibuat dari peserta terverifikasi. Pastikan pendaftaran sudah habis (tidak ada pendaftar lagi) ` +
+      'dan tidak ada peserta yang mengundurkan diri. Bila ada peserta mundur, reset bagan lebih dulu lalu generate ulang. ' +
+      'Peserta yang lolos verifikasi setelah bagan ada akan masuk otomatis selama draw belum dikunci.',
+    confirmText: 'Ya, Pendaftar Sudah Lengkap',
     confirmVariant: 'emerald',
     action: async () => {
       try {
-        await generateBracketMutation.mutateAsync({
-          weight_class: currentWeightClass.value,
-          gender: currentGender.value,
-          participant_ids: [],
-        })
+        await generateBracketMutation.mutateAsync(
+          currentCategoryId.value
+            ? { category_id: currentCategoryId.value, participant_ids: [] }
+            : {
+                weight_class: currentWeightClass.value,
+                gender: currentGender.value,
+                participant_ids: [],
+              },
+        )
         await refetchBracket()
         await refetchMatches()
         drawHash.value = `#IPSI-2025-CL-${currentWeightClass.value}-${Math.floor(1000 + Math.random() * 9000)}`
@@ -644,7 +815,63 @@ function handleGenerateDraw() {
   }
 }
 
+function handleResetBracket() {
+  if (isLocked.value) {
+    showToast('Bagan Terkunci', 'Buka kunci draw terlebih dahulu sebelum mereset bagan.', 'warning')
+    return
+  }
+  modal.value = {
+    show: true,
+    title: 'Reset Bagan Kategori?',
+    message: `Bagan ${selectedCategory.value} dan partainya yang belum dimainkan akan dihapus. Peserta tetap terdaftar dan bagan dapat dibuat ulang lewat Generate Bagan. Reset ditolak bila sudah ada partai yang dimulai.`,
+    confirmText: 'Ya, Reset Bagan',
+    confirmVariant: 'danger',
+    action: async () => {
+      try {
+        await resetBracketMutation.mutateAsync(currentCategoryId.value)
+        await refetchMatches()
+        showToast('Bagan Direset', 'Bagan kategori dihapus. Silakan generate ulang.', 'success')
+      } catch (err) {
+        showToast(
+          'Gagal Reset Bagan',
+          getErrorMessage(err, 'Bagan tidak dapat direset.'),
+          'warning',
+        )
+      } finally {
+        modal.value = null
+      }
+    },
+  }
+}
+
+async function applyLock(locked: boolean) {
+  try {
+    await lockMutation.mutateAsync({ categoryId: currentCategoryId.value, locked })
+    showToast(
+      locked ? 'Bagan Dikunci' : 'Kunci Dibuka',
+      locked
+        ? 'Susunan bagan resmi terkunci di server dan tidak bisa diacak ulang.'
+        : 'Bagan kini dapat diacak ulang.',
+      locked ? 'success' : 'info',
+    )
+  } catch (err) {
+    showToast(
+      'Gagal Mengubah Kunci',
+      getErrorMessage(err, 'Kunci draw tidak dapat diubah.'),
+      'warning',
+    )
+  }
+}
+
 function toggleLock() {
+  if (!currentCategoryId.value) {
+    showToast(
+      'Kunci Tidak Tersedia',
+      'Kunci draw hanya untuk kategori resmi. Kelas ini berasal dari peserta lama tanpa kategori.',
+      'info',
+    )
+    return
+  }
   if (isLocked.value) {
     modal.value = {
       show: true,
@@ -652,15 +879,13 @@ function toggleLock() {
       message: 'Membuka kunci memungkinkan perubahan susunan atlet oleh Delegasi Teknik.',
       confirmText: 'Buka Kunci',
       confirmVariant: 'danger',
-      action: () => {
-        isLocked.value = false
-        showToast('Kunci Dibuka', 'Bagan kini dapat disunting atau diacak ulang.', 'info')
+      action: async () => {
+        await applyLock(false)
         modal.value = null
       },
     }
   } else {
-    isLocked.value = true
-    showToast('Bagan Dikunci', 'Susunan bagan resmi terkunci dan tersertifikasi.', 'success')
+    void applyLock(true)
   }
 }
 
@@ -683,22 +908,37 @@ function handlePanggilAtlet() {
 
 function handleLoadToMat1() {
   const m = queuedMatch.value
-  const targetArena = rawArenas.value?.[0]?.id || 'gelanggang-1'
-  const arenaName = rawArenas.value?.[0]?.name || 'Gelanggang 1'
-  const matchId = m?.id || 'm-live'
+  // Gelanggang tujuan adalah gelanggang asal partai itu sendiri (server menolak gelanggang lain).
+  if (!m?.matchId || !m.arenaId) {
+    showToast(
+      'Partai Belum Siap',
+      'Partai ini belum terbentuk atau belum punya gelanggang (menunggu pemenang babak sebelumnya).',
+      'warning',
+    )
+    return
+  }
+  const targetArena = m.arenaId
+  const arenaName = rawArenas.value?.find((a) => a.id === targetArena)?.name || m.arenaLabel
+  const matchId = m.matchId
 
   modal.value = {
     show: true,
     title: `Muat Partai ke ${arenaName}?`,
-    message: `Data atlet ${m?.red?.name || 'Sudut Merah'} vs ${m?.blue?.name || 'Sudut Biru'} akan dikirim ke Konsol Wasit & Scoreboard ${arenaName}.`,
-    confirmText: 'Muat & Buka Konsol Wasit',
+    message: `Data atlet ${m?.red?.name || 'Sudut Merah'} vs ${m?.blue?.name || 'Sudut Biru'} akan dikirim ke Konsol Meja & Scoreboard ${arenaName}.`,
+    confirmText: 'Muat & Buka Konsol Meja',
     confirmVariant: 'emerald',
     action: async () => {
       try {
         await matchService.loadArena(activeCompId.value, matchId, targetArena)
         showToast('Partai Dimuat', `Partai berhasil di-load ke ${arenaName}.`, 'success')
-      } catch {
-        showToast('Partai Dimuat', `Partai siap di ${arenaName}.`, 'success')
+      } catch (err) {
+        const msg = getErrorMessage(err, 'Partai tidak dapat dimuat ke gelanggang.')
+        // Sudah termuat sebelumnya: cukup buka konsol wasit.
+        if (!/sudah dimuat/i.test(msg)) {
+          showToast('Gagal Memuat Partai', msg, 'warning')
+          modal.value = null
+          return
+        }
       }
       modal.value = null
       setTimeout(() => {
@@ -712,7 +952,8 @@ function handleLoadToMat1() {
 <template>
   <div class="ops-layout">
     <!-- LEFT SIDEBAR -->
-    <aside class="ops-sidebar">
+    <div v-if="isMobileSidebarOpen" class="ops-sidebar-backdrop" @click="closeMobileSidebar" />
+    <aside class="ops-sidebar" :class="{ 'ops-sidebar--open': isMobileSidebarOpen }">
       <div class="ops-sidebar__header">
         <div class="ops-brand">
           <div class="ops-brand__logo font-mono">PS</div>
@@ -720,18 +961,40 @@ function handleLoadToMat1() {
             <div class="ops-brand__title font-mono">SILAT CORE</div>
             <div class="ops-brand__sub font-mono">TOURNAMENT OPS V2.4</div>
           </div>
+          <button
+            type="button"
+            class="ops-sidebar-close"
+            aria-label="Tutup Navigasi"
+            @click="closeMobileSidebar"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         <div class="ops-telemetry font-mono">
-          <span class="telemetry-dot" />
-          <span class="telemetry-text">TELEMETRY LIVE</span>
+          <span class="telemetry-dot" :class="{ 'telemetry-dot--down': serverUnreachable }" />
+          <span class="telemetry-text">{{
+            serverUnreachable ? 'TELEMETRI MATI' : 'TELEMETRI LIVE'
+          }}</span>
           <span class="telemetry-ping">{{ telemetryMs }}ms</span>
         </div>
       </div>
 
       <nav class="ops-nav font-mono">
         <!-- Section: Operasional Turnamen -->
-        <template v-if="canAccessTab('kompetisi') || canAccessTab('gelanggang') || canAccessTab('kategori')">
+        <template
+          v-if="canAccessTab('kompetisi') || canAccessTab('gelanggang') || canAccessTab('kategori')"
+        >
           <div class="ops-nav__section-title">OPERASIONAL TURNAMEN</div>
           <button
             v-if="canAccessTab('kompetisi')"
@@ -935,6 +1198,29 @@ function handleLoadToMat1() {
         </button>
 
         <button
+          v-if="canAccessTab('petugas')"
+          class="ops-nav__item"
+          :class="{ 'ops-nav__item--active': activeNav === 'petugas' }"
+          data-test="nav-petugas"
+          @click="setNav('petugas')"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>Akun Petugas</span>
+        </button>
+
+        <button
           v-if="canAccessTab('laporan')"
           class="ops-nav__item"
           :class="{ 'ops-nav__item--active': activeNav === 'laporan' }"
@@ -970,6 +1256,27 @@ function handleLoadToMat1() {
           </div>
         </div>
         <button
+          v-if="authStore.isAuthenticated"
+          class="ops-logout-btn ops-logout-btn--key"
+          title="Ganti Password Saya"
+          aria-label="Ganti Password Saya"
+          data-test="ops-change-password"
+          @click="ownPasswordOpen = true"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="7.5" cy="15.5" r="4.5" />
+            <path d="m10.7 12.3 9.8-9.8" />
+            <path d="m16 7 3 3" />
+          </svg>
+        </button>
+        <button
           class="ops-logout-btn"
           title="Keluar dari Sesi (Logout)"
           @click="triggerLogoutPrompt"
@@ -994,6 +1301,28 @@ function handleLoadToMat1() {
     <main class="ops-main">
       <!-- TOP STATUS BAR -->
       <header class="ops-topbar">
+        <button
+          type="button"
+          class="ops-hamburger-btn"
+          aria-label="Buka Navigasi Operasional"
+          @click="toggleMobileSidebar"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
         <div class="ops-topbar__titles">
           <div class="ops-topbar__sub font-mono">{{ currentNavMeta.sub }}</div>
           <h1 class="ops-topbar__heading">{{ currentNavMeta.title }}</h1>
@@ -1058,7 +1387,7 @@ function handleLoadToMat1() {
         <div class="ops-topbar__system-pills font-mono">
           <div class="system-pill">
             <span class="system-pill__dot emerald" />
-            <span>SERVER SYNC: 100%</span>
+            <span>{{ serverUnreachable ? 'SERVER TERPUTUS' : 'SERVER ONLINE' }}</span>
           </div>
           <div class="system-pill">
             <svg
@@ -1073,7 +1402,7 @@ function handleLoadToMat1() {
               <path d="M4 4a16 16 0 0 1 16 16" />
               <circle cx="5" cy="19" r="1" />
             </svg>
-            <span>5 JURY CONNECTED</span>
+            <span data-test="juri-online">{{ judgesOnline }} JURI ONLINE</span>
           </div>
           <div
             class="ops-profile-badge"
@@ -1107,6 +1436,7 @@ function handleLoadToMat1() {
           'ops-content-scroll--pin':
             activeNav === 'pin' ||
             activeNav === 'regulasi' ||
+            activeNav === 'petugas' ||
             activeNav === 'laporan' ||
             activeNav === 'kompetisi' ||
             activeNav === 'gelanggang' ||
@@ -1114,6 +1444,8 @@ function handleLoadToMat1() {
             activeNav === 'atlet' ||
             activeNav === 'verifikasi' ||
             activeNav === 'jadwal',
+          'ops-content-scroll--bagan-collapsed': activeNav === 'bagan' && isDockCollapsed,
+          'ops-content-scroll--bagan-expanded': activeNav === 'bagan' && !isDockCollapsed,
         }"
       >
         <!-- TAB KOMPETISI -->
@@ -1139,7 +1471,10 @@ function handleLoadToMat1() {
         <AthletesOpsView
           v-else-if="activeNav === 'atlet' && canAccessTab('atlet')"
           :competition-id="activeCompId"
-          @navigate-verification="canAccessTab('verifikasi') ? (activeNav = 'verifikasi') : undefined"
+          @navigate-verification="
+            canAccessTab('verifikasi') ? (activeNav = 'verifikasi') : undefined
+          "
+          @navigate-categories="canAccessTab('kategori') ? (activeNav = 'kategori') : undefined"
         />
 
         <!-- TAB VERIFIKASI PESERTA -->
@@ -1149,16 +1484,31 @@ function handleLoadToMat1() {
         />
 
         <!-- TAB JADWAL TANDING -->
-        <ScheduleOpsView v-else-if="activeNav === 'jadwal' && canAccessTab('jadwal')" :competition-id="activeCompId" />
+        <ScheduleOpsView
+          v-else-if="activeNav === 'jadwal' && canAccessTab('jadwal')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB PERANGKAT & PIN JURI -->
-        <DevicePinManager v-else-if="activeNav === 'pin' && canAccessTab('pin')" :competition-id="activeCompId" />
+        <DevicePinManager
+          v-else-if="activeNav === 'pin' && canAccessTab('pin')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB REGULASI & RULESET -->
-        <RulesetsOpsView v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')" />
+        <RulesetsOpsView
+          v-else-if="activeNav === 'regulasi' && canAccessTab('regulasi')"
+          :competition-id="activeCompId"
+        />
+
+        <!-- TAB AKUN PETUGAS -->
+        <OfficialsOpsView v-else-if="activeNav === 'petugas' && canAccessTab('petugas')" />
 
         <!-- TAB LAPORAN & EKSPOR -->
-        <ReportsOpsView v-else-if="activeNav === 'laporan' && canAccessTab('laporan')" :competition-id="activeCompId" />
+        <ReportsOpsView
+          v-else-if="activeNav === 'laporan' && canAccessTab('laporan')"
+          :competition-id="activeCompId"
+        />
 
         <!-- TAB BAGAN PERTANDINGAN (DEFAULT) -->
         <template v-else-if="activeNav === 'bagan' && canAccessTab('bagan')">
@@ -1217,9 +1567,18 @@ function handleLoadToMat1() {
               <button
                 v-if="isAdminOrDewan"
                 class="ops-action-btn-dark font-mono"
+                :class="{ 'ops-action-btn-dark--unlocked': !isLocked }"
+                :title="
+                  isLocked
+                    ? 'Draw sedang TERKUNCI. Klik untuk membuka kunci.'
+                    : 'Draw sedang TERBUKA (bisa diacak ulang). Klik untuk mengunci.'
+                "
+                :aria-pressed="isLocked"
+                data-test="draw-lock"
                 @click="toggleLock"
               >
                 <svg
+                  v-if="isLocked"
                   width="15"
                   height="15"
                   viewBox="0 0 24 24"
@@ -1230,7 +1589,32 @@ function handleLoadToMat1() {
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                <span>{{ isLocked ? 'Kunci Draw (Locked)' : 'Buka Kunci' }}</span>
+                <svg
+                  v-else
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                </svg>
+                <span>{{ isLocked ? 'Draw Terkunci' : 'Draw Terbuka' }}</span>
+                <small class="ops-lock-hint">{{
+                  isLocked ? 'klik untuk buka' : 'klik untuk kunci'
+                }}</small>
+              </button>
+
+              <button
+                v-if="isAdminOrDewan && canResetBracket"
+                class="ops-action-btn-dark font-mono"
+                title="Hapus bagan kategori ini agar bisa dibuat ulang"
+                data-test="bracket-reset"
+                @click="handleResetBracket"
+              >
+                <span>Reset Bagan</span>
               </button>
 
               <button class="ops-action-btn-dark font-mono" @click="handlePrintPDF">
@@ -1259,10 +1643,16 @@ function handleLoadToMat1() {
             <div class="filter-card">
               <label class="filter-label font-mono">KATEGORI & KELAS TANDING</label>
               <div class="filter-select-wrapper">
-                <select v-model="selectedCategory" class="filter-select font-mono">
-                  <option v-for="c in categoryOptions" :key="c.id" :value="c.name">
-                    {{ c.name }}
-                  </option>
+                <select
+                  v-model="selectedCategory"
+                  class="filter-select font-mono"
+                  @change="categoryPicked = true"
+                >
+                  <optgroup v-for="g in categoryOptionGroups" :key="g.label" :label="g.label">
+                    <option v-for="c in g.options" :key="c.id" :value="c.name">
+                      {{ c.label }}
+                    </option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -1285,8 +1675,8 @@ function handleLoadToMat1() {
                   </svg>
                   <span>Timbang Sah</span>
                 </div>
-                <AppBadge variant="emerald"
-                  >{{ rawParticipants?.length || 0 }} ATLET TERDAFTAR</AppBadge
+                <AppBadge :variant="verifiedInCategory >= 2 ? 'emerald' : 'warning'"
+                  >{{ verifiedInCategory }} ATLET LOLOS VERIFIKASI</AppBadge
                 >
               </div>
             </div>
@@ -1311,9 +1701,9 @@ function handleLoadToMat1() {
           <!-- SUMMARY METRICS BAR -->
           <section class="ops-metrics-bar font-mono">
             <div class="metric-block">
-              <div class="metric-label">TOTAL PESERTA</div>
+              <div class="metric-label">PESERTA TERVERIFIKASI</div>
               <div class="metric-val">
-                {{ rawParticipants?.length || 16 }} <span class="metric-unit">Atlet</span>
+                {{ verifiedInCategory }} <span class="metric-unit">Atlet</span>
               </div>
             </div>
             <div class="metric-block">
@@ -1326,7 +1716,7 @@ function handleLoadToMat1() {
             <div class="metric-block">
               <div class="metric-label">SEDANG TANDING</div>
               <div class="metric-val text-emerald-400">
-                {{ rawMatches?.filter((m) => m.status === 'running').length || 0 }}
+                {{ rawMatches?.filter((m) => isLiveMatch(m.status)).length || 0 }}
                 <span class="metric-unit">LIVE</span>
               </div>
             </div>
@@ -1368,66 +1758,15 @@ function handleLoadToMat1() {
             </div>
           </section>
 
-          <!-- TOURNAMENT BRACKET TREE COLUMNS (DYNAMIC BERDASARKAN HASIL UNDIAN KELAS) -->
-          <section v-if="bracketRounds.length > 0" class="bracket-tree-container">
-            <div v-for="round in bracketRounds" :key="round.roundNumber" class="bracket-column">
-              <div class="bracket-column__header font-mono">
-                <div class="col-title">
-                  <span class="col-dot" :class="round.badgeVariant" />
-                  <span>{{ round.title }}</span>
-                </div>
-                <AppBadge :variant="round.badgeVariant" size="sm">
-                  {{ round.matches.length }} PARTAI
-                </AppBadge>
-              </div>
-
-              <div
-                class="bracket-matches-list"
-                :class="`bracket-matches-list--round-${round.roundNumber}`"
-              >
-                <div
-                  v-for="m in round.matches"
-                  :key="m.id"
-                  class="bracket-match-card"
-                  :class="{ 'bracket-match-card--live': m.isLive }"
-                >
-                  <div class="match-card__header font-mono">
-                    <span class="match-partai">
-                      <span v-if="m.isLive" class="live-dot-pulse" />
-                      PARTAI {{ String(m.partaiNumber).padStart(2, '0') }} • {{ m.arenaLabel }}
-                    </span>
-                    <span class="match-status-badge" :class="m.isLive ? 'emerald' : 'neutral'">
-                      {{ m.statusBadge }}
-                    </span>
-                  </div>
-
-                  <div
-                    class="match-card__athlete match-card__athlete--red"
-                    :class="{ 'athlete--winner': m.red.isWinner }"
-                  >
-                    <div class="athlete-name-group">
-                      <span class="corner-dot red" />
-                      <span class="athlete-name">{{ m.red.name }}</span>
-                      <span class="athlete-contingent font-mono">{{ m.red.contingent }}</span>
-                    </div>
-                    <span class="athlete-score font-mono">{{ m.red.score }}</span>
-                  </div>
-
-                  <div
-                    class="match-card__athlete match-card__athlete--blue"
-                    :class="{ 'athlete--winner': m.blue.isWinner }"
-                  >
-                    <div class="athlete-name-group">
-                      <span class="corner-dot blue" />
-                      <span class="athlete-name">{{ m.blue.name }}</span>
-                      <span class="athlete-contingent font-mono">{{ m.blue.contingent }}</span>
-                    </div>
-                    <span class="athlete-score font-mono">{{ m.blue.score }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <!-- TOURNAMENT BRACKET TREE (PENCAK SILAT EDITION VUE-TOURNAMENT-BRACKET) -->
+          <TournamentTreeBracket
+            v-if="bracketRounds.length > 0"
+            :rounds="bracketRounds"
+            :selected-match-id="selectedBracketMatch?.id || queuedMatch?.id"
+            :category-name="selectedCategory"
+            @select-match="handleSelectBracketMatch"
+            @generate-draw="handleGenerateDraw"
+          />
 
           <!-- EMPTY STATE JIKA BAGAN KATEGORI BELUM DI-GENERATE -->
           <div v-else class="bracket-empty-state font-mono">
@@ -1459,78 +1798,108 @@ function handleLoadToMat1() {
       </div>
 
       <!-- BOTTOM STICKY QUICK-ACTION / COMMAND DOCK -->
-      <footer v-if="activeNav === 'bagan'" class="ops-dock">
-        <div class="ops-dock__match-info">
-          <div class="ops-dock__athlete-icon">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#DC2626"
-              stroke-width="2.2"
-            >
-              <circle cx="12" cy="5" r="3" />
-              <path d="M6.5 9 12 14l5.5-5" />
-              <path d="M12 14v8" />
-              <path d="M9 22h6" />
-            </svg>
-          </div>
-          <div>
-            <div class="ops-dock__sub font-mono">
-              <span>PARTAI ANTRIAN BERIKUTNYA</span>
-              <span class="ops-bullet">•</span>
-              <span>{{ selectedCategory }}</span>
-            </div>
-            <div class="ops-dock__match-title">
-              {{
-                queuedMatch
-                  ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})`
-                  : 'Belum ada antrian partai aktif'
-              }}
-            </div>
-          </div>
-        </div>
-
-        <div class="ops-dock__actions font-mono">
-          <button class="ops-dock-btn-dark font-mono" @click="handlePanggilAtlet">
-            Panggil Atlet
-          </button>
-          <AppButton variant="emerald" size="md" @click="handleLoadToMat1">
-            <template #icon>
+      <footer
+        v-if="activeNav === 'bagan'"
+        class="ops-dock"
+        :class="{ 'ops-dock--collapsed': isDockCollapsed }"
+      >
+        <div class="ops-dock__header" @click="isDockCollapsed = !isDockCollapsed">
+          <div class="ops-dock__match-info">
+            <div class="ops-dock__athlete-icon">
               <svg
-                width="18"
-                height="18"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+                stroke="#DC2626"
+                stroke-width="2.2"
               >
-                <polygon points="5 3 19 12 5 21 5 3" />
+                <circle cx="12" cy="5" r="3" />
+                <path d="M6.5 9 12 14l5.5-5" />
+                <path d="M12 14v8" />
+                <path d="M9 22h6" />
               </svg>
-            </template>
-            Kirim ke Gelanggang
-          </AppButton>
-        </div>
-
-        <div class="ops-dock__legal font-mono">
-          <div class="ops-legal-texts">
-            <div class="legal-label">LEGALITAS BAGAN PERTANDINGAN</div>
-            <div class="legal-officials">DELEGET TEKNIK & KETUA PERTANDINGAN</div>
-            <div class="legal-hash">HASH-DRAW: {{ drawHash }}</div>
+            </div>
+            <div class="ops-dock__texts">
+              <div class="ops-dock__sub font-mono">
+                <span>PARTAI ANTRIAN BERIKUTNYA</span>
+                <span class="ops-bullet">•</span>
+                <span class="ops-dock__cat-text">{{ selectedCategory }}</span>
+              </div>
+              <div class="ops-dock__match-title">
+                {{
+                  queuedMatch
+                    ? `PARTAI ${queuedMatch.partaiNumber}: ${queuedMatch.red.name} (${queuedMatch.red.contingent}) vs ${queuedMatch.blue.name} (${queuedMatch.blue.contingent})`
+                    : 'Belum ada antrian partai aktif'
+                }}
+              </div>
+            </div>
           </div>
-          <div class="legal-shield">
+
+          <button
+            type="button"
+            class="ops-dock__toggle-btn font-mono"
+            :aria-expanded="!isDockCollapsed"
+            :title="isDockCollapsed ? 'Buka kontrol partai' : 'Sembunyikan panel'"
+            @click.stop="isDockCollapsed = !isDockCollapsed"
+          >
+            <span>{{ isDockCollapsed ? 'Aksi' : 'Tutup' }}</span>
             <svg
-              width="22"
-              height="22"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#10B981"
-              stroke-width="2.2"
+              stroke="currentColor"
+              stroke-width="2.4"
+              class="ops-dock__toggle-icon"
+              :class="{ 'ops-dock__toggle-icon--expanded': !isDockCollapsed }"
             >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <polyline points="9 12 11 14 15 10" />
+              <polyline points="18 15 12 9 6 15" />
             </svg>
+          </button>
+        </div>
+
+        <div class="ops-dock__body">
+          <div class="ops-dock__actions font-mono">
+            <button class="ops-dock-btn-dark font-mono" @click="handlePanggilAtlet">
+              Panggil Atlet
+            </button>
+            <AppButton variant="emerald" size="md" @click="handleLoadToMat1">
+              <template #icon>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              </template>
+              Kirim ke Gelanggang
+            </AppButton>
+          </div>
+
+          <div class="ops-dock__legal font-mono">
+            <div class="ops-legal-texts">
+              <div class="legal-label">LEGALITAS BAGAN PERTANDINGAN</div>
+              <div class="legal-officials">DELEGET TEKNIK & KETUA PERTANDINGAN</div>
+              <div class="legal-hash">HASH-DRAW: {{ drawHash }}</div>
+            </div>
+            <div class="legal-shield">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#10B981"
+                stroke-width="2.2"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
           </div>
         </div>
       </footer>
@@ -1543,6 +1912,14 @@ function handleLoadToMat1() {
         <div class="toast-msg">{{ toast.message }}</div>
       </div>
     </Transition>
+
+    <ChangeOwnPasswordDialog
+      :open="ownPasswordOpen"
+      @close="ownPasswordOpen = false"
+      @changed="
+        showToast('Password Diganti', 'Gunakan password baru saat masuk berikutnya.', 'success')
+      "
+    />
 
     <!-- MODAL CONFIRMATION DIALOG -->
     <Transition name="modal-fade">
@@ -1668,12 +2045,14 @@ function handleLoadToMat1() {
 /* Main Container Layout */
 .ops-layout {
   display: flex;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   background-color: #080d1a;
   color: #e2e8f0;
   overflow: hidden;
   font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
@@ -1740,6 +2119,10 @@ function handleLoadToMat1() {
   font-size: 0.6875rem;
 }
 
+.telemetry-dot--down {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px #ef4444 !important;
+}
 .telemetry-dot {
   width: 7px;
   height: 7px;
@@ -1860,6 +2243,11 @@ function handleLoadToMat1() {
   background-color: rgba(220, 38, 38, 0.1);
 }
 
+.ops-logout-btn--key:hover {
+  color: #34d399;
+  background-color: rgba(52, 211, 153, 0.1);
+}
+
 /* ==========================================================================
    MAIN OPS VIEW & TOPBAR
    ========================================================================== */
@@ -1869,6 +2257,53 @@ function handleLoadToMat1() {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ops-hamburger-btn {
+  display: none;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 38px;
+  touch-action: manipulation;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.ops-hamburger-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.ops-sidebar-close {
+  display: none;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  touch-action: manipulation;
+}
+.ops-sidebar-close:hover {
+  color: #ffffff;
+}
+
+.ops-sidebar-backdrop {
+  display: none;
 }
 
 /* Top Status Bar */
@@ -2012,7 +2447,7 @@ function handleLoadToMat1() {
 
 /* ==========================================================================
    SCROLLABLE CONTENT AREA
-   ========================================================================== */
+   ========================================================================= */
 .ops-content-scroll {
   flex: 1;
   overflow-y: auto;
@@ -2021,6 +2456,9 @@ function handleLoadToMat1() {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ops-content-scroll--pin {
@@ -2100,6 +2538,17 @@ function handleLoadToMat1() {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.ops-action-btn-dark--unlocked {
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+.ops-lock-hint {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .ops-action-btn-dark:hover {
@@ -2307,276 +2756,6 @@ function handleLoadToMat1() {
   max-width: 440px;
 }
 
-.bracket-column__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.col-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #cbd5e1;
-}
-
-.col-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.col-dot.neutral {
-  background-color: #64748b;
-}
-.col-dot.blue {
-  background-color: #38bdf8;
-  box-shadow: 0 0 6px #38bdf8;
-}
-.col-dot.red {
-  background-color: #ef4444;
-  box-shadow: 0 0 6px #ef4444;
-}
-
-.bracket-matches-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.bracket-matches-list--qf {
-  gap: 32px;
-  justify-content: space-around;
-  padding-top: 10px;
-}
-
-.bracket-matches-list--sf {
-  gap: 60px;
-  justify-content: space-around;
-  padding-top: 30px;
-}
-
-/* Match Card */
-.bracket-match-card {
-  background-color: #0e1626;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.bracket-match-card--live {
-  border-color: rgba(16, 185, 129, 0.6);
-  background-color: #0b1924;
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
-}
-
-.bracket-match-card--highlighted {
-  border-color: rgba(56, 189, 248, 0.4);
-  background-color: #0d192e;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.12);
-  padding: 14px 16px;
-}
-
-.match-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #94a3b8;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  padding-bottom: 6px;
-}
-
-.match-partai {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.live-dot-pulse {
-  width: 7px;
-  height: 7px;
-  background-color: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 6px #10b981;
-  animation: pulse-ring 1.5s infinite;
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-}
-
-.match-status-badge {
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.match-status-badge.neutral {
-  background-color: rgba(100, 116, 139, 0.2);
-  color: #94a3b8;
-}
-
-.match-status-badge.emerald {
-  background-color: rgba(16, 185, 129, 0.2);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-/* Athlete Row */
-.match-card__athlete {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: background 0.15s ease;
-}
-
-.match-card__athlete--red {
-  background-color: rgba(220, 38, 38, 0.06);
-}
-
-.match-card__athlete--blue {
-  background-color: rgba(37, 99, 235, 0.06);
-}
-
-.match-card__athlete--detailed {
-  padding: 8px 10px;
-}
-
-.athlete-name-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.corner-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-
-.corner-dot.red {
-  background-color: #dc2626;
-  box-shadow: 0 0 6px rgba(220, 38, 38, 0.5);
-}
-.corner-dot.blue {
-  background-color: #2563eb;
-  box-shadow: 0 0 6px rgba(37, 99, 235, 0.5);
-}
-
-.athlete-name {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #e2e8f0;
-}
-
-.athlete-contingent {
-  font-size: 0.6875rem;
-  color: #64748b;
-}
-
-.athlete-score {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: #cbd5e1;
-}
-
-.athlete--winner .athlete-name {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.athlete--winner .athlete-score {
-  color: #10b981;
-  font-weight: 800;
-}
-
-.corner-tag {
-  font-size: 0.6875rem;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.corner-tag.red {
-  background-color: rgba(220, 38, 38, 0.2);
-  color: #ef4444;
-  border: 1px solid rgba(220, 38, 38, 0.3);
-}
-
-.corner-tag.blue {
-  background-color: rgba(37, 99, 235, 0.2);
-  color: #38bdf8;
-  border: 1px solid rgba(37, 99, 235, 0.3);
-}
-
-.match-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #64748b;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  padding-top: 6px;
-}
-
-.match-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
-  margin-top: 4px;
-}
-
-.match-time-hint {
-  font-size: 0.75rem;
-  color: #94a3b8;
-}
-
-.load-arena-btn {
-  background-color: #10b981;
-  color: #064e3b;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: all 0.15s ease;
-}
-
-.load-arena-btn:hover {
-  background-color: #34d399;
-  transform: translateY(-1px);
-}
-
 /* ==========================================================================
    BOTTOM STICKY DOCK / COMMAND BAR
    ========================================================================== */
@@ -2594,6 +2773,21 @@ function handleLoadToMat1() {
   justify-content: space-between;
   box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
   z-index: 30;
+}
+
+.ops-dock__header {
+  display: flex;
+  align-items: center;
+}
+
+.ops-dock__toggle-btn {
+  display: none;
+}
+
+.ops-dock__body {
+  display: flex;
+  align-items: center;
+  gap: 24px;
 }
 
 .ops-dock__match-info {
@@ -2784,6 +2978,278 @@ function handleLoadToMat1() {
   transform: scale(0.95);
 }
 
+/* ==========================================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .ops-hamburger-btn {
+    display: inline-flex;
+  }
+  .ops-sidebar-close {
+    display: inline-flex;
+  }
+  .ops-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(3px);
+    z-index: 45;
+  }
+  .ops-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: none;
+  }
+  .ops-sidebar--open {
+    transform: translateX(0);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+  }
+  .ops-topbar {
+    padding: 10px 16px;
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .ops-topbar__titles {
+    flex: 1 1 auto;
+    min-width: 160px;
+  }
+  .ops-topbar__comp-select {
+    max-width: 100%;
+  }
+  .comp-dropdown {
+    max-width: 180px;
+  }
+  .ops-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ops-filter-grid .filter-card:first-child {
+    grid-column: span 2;
+  }
+  .ops-metrics-bar {
+    grid-template-columns: repeat(2, 1fr) 1.5fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .ops-topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .ops-topbar__heading {
+    font-size: 0.9375rem;
+  }
+  .ops-topbar__sub {
+    font-size: 0.625rem;
+  }
+  .comp-label,
+  .arena-label {
+    display: none;
+  }
+  .comp-dropdown {
+    max-width: 140px;
+    font-size: 0.75rem;
+  }
+  .ops-topbar__system-pills .system-pill {
+    display: none;
+  }
+  .ops-banner-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .ops-banner-title-group {
+    gap: 12px;
+  }
+  .ops-banner-main-title {
+    font-size: 1.125rem;
+  }
+  .ops-banner-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ops-banner-actions button,
+  .ops-banner-actions :deep(button) {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .ops-filter-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ops-filter-grid .filter-card:first-child {
+    grid-column: span 1;
+  }
+  .ops-metrics-bar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .metric-block--progress {
+    grid-column: span 2;
+  }
+  .metric-val {
+    font-size: 1.1rem;
+  }
+  .ops-content-scroll {
+    padding: 14px 12px 180px 12px;
+    gap: 12px;
+  }
+  .ops-content-scroll--pin {
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+  }
+  .ops-content-scroll--bagan-collapsed {
+    padding-bottom: max(60px, calc(52px + env(safe-area-inset-bottom)));
+  }
+  .ops-content-scroll--bagan-expanded {
+    padding-bottom: max(220px, calc(200px + env(safe-area-inset-bottom)));
+  }
+  .ops-dock {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 14px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 0;
+    transition: padding 0.2s ease;
+  }
+  .ops-dock--collapsed {
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .ops-dock--collapsed .ops-dock__body {
+    display: none;
+  }
+  .ops-dock__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .ops-dock__match-info {
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+  .ops-dock__athlete-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+  .ops-dock__texts {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+  .ops-dock__sub {
+    font-size: 0.625rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ops-dock__cat-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ops-dock__match-title {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ops-dock__toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 9px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    color: #cbd5e1;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .ops-dock__toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+  }
+  .ops-dock__toggle-icon {
+    transition: transform 0.2s ease;
+  }
+  .ops-dock__toggle-icon--expanded {
+    transform: rotate(180deg);
+  }
+  .ops-dock__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+  }
+  .ops-dock__actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .ops-dock__actions > button,
+  .ops-dock__actions > :deep(button) {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.75rem;
+    padding: 8px 10px;
+  }
+  .ops-dock__legal {
+    justify-content: space-between;
+    text-align: left;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 6px;
+  }
+  .legal-shield {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .ops-topbar__titles {
+    min-width: 120px;
+  }
+  .ops-topbar__comp-select {
+    padding: 4px 8px;
+  }
+  .comp-dropdown {
+    max-width: 120px;
+  }
+  .ops-metrics-bar {
+    grid-template-columns: 1fr;
+  }
+  .metric-block--progress {
+    grid-column: span 1;
+  }
+}
+
 /* Print Styles */
 @media print {
   .ops-sidebar,
@@ -2805,7 +3271,7 @@ function handleLoadToMat1() {
     padding: 0 !important;
     overflow: visible !important;
   }
-  .bracket-match-card {
+  :deep(.t-match-card) {
     background: #ffffff !important;
     border: 1px solid #000000 !important;
     color: #000000 !important;

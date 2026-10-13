@@ -1,11 +1,12 @@
 import { http } from '@/api/client'
 import { ENDPOINTS } from '@/api/endpoints'
 import type {
+  RulesetAssignment,
   Category,
   CreateCategoryFormValues,
   StandardClassPreset,
 } from '../types/category.schema'
-import { IPSI_STANDARD_PRESETS } from '../types/category.schema'
+import { IPSI_STANDARD_PRESETS, presetToPayload } from '../types/category.schema'
 
 export const categoryService = {
   /**
@@ -40,8 +41,77 @@ export const categoryService = {
   },
 
   /**
-   * 4. Batch seed standard IPSI weight class presets
-   * Convenient helper for tournament admins to quickly populate standard classes
+   * PUT /api/v1/competitions/{comp_id}/categories/{id}
+   * Ditolak 409 bila standar berbeda atau kategori sudah punya peserta (saat itu hanya nama yang dapat diubah).
+   */
+  async updateCategory(
+    competitionId: string,
+    id: string,
+    payload: CreateCategoryFormValues,
+  ): Promise<Category> {
+    const res = await http.put<Category>(ENDPOINTS.CATEGORIES.DETAIL(competitionId, id), payload)
+    return res.data
+  },
+
+  /**
+   * DELETE /api/v1/competitions/{comp_id}/categories/{id}
+   * Ditolak 409 bila masih ada peserta atau partainya sudah berjalan/selesai.
+   */
+  async deleteCategory(competitionId: string, id: string): Promise<void> {
+    await http.delete<unknown>(ENDPOINTS.CATEGORIES.DETAIL(competitionId, id))
+  },
+
+  /**
+   * DELETE /api/v1/competitions/{comp_id}/categories — reset seluruh kategori (ganti standar).
+   * Ditolak 409 bila masih ada peserta terdaftar pada kategori.
+   */
+  async resetCategories(competitionId: string): Promise<{ deleted: number }> {
+    const res = await http.delete<{ deleted: number }>(ENDPOINTS.CATEGORIES.RESET(competitionId))
+    return res.data
+  },
+
+  /**
+   * PUT /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock
+   * Kunci/buka draw bagan sebuah kategori (disimpan di server dan ditegakkan pada brackets/generate).
+   */
+  async setBracketLock(competitionId: string, id: string, locked: boolean): Promise<Category> {
+    const res = await http.put<Category>(ENDPOINTS.CATEGORIES.BRACKET_LOCK(competitionId, id), {
+      locked,
+    })
+    return res.data
+  },
+
+  /**
+   * PUT /api/v1/competitions/{comp_id}/categories/{id}/home-arena
+   * Tetapkan gelanggang asal kategori (partai yang belum dimuat ikut pindah; 409 bila sudah ada yang berjalan).
+   */
+  async setHomeArena(competitionId: string, id: string, arenaId: string): Promise<Category> {
+    const res = await http.put<Category>(ENDPOINTS.CATEGORIES.HOME_ARENA(competitionId, id), {
+      arena_id: arenaId,
+    })
+    return res.data
+  },
+
+  /**
+   * PUT /api/v1/competitions/{comp_id}/categories/ruleset
+   * Tetapkan ruleset khusus (durasi/jumlah babak) per golongan umur atau kategori.
+   * ruleset_id null = ikut ruleset kejuaraan. Ditolak 409 bila sudah ada partai berjalan.
+   */
+  async assignRulesets(
+    competitionId: string,
+    assignments: RulesetAssignment[],
+  ): Promise<{ updated: number }> {
+    const res = await http.put<{ updated: number }>(
+      ENDPOINTS.CATEGORIES.ASSIGN_RULESETS(competitionId),
+      { assignments },
+    )
+    return res.data
+  },
+
+  /**
+   * 4. Batch seed preset kelas resmi (IPSI / PERSILAT 2026).
+   * Kategori yang namanya sudah ada dilewati; pembuatan dijalankan paralel terbatas
+   * agar ratusan kelas tidak membanjiri server.
    */
   async seedPresetCategories(
     competitionId: string,
@@ -51,28 +121,26 @@ export const categoryService = {
     const existing = await this.getCategories(competitionId)
     const existingNames = new Set(existing.map((c) => c.name.toLowerCase().trim()))
 
+    const todo = presets.filter((p) => !existingNames.has(p.categoryName.toLowerCase().trim()))
     let created = 0
-    let skipped = 0
+    let failed = 0
 
-    for (const preset of presets) {
-      if (existingNames.has(preset.categoryName.toLowerCase().trim())) {
-        skipped++
-        continue
-      }
-
-      try {
-        await this.createCategory(competitionId, {
-          name: preset.categoryName,
-          gender: preset.gender,
-          weight_class: preset.code,
-        })
-        created++
-      } catch (err) {
-        console.warn(`Failed to seed preset ${preset.categoryName}:`, err)
-        skipped++
+    const CONCURRENCY = 6
+    let cursor = 0
+    const worker = async () => {
+      while (cursor < todo.length) {
+        const preset = todo[cursor++]
+        try {
+          await this.createCategory(competitionId, presetToPayload(preset))
+          created++
+        } catch (err) {
+          console.warn(`Failed to seed preset ${preset.categoryName}:`, err)
+          failed++
+        }
       }
     }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker))
 
-    return { created, skipped }
+    return { created, skipped: presets.length - todo.length + failed }
   },
 }

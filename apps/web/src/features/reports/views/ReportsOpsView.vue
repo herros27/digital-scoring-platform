@@ -445,7 +445,7 @@ function refreshAll() {
         <div class="empty-title">Belum Ada Perolehan Medali</div>
         <div class="empty-desc">
           Medali akan otomatis terhitung saat pertandingan final atau penyisihan diselesaikan oleh
-          dewan wasit.
+          pengawas pertandingan.
         </div>
       </div>
 
@@ -564,7 +564,7 @@ function refreshAll() {
       <div v-else-if="!matches || matches.length === 0" class="table-empty-box font-mono">
         <div class="empty-title">Belum Ada Pertandingan Selesai</div>
         <div class="empty-desc">
-          Pertandingan yang diselesaikan di meja wasit akan muncul di sini beserta ringkasan
+          Pertandingan yang diselesaikan di meja operator akan muncul di sini beserta ringkasan
           pemenang.
         </div>
       </div>

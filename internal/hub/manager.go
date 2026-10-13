@@ -41,12 +41,3 @@ func (m *Manager) Get(arenaID string) (*Hub, error) {
 	}
 	return h, nil
 }
-
-func (m *Manager) BroadcastAll(msg Message) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	for _, h := range m.hubs {
-		h.Broadcast(msg)
-	}
-}

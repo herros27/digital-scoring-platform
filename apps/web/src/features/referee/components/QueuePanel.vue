@@ -1,38 +1,84 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { RefereeConsole } from '../composables/useRefereeConsole'
-import { bracketCategories, groupBracket, QUEUE_STATE_LABEL, roundLabel } from '../lib/queue'
+import { QUEUE_STATE_LABEL } from '../lib/queue'
+import { buildRefereeRounds } from '../lib/bracketView'
+import TournamentTreeBracket, {
+  type BracketRoundDisplay,
+  type MatchCard,
+} from '@/features/tournament/components/TournamentTreeBracket.vue'
 
 const props = defineProps<{ c: RefereeConsole }>()
 const emit = defineEmits<{ goto: [tab: string] }>()
 
-const categories = computed(() => bracketCategories(props.c.participants))
-const selectedKey = ref('')
+// Bagan milik kategori (bukan gelanggang): partainya bisa tersebar di beberapa gelanggang. Kategori yang punya partai
+// di gelanggang ini diurutkan lebih dulu dan menjadi pilihan awal; kategori lain tetap bisa dilihat.
+const ownCategoryIds = computed(() => {
+  const ids = new Set<string>()
+  for (const row of props.c.queue) {
+    for (const pid of [row.match.athlete_red_id, row.match.athlete_blue_id]) {
+      const cat = props.c.participants.find((p) => p.id === pid)?.category_id
+      if (cat) ids.add(cat)
+    }
+  }
+  return ids
+})
 
-const selected = computed(() => categories.value.find((x) => x.key === selectedKey.value) ?? null)
+const categoryOptions = computed(() =>
+  props.c.categories
+    .map((cat) => ({ id: cat.id, label: cat.name, own: ownCategoryIds.value.has(cat.id) }))
+    .sort(
+      (a, b) =>
+        Number(b.own) - Number(a.own) ||
+        a.label.localeCompare(b.label, undefined, { numeric: true }),
+    ),
+)
+
+const selectedId = ref('')
+const selected = computed(
+  () => categoryOptions.value.find((x) => x.id === selectedId.value) ?? null,
+)
 
 watch(
-  categories,
+  categoryOptions,
   (list) => {
-    if (!selectedKey.value && list.length) selectedKey.value = list[0].key
+    if (!list.some((x) => x.id === selectedId.value)) selectedId.value = list[0]?.id ?? ''
   },
   { immediate: true },
 )
 
 watch(
-  selected,
-  (cat) => {
-    if (cat) void props.c.loadBracket(cat.weightClass, cat.gender)
+  selectedId,
+  (id) => {
+    if (id) void props.c.loadCategoryBracket(id)
   },
   { immediate: true },
 )
 
-const rounds = computed(() => groupBracket(props.c.bracketSlots, props.c.competitors))
-const lastRound = computed(() => Math.max(1, ...rounds.value.map((r) => r.round)))
+const bracketRounds = computed<BracketRoundDisplay[]>(() =>
+  buildRefereeRounds({
+    slots: props.c.bracketSlots,
+    competitors: props.c.competitors,
+    matches: props.c.allMatches,
+    arenas: props.c.arenas,
+    arenaId: props.c.arenaId,
+    queueNumbers: new Map(props.c.queue.map((q) => [q.match.id, q.number])),
+    loadedMatchId: props.c.matchId,
+  }),
+)
+
+function handleSelectBracketMatch(m: MatchCard) {
+  if (!m.isOwnArena) return // partai gelanggang lain hanya untuk dilihat
+  const queued = props.c.queue.find((q) => q.number === m.partaiNumber)
+  if (queued && queued.canLoad) {
+    props.c.loadMatch(queued.match.id)
+  }
+}
 </script>
 
 <template>
   <div>
+    <!-- SECTION 1: ANTREAN PARTAI GELANGGANG -->
     <section class="ref-card ref-section">
       <div class="ref-card__head font-mono">
         <span>ANTREAN PARTAI GELANGGANG</span>
@@ -102,41 +148,46 @@ const lastRound = computed(() => Math.max(1, ...rounds.value.map((r) => r.round)
       </div>
     </section>
 
+    <!-- SECTION 2: BAGAN PERTANDINGAN KELAS -->
     <section class="ref-card ref-section">
       <div class="ref-card__head font-mono">
-        <span>BAGAN PERTANDINGAN</span>
-        <select v-model="selectedKey" class="ref-select font-mono" :disabled="!categories.length">
-          <option v-for="cat in categories" :key="cat.key" :value="cat.key">{{ cat.label }}</option>
+        <span>BAGAN PERTANDINGAN RESMI</span>
+        <select
+          v-model="selectedId"
+          class="ref-select font-mono"
+          :disabled="!categoryOptions.length"
+        >
+          <option v-for="cat in categoryOptions" :key="cat.id" :value="cat.id">
+            {{ cat.own ? '● ' : '' }}{{ cat.label }}
+          </option>
         </select>
       </div>
 
-      <div v-if="!categories.length" class="ref-card__sub font-mono">
-        Belum ada peserta terverifikasi.
+      <div v-if="!categoryOptions.length" class="ref-card__sub font-mono">
+        Belum ada kategori pada kejuaraan ini.
       </div>
-      <div v-else-if="!rounds.length" class="ref-card__sub font-mono">
-        Bagan untuk kelas ini belum dibuat. Buat bagan dari menu Bagan Pertandingan pada panel
+      <div v-else-if="!bracketRounds.length" class="ref-card__sub font-mono">
+        Bagan untuk kategori ini belum dibuat. Buat bagan dari menu Bagan Pertandingan pada panel
         operasional.
       </div>
-      <div v-else class="ref-bracket font-mono">
-        <div v-for="r in rounds" :key="r.round" class="ref-bracket-col">
-          <div class="ref-bracket-title">{{ roundLabel(r.round, lastRound) }}</div>
-          <div
-            v-for="s in r.slots"
-            :key="s.id"
-            class="ref-bracket-slot"
-            :class="{
-              'ref-bracket-slot--empty': !s.competitor,
-              'ref-bracket-slot--winner': !!s.winner_id && s.winner_id === s.participant_id,
-            }"
-          >
-            <template v-if="s.competitor">
-              {{ s.competitor.name }}
-              <small>{{ s.competitor.team }}</small>
-            </template>
-            <template v-else>{{ s.is_bye ? 'BYE' : 'Menunggu pemenang' }}</template>
-          </div>
-        </div>
+      <div v-else class="ref-tree-wrapper">
+        <p class="ref-card__sub font-mono" data-testid="ref-bracket-note">
+          Bagan kategori mencakup semua gelanggang. Kartu bertepi biru adalah partai di
+          {{ c.arenaName || 'gelanggang ini' }}.
+        </p>
+        <TournamentTreeBracket
+          :rounds="bracketRounds"
+          :category-name="selected?.label || ''"
+          @select-match="handleSelectBracketMatch"
+        />
       </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+.ref-tree-wrapper {
+  margin-top: 14px;
+  width: 100%;
+}
+</style>

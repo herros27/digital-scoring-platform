@@ -3,6 +3,9 @@ import { computed, reactive, ref } from 'vue'
 import {
   METHOD_LABEL,
   PHASE_LABEL,
+  IPSI_YOUTH_CODES,
+  IPSI_YOUTH_SUGGESTION,
+  POINT_GAP_MODE_LABEL,
   TIEBREAK_METHODS,
   normalizedPriority,
   payloadFromDraft,
@@ -22,6 +25,23 @@ const hasErrors = computed(() => Object.keys(errors.value).length > 0)
 const showError = (key: string) => (submitted.value ? errors.value[key] : undefined)
 
 const isEdit = computed(() => !!d.id)
+
+// Mengaktifkan pengecualian: mulai dari waktu utama agar panitia tinggal mengubah yang berbeda.
+function toggleAge(i: number) {
+  const a = d.ageTimings[i]
+  if (a.enabled) {
+    a.roundDuration = d.roundDuration
+    a.breakDuration = d.breakDuration
+    a.totalRounds = d.totalRounds
+  }
+}
+
+function applyYouthSuggestion() {
+  for (const a of d.ageTimings) {
+    if (IPSI_YOUTH_CODES.includes(a.code))
+      Object.assign(a, { enabled: true }, IPSI_YOUTH_SUGGESTION)
+  }
+}
 const priority = computed(() => normalizedPriority(d))
 const techOf = (code: string) => d.techniques.find((t) => t.type === code)
 
@@ -136,6 +156,64 @@ function submit() {
                 errors.totalRounds
               }}</small>
             </label>
+          </div>
+        </section>
+
+        <!-- Waktu per golongan umur -->
+        <section class="rs-section" data-test="age-timings">
+          <h3>Waktu per Golongan Umur</h3>
+          <p class="rs-hint">
+            Opsional. Golongan yang dicentang memakai waktunya sendiri (bebas ditentukan panitia,
+            mis. 2 babak × 2 menit untuk Usia Dini); golongan lain ikut waktu di atas. Berlaku
+            otomatis menurut golongan umur kategori partai.
+          </p>
+          <button
+            type="button"
+            class="rs-btn"
+            data-test="age-suggest"
+            @click="applyYouthSuggestion"
+          >
+            Isi usulan IPSI untuk Usia Dini (2 babak × 1,5 menit)
+          </button>
+          <div
+            v-for="(a, i) in d.ageTimings"
+            :key="a.code"
+            class="rs-age-row"
+            :data-test="`age-${a.code}`"
+          >
+            <label class="rs-check">
+              <input v-model="a.enabled" type="checkbox" @change="toggleAge(i)" />
+              <span>{{ a.label }}</span>
+            </label>
+            <template v-if="a.enabled">
+              <label class="rs-field">
+                <span>Durasi babak (detik)</span>
+                <input v-model.number="a.roundDuration" type="number" min="1" class="rs-input" />
+                <small v-if="showError(`ageTimings.${i}.roundDuration`)" class="rs-error">{{
+                  errors[`ageTimings.${i}.roundDuration`]
+                }}</small>
+              </label>
+              <label class="rs-field">
+                <span>Istirahat (detik)</span>
+                <input v-model.number="a.breakDuration" type="number" min="0" class="rs-input" />
+                <small v-if="showError(`ageTimings.${i}.breakDuration`)" class="rs-error">{{
+                  errors[`ageTimings.${i}.breakDuration`]
+                }}</small>
+              </label>
+              <label class="rs-field">
+                <span>Jumlah babak</span>
+                <input
+                  v-model.number="a.totalRounds"
+                  type="number"
+                  min="1"
+                  max="3"
+                  class="rs-input"
+                />
+                <small v-if="showError(`ageTimings.${i}.totalRounds`)" class="rs-error">{{
+                  errors[`ageTimings.${i}.totalRounds`]
+                }}</small>
+              </label>
+            </template>
           </div>
         </section>
 
@@ -284,11 +362,72 @@ function submit() {
           </p>
         </section>
 
+        <!-- WMP -->
+        <section class="rs-section">
+          <h3>Wasit Menghentikan Pertandingan (WMP)</h3>
+          <p class="rs-hint">
+            Bila selisih total poin kedua sudut (setelah sanksi) mencapai batas pada babak yang
+            ditentukan, pertandingan langsung dihentikan dan sudut yang unggul menang.
+          </p>
+          <div class="rs-grid">
+            <label class="rs-field">
+              <span>Mode</span>
+              <select v-model="d.pointGap.mode" class="rs-input" data-test="gap-mode">
+                <option v-for="(label, mode) in POINT_GAP_MODE_LABEL" :key="mode" :value="mode">
+                  {{ label }}
+                </option>
+              </select>
+            </label>
+            <template v-if="d.pointGap.mode === 'custom'">
+              <label class="rs-field">
+                <span>Selisih poin</span>
+                <input
+                  v-model.number="d.pointGap.margin"
+                  type="number"
+                  min="1"
+                  class="rs-input"
+                  data-test="gap-margin"
+                />
+                <small v-if="showError('pointGap.margin')" class="rs-error">{{
+                  errors['pointGap.margin']
+                }}</small>
+              </label>
+              <label class="rs-field">
+                <span>Berlaku mulai babak</span>
+                <input
+                  v-model.number="d.pointGap.fromRound"
+                  type="number"
+                  min="1"
+                  :max="d.totalRounds"
+                  class="rs-input"
+                  data-test="gap-from-round"
+                />
+                <small v-if="showError('pointGap.fromRound')" class="rs-error">{{
+                  errors['pointGap.fromRound']
+                }}</small>
+              </label>
+            </template>
+          </div>
+          <p class="rs-hint">
+            <template v-if="d.pointGap.mode === 'auto'">
+              Remaja, Dewasa, dan golongan lain: 30 poin. Usia Dini dan Pra-Remaja: 20 poin. Berlaku
+              mulai babak 2.
+            </template>
+            <template v-else-if="d.pointGap.mode === 'custom'">
+              Pertandingan dihentikan bila selisih mencapai {{ d.pointGap.margin }} poin sejak babak
+              {{ d.pointGap.fromRound }}.
+            </template>
+            <template v-else
+              >Pertandingan hanya berakhir lewat waktu atau keputusan operator meja.</template
+            >
+          </p>
+        </section>
+
         <!-- Seri -->
         <section class="rs-section">
           <h3>Aturan Seri</h3>
           <p class="rs-hint">
-            Dijalankan berurutan bila skor bersih seri; bila masih seri, wasit memutuskan manual.
+            Dijalankan berurutan bila skor bersih seri; bila masih seri, operator meja memutuskan manual.
           </p>
           <label class="rs-check">
             <input v-model="d.tiebreak.fewestPenalties" type="checkbox" />
@@ -330,7 +469,7 @@ function submit() {
             </ol>
           </div>
           <div class="rs-methods">
-            <span class="rs-hint">Dasar keputusan manual yang boleh dipilih wasit:</span>
+            <span class="rs-hint">Dasar keputusan manual yang boleh dipilih operator meja:</span>
             <label v-for="m in TIEBREAK_METHODS" :key="m" class="rs-check">
               <input
                 type="checkbox"
@@ -346,7 +485,7 @@ function submit() {
         <section class="rs-section">
           <h3>Hasil Khusus</h3>
           <p class="rs-hint">
-            Tombol di konsol wasit di luar skor. Nonaktifkan jenis yang tidak dipakai pada regulasi
+            Tombol di konsol meja di luar skor. Nonaktifkan jenis yang tidak dipakai pada regulasi
             ini.
           </p>
           <div v-for="(o, i) in d.outcomes" :key="o.type" class="rs-row" data-test="outcome-row">
@@ -569,5 +708,21 @@ function submit() {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+.rs-age-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) repeat(3, minmax(90px, 1fr));
+  gap: 10px 12px;
+  align-items: end;
+  padding: 8px 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.rs-age-row > .rs-check {
+  grid-column: 1 / -1;
+}
+@media (min-width: 720px) {
+  .rs-age-row > .rs-check {
+    grid-column: auto;
+  }
 }
 </style>

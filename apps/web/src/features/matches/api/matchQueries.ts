@@ -33,22 +33,23 @@ export function useMatchQuery(compId: Ref<string>, matchId: Ref<string>) {
   })
 }
 
-/**
- * Create match mutation
- */
-export function useCreateMatchMutation(compId: Ref<string>) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (payload: {
-      arena_id?: string
-      bracket_slot_id?: string
-      athlete_red_id: string
-      athlete_blue_id: string
-      current_round?: number
-    }) => matchService.createMatch(compId.value, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: matchKeys.lists() })
-    },
+/** Rincian skor satu partai (per babak). Hanya diambil saat dialog rincian dibuka. */
+export function useMatchScoresQuery(compId: Ref<string>, matchId: Ref<string>) {
+  return useQuery({
+    queryKey: computed(() => [...matchKeys.all, 'scores', compId.value, matchId.value] as const),
+    queryFn: () => matchService.getMatchScores(compId.value, matchId.value),
+    enabled: computed(() => !!compId.value && !!matchId.value),
+    staleTime: 0,
+  })
+}
+
+/** Riwayat kejadian satu partai (poin sah, sanksi, kontrol wasit). */
+export function useMatchEventsQuery(compId: Ref<string>, matchId: Ref<string>) {
+  return useQuery({
+    queryKey: computed(() => [...matchKeys.all, 'events', compId.value, matchId.value] as const),
+    queryFn: () => matchService.getEvents(compId.value, matchId.value),
+    enabled: computed(() => !!compId.value && !!matchId.value),
+    staleTime: 0,
   })
 }
 

@@ -87,7 +87,7 @@ function lastInputText(seat: number): string {
         <div class="ref-seat-grid font-mono">
           <div class="ref-seat-card">
             <div class="ref-kv">
-              <span>Meja wasit</span><strong>{{ c.presence?.referees ?? 0 }}</strong>
+              <span>Meja operator</span><strong>{{ c.presence?.referees ?? 0 }}</strong>
             </div>
           </div>
           <div class="ref-seat-card">

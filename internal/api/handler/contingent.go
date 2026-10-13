@@ -1,31 +1,48 @@
 package handler
 
 import (
+	"crypto/subtle"
+	"errors"
 	"net/http"
 
+	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type ContingentHandler struct {
-	Service *service.ContingentService
+	Service    *service.ContingentService
+	InviteCode string
 }
 
 // POST /api/v1/auth/contingent/register
 func (h *ContingentHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name     string `json:"name" validate:"required,min=2,max=100"`
-		PicName  string `json:"pic_name" validate:"required,min=2,max=100"`
-		Email    string `json:"email" validate:"required,email"`
-		Phone    string `json:"phone" validate:"required,min=6,max=20"`
-		Password string `json:"password" validate:"required,min=6"`
+		Name       string `json:"name" validate:"required,min=2,max=100"`
+		PicName    string `json:"pic_name" validate:"required,min=2,max=100"`
+		Email      string `json:"email" validate:"required,email"`
+		Phone      string `json:"phone" validate:"required,min=6,max=20"`
+		Password   string `json:"password" validate:"required,min=8,max=72"`
+		InviteCode string `json:"invite_code"`
 	}
 	if err := Decode(r, &req); err != nil {
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
 
+	// ponytail: jika kode undangan dikonfigurasi di server, tolak pendaftaran yang tidak memuat kode cocok
+	if h.InviteCode != "" {
+		if req.InviteCode == "" || subtle.ConstantTimeCompare([]byte(req.InviteCode), []byte(h.InviteCode)) != 1 {
+			Fail(w, http.StatusForbidden, "FORBIDDEN", "kode undangan pendaftaran tidak valid atau belum diisi", nil)
+			return
+		}
+	}
+
 	contingent, err := h.Service.Register(req.Name, req.PicName, req.Email, req.Phone, req.Password)
 	if err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", "email sudah terdaftar atau tidak valid", nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
@@ -70,10 +87,54 @@ func (h *ContingentHandler) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/contingents/{id}
 func (h *ContingentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	// Kontingen hanya boleh membaca profilnya sendiri (memuat email & telepon PIC).
+	if scope, restricted := contingentScope(r); restricted && scope != id {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "insufficient role permissions", nil)
+		return
+	}
 	c, err := h.Service.GetByID(id)
 	if err != nil {
 		Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 		return
 	}
 	Ok(w, c)
+}
+
+// PUT /api/v1/contingents/{id}/password — admin/dewan mereset password manajer kontingen (lupa password).
+func (h *ContingentHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Password string `json:"password" validate:"required,min=8,max=72"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	if err := h.Service.ResetPassword(r.PathValue("id"), req.Password); err != nil {
+		failOfficial(w, err)
+		return
+	}
+	Ok(w, map[string]string{"status": "password_reset"})
+}
+
+// ChangePassword mengganti password milik manajer kontingen yang sedang masuk (dipanggil dari
+// POST /api/v1/auth/change-password bila peran token = contingent).
+func (h *ContingentHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		CurrentPassword string `json:"current_password" validate:"required"`
+		NewPassword     string `json:"new_password" validate:"required,min=8,max=72"`
+	}
+	if err := Decode(r, &req); err != nil {
+		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
+		return
+	}
+	id, restricted := contingentScope(r)
+	if !restricted || id == "" {
+		Fail(w, http.StatusForbidden, "FORBIDDEN", "akun kontingen tidak dikenali", nil)
+		return
+	}
+	if err := h.Service.ChangeOwnPassword(id, req.CurrentPassword, req.NewPassword); err != nil {
+		failOfficial(w, err)
+		return
+	}
+	Ok(w, map[string]string{"status": "password_changed"})
 }

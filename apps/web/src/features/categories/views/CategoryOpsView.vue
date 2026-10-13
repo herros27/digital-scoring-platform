@@ -2,17 +2,39 @@
 import { getErrorMessage } from '@/api/error'
 import { ref, computed } from 'vue'
 import { AppButton } from '@/components/ui'
+import { useRulesetsQuery, useSaveRulesetMutation } from '@/features/rulesets/api/rulesetQueries'
+import { useCompetitionQuery } from '@/features/competitions/api/competitionQueries'
+import type { RulesetDTO } from '@/features/rulesets/types'
 import {
   useCategoriesQuery,
+  useAssignRulesetsMutation,
   useCreateCategoryMutation,
+  useDeleteCategoryMutation,
+  useResetCategoriesMutation,
+  useUpdateCategoryMutation,
   useSeedPresetsMutation,
+  useSetHomeArenaMutation,
 } from '../api/categoryQueries'
+import { useArenasQuery } from '@/features/arena/api/arenaQueries'
 import {
+  BRACKET_MODE_LABELS,
   createCategorySchema,
-  IPSI_STANDARD_PRESETS,
+  groupNote,
+  isJurusOnly,
+  presetsFor,
+  type BracketMode,
   type Category,
   type CreateCategoryFormValues,
+  type StandardClassPreset,
+  normalizeCategoryName,
 } from '../types/category.schema'
+import {
+  AGE_BANDS,
+  PRESET_LABELS,
+  ageGroupLabel,
+  type AgeGroupCode,
+  type PresetStandard,
+} from '../lib/ageGroups'
 
 const props = withDefaults(
   defineProps<{
@@ -42,11 +64,242 @@ const {
 } = useCategoriesQuery(activeCompId)
 const createMutation = useCreateCategoryMutation(activeCompId)
 const seedMutation = useSeedPresetsMutation(activeCompId)
+const resetMutation = useResetCategoriesMutation(activeCompId)
+const updateMutation = useUpdateCategoryMutation(activeCompId)
+const deleteMutation = useDeleteCategoryMutation(activeCompId)
+const homeArenaMutation = useSetHomeArenaMutation(activeCompId)
+const { data: rawArenas } = useArenasQuery(activeCompId)
+const arenaOptions = computed(() => rawArenas.value ?? [])
+
+async function changeHomeArena(cat: Category, arenaId: string) {
+  if (!arenaId || arenaId === cat.home_arena_id) return
+  try {
+    await homeArenaMutation.mutateAsync({ categoryId: cat.id, arenaId })
+    const name = arenaOptions.value.find((a) => a.id === arenaId)?.name ?? 'gelanggang'
+    showToast('Gelanggang Asal Diubah', `${cat.name} kini dimainkan di ${name}.`, 'success')
+  } catch (err) {
+    showToast(
+      'Gagal Mengubah Gelanggang',
+      getErrorMessage(err, 'Gelanggang asal tidak dapat diubah.'),
+      'danger',
+    )
+  }
+}
 
 const categories = computed(() => rawCategories.value || [])
 
+// Satu kejuaraan hanya boleh memakai SATU standar. Bila sudah ada kategori, standar terkunci
+// sampai kategori di-reset (server juga menolak pencampuran standar).
+const activeStandard = computed<PresetStandard | null>(() => {
+  const first = categories.value[0]
+  return first ? (first.preset_standard ?? 'ipsi') : null
+})
+const availableStandards = computed<PresetStandard[]>(() =>
+  activeStandard.value ? [activeStandard.value] : ['ipsi', 'persilat_2026'],
+)
+
+// ---------- Ruleset (durasi/jumlah babak) per golongan umur ----------
+const { data: rawRulesets } = useRulesetsQuery()
+const { data: competition } = useCompetitionQuery(activeCompId)
+const saveRulesetMutation = useSaveRulesetMutation()
+const assignMutation = useAssignRulesetsMutation(activeCompId)
+const rulesetList = computed(() => rawRulesets.value ?? [])
+const rulesetById = computed(() => new Map(rulesetList.value.map((r) => [r.id, r])))
+
+const fmtMinutes = (sec: number) => String(Math.round((sec / 60) * 10) / 10).replace('.', ',')
+const rulesetDuration = (r?: RulesetDTO) =>
+  r ? `${r.scoring.total_rounds} babak × ${fmtMinutes(r.scoring.round_duration)} mnt` : ''
+const categoryDuration = (c: Category) =>
+  c.ruleset_id ? rulesetDuration(rulesetById.value.get(c.ruleset_id)) : ''
+
+/** Ruleset kejuaraan (dipakai kategori yang tidak punya ruleset khusus). */
+const competitionRuleset = computed(() => {
+  const c = competition.value
+  if (!c) return undefined
+  return (
+    rulesetList.value.find((r) => r.id === c.ruleset_id) ??
+    rulesetList.value.find((r) => r.name === c.ruleset_name) ??
+    rulesetList.value.find(
+      (r) => r.name.split(' ')[0].toLowerCase() === c.ruleset_name?.toLowerCase(),
+    )
+  )
+})
+
+const isRulesetOpen = ref(false)
+const MIXED = '__mixed__'
+const rulesetChoice = ref<Record<string, string>>({})
+
+/** Golongan umur yang punya kategori, berurutan sesuai standar aktif. */
+const rulesetGroups = computed(() => {
+  const std = activeStandard.value ?? 'ipsi'
+  return AGE_BANDS[std]
+    .map((b) => ({
+      code: b.code,
+      label: b.label,
+      count: categories.value.filter((c) => (c.age_group ?? 'dewasa') === b.code).length,
+    }))
+    .filter((g) => g.count > 0)
+})
+
+/** Nilai ruleset saat ini untuk satu golongan ('' = ikut kejuaraan, MIXED = beragam). */
+function currentRulesetOf(code: string): string {
+  const ids = new Set(
+    categories.value
+      .filter((c) => (c.age_group ?? 'dewasa') === code)
+      .map((c) => c.ruleset_id ?? ''),
+  )
+  return ids.size === 1 ? [...ids][0] : MIXED
+}
+
+function openRulesetDialog() {
+  const choice: Record<string, string> = {}
+  for (const g of rulesetGroups.value) choice[g.code] = currentRulesetOf(g.code)
+  rulesetChoice.value = choice
+  isRulesetOpen.value = true
+}
+
+const pendingAssignments = computed(() =>
+  rulesetGroups.value
+    .filter((g) => {
+      const v = rulesetChoice.value[g.code]
+      return v !== undefined && v !== MIXED && v !== currentRulesetOf(g.code)
+    })
+    .map((g) => ({ age_group: g.code, ruleset_id: rulesetChoice.value[g.code] || null })),
+)
+
+// Pintasan sesuai regulasi: durasi golongan usia muda berbeda dari golongan di atasnya.
+const durationPreset = computed(() =>
+  (activeStandard.value ?? 'ipsi') === 'persilat_2026'
+    ? {
+        label: 'Singa / Macan / Pre-Teen: 3 babak × 1,5 menit',
+        rounds: 3,
+        seconds: 90,
+        suffix: 'Usia Muda',
+        groups: ['singa', 'macan', 'pre_teen'],
+      }
+    : {
+        label: 'Usia Dini 1 & 2: 2 babak × 1,5 menit',
+        rounds: 2,
+        seconds: 90,
+        suffix: 'Usia Dini',
+        groups: ['usia_dini_1', 'usia_dini_2'],
+      },
+)
+const presetApplicableGroups = computed(() =>
+  rulesetGroups.value.filter((g) => durationPreset.value.groups.includes(g.code)),
+)
+
+async function applyDurationPreset() {
+  const base = competitionRuleset.value ?? rulesetList.value.find((r) => r.status === 'active')
+  if (!base) {
+    showToast('Ruleset Belum Ada', 'Pilih ruleset kejuaraan terlebih dahulu.', 'danger')
+    return
+  }
+  const dp = durationPreset.value
+  const name = `${base.name} — ${dp.suffix} (${dp.rounds}×${fmtMinutes(dp.seconds)} mnt)`
+  try {
+    let target = rulesetList.value.find((r) => r.name === name)
+    if (!target) {
+      target = await saveRulesetMutation.mutateAsync({
+        payload: {
+          name,
+          version: '1.0',
+          status: 'active',
+          scoring: { ...base.scoring, total_rounds: dp.rounds, round_duration: dp.seconds },
+        },
+      })
+    }
+    const next = { ...rulesetChoice.value }
+    for (const g of presetApplicableGroups.value) next[g.code] = target.id
+    rulesetChoice.value = next
+    showToast(
+      'Ruleset Siap',
+      `${name} dipilih untuk golongan terkait. Klik Simpan untuk menerapkan.`,
+      'info',
+    )
+  } catch (err) {
+    showToast(
+      'Gagal Membuat Ruleset',
+      getErrorMessage(err, 'Ruleset varian tidak dapat dibuat.'),
+      'danger',
+    )
+  }
+}
+
+async function saveRulesetAssignments() {
+  if (pendingAssignments.value.length === 0) {
+    isRulesetOpen.value = false
+    return
+  }
+  try {
+    const res = await assignMutation.mutateAsync(pendingAssignments.value)
+    isRulesetOpen.value = false
+    showToast('Ruleset Diterapkan', `${res.updated} kategori diperbarui.`, 'success')
+  } catch (err) {
+    showToast(
+      'Gagal Menerapkan',
+      getErrorMessage(err, 'Ruleset kategori tidak dapat diubah.'),
+      'danger',
+    )
+  }
+}
+
+const isResetOpen = ref(false)
+async function handleResetCategories() {
+  try {
+    const res = await resetMutation.mutateAsync()
+    isResetOpen.value = false
+    showToast(
+      'Kategori Di-reset',
+      `${res.deleted} kategori dihapus. Pilih standar PB IPSI atau PERSILAT 2026 untuk memulai ulang.`,
+      'success',
+    )
+  } catch (err) {
+    showToast('Reset Ditolak', getErrorMessage(err, 'Kategori tidak dapat di-reset.'), 'danger')
+  }
+}
+
 // UI Filter & Search State
 const activeGenderTab = ref<'all' | 'male' | 'female'>('all')
+// Filter golongan umur: "master" menggabungkan Master A & B.
+type AgeTab =
+  | 'all'
+  | 'pra_usia_dini'
+  | 'usia_dini_1'
+  | 'usia_dini_2'
+  | 'pra_remaja'
+  | 'remaja'
+  | 'dewasa'
+  | 'master'
+const activeAgeTab = ref<AgeTab>('all')
+const AGE_TABS: { key: AgeTab; label: string }[] = [
+  { key: 'all', label: 'Semua' },
+  { key: 'pra_usia_dini', label: 'Pra Usia Dini' },
+  { key: 'usia_dini_1', label: 'Usia Dini 1' },
+  { key: 'usia_dini_2', label: 'Usia Dini 2' },
+  { key: 'pra_remaja', label: 'Pra-Remaja' },
+  { key: 'remaja', label: 'Remaja' },
+  { key: 'dewasa', label: 'Dewasa' },
+  { key: 'master', label: 'Master' },
+]
+function matchesAgeTab(c: Category, tab: AgeTab): boolean {
+  if (tab === 'all') return true
+  const g = c.age_group ?? 'dewasa'
+  if (tab === 'master') return g === 'master_a' || g === 'master_b'
+  return g === tab
+}
+function ageTabCount(tab: AgeTab): number {
+  return categories.value.filter((c) => matchesAgeTab(c, tab)).length
+}
+
+function formatWeightRange(c: Category): string {
+  const min = c.min_weight ?? null
+  const max = c.max_weight ?? null
+  if (min === null && max === null) return 'TANPA BATAS'
+  if (min === null) return `≤ ${max} KG`
+  if (max === null) return `> ${min} KG`
+  return `${min}–${max} KG`
+}
 const searchQuery = ref('')
 const sortBy = ref<'class' | 'name'>('class')
 
@@ -70,27 +323,91 @@ function showToast(
 
 // Modal Form State (Create Category)
 const isModalOpen = ref(false)
+// Kategori yang sedang diubah; null = mode tambah. Server menolak (409) perubahan bobot/gender/golongan bila sudah
+// ada peserta, dan pesannya ditampilkan di dalam dialog.
+const editingCategory = ref<Category | null>(null)
+const submitError = ref('')
 const selectedPresetIndex = ref<number | ''>('')
 const formErrors = ref<Record<string, string>>({})
-const formState = ref<{
+interface CategoryFormState {
   name: string
   gender: 'male' | 'female' | 'putra' | 'putri'
   weight_class: string
-}>({
+  age_group: AgeGroupCode
+  preset_standard: PresetStandard
+  min_weight: number | null
+  max_weight: number | null
+  bracket_mode: BracketMode
+}
+const emptyForm = (): CategoryFormState => ({
   name: '',
   gender: 'male',
   weight_class: 'A',
+  age_group: 'dewasa',
+  preset_standard: activeStandard.value ?? 'ipsi',
+  min_weight: null,
+  max_weight: null,
+  bracket_mode: 'single_elimination',
 })
+const formState = ref<CategoryFormState>(emptyForm())
+
+const modalPresets = computed(() => presetsFor(formState.value.preset_standard))
+const modalAgeBands = computed(() => AGE_BANDS[formState.value.preset_standard])
 
 function openCreateModal() {
+  editingCategory.value = null
+  submitError.value = ''
+  selectedPresetIndex.value = ''
+  formState.value = emptyForm()
+  formErrors.value = {}
+  isModalOpen.value = true
+}
+
+function openEditModal(cat: Category) {
+  editingCategory.value = cat
+  submitError.value = ''
   selectedPresetIndex.value = ''
   formState.value = {
-    name: '',
-    gender: 'male',
-    weight_class: 'A',
+    name: cat.name,
+    gender: cat.gender,
+    weight_class: cat.weight_class,
+    age_group: cat.age_group ?? 'dewasa',
+    preset_standard: cat.preset_standard ?? 'ipsi',
+    min_weight: cat.min_weight ?? null,
+    max_weight: cat.max_weight ?? null,
+    bracket_mode: cat.bracket_mode ?? 'single_elimination',
   }
   formErrors.value = {}
   isModalOpen.value = true
+}
+
+// Hapus satu kategori
+const deleteTarget = ref<Category | null>(null)
+const deleteError = ref('')
+
+function openDeleteDialog(cat: Category) {
+  deleteTarget.value = cat
+  deleteError.value = ''
+}
+
+async function confirmDeleteCategory() {
+  if (!deleteTarget.value) return
+  deleteError.value = ''
+  try {
+    await deleteMutation.mutateAsync(deleteTarget.value.id)
+    showToast('Kategori Dihapus', `${deleteTarget.value.name} telah dihapus.`, 'success')
+    deleteTarget.value = null
+  } catch (err) {
+    deleteError.value = getErrorMessage(err, 'Kategori tidak dapat dihapus.')
+  }
+}
+
+// Mengganti standar mereset template & memastikan golongan umur valid untuk standar tsb.
+function handleStandardChange() {
+  selectedPresetIndex.value = ''
+  if (!modalAgeBands.value.some((b) => b.code === formState.value.age_group)) {
+    formState.value.age_group = modalAgeBands.value[modalAgeBands.value.length - 1].code
+  }
 }
 
 function handlePresetSelect(event: Event) {
@@ -100,11 +417,18 @@ function handlePresetSelect(event: Event) {
 
   const idx = Number(val)
   selectedPresetIndex.value = idx
-  const preset = IPSI_STANDARD_PRESETS[idx]
+  const preset = modalPresets.value[idx]
   if (preset) {
-    formState.value.name = preset.categoryName
-    formState.value.gender = preset.gender
-    formState.value.weight_class = preset.code
+    formState.value = {
+      name: preset.categoryName,
+      gender: preset.gender,
+      weight_class: preset.code,
+      age_group: preset.ageGroup,
+      preset_standard: preset.standard,
+      min_weight: preset.minWeight,
+      max_weight: preset.maxWeight,
+      bracket_mode: preset.bracketMode,
+    }
     formErrors.value = {}
   }
 }
@@ -128,6 +452,23 @@ async function handleSubmitCategory() {
       name: formState.value.name.trim(),
       gender: formState.value.gender,
       weight_class: formState.value.weight_class.trim().toUpperCase(),
+      age_group: formState.value.age_group,
+      preset_standard: formState.value.preset_standard,
+      min_weight: formState.value.min_weight,
+      max_weight: formState.value.max_weight,
+      bracket_mode: formState.value.bracket_mode,
+    }
+
+    if (editingCategory.value) {
+      submitError.value = ''
+      try {
+        const updated = await updateMutation.mutateAsync({ id: editingCategory.value.id, payload })
+        isModalOpen.value = false
+        showToast('Kategori Diperbarui', `${updated.name} berhasil diperbarui.`, 'success')
+      } catch (err) {
+        submitError.value = getErrorMessage(err, 'Kategori tidak dapat diperbarui.')
+      }
+      return
     }
 
     const created = await createMutation.mutateAsync(payload)
@@ -143,25 +484,115 @@ async function handleSubmitCategory() {
   }
 }
 
-// Batch Seed Standard IPSI
+// Batch Seed Preset (PB IPSI / PERSILAT 2026) — admin memilih golongan umur yang dipertandingkan.
+const isSeedOpen = ref(false)
+const seedStandard = ref<PresetStandard>('ipsi')
+// Pilihan dilacak per kelas (nama kategori unik). Kelas yang sudah ada di kejuaraan
+// ditandai "sudah diterapkan" dan tidak bisa dipilih lagi.
+const seedSelected = ref<Set<string>>(new Set())
+const seedExpanded = ref<Set<AgeGroupCode>>(new Set())
+
+const seedBands = computed(() => AGE_BANDS[seedStandard.value])
+const seedAllPresets = computed(() => presetsFor(seedStandard.value))
+const existingNames = computed(
+  () => new Set(categories.value.map((c) => normalizeCategoryName(c.name))),
+)
+const isApplied = (p: StandardClassPreset) =>
+  existingNames.value.has(normalizeCategoryName(p.categoryName))
+
+function presetsOfGroup(code: AgeGroupCode) {
+  return seedAllPresets.value.filter((p) => p.ageGroup === code)
+}
+
+interface GroupState {
+  total: number
+  applied: number
+  selectable: number
+  selected: number
+}
+function groupState(code: AgeGroupCode): GroupState {
+  const list = presetsOfGroup(code)
+  const applied = list.filter(isApplied).length
+  const selected = list.filter(
+    (p) => !isApplied(p) && seedSelected.value.has(p.categoryName),
+  ).length
+  return { total: list.length, applied, selectable: list.length - applied, selected }
+}
+
+const seedPreview = computed(() =>
+  seedAllPresets.value.filter((p) => !isApplied(p) && seedSelected.value.has(p.categoryName)),
+)
+
+// Default: semua kelas yang belum diterapkan tercentang.
+function resetSeedSelection() {
+  seedSelected.value = new Set(
+    seedAllPresets.value.filter((p) => !isApplied(p)).map((p) => p.categoryName),
+  )
+  seedExpanded.value = new Set()
+}
+
+function openSeedDialog(standard: PresetStandard = 'ipsi') {
+  seedStandard.value = standard
+  resetSeedSelection()
+  isSeedOpen.value = true
+}
+
+function setSeedStandard(standard: PresetStandard) {
+  seedStandard.value = standard
+  resetSeedSelection()
+}
+
+function toggleSeedGroup(code: AgeGroupCode) {
+  const st = groupState(code)
+  const next = new Set(seedSelected.value)
+  const free = presetsOfGroup(code).filter((p) => !isApplied(p))
+  if (st.selected === st.selectable) free.forEach((p) => next.delete(p.categoryName))
+  else free.forEach((p) => next.add(p.categoryName))
+  seedSelected.value = next
+}
+
+function toggleSeedClass(name: string) {
+  const next = new Set(seedSelected.value)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
+  seedSelected.value = next
+}
+
+function toggleSeedExpand(code: AgeGroupCode) {
+  const next = new Set(seedExpanded.value)
+  if (next.has(code)) next.delete(code)
+  else next.add(code)
+  seedExpanded.value = next
+}
+
 async function handleSeedPresets() {
+  if (seedPreview.value.length === 0) {
+    showToast('Pilih Kelas', 'Pilih minimal satu kelas yang dipertandingkan.', 'info')
+    return
+  }
+  const label = PRESET_LABELS[seedStandard.value]
   try {
-    const result = await seedMutation.mutateAsync(IPSI_STANDARD_PRESETS)
+    const result = await seedMutation.mutateAsync(seedPreview.value)
+    isSeedOpen.value = false
     if (result.created > 0) {
       showToast(
         'Sinkronisasi Kategori Berhasil',
-        `${result.created} kelas kategori standar IPSI berhasil dibuat (${result.skipped} kelas dilewati karena sudah ada).`,
+        `${result.created} kelas standar ${label} berhasil dibuat (${result.skipped} dilewati karena sudah ada).`,
         'success',
       )
     } else {
       showToast(
         'Kategori Sudah Lengkap',
-        `Semua ${result.skipped} kelas tanding standar IPSI sudah terdaftar di kompetisi ini.`,
+        `Semua ${result.skipped} kelas standar ${label} yang dipilih sudah terdaftar di kompetisi ini.`,
         'info',
       )
     }
   } catch (err) {
-    showToast('Gagal Sinkronisasi', getErrorMessage(err, 'Gagal memuat standar IPSI.'), 'danger')
+    showToast(
+      'Gagal Sinkronisasi',
+      getErrorMessage(err, `Gagal memuat standar ${label}.`),
+      'danger',
+    )
   }
 }
 
@@ -188,6 +619,9 @@ const filteredCategories = computed(() => {
     list = list.filter((c) => c.gender === 'female' || c.gender === 'putri')
   }
 
+  // Filter golongan umur
+  list = list.filter((c) => matchesAgeTab(c, activeAgeTab.value))
+
   // Filter search
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase().trim()
@@ -195,6 +629,7 @@ const filteredCategories = computed(() => {
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.weight_class.toLowerCase().includes(q) ||
+        ageGroupLabel(c.age_group, c.preset_standard).toLowerCase().includes(q) ||
         c.gender.toLowerCase().includes(q),
     )
   }
@@ -202,6 +637,11 @@ const filteredCategories = computed(() => {
   // Sort
   list.sort((a, b) => {
     if (sortBy.value === 'class') {
+      const ageOrder = (c: Category) => {
+        const idx = AGE_BANDS.ipsi.findIndex((x) => x.code === (c.age_group ?? 'dewasa'))
+        return idx === -1 ? 99 : idx
+      }
+      if (ageOrder(a) !== ageOrder(b)) return ageOrder(a) - ageOrder(b)
       // Sort by gender first (putra then putri), then weight_class
       const gOrderA = a.gender === 'male' || a.gender === 'putra' ? 0 : 1
       const gOrderB = b.gender === 'male' || b.gender === 'putri' ? 0 : 1
@@ -264,7 +704,7 @@ function handleCategoryClick(cat: Category) {
         </div>
         <div>
           <div class="cat-header__sub font-mono">
-            <span>SISTEM ELIMINASI IPSI RULES 2023</span>
+            <span>REGULASI PB IPSI TERBARU · PERSILAT 2026</span>
             <span class="cat-bullet">•</span>
             <span class="cat-comp-badge"
               >EVENT: {{ (competitionName || 'Kejuaraan').toUpperCase() }}</span
@@ -300,26 +740,28 @@ function handleCategoryClick(cat: Category) {
         </AppButton>
 
         <AppButton
+          v-for="std in availableStandards"
+          :key="std"
           variant="secondary"
           size="sm"
           :loading="seedMutation.isPending.value"
-          @click="handleSeedPresets"
+          @click="openSeedDialog(std)"
         >
-          <template #icon>
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-              <path d="M6 6h10" />
-              <path d="M6 10h10" />
-            </svg>
-          </template>
-          Template Standar IPSI
+          Terapkan Standar {{ std === 'ipsi' ? 'PB IPSI' : 'PERSILAT 2026' }}
+        </AppButton>
+
+        <AppButton v-if="activeStandard" variant="secondary" size="sm" @click="openRulesetDialog">
+          Durasi per Golongan
+        </AppButton>
+
+        <AppButton
+          v-if="activeStandard"
+          variant="secondary"
+          size="sm"
+          :loading="resetMutation.isPending.value"
+          @click="isResetOpen = true"
+        >
+          Reset Kategori
         </AppButton>
 
         <AppButton variant="emerald" size="sm" @click="openCreateModal">
@@ -354,32 +796,49 @@ function handleCategoryClick(cat: Category) {
 
       <div class="cat-metric-card cat-metric-card--male">
         <div class="cat-metric-corner-tag font-mono">SUDUT MERAH</div>
-        <span class="cat-metric-label">DEWASA PUTRA</span>
+        <span class="cat-metric-label">PUTRA</span>
         <div class="cat-metric-value-row">
           <span class="cat-metric-val cat-val-male tabular-nums">{{ stats.male }}</span>
           <span class="cat-metric-badge cat-badge-male font-mono">KELAS A - J</span>
         </div>
-        <span class="cat-metric-desc">Golongan Putra Remaja / Dewasa</span>
+        <span class="cat-metric-desc">Seluruh golongan umur</span>
       </div>
 
       <div class="cat-metric-card cat-metric-card--female">
         <div class="cat-metric-corner-tag font-mono">SUDUT BIRU</div>
-        <span class="cat-metric-label">DEWASA PUTRI</span>
+        <span class="cat-metric-label">PUTRI</span>
         <div class="cat-metric-value-row">
           <span class="cat-metric-val cat-val-female tabular-nums">{{ stats.female }}</span>
           <span class="cat-metric-badge cat-badge-female font-mono">KELAS A - F</span>
         </div>
-        <span class="cat-metric-desc">Golongan Putri Remaja / Dewasa</span>
+        <span class="cat-metric-desc">Seluruh golongan umur</span>
       </div>
 
       <div class="cat-metric-card">
         <span class="cat-metric-label">STANDAR ATURAN</span>
         <div class="cat-metric-value-row">
-          <span class="cat-metric-val-text font-mono">IPSI 2023</span>
+          <span class="cat-metric-val-text font-mono">PB IPSI</span>
         </div>
-        <span class="cat-metric-desc">Sistem Gugur Tunggal Digital</span>
+        <span class="cat-metric-desc">Preset PB IPSI / PERSILAT 2026</span>
       </div>
     </section>
+
+    <!-- Filter Golongan Umur -->
+    <nav class="cat-age-tabs font-mono" role="tablist" aria-label="Filter golongan umur">
+      <button
+        v-for="tab in AGE_TABS"
+        :key="tab.key"
+        type="button"
+        class="cat-age-tab"
+        :class="{ 'cat-age-tab--active': activeAgeTab === tab.key }"
+        role="tab"
+        :aria-selected="activeAgeTab === tab.key"
+        @click="activeAgeTab = tab.key"
+      >
+        {{ tab.label }}
+        <span class="cat-tab-badge tabular-nums">{{ ageTabCount(tab.key) }}</span>
+      </button>
+    </nav>
 
     <!-- Controls Toolbar (Search & Filter Tabs) -->
     <section class="cat-toolbar">
@@ -403,7 +862,7 @@ function handleCategoryClick(cat: Category) {
           @click="activeGenderTab = 'male'"
         >
           <span class="cat-tab-dot cat-dot-male" />
-          Dewasa Putra
+          Putra
           <span class="cat-tab-badge tabular-nums">{{ stats.male }}</span>
         </button>
 
@@ -415,7 +874,7 @@ function handleCategoryClick(cat: Category) {
           @click="activeGenderTab = 'female'"
         >
           <span class="cat-tab-dot cat-dot-female" />
-          Dewasa Putri
+          Putri
           <span class="cat-tab-badge tabular-nums">{{ stats.female }}</span>
         </button>
       </div>
@@ -570,7 +1029,15 @@ function handleCategoryClick(cat: Category) {
               <span class="cat-badge-dot" />
               {{ isMaleGender(cat.gender) ? 'PUTRA (MERAH)' : 'PUTRI (BIRU)' }}
             </span>
-            <span class="cat-badge-rule font-mono">IPSI 2023</span>
+            <span class="cat-badge-rule font-mono">{{
+              (cat.preset_standard ?? 'ipsi') === 'persilat_2026' ? 'PERSILAT 2026' : 'PB IPSI'
+            }}</span>
+            <span v-if="categoryDuration(cat)" class="cat-badge-rule font-mono">{{
+              categoryDuration(cat)
+            }}</span>
+            <span v-if="cat.bracket_mode === 'pemasalan_4'" class="cat-badge-rule font-mono"
+              >PEMASALAN</span
+            >
           </div>
 
           <div class="cat-card__code font-mono">
@@ -585,21 +1052,57 @@ function handleCategoryClick(cat: Category) {
 
           <div class="cat-card__spec-box font-mono">
             <div class="cat-spec-item">
-              <span class="cat-spec-label">KELAS BOBOT</span>
-              <span class="cat-spec-value tabular-nums">KELAS {{ cat.weight_class }}</span>
+              <span class="cat-spec-label">RENTANG BOBOT</span>
+              <span class="cat-spec-value tabular-nums">{{ formatWeightRange(cat) }}</span>
             </div>
             <div class="cat-spec-divider" />
             <div class="cat-spec-item">
               <span class="cat-spec-label">GOLONGAN</span>
-              <span class="cat-spec-value">{{
-                isMaleGender(cat.gender) ? 'DEWASA PUTRA' : 'DEWASA PUTRI'
-              }}</span>
+              <span class="cat-spec-value"
+                >{{ ageGroupLabel(cat.age_group ?? 'dewasa', cat.preset_standard).toUpperCase() }}
+                {{ isMaleGender(cat.gender) ? 'PUTRA' : 'PUTRI' }}</span
+              >
             </div>
           </div>
         </div>
 
+        <div class="cat-card__arena font-mono">
+          <label :for="`home-arena-${cat.id}`" class="cat-spec-label">GELANGGANG ASAL</label>
+          <select
+            :id="`home-arena-${cat.id}`"
+            class="cat-arena-select"
+            data-test="category-home-arena"
+            :value="cat.home_arena_id ?? ''"
+            :disabled="homeArenaMutation.isPending.value || !arenaOptions.length"
+            @change="changeHomeArena(cat, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="" disabled>Otomatis saat bagan dibuat</option>
+            <option v-for="a in arenaOptions" :key="a.id" :value="a.id">{{ a.name }}</option>
+          </select>
+        </div>
+
         <!-- Card Footer: Direct Bracket Action -->
         <footer class="cat-card__footer">
+          <div class="cat-card__manage font-mono">
+            <button
+              type="button"
+              class="cat-manage-btn"
+              :aria-label="`Ubah ${cat.name}`"
+              data-test="category-edit"
+              @click="openEditModal(cat)"
+            >
+              Ubah
+            </button>
+            <button
+              type="button"
+              class="cat-manage-btn cat-manage-btn--danger"
+              :aria-label="`Hapus ${cat.name}`"
+              data-test="category-delete"
+              @click="openDeleteDialog(cat)"
+            >
+              Hapus
+            </button>
+          </div>
           <button
             type="button"
             class="cat-view-bracket-btn font-mono"
@@ -627,7 +1130,347 @@ function handleCategoryClick(cat: Category) {
       </article>
     </div>
 
-    <!-- Create Category Modal Dialog -->
+    <!-- Ruleset / Durasi per Golongan Dialog -->
+    <div
+      v-if="isRulesetOpen"
+      class="cat-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ruleset-title"
+      @click.self="isRulesetOpen = false"
+    >
+      <div class="cat-modal cat-modal--compact">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">ATURAN PERTANDINGAN</div>
+            <h3 id="ruleset-title" class="cat-modal__title">Durasi & Babak per Golongan</h3>
+          </div>
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isRulesetOpen = false">
+            ✕
+          </button>
+        </header>
+        <div class="cat-modal__body cat-modal__body--compact">
+          <p class="cat-form-help">
+            Secara default semua kategori mengikuti ruleset kejuaraan
+            <strong>{{
+              competitionRuleset
+                ? `${competitionRuleset.name} (${rulesetDuration(competitionRuleset)})`
+                : '—'
+            }}</strong
+            >. Pilih ruleset lain untuk golongan tertentu, misalnya durasi lebih pendek untuk usia
+            dini.
+          </p>
+
+          <div v-if="presetApplicableGroups.length" class="cat-ruleset-preset">
+            <span class="font-mono">Sesuai regulasi — {{ durationPreset.label }}</span>
+            <AppButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              :loading="saveRulesetMutation.isPending.value"
+              @click="applyDurationPreset"
+            >
+              Pilih untuk golongan ini
+            </AppButton>
+          </div>
+
+          <ul class="cat-ruleset-list">
+            <li v-for="g in rulesetGroups" :key="g.code" class="cat-ruleset-row">
+              <label :for="`rs-${g.code}`" class="cat-ruleset-label">
+                <strong>{{ g.label }}</strong>
+                <span class="cat-sub font-mono">{{ g.count }} kelas</span>
+              </label>
+              <select
+                :id="`rs-${g.code}`"
+                v-model="rulesetChoice[g.code]"
+                class="cat-form-select font-mono"
+              >
+                <option v-if="rulesetChoice[g.code] === MIXED" :value="MIXED" disabled>
+                  (beragam)
+                </option>
+                <option value="">
+                  Ikut kejuaraan{{
+                    competitionRuleset ? ` — ${rulesetDuration(competitionRuleset)}` : ''
+                  }}
+                </option>
+                <option
+                  v-for="r in rulesetList.filter((x) => x.status === 'active')"
+                  :key="r.id"
+                  :value="r.id"
+                >
+                  {{ r.name }} — {{ rulesetDuration(r) }}
+                </option>
+              </select>
+            </li>
+          </ul>
+          <span class="cat-form-help"
+            >Tidak dapat diubah untuk golongan yang sudah punya pertandingan berjalan atau
+            selesai.</span
+          >
+
+          <footer class="cat-modal__footer font-mono">
+            <span class="cat-sub">{{ pendingAssignments.length }} golongan diubah</span>
+            <AppButton type="button" variant="secondary" size="md" @click="isRulesetOpen = false">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="emerald"
+              size="md"
+              :loading="assignMutation.isPending.value"
+              :disabled="pendingAssignments.length === 0"
+              @click="saveRulesetAssignments"
+            >
+              Simpan
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Kategori Dialog -->
+    <div
+      v-if="isResetOpen"
+      class="cat-modal-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="reset-title"
+      @click.self="isResetOpen = false"
+    >
+      <div class="cat-modal">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">GANTI STANDAR</div>
+            <h3 id="reset-title" class="cat-modal__title">Reset Seluruh Kategori?</h3>
+          </div>
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isResetOpen = false">
+            ✕
+          </button>
+        </header>
+        <div class="cat-modal__body">
+          <p class="cat-form-help">
+            Semua <strong>{{ categories.length }}</strong> kategori standar
+            <strong>{{ activeStandard ? PRESET_LABELS[activeStandard] : '' }}</strong> pada
+            kejuaraan ini akan dihapus beserta bagan yang terkait, lalu Anda dapat memilih standar
+            lain (PB IPSI atau PERSILAT 2026).
+          </p>
+          <p class="cat-form-help">
+            Reset ditolak bila masih ada peserta yang terdaftar pada kategori. Batalkan atau hapus
+            peserta tersebut terlebih dahulu.
+          </p>
+          <footer class="cat-modal__footer font-mono">
+            <AppButton type="button" variant="secondary" size="md" @click="isResetOpen = false">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="md"
+              :loading="resetMutation.isPending.value"
+              @click="handleResetCategories"
+            >
+              Ya, Reset Kategori
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seed Standar Dialog -->
+    <div
+      v-if="isSeedOpen"
+      class="cat-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="seed-title"
+      @click.self="isSeedOpen = false"
+    >
+      <div class="cat-modal cat-modal--compact">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">TEMPLATE KATEGORI</div>
+            <h3 id="seed-title" class="cat-modal__title">
+              Terapkan Standar {{ PRESET_LABELS[seedStandard] }}
+            </h3>
+          </div>
+          <button class="cat-modal__close" aria-label="Tutup dialog" @click="isSeedOpen = false">
+            ✕
+          </button>
+        </header>
+
+        <div class="cat-modal__body cat-modal__body--compact">
+          <div class="cat-seed-standards font-mono" role="tablist" aria-label="Standar regulasi">
+            <button
+              v-for="std in ['ipsi', 'persilat_2026'] as PresetStandard[]"
+              :key="std"
+              type="button"
+              class="cat-age-tab"
+              :class="{ 'cat-age-tab--active': seedStandard === std }"
+              role="tab"
+              :aria-selected="seedStandard === std"
+              @click="setSeedStandard(std)"
+            >
+              {{ PRESET_LABELS[std] }}
+            </button>
+          </div>
+
+          <div class="cat-form-group">
+            <span class="cat-form-label font-mono">GOLONGAN UMUR & KELAS YANG DIPERTANDINGKAN</span>
+            <ul class="cat-seed-list">
+              <li
+                v-for="band in seedBands"
+                :key="band.code"
+                class="cat-seed-item"
+                :class="{ 'cat-seed-item--done': groupState(band.code).selectable === 0 }"
+              >
+                <div class="cat-seed-row">
+                  <label class="cat-seed-check">
+                    <input
+                      type="checkbox"
+                      :checked="
+                        groupState(band.code).selectable > 0 &&
+                        groupState(band.code).selected === groupState(band.code).selectable
+                      "
+                      :indeterminate="
+                        groupState(band.code).selected > 0 &&
+                        groupState(band.code).selected < groupState(band.code).selectable
+                      "
+                      :disabled="groupState(band.code).selectable === 0"
+                      @change="toggleSeedGroup(band.code)"
+                    />
+                    <span>
+                      <strong>{{ band.label }}</strong>
+                      <span class="cat-sub font-mono">{{ band.hint }}</span>
+                    </span>
+                  </label>
+                  <span class="cat-seed-count font-mono">
+                    <template v-if="isJurusOnly(seedStandard, band.code)">Hanya Jurus</template>
+                    <template v-else-if="groupState(band.code).selectable === 0"
+                      >Sudah diterapkan</template
+                    >
+                    <template v-else
+                      >{{ groupState(band.code).selected }}/{{
+                        groupState(band.code).selectable
+                      }}
+                      kelas<template v-if="groupState(band.code).applied > 0">
+                        · {{ groupState(band.code).applied }} sudah ada</template
+                      ></template
+                    >
+                  </span>
+                  <button
+                    type="button"
+                    class="cat-seed-toggle"
+                    :aria-expanded="seedExpanded.has(band.code)"
+                    :aria-label="`Tampilkan kelas ${band.label}`"
+                    @click="toggleSeedExpand(band.code)"
+                  >
+                    {{ seedExpanded.has(band.code) ? '▲' : '▼' }}
+                  </button>
+                </div>
+
+                <p v-if="groupNote(seedStandard, band.code)" class="cat-seed-note font-mono">
+                  {{ groupNote(seedStandard, band.code) }}
+                </p>
+                <div v-if="seedExpanded.has(band.code)" class="cat-seed-classes">
+                  <div v-for="sex in ['male', 'female']" :key="sex" class="cat-seed-col">
+                    <span class="cat-seed-col-title font-mono">{{
+                      sex === 'male' ? 'PUTRA' : 'PUTRI'
+                    }}</span>
+                    <label
+                      v-for="p in presetsOfGroup(band.code).filter((x) => x.gender === sex)"
+                      :key="p.categoryName"
+                      class="cat-seed-class"
+                      :class="{ 'cat-seed-class--done': isApplied(p) }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="isApplied(p) || seedSelected.has(p.categoryName)"
+                        :disabled="isApplied(p)"
+                        @change="toggleSeedClass(p.categoryName)"
+                      />
+                      <span>{{ p.label }}</span>
+                    </label>
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <span class="cat-form-help"
+              >Klik panah untuk memilih kelas satu per satu; default semua kelas tercentang. Kelas
+              yang sudah ada di kejuaraan ditandai abu-abu dan dilewati. Golongan tanpa tabel bobot
+              resmi dibuat sebagai "Kelas Bebas" dan dapat disesuaikan.</span
+            >
+          </div>
+
+          <footer class="cat-modal__footer font-mono">
+            <span class="cat-sub">{{ seedPreview.length }} kelas akan dibuat</span>
+            <AppButton type="button" variant="secondary" size="md" @click="isSeedOpen = false">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="emerald"
+              size="md"
+              :loading="seedMutation.isPending.value"
+              :disabled="seedPreview.length === 0"
+              @click="handleSeedPresets"
+            >
+              Terapkan
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hapus Satu Kategori -->
+    <div
+      v-if="deleteTarget"
+      class="cat-modal-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="cat-delete-title"
+      data-test="category-delete-dialog"
+      @click.self="deleteTarget = null"
+    >
+      <div class="cat-modal cat-modal--compact">
+        <header class="cat-modal__header">
+          <div>
+            <div class="cat-modal__tag font-mono">HAPUS KATEGORI</div>
+            <h3 id="cat-delete-title" class="cat-modal__title">Hapus Kategori Ini?</h3>
+          </div>
+        </header>
+        <div class="cat-modal__body cat-modal__body--compact">
+          <p class="cat-form-help">
+            <strong>{{ deleteTarget.name }}</strong> beserta bagan kosongnya akan dihapus. Kategori
+            yang masih memiliki peserta atau partai yang sudah berjalan tidak dapat dihapus.
+          </p>
+          <p
+            v-if="deleteError"
+            class="cat-form-error"
+            role="alert"
+            data-test="category-delete-error"
+          >
+            {{ deleteError }}
+          </p>
+          <footer class="cat-modal__footer font-mono">
+            <AppButton type="button" variant="secondary" size="md" @click="deleteTarget = null">
+              Batal
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="md"
+              :loading="deleteMutation.isPending.value"
+              data-test="category-delete-confirm"
+              @click="confirmDeleteCategory"
+            >
+              Hapus Kategori
+            </AppButton>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create / Edit Category Modal Dialog -->
     <div
       v-if="isModalOpen"
       class="cat-modal-overlay"
@@ -639,15 +1482,23 @@ function handleCategoryClick(cat: Category) {
       <div class="cat-modal">
         <header class="cat-modal__header">
           <div>
-            <div class="cat-modal__tag font-mono">FORM KATEGORI BARU</div>
-            <h3 id="modal-title" class="cat-modal__title">Tambah Kategori Tanding</h3>
+            <div class="cat-modal__tag font-mono">
+              {{ editingCategory ? 'UBAH KATEGORI' : 'FORM KATEGORI BARU' }}
+            </div>
+            <h3 id="modal-title" class="cat-modal__title">
+              {{ editingCategory ? 'Ubah Kategori Tanding' : 'Tambah Kategori Tanding' }}
+            </h3>
           </div>
           <button class="cat-modal__close" aria-label="Tutup dialog" @click="isModalOpen = false">
             ✕
           </button>
         </header>
 
-        <form class="cat-modal__body" @submit.prevent="handleSubmitCategory">
+        <form
+          class="cat-modal__body"
+          data-test="category-form"
+          @submit.prevent="handleSubmitCategory"
+        >
           <!-- Active Competition Target Banner -->
           <div class="cat-target-comp font-mono">
             <svg
@@ -672,10 +1523,30 @@ function handleCategoryClick(cat: Category) {
             </div>
           </div>
 
-          <!-- Preset Selector -->
+          <!-- Standar & Preset Selector -->
           <div class="cat-form-group">
+            <label for="cat-standard-select" class="cat-form-label font-mono">
+              STANDAR REGULASI
+            </label>
+            <select
+              id="cat-standard-select"
+              v-model="formState.preset_standard"
+              class="cat-form-select font-mono"
+              :disabled="activeStandard !== null"
+              @change="handleStandardChange"
+            >
+              <option value="ipsi">{{ PRESET_LABELS.ipsi }} (Default)</option>
+              <option value="persilat_2026">{{ PRESET_LABELS.persilat_2026 }}</option>
+            </select>
+            <span v-if="activeStandard" class="cat-form-help"
+              >Kejuaraan ini memakai standar {{ PRESET_LABELS[activeStandard] }}. Gunakan "Reset
+              Kategori" untuk beralih standar.</span
+            >
+          </div>
+
+          <div v-if="!editingCategory" class="cat-form-group">
             <label for="cat-preset-select" class="cat-form-label font-mono">
-              PILIH TEMPLATE KELAS STANDAR IPSI (OPSIONAL)
+              PILIH TEMPLATE KELAS STANDAR (OPSIONAL)
             </label>
             <select
               id="cat-preset-select"
@@ -684,29 +1555,21 @@ function handleCategoryClick(cat: Category) {
               @change="handlePresetSelect"
             >
               <option value="">— Input Kustom / Manual —</option>
-              <optgroup label="Dewasa Putra (Sudut Merah)">
-                <option
-                  v-for="(preset, idx) in IPSI_STANDARD_PRESETS.filter((p) => p.gender === 'male')"
-                  :key="idx"
-                  :value="IPSI_STANDARD_PRESETS.indexOf(preset)"
-                >
-                  {{ preset.label }} - PUTRA
-                </option>
-              </optgroup>
-              <optgroup label="Dewasa Putri (Sudut Biru)">
-                <option
-                  v-for="(preset, idx) in IPSI_STANDARD_PRESETS.filter(
-                    (p) => p.gender === 'female',
-                  )"
-                  :key="idx"
-                  :value="IPSI_STANDARD_PRESETS.indexOf(preset)"
-                >
-                  {{ preset.label }} - PUTRI
-                </option>
+              <optgroup
+                v-for="band in modalAgeBands"
+                :key="band.code"
+                :label="`${band.label} (${band.hint})`"
+              >
+                <template v-for="(preset, idx) in modalPresets" :key="idx">
+                  <option v-if="preset.ageGroup === band.code" :value="idx">
+                    {{ preset.gender === 'male' ? 'Putra' : 'Putri' }} · {{ preset.label }}
+                  </option>
+                </template>
               </optgroup>
             </select>
             <span class="cat-form-help"
-              >Memilih template akan otomatis mengisi nama kategori dan rentang bobot.</span
+              >Memilih template akan otomatis mengisi nama, golongan umur, rentang bobot, dan mode
+              bagan.</span
             >
           </div>
 
@@ -730,7 +1593,7 @@ function handleCategoryClick(cat: Category) {
           <!-- Gender Radio Options -->
           <div class="cat-form-group">
             <label class="cat-form-label font-mono">
-              GOLONGAN & JENIS KELAMIN <span class="cat-req">*</span>
+              JENIS KELAMIN <span class="cat-req">*</span>
             </label>
             <div class="cat-gender-toggle-group">
               <label
@@ -743,7 +1606,7 @@ function handleCategoryClick(cat: Category) {
                 <input v-model="formState.gender" type="radio" value="male" class="sr-only" />
                 <span class="cat-radio-indicator cat-radio-indicator--male" />
                 <div class="cat-radio-text">
-                  <strong>DEWASA PUTRA</strong>
+                  <strong>PUTRA</strong>
                   <span class="cat-sub font-mono">Sudut Merah</span>
                 </div>
               </label>
@@ -758,7 +1621,7 @@ function handleCategoryClick(cat: Category) {
                 <input v-model="formState.gender" type="radio" value="female" class="sr-only" />
                 <span class="cat-radio-indicator cat-radio-indicator--female" />
                 <div class="cat-radio-text">
-                  <strong>DEWASA PUTRI</strong>
+                  <strong>PUTRI</strong>
                   <span class="cat-sub font-mono">Sudut Biru</span>
                 </div>
               </label>
@@ -787,6 +1650,87 @@ function handleCategoryClick(cat: Category) {
             <span class="cat-form-help">Kode kelas tanding resmi (A sampai J atau BEBAS).</span>
           </div>
 
+          <!-- Golongan Umur -->
+          <div class="cat-form-group">
+            <label for="cat-age-group-select" class="cat-form-label font-mono">
+              GOLONGAN UMUR <span class="cat-req">*</span>
+            </label>
+            <select
+              id="cat-age-group-select"
+              v-model="formState.age_group"
+              class="cat-form-select font-mono"
+            >
+              <option v-for="band in modalAgeBands" :key="band.code" :value="band.code">
+                {{ band.label }} — {{ band.hint }}
+              </option>
+            </select>
+            <span v-if="formErrors.age_group" class="cat-form-error">{{
+              formErrors.age_group
+            }}</span>
+          </div>
+
+          <!-- Rentang Bobot -->
+          <div class="cat-form-row">
+            <div class="cat-form-group">
+              <label for="cat-min-weight" class="cat-form-label font-mono">BOBOT MIN (KG)</label>
+              <input
+                id="cat-min-weight"
+                v-model.number="formState.min_weight"
+                type="number"
+                min="0"
+                step="0.1"
+                class="cat-form-input font-mono"
+                placeholder="Kosong = tanpa batas"
+              />
+            </div>
+            <div class="cat-form-group">
+              <label for="cat-max-weight" class="cat-form-label font-mono">BOBOT MAKS (KG)</label>
+              <input
+                id="cat-max-weight"
+                v-model.number="formState.max_weight"
+                type="number"
+                min="0"
+                step="0.1"
+                class="cat-form-input font-mono"
+                :class="{ 'cat-form-input--error': formErrors.max_weight }"
+                placeholder="Kosong = tanpa batas"
+              />
+              <span v-if="formErrors.max_weight" class="cat-form-error">{{
+                formErrors.max_weight
+              }}</span>
+            </div>
+          </div>
+          <span class="cat-form-help"
+            >Penimbangan resmi tanpa toleransi (0 kg): kelebihan/kekurangan 0,1 kg berakibat
+            diskualifikasi. Kosongkan kedua kolom untuk kelas tanpa batas bobot.</span
+          >
+
+          <!-- Mode Bagan -->
+          <div class="cat-form-group">
+            <label for="cat-bracket-mode" class="cat-form-label font-mono">MODE BAGAN</label>
+            <select
+              id="cat-bracket-mode"
+              v-model="formState.bracket_mode"
+              class="cat-form-select font-mono"
+            >
+              <option v-for="(label, key) in BRACKET_MODE_LABELS" :key="key" :value="key">
+                {{ label }}
+              </option>
+            </select>
+            <span class="cat-form-help"
+              >Pemasalan: peserta dibagi ke mini bagan maks. 4 orang (semifinal + final) untuk Pra
+              Usia Dini / Usia Dini 1.</span
+            >
+          </div>
+
+          <p v-if="submitError" class="cat-form-error" role="alert" data-test="category-form-error">
+            {{ submitError }}
+          </p>
+          <p v-if="editingCategory" class="cat-form-help">
+            Bila kategori sudah memiliki peserta, hanya nama yang dapat diubah. Standar regulasi
+            tidak dapat diubah (gunakan "Reset Kategori").
+          </p>
+
           <footer class="cat-modal__footer font-mono">
             <AppButton type="button" variant="secondary" size="md" @click="isModalOpen = false">
               Batal
@@ -795,9 +1739,10 @@ function handleCategoryClick(cat: Category) {
               type="submit"
               variant="emerald"
               size="md"
-              :loading="createMutation.isPending.value"
+              :loading="createMutation.isPending.value || updateMutation.isPending.value"
+              data-test="category-save"
             >
-              Simpan Kategori
+              {{ editingCategory ? 'Simpan Perubahan' : 'Simpan Kategori' }}
             </AppButton>
           </footer>
         </form>
@@ -1175,17 +2120,12 @@ function handleCategoryClick(cat: Category) {
 /* Card Grid with Container Queries */
 .cat-grid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
-@container (min-width: 640px) {
+@media (max-width: 640px) {
   .cat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@container (min-width: 1024px) {
-  .cat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1327,6 +2267,34 @@ function handleCategoryClick(cat: Category) {
   padding: 12px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.15);
+}
+.cat-card__manage {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cat-manage-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card, #334155);
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--color-neutral-200, #e2e8f0);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cat-manage-btn:hover {
+  background: rgba(51, 65, 85, 0.7);
+  color: #fff;
+}
+.cat-manage-btn--danger {
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.cat-manage-btn--danger:hover {
+  background: rgba(220, 38, 38, 0.25);
 }
 .cat-view-bracket-btn {
   display: flex;
@@ -1478,8 +2446,13 @@ function handleCategoryClick(cat: Category) {
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   overflow: hidden;
+  /* Tinggi dibatasi viewport; header tetap, isi form yang di-scroll. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
 }
 .cat-modal__header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1507,6 +2480,10 @@ function handleCategoryClick(cat: Category) {
   font-size: 1.25rem;
 }
 .cat-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
@@ -1659,5 +2636,222 @@ function handleCategoryClick(cat: Category) {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+.cat-age-tabs,
+.cat-seed-standards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+.cat-age-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.cat-age-tab:hover {
+  border-color: currentColor;
+}
+.cat-age-tab--active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgb(16, 185, 129);
+}
+.cat-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.cat-seed-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  cursor: pointer;
+}
+.cat-modal--compact {
+  max-width: 480px;
+  font-size: 0.8125rem;
+}
+.cat-modal--compact .cat-modal__header {
+  padding: 12px 18px;
+}
+.cat-modal--compact .cat-modal__title {
+  font-size: 1rem;
+}
+.cat-modal__body--compact {
+  padding: 14px 18px;
+  gap: 12px;
+}
+.cat-seed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-card, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cat-seed-item + .cat-seed-item {
+  border-top: 1px solid var(--border-card, #334155);
+}
+.cat-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+}
+.cat-seed-row .cat-seed-check {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cat-seed-count {
+  font-size: 0.68rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.cat-seed-toggle {
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 0.7rem;
+  padding: 4px 6px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.cat-seed-item--done {
+  opacity: 0.5;
+}
+.cat-seed-classes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  padding: 6px 12px 10px 34px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.02);
+}
+@media (max-width: 520px) {
+  .cat-seed-classes {
+    grid-template-columns: 1fr;
+  }
+}
+.cat-seed-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cat-seed-col-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 2px;
+}
+.cat-seed-class {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.cat-seed-class--done {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cat-modal--compact .cat-seed-check {
+  padding: 4px 0;
+  gap: 8px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+.cat-modal--compact .cat-seed-check .cat-sub {
+  display: block;
+  font-size: 0.68rem;
+  opacity: 0.65;
+}
+.cat-modal--compact .cat-age-tab {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.7rem;
+}
+.cat-modal--compact .cat-form-label {
+  font-size: 0.65rem;
+}
+.cat-modal--compact .cat-form-help {
+  font-size: 0.68rem;
+}
+.cat-modal--compact .cat-modal__footer {
+  gap: 8px;
+  align-items: center;
+}
+.cat-modal--compact .cat-modal__footer > .cat-sub {
+  margin-right: auto;
+  font-size: 0.72rem;
+}
+.cat-seed-note {
+  margin: 0;
+  padding: 0 12px 8px 34px;
+  font-size: 0.66rem;
+  opacity: 0.65;
+}
+.cat-ruleset-preset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border-card, #334155);
+  border-radius: 8px;
+  font-size: 0.72rem;
+}
+.cat-ruleset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cat-ruleset-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.cat-ruleset-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+}
+@media (max-width: 520px) {
+  .cat-ruleset-row {
+    grid-template-columns: 1fr;
+  }
+}
+.cat-card__arena {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 18px 12px;
+}
+.cat-arena-select {
+  min-width: 0;
+  max-width: 60%;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.75rem;
 }
 </style>

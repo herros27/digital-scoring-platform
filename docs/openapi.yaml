@@ -238,7 +238,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [judge, referee, admin, dewan, operator, judge_1, judge_2, judge_3]
+                  enum: [judge, juri, wasit]
                   example: "judge"
                 seat_number:
                   type: integer
@@ -370,9 +370,39 @@ paths:
   # -------------------------------------------------------
   # COMPETITIONS
   # -------------------------------------------------------
+  /api/v1/competitions/stats:
+    get:
+      summary: Jumlah Kejuaraan per Status
+      description: |
+        Hitungan global (draft, active, paused, completed, cancelled, total), tidak bergantung filter atau halaman daftar.
+      tags:
+        - Competition
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Hitungan per status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total: {type: integer}
+                      draft: {type: integer}
+                      active: {type: integer}
+                      paused: {type: integer}
+                      completed: {type: integer}
+                      cancelled: {type: integer}
   /api/v1/competitions:
     get:
-      summary: Daftar Seluruh Kejuaraan (Mendukung Pagination & Filter Status)
+      summary: Daftar Seluruh Kejuaraan (Pagination, Filter Status, Pencarian)
+      description: |
+        Urutan: active, paused, draft, completed, lalu cancelled; di dalam status yang sama yang terbaru lebih dulu.
       tags:
         - Competition
       security:
@@ -397,8 +427,14 @@ paths:
           required: false
           schema:
             type: string
-            enum: [upcoming, ongoing, completed]
+            enum: [draft, active, paused, completed, cancelled]
           description: Filter berdasarkan status kompetisi
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Cari teks pada nama, lokasi, nama ruleset, atau ID (tidak peka huruf besar/kecil)
       responses:
         '200':
           description: List kompetisi berhasil diambil beserta metadata pagination
@@ -528,10 +564,12 @@ paths:
                 ruleset_id:
                   type: string
                   format: uuid
-                  description: Ganti ruleset kejuaraan (berlaku untuk partai yang dimuat setelahnya). String kosong melepas ruleset.
+                  description: Ganti ruleset kejuaraan (satu kejuaraan = satu ruleset). String kosong melepas ruleset. Ditolak 409 bila sudah ada partai berjalan/selesai.
       responses:
         '200':
           description: Data kompetisi berhasil diperbarui
+        '409':
+          description: Ruleset tidak dapat diganti karena sudah ada pertandingan yang berjalan atau selesai.
 
   /api/v1/competitions/{id}/activate:
     put:
@@ -659,9 +697,196 @@ paths:
                 ruleset_id:
                   type: string
                   format: uuid
+                age_group:
+                  type: string
+                  default: dewasa
+                  description: |
+                    Golongan umur. Standar `ipsi`: pra_usia_dini, usia_dini_1, usia_dini_2, pra_remaja,
+                    remaja, dewasa, master_a (36-45), master_b (46+). Standar `persilat_2026`: singa, macan,
+                    pre_teen, pra_remaja, remaja, dewasa (17-45), master_a (46-60), master_b (61+).
+                  example: "usia_dini_2"
+                preset_standard:
+                  type: string
+                  enum: [ipsi, persilat_2026]
+                  default: ipsi
+                min_weight:
+                  type: number
+                  nullable: true
+                  description: Batas bobot bawah (kg, inklusif). Kosong = tanpa batas.
+                  example: 26
+                max_weight:
+                  type: number
+                  nullable: true
+                  description: Batas bobot atas (kg, inklusif). Kosong = tanpa batas.
+                  example: 28
+                bracket_mode:
+                  type: string
+                  enum: [single_elimination, pemasalan_4]
+                  default: single_elimination
+                  description: "`pemasalan_4` = mini-bracket maks. 4 peserta; pilihan manual panitia (tidak ada di regulasi, yang memakai sistem gugur)."
       responses:
         '201':
           description: Kategori tanding berhasil dibuat
+        '409':
+          description: Kejuaraan sudah memakai standar lain (satu kejuaraan hanya satu standar, PB IPSI atau PERSILAT 2026). Reset kategori terlebih dahulu.
+    delete:
+      summary: Reset Seluruh Kategori Kejuaraan (Admin / Dewan) — untuk mengganti standar
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kategori (dan slot bagan terkait) dihapus; mengembalikan jumlah `deleted`.
+        '409':
+          description: Masih ada peserta terdaftar pada kategori; reset ditolak.
+
+  /api/v1/competitions/{comp_id}/categories/{id}/home-arena:
+    put:
+      summary: Ubah gelanggang asal sebuah kategori
+      description: |
+        Semua partai satu kategori (termasuk semifinal dan final) dimainkan di gelanggang asalnya. Gelanggang asal diisi
+        otomatis saat bagan pertama dibuat: gelanggang dengan sisa partai paling sedikit, seri ke nama paling awal, dan
+        tidak berubah saat bagan diacak ulang. Endpoint ini mengubahnya oleh panitia; partai `idle` kategori itu ikut
+        pindah. `409` bila ada partai kategori yang sudah dimuat/berjalan/selesai di gelanggang lain; `404` bila
+        gelanggang bukan milik kejuaraan. Hanya admin/dewan.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [arena_id]
+              properties:
+                arena_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Kategori dengan `home_arena_id` terbaru
+        '404':
+          description: Kategori atau gelanggang tidak ditemukan pada kejuaraan ini
+        '409':
+          description: Partai kategori sudah dimuat atau berjalan
+  /api/v1/competitions/{comp_id}/categories/{id}/bracket-lock:
+    put:
+      summary: Kunci / buka draw bagan sebuah kategori
+      description: |
+        Draw yang dikunci disimpan di server dan ditegakkan: `POST /competitions/{comp_id}/brackets/generate` untuk
+        kategori itu ditolak `409 BRACKET_LOCKED` sampai dibuka lagi. Mengunci tidak menghalangi pertandingan berjalan.
+        Operasinya idempoten. Terlepas dari kunci, bagan yang sudah mulai dimainkan tidak bisa dibentuk ulang
+        (`409 BRACKET_IN_PROGRESS`). Hanya admin/dewan.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locked]
+              properties:
+                locked:
+                  type: boolean
+      responses:
+        '200':
+          description: Kategori dengan status kunci terbaru (`bracket_locked`, `bracket_locked_at`)
+        '400':
+          description: Field `locked` tidak ada
+        '403':
+          description: Bukan admin/dewan
+        '404':
+          description: Kategori tidak ditemukan pada kejuaraan ini
+
+  /api/v1/competitions/{comp_id}/categories/ruleset:
+    put:
+      summary: Tetapkan Ruleset Khusus per Golongan Umur / Kategori (Admin / Dewan)
+      description: |
+        Ruleset khusus kategori menimpa ruleset kejuaraan untuk partai pada kategori tersebut
+        (mis. Usia Dini 2 babak × 1,5 menit, sedangkan golongan lain tetap 3 babak × 2 menit).
+        `ruleset_id: null` mengembalikan ke ruleset kejuaraan. Ditolak 409 bila kategori yang
+        terdampak sudah punya partai berjalan/selesai.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignments]
+              properties:
+                assignments:
+                  type: array
+                  items:
+                    type: object
+                    description: Isi tepat satu dari `age_group` atau `category_id`.
+                    properties:
+                      age_group:
+                        type: string
+                        example: usia_dini_2
+                      category_id:
+                        type: string
+                        format: uuid
+                      ruleset_id:
+                        type: string
+                        format: uuid
+                        nullable: true
+      responses:
+        '200':
+          description: Jumlah kategori yang diperbarui (`updated`).
+        '400':
+          description: Ruleset tidak ditemukan / pemilih tidak valid.
+        '409':
+          description: Sudah ada pertandingan yang berjalan atau selesai pada kategori terdampak.
 
   /api/v1/competitions/{comp_id}/categories/{id}:
     get:
@@ -686,13 +911,102 @@ paths:
       responses:
         '200':
           description: Detail kategori pertandingan
+    put:
+      summary: Ubah Satu Kategori (Admin / Dewan)
+      description: |
+        Mengubah nama, gender, kelas/batas bobot, golongan umur, dan mode bagan. Ruleset dan kunci bagan punya endpoint
+        sendiri. Standar (`preset_standard`) tidak dapat diubah (gunakan reset kategori). **Setelah ada peserta
+        terdaftar, hanya nama yang boleh berubah** (409 bila atribut lain berbeda).
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, gender, weight_class]
+              properties:
+                name:
+                  type: string
+                gender:
+                  type: string
+                  enum: [male, female, putra, putri]
+                weight_class:
+                  type: string
+                age_group:
+                  type: string
+                preset_standard:
+                  type: string
+                  description: Boleh dikirim, tetapi harus sama dengan standar kategori saat ini.
+                min_weight:
+                  type: number
+                  nullable: true
+                max_weight:
+                  type: number
+                  nullable: true
+                bracket_mode:
+                  type: string
+      responses:
+        '200':
+          description: Kategori diperbarui
+        '400':
+          description: Data tidak valid (mis. bobot minimal melebihi maksimal)
+        '404':
+          description: Kategori bukan milik kejuaraan ini
+        '409':
+          description: Standar berbeda, atau kategori sudah punya peserta dan atribut selain nama diubah
+    delete:
+      summary: Hapus Satu Kategori (Admin / Dewan)
+      description: |
+        Menghapus kategori beserta slot bagannya (partai idle yang terhubung ikut dihapus). Ditolak 409 bila masih ada
+        peserta pada kategori atau partainya sudah berjalan/selesai.
+      tags:
+        - Category
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kategori dihapus
+        '404':
+          description: Kategori bukan milik kejuaraan ini
+        '409':
+          description: Masih ada peserta atau partai yang sudah berjalan
 
   # -------------------------------------------------------
   # ATHLETES & PARTICIPANTS
   # -------------------------------------------------------
   /api/v1/athletes:
     get:
-      summary: Daftar Master Seluruh Atlet (Mendukung Pagination & Filter Gender)
+      summary: Daftar Master Seluruh Atlet (Mendukung Pagination & Filter Gender). Hanya admin/dewan; memuat tanggal lahir & NIK
       tags:
         - Athlete
       security:
@@ -794,10 +1108,48 @@ paths:
       responses:
         '200':
           description: Detail data atlet
+    put:
+      summary: Lengkapi / Perbaiki Tanggal Lahir & NIK Atlet
+      description: |
+        Mengisi tanggal lahir (`YYYY-MM-DD`, tidak boleh di masa depan) dan/atau NIK (maks. 50 karakter);
+        field yang tidak dikirim tidak diubah. Dipakai untuk data lama yang belum punya tanggal lahir atau
+        salah ketik, agar golongan umur bisa diperiksa (lihat `age_check` pada daftar peserta).
+        Peran: admin/dewan (semua atlet) dan contingent (hanya atlet miliknya; selain itu `404`).
+      tags:
+        - Athlete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                birth_date:
+                  type: string
+                  example: '1998-03-12'
+                nik:
+                  type: string
+                  maxLength: 50
+      responses:
+        '200':
+          description: Data atlet terbaru
+        '400':
+          description: Tanggal lahir tidak valid / body kosong / NIK terlalu panjang
+        '404':
+          description: Atlet tidak ditemukan (atau bukan milik kontingen pemanggil)
 
   /api/v1/competitions/{comp_id}/athletes:
     get:
-      summary: Daftar Peserta / Atlet yang Terdaftar pada Kompetisi
+      summary: Daftar Peserta / Atlet yang Terdaftar pada Kompetisi. Perlu login (admin/dewan/operator/contingent); peran contingent hanya menerima atlet kontingennya sendiri
       tags:
         - Athlete
       security:
@@ -846,16 +1198,34 @@ paths:
                 team:
                   type: string
                   example: "Jawa Barat"
+                birth_date:
+                  type: string
+                  format: date
+                  description: Tanggal lahir (YYYY-MM-DD). Wajib untuk atlet baru yang didaftarkan ke `category_id`.
+                  example: "2016-05-01"
+                nik:
+                  type: string
+                  maxLength: 50
+                  description: NIK pada KK / KIA / Akta Kelahiran.
+                category_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Kategori resmi. Server memvalidasi gender dan golongan umur atlet (usia dihitung pada
+                    `start_date` kompetisi) terhadap kategori; jika tidak sah, 400 dan atlet baru tidak dibuat.
                 weight_class:
                   type: string
                   example: "A"
+                  description: Wajib bila `category_id` tidak diisi (jalur legacy).
       responses:
         '201':
           description: Atlet berhasil didaftarkan ke kompetisi
+        '409':
+          description: Atlet sudah terdaftar pada kejuaraan ini (satu atlet satu kali per kejuaraan)
 
   /api/v1/competitions/{comp_id}/participants:
     get:
-      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected)
+      summary: Daftar Peserta Kompetisi beserta Status Verifikasi (pending/verified/rejected/overweight/underweight). Peran contingent hanya menerima peserta yang ia daftarkan sendiri. Peserta berkategori diberi `age_check` (`missing_birth_date` | `age_mismatch`) bila umurnya belum bisa dipastikan/tidak sesuai golongan; verifikasi `verified` ditolak (400) selama tanda itu ada
       tags:
         - Athlete
       security:
@@ -877,10 +1247,56 @@ paths:
         '200':
           description: Daftar peserta kompetisi
 
+  /api/v1/competitions/{comp_id}/participants/{id}:
+    delete:
+      summary: Batal Daftar Peserta dari Kejuaraan (Admin / Dewan / Manajer Kontingen)
+      description: |
+        Mengeluarkan peserta dari kejuaraan (data atlet tetap tersimpan dan dapat didaftarkan lagi).
+        - **Admin/Dewan**: peserta mana pun yang belum masuk bagan atau partai (409 bila sudah; ubah status menjadi
+          `rejected`, lalu buat ulang bagan kategorinya).
+        - **Manajer kontingen**: hanya peserta kontingennya sendiri yang belum `verified` (403 bila sudah diverifikasi;
+          peserta kontingen lain dijawab 404).
+      tags:
+        - Athletes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pendaftaran dibatalkan
+        '403':
+          description: Kontingen mencoba membatalkan peserta yang sudah diverifikasi
+        '404':
+          description: Peserta tidak ditemukan pada kejuaraan ini (atau bukan milik kontingen pemanggil)
+        '409':
+          description: Peserta sudah masuk bagan atau partai
+
   /api/v1/competitions/{comp_id}/participants/{id}/verify:
     put:
       summary: Verifikasi Pendaftaran Atlet oleh Admin / Dewan (Timbang Badan & Berkas)
-      description: Mengubah status pendaftaran peserta menjadi 'verified' atau 'rejected'.
+      description: |
+        Mengubah status pendaftaran peserta menjadi 'verified' atau 'rejected'.
+
+        Aturan resmi PB IPSI untuk peserta yang terhubung ke kategori:
+        - **Tanpa toleransi bobot (0 kg)**: jika `actual_weight` di luar rentang kategori, status akhir
+          menjadi `overweight` / `underweight` walau diminta `verified` (lihat `reason`).
+        - Kategori ber-batas bobot mewajibkan `actual_weight` (atau nilai tersimpan sebelumnya) untuk `verified`.
+        - Berkas wajib (`docs_verified`) sesuai regulasi PB IPSI 2025 / IPSF-PERSILAT 2026: `identity`
+          (bukti umur) dan `health` (surat sehat) untuk semua atlet, ditambah `pregnancy` (pernyataan
+          tidak hamil) bagi putri Remaja & Dewasa; jika belum lengkap, 400. `parental` (izin orang tua)
+          opsional dan tidak memblokir verifikasi.
       tags:
         - Athlete
       security:
@@ -910,9 +1326,21 @@ paths:
                   type: string
                   enum: [verified, rejected]
                   example: "verified"
+                actual_weight:
+                  type: number
+                  description: Hasil timbang aktual (kg), > 0 dan <= 300.
+                  example: 27.5
+                docs_verified:
+                  type: object
+                  additionalProperties:
+                    type: boolean
+                  description: "Checklist berkas: identity (bukti umur), health (surat sehat), pregnancy (tidak hamil, putri Remaja/Dewasa), parental (opsional)."
+                  example: { identity: true, health: true }
       responses:
         '200':
-          description: Status verifikasi berhasil diperbarui
+          description: |
+            Status verifikasi berhasil diperbarui. Field `status` berisi status akhir
+            (verified / rejected / overweight / underweight) dan `reason` berisi alasan bila gagal timbang.
 
   /api/v1/contingents:
     get:
@@ -942,6 +1370,43 @@ paths:
       responses:
         '200':
           description: Detail data kontingen
+
+  /api/v1/contingents/{id}/password:
+    put:
+      summary: Reset Password Manajer Kontingen (Admin / Dewan)
+      description: |
+        Menetapkan password baru tanpa password lama (manajer lupa password). Sesi yang sedang berjalan tetap berlaku
+        sampai habis masa berlakunya. Manajer mengganti password sendiri lewat `POST /api/v1/auth/change-password`.
+      tags:
+        - Contingent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password diganti
+        '400':
+          description: Password kurang dari 8 karakter
+        '404':
+          description: Kontingen tidak ditemukan
 
   # -------------------------------------------------------
   # ARENAS
@@ -990,6 +1455,60 @@ paths:
       responses:
         '201':
           description: Gelanggang berhasil ditambahkan
+
+  /api/v1/competitions/{comp_id}/arenas/{id}/presence:
+    get:
+      summary: Kehadiran perangkat di gelanggang (koneksi WebSocket yang hidup)
+      description: |
+        Perangkat yang BENAR-BENAR terhubung ke gelanggang saat ini: nomor kursi juri yang online, jumlah wasit,
+        scoreboard, dan admin. Gelanggang yang belum pernah dihubungi perangkat apa pun mengembalikan semua nol.
+        Dipakai ruang operasi (tab Perangkat & PIN dan header) dan disegarkan tiap beberapa detik. Hanya admin/dewan.
+      tags:
+        - Arena
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kehadiran perangkat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      arena_id:
+                        type: string
+                        format: uuid
+                      judge_seats:
+                        type: array
+                        description: Nomor kursi juri yang online, terurut
+                        items:
+                          type: integer
+                      referees:
+                        type: integer
+                      scoreboards:
+                        type: integer
+                      admins:
+                        type: integer
+        '404':
+          description: Gelanggang tidak ditemukan pada kejuaraan ini
 
   /api/v1/competitions/{comp_id}/arenas/{id}:
     get:
@@ -1176,6 +1695,10 @@ paths:
                     $ref: '#/components/schemas/Pagination'
     post:
       summary: Buat Partai Pertandingan Baru (Admin / Dewan)
+      description: |
+        Membuat partai manual di luar bagan (eksibisi atau partai tambahan). Kedua peserta wajib ada pada kejuaraan ini,
+        berstatus `verified`, dan berbeda; `arena_id` (opsional) harus gelanggang kejuaraan ini. Pelanggaran dijawab
+        **400** dengan pesan yang menjelaskan sudut mana yang bermasalah.
       tags:
         - Match
       security:
@@ -1241,6 +1764,8 @@ paths:
       description: |
         Menginisialisasi Match Orchestrator, Rules Engine, Timer, dan mengubah status match menjadi READY.
         Jika arena sedang aktif menjalankan pertandingan lain, akan mengembalikan error 409 ARENA_BUSY.
+        Partai hanya boleh dimuat di gelanggang tempat ia dijadwalkan (gelanggang asal kategorinya); selain itu
+        (atau partai tanpa gelanggang) ditolak `403 FORBIDDEN`.
       tags:
         - Match
       security:
@@ -1286,6 +1811,15 @@ paths:
   /api/v1/competitions/{comp_id}/matches/{id}/start:
     post:
       summary: Mulai Pertandingan / Ronde (Admin / Dewan / Wasit)
+      description: |
+        Partai harus sudah dimuat ke gelanggang (`load-arena`). Status partai di database menjadi `running`
+        (`started_at` terisi). Memulai partai yang sudah berjalan, selesai, atau dibatalkan → 400
+        `INVALID_STATE_TRANSITION`.
+
+        **Pembatasan gelanggang (berlaku untuk semua aksi kontrol: load-arena, start, pause, resume, finish,
+        outcome, cancel, reschedule):** token PIN wasit terikat ke satu gelanggang dan hanya boleh mengontrol partai
+        di gelanggangnya (`403` bila berbeda), sama seperti handshake WebSocket. Login email admin/dewan/wasit tidak
+        terikat gelanggang.
       tags:
         - Match Lifecycle
       security:
@@ -1366,6 +1900,10 @@ paths:
         400 `TIE_NEEDS_DECISION` kecuali body menyertakan `winner` (keputusan manual; `method` menentukan dasar
         keputusan dan `result_type`: `referee_decision` bila kosong, atau `tiebreak_extra_round`,
         `tiebreak_lighter_weight`, `tiebreak_coin_toss`).
+
+        Partai yang **belum dimulai** (state `idle`) tidak dapat diselesaikan: 400 `INVALID_STATE_TRANSITION`.
+        Untuk WO/undur diri sebelum mulai gunakan `/outcome`; untuk membatalkan gunakan `/cancel`.
+        Penutupan partai menyiarkan `state_change` (`finished`, timer berhenti) lalu `match_result` ke semua perangkat.
       tags:
         - Match Lifecycle
       security:
@@ -1542,6 +2080,9 @@ paths:
         Mendukung header `Idempotency-Key` atau properti `event_id` / `idempotency_key` pada payload
         untuk mencegah duplikasi skor (accidental double tap / retry akibat network latency).
         Jika key sudah pernah diproses, server mengembalikan status 200 dengan `duplicate: true` tanpa menggandakan poin.
+
+        **Otorisasi:** hanya token PIN juri (`403` untuk peran lain). Identitas juri diambil dari token;
+        `judge_id` pada body diabaikan. Token harus milik gelanggang tempat partai dimuat (`403` bila berbeda).
       tags:
         - Match
       security:
@@ -1687,8 +2228,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [weight_class, gender, participant_ids]
+              description: |
+                Isi `category_id` untuk bagan terisolasi per kategori (weight_class, gender, dan mode bagan
+                diambil dari kategori; peserta otomatis = peserta terverifikasi kategori tsb bila
+                `participant_ids` kosong). Tanpa `category_id`, gunakan `weight_class` + `gender` (legacy).
               properties:
+                category_id:
+                  type: string
+                  format: uuid
                 weight_class:
                   type: string
                   example: "A"
@@ -1719,15 +2266,22 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: category_id
+          in: query
+          required: false
+          description: Bagan terisolasi per kategori. Jika diisi, `weight_class` & `gender` tidak diperlukan.
+          schema:
+            type: string
+            format: uuid
         - name: weight_class
           in: query
-          required: true
+          required: false
           schema:
             type: string
             example: "A"
         - name: gender
           in: query
-          required: true
+          required: false
           schema:
             type: string
             example: "male"
@@ -1879,6 +2433,16 @@ paths:
                         judges: { type: integer, minimum: 1, maximum: 5, example: 3 }
                         majority: { type: integer, minimum: 1, example: 2, description: "Jumlah juri yang harus sepakat (<= judges)" }
                         window_ms: { type: integer, minimum: 500, maximum: 10000, example: 3000 }
+                    point_gap:
+                      type: object
+                      description: |
+                        WMP (Wasit Menghentikan Pertandingan). Bila selisih TOTAL poin kedua sudut (setelah sanksi) mencapai
+                        `margin` pada babak `from_round` atau sesudahnya, partai dihentikan otomatis dan sudut yang unggul menang
+                        dengan `result_type` `wmp`. Tanpa `point_gap`: server memakai 30 poin, atau 20 poin bila kategori partai
+                        adalah Pra-Usia Dini, Usia Dini 1/2, atau Pra-Remaja. `margin: 0` menonaktifkan WMP.
+                      properties:
+                        margin: { type: integer, minimum: 0, example: 30 }
+                        from_round: { type: integer, minimum: 1, example: 2, description: "Bawaan 2; maksimal total_rounds" }
                 status:
                   type: string
                   example: "active"
@@ -2004,6 +2568,9 @@ paths:
   # -------------------------------------------------------
   # OFFICIALS & OPERATOR MANAGEMENT
   # -------------------------------------------------------
+        '409':
+          description: Ruleset masih dipakai kejuaraan (juga berlaku saat mengubah status ke draf/arsip lewat PUT).
+
   /api/v1/officials:
     get:
       summary: Daftar Petugas / Operator Sistem (Admin / Dewan)
@@ -2049,13 +2616,19 @@ paths:
                   example: "operator1@silat.id"
                 password:
                   type: string
-                  example: "mock_secret_1"
+                  minLength: 8
+                  example: "secret-123"
                 role:
                   type: string
                   enum: [admin, dewan, operator, wasit]
                   default: operator
                   example: "operator"
+                  description: Dewan hanya boleh membuat wasit, operator, dan juri; admin dan dewan hanya dapat dibuat Admin.
       responses:
+        '403':
+          description: Peran pemanggil tidak boleh membuat akun berperan tersebut
+        '409':
+          description: Email sudah dipakai
         '201':
           description: Akun petugas berhasil dibuat
           content:
@@ -2138,6 +2711,7 @@ paths:
                     $ref: '#/components/schemas/Official'
     delete:
       summary: Hapus Akun Petugas / Operator (Admin / Dewan)
+      description: Akun sendiri dan admin terakhir tidak dapat dihapus (409). Dewan tidak boleh menghapus admin atau dewan (403).
       tags:
         - Officials
       security:
@@ -2156,6 +2730,75 @@ paths:
   # -------------------------------------------------------
   # REPORTING, STATISTICS & EXPORT
   # -------------------------------------------------------
+  /api/v1/officials/{id}/password:
+    put:
+      summary: Reset Password Akun Petugas Lain (Admin / Dewan)
+      description: |
+        Mengganti password akun lain tanpa password lama (lupa password). Admin dapat mereset semua akun; Dewan hanya
+        wasit, operator, dan juri. Sesi (token) yang sedang berjalan tetap berlaku sampai habis masa berlakunya.
+      tags:
+        - Officials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password diganti
+        '400':
+          description: Password kurang dari 8 karakter
+        '403':
+          description: Peran pemanggil tidak boleh mereset akun ini
+        '404':
+          description: Akun tidak ditemukan
+
+  /api/v1/auth/change-password:
+    post:
+      summary: Ganti Password Sendiri (Petugas)
+      description: |
+        Admin, dewan, wasit, operator, atau manajer kontingen mengganti password miliknya (peran pada token menentukan akun). Password lama salah dijawab **400** (bukan 401)
+        supaya klien tidak mengira sesi berakhir.
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password diganti
+        '400':
+          description: Password lama salah, password baru kurang dari 8 karakter, atau sama dengan yang lama
+
   /api/v1/competitions/{comp_id}/report/summary:
     get:
       summary: Ringkasan Metrik & Statistik Kompetisi
@@ -2278,6 +2921,127 @@ paths:
                         blue_athlete: { type: string }
                         red_total: { type: integer }
                         blue_total: { type: integer }
+
+  /api/v1/public/competitions:
+    get:
+      summary: Kejuaraan Aktif untuk Bagan Publik (Publik)
+      description: |
+        Daftar kejuaraan berstatus `active`. Tanpa login. Dipakai halaman `/bagan`. Kejuaraan draft,
+        paused, finished, atau cancelled tidak ditampilkan. Di-cache 10 detik dan dibersihkan saat status berubah.
+      tags:
+        - Public Bracket
+      responses:
+        '200':
+          description: Daftar kejuaraan aktif (kosong bila tidak ada)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        location: { type: string }
+                        start_date: { type: string, example: '2026-06-01' }
+                        end_date: { type: string, example: '2026-06-03' }
+
+  /api/v1/public/competitions/{comp_id}/brackets:
+    get:
+      summary: Daftar Bagan per Kategori (Publik)
+      description: |
+        Satu entri per kategori yang sudah dibuat bagannya. Kategori tanpa bagan tidak muncul.
+        Hanya untuk kejuaraan `active`; selain itu `404` (sengaja sama dengan "tidak ada" agar kejuaraan
+        draft tidak terdeteksi).
+      tags:
+        - Public Bracket
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Daftar bagan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicBracketSummary'
+        '404':
+          description: Kejuaraan tidak ada atau belum/tidak lagi aktif
+
+  /api/v1/public/competitions/{comp_id}/brackets/{category_id}:
+    get:
+      summary: Bagan Lengkap satu Kategori (Publik)
+      description: |
+        Slot bagan beserta nama dan kontingen atlet. **Hanya** field yang tercantum di skema ini yang
+        dikembalikan: tidak ada NIK, tanggal lahir, berat badan, berkas, maupun ID atlet/peserta.
+        `is_winner` menandai slot yang memenangkan partainya. `404` bila kejuaraan tidak aktif, kategori
+        bukan milik kejuaraan itu, atau kategori belum punya bagan.
+      tags:
+        - Public Bracket
+      parameters:
+        - name: comp_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: category_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Bagan kategori
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      competition:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          name: { type: string }
+                          location: { type: string }
+                          start_date: { type: string }
+                          end_date: { type: string }
+                      category:
+                        $ref: '#/components/schemas/PublicBracketSummary'
+                      slots:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string, format: uuid }
+                            round: { type: integer }
+                            slot_index: { type: integer }
+                            is_bye: { type: boolean }
+                            next_slot_id: { type: string, format: uuid, nullable: true }
+                            is_winner: { type: boolean }
+                            participant:
+                              nullable: true
+                              type: object
+                              properties:
+                                name: { type: string }
+                                team: { type: string }
+        '404':
+          description: Bagan tidak ditemukan atau belum dibuka untuk umum
 
   /api/v1/live/schedule:
     get:
@@ -2667,6 +3431,17 @@ components:
       description: Token JWT yang dihasilkan dari login PIN atau admin auth
 
   schemas:
+    PublicBracketSummary:
+      type: object
+      properties:
+        category_id: { type: string, format: uuid }
+        name: { type: string }
+        gender: { type: string }
+        age_group: { type: string }
+        weight_class: { type: string }
+        participants: { type: integer, description: Peserta nyata di ronde 1 (tanpa bye) }
+        rounds: { type: integer }
+        completed: { type: boolean, description: Babak final sudah punya pemenang }
     ErrorResponse:
       type: object
       required: [success, error]

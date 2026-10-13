@@ -68,4 +68,14 @@ describe('useConsensusFeedback', () => {
     f.onProgress({ target: 'red', score_type: 'technique', count: 9, needed: 2, window_ms: 3000 })
     expect(f.sides.red.lit).toBe(3)
   })
+
+  it('count 0 (juri membatalkan) memadamkan lampu sudut itu saja', () => {
+    const f = useConsensusFeedback(() => techniques)
+    f.onProgress({ target: 'red', score_type: 'technique', count: 1, needed: 2, window_ms: 3000 })
+    f.onProgress({ target: 'blue', score_type: 'technique', count: 1, needed: 2, window_ms: 3000 })
+    f.onProgress({ target: 'red', score_type: 'technique', count: 0, needed: 2, window_ms: 3000 })
+    expect(f.sides.red.lit).toBe(0)
+    expect(f.sides.red.text).toBe('')
+    expect(f.sides.blue.lit).toBe(1)
+  })
 })

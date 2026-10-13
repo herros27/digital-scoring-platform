@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useTimer } from '@/composables/useTimer'
@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/features/auth/api/authService'
 import { MAX_PIN_LENGTH, isCompletePin, pinLoginErrorMessage } from '@/features/auth/lib/pin'
 import { arenaService } from '@/features/arena/api/arenaService'
+import { competitionService } from '@/features/competitions/api/competitionService'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,9 +59,40 @@ const matchStatus = ref<MatchStatus>('idle')
 const roundStatus = computed(() => MATCH_STATUS_LABEL[matchStatus.value])
 // Skor ditolak server saat istirahat; tombol dikunci agar juri tidak mengira input tercatat.
 const isBreak = computed(() => matchStatus.value === 'break')
+// Skor juga ditolak saat partai dijeda operator meja; tombol dikunci dengan alasan yang sama.
+const isPaused = computed(() => matchStatus.value === 'paused')
+// Tombol hanya aktif saat babak berjalan: istirahat, dijeda, belum mulai, dan selesai semuanya ditolak server.
+const scoringLocked = computed(() => matchStatus.value !== 'running')
 
-// Daftar tombol teknik mengikuti ruleset pertandingan yang dimuat (nilai poin dari server)
-const techniques = ref<WsTechniqueKind[]>(DEFAULT_TECHNIQUES)
+// Pesan penolakan dari server (mis. skor saat dijeda, BATAL tanpa input yang bisa dibatalkan)
+const notice = ref('')
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+function showNotice(text: string) {
+  notice.value = text
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => (notice.value = ''), 4000)
+}
+const ERROR_TEXT: Record<string, string> = {
+  SCORING_NOT_ALLOWED: 'Skor tidak diterima: pertandingan sedang dijeda atau tidak berjalan.',
+  UNDO_NOT_POSSIBLE:
+    'Tidak ada input yang bisa dibatalkan (poin terkonfirmasi tidak dapat dibatalkan).',
+}
+
+// Daftar tombol teknik mengikuti ruleset: ruleset kejuaraan sejak halaman dibuka, lalu ruleset partai yang dimuat
+// ke gelanggang (bisa ruleset khusus kategori) begitu snapshot tiba. Kosong sampai salah satunya diterima.
+const techniques = ref<WsTechniqueKind[]>([])
+let techniquesFromMatch = false
+async function loadCompetitionTechniques() {
+  if (!authStore.token || !compId.value || techniques.value.length) return
+  try {
+    const list = await competitionService.getTechniques(compId.value)
+    if (!techniquesFromMatch && list.length) techniques.value = list
+  } catch {
+    // server tidak terjangkau: pakai daftar bawaan agar juri tetap bisa menilai begitu partai dimuat
+    if (!techniques.value.length) techniques.value = DEFAULT_TECHNIQUES
+  }
+}
+watch([() => authStore.token, compId], loadCompetitionTechniques, { immediate: true })
 const TECHNIQUE_HINT: Record<string, string> = {
   technique: 'SERANGAN TANGAN SAH',
   knockdown: 'SERANGAN KAKI SAH',
@@ -95,6 +127,8 @@ interface TouchLog {
 const lastRedTouch = ref<TouchLog | null>(null)
 
 const lastBlueTouch = ref<TouchLog | null>(null)
+// Sudut yang terakhir disentuh: BATAL menarik input terakhir ini, bukan selalu merah.
+const lastTapTarget = ref<'red' | 'blue' | null>(null)
 
 // Nama atlet dari pertandingan yang sedang aktif di gelanggang ini (bila ada)
 async function loadAthleteNames() {
@@ -142,7 +176,7 @@ function handlePinClear() {
 
 async function handlePinSubmit() {
   if (!isCompletePin(pinInput.value)) {
-    pinError.value = 'PIN harus 6 digit (juri) atau 8 digit (wasit)'
+    pinError.value = 'PIN harus 6 digit (juri) atau 8 digit (operator meja)'
     return
   }
   pinLoading.value = true
@@ -186,6 +220,8 @@ function handleScoreTap(target: 'red' | 'blue', technique: string, points: numbe
   const eventId = generateUUID()
   const idempotencyKey = eventId
 
+  lastTapTarget.value = target
+
   // 4. Update local feedback
   const log: TouchLog = {
     technique: label,
@@ -214,24 +250,22 @@ function handleScoreTap(target: 'red' | 'blue', technique: string, points: numbe
 // Undo (BATAL) last touch
 function handleCancelLast() {
   haptics.trigger([80, 50, 80])
-  let lastTarget: 'red' | 'blue' | null = null
-  if (lastRedTouch.value) {
-    lastTarget = 'red'
-    lastRedTouch.value = null
-  } else if (lastBlueTouch.value) {
-    lastTarget = 'blue'
-    lastBlueTouch.value = null
+  const lastTarget = lastTapTarget.value
+  if (!lastTarget) {
+    showNotice(ERROR_TEXT.UNDO_NOT_POSSIBLE)
+    return
   }
+  if (lastTarget === 'red') lastRedTouch.value = null
+  else lastBlueTouch.value = null
+  lastTapTarget.value = null
 
-  if (lastTarget) {
-    sendMessage('judge_input', {
-      event_id: generateUUID(),
-      idempotency_key: generateUUID(),
-      score_type: 'undo',
-      target: lastTarget,
-      round: currentRound.value,
-    })
-  }
+  sendMessage('judge_input', {
+    event_id: generateUUID(),
+    idempotency_key: generateUUID(),
+    score_type: 'undo',
+    target: lastTarget,
+    round: currentRound.value,
+  })
 }
 
 onMounted(() => {
@@ -246,7 +280,10 @@ onMounted(() => {
       syncedMatchId = payload.match_id
       void loadAthleteNames()
     }
-    if (payload.techniques?.length) techniques.value = payload.techniques
+    if (payload.techniques?.length) {
+      techniques.value = payload.techniques
+      techniquesFromMatch = true
+    }
     feedback.configure(payload.judge_count, payload.consensus?.majority)
     matchStatus.value =
       matchStatusFromState(payload.state, payload.timer_running) ?? matchStatus.value
@@ -262,6 +299,9 @@ onMounted(() => {
 
   onMessage('consensus_progress', (payload) => feedback.onProgress(payload))
   onMessage('score_confirmed', (payload) => feedback.onConfirmed(payload))
+  onMessage('error', (payload) =>
+    showNotice(ERROR_TEXT[payload.code] ?? payload.message ?? 'Perintah ditolak server.'),
+  )
 
   onMessage('state_change', (payload) => {
     matchStatus.value =
@@ -286,11 +326,95 @@ onMounted(() => {
       )
     }
   })
+
+  window.addEventListener('keydown', handleGlobalKey)
+})
+
+function handleGlobalKey(e: KeyboardEvent) {
+  if (showPinModal.value) {
+    if (e.key >= '0' && e.key <= '9') {
+      handlePinNumber(e.key)
+    } else if (e.key === 'Backspace') {
+      pinInput.value = pinInput.value.slice(0, -1)
+    } else if (e.key === 'Escape' || e.key === 'Delete') {
+      handlePinClear()
+    } else if (e.key === 'Enter') {
+      if (isCompletePin(pinInput.value)) {
+        void handlePinSubmit()
+      }
+    }
+  }
+}
+
+const canRequestFullscreen = computed(
+  () => typeof document !== 'undefined' && !!document.documentElement?.requestFullscreen,
+)
+
+async function requestLandscapeFullscreen() {
+  try {
+    if (!document.fullscreenElement && document.documentElement?.requestFullscreen) {
+      await document.documentElement.requestFullscreen()
+    }
+    const orient = screen.orientation as unknown as
+      { lock?: (mode: string) => Promise<void> } | undefined
+    if (orient?.lock) {
+      await orient.lock('landscape')
+    }
+  } catch {
+    // browser fallback: panduan overlay CSS tetap aktif bila orientasi belum diputar
+  }
+}
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKey)
 })
 </script>
 
 <template>
   <div class="judge-screen">
+    <!-- ROTATE DEVICE OVERLAY (Wajib Landscape di Mobile & Tablet) -->
+    <aside class="judge-rotate-prompt font-mono" aria-label="Instruksi Orientasi Layar">
+      <div class="rotate-icon-wrapper">
+        <svg
+          class="rotate-phone-icon"
+          width="50"
+          height="50"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <rect x="4" y="2" width="16" height="20" rx="3" />
+          <line x1="12" y1="18" x2="12.01" y2="18" stroke-width="2.5" />
+        </svg>
+        <svg
+          class="rotate-arrow-icon"
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#10b981"
+          stroke-width="2.5"
+        >
+          <path d="M21.5 2v6h-6" />
+          <path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+        </svg>
+      </div>
+      <h2 class="rotate-prompt-title font-sans">PUTAR KE MODE LANSKAP</h2>
+      <p class="rotate-prompt-desc font-mono">
+        Layar Penilaian Juri Silat wajib digunakan dalam posisi mendatar (landscape) untuk akses
+        simultan Sudut Merah &amp; Sudut Biru.
+      </p>
+      <button
+        v-if="canRequestFullscreen"
+        type="button"
+        class="btn-rotate-fullscreen font-mono"
+        @click="requestLandscapeFullscreen"
+      >
+        Layar Penuh / Kunci Lanskap ↗
+      </button>
+    </aside>
+
     <!-- TOP NAVIGATION & STATUS BAR -->
     <header class="judge-topbar">
       <!-- Left: Identity -->
@@ -324,6 +448,12 @@ onMounted(() => {
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <span>{{ timer.formattedTime.value }}</span>
+        </div>
+        <div v-if="isPaused" class="judge-break-note judge-paused-note font-mono">
+          Pertandingan dijeda operator meja — skor tidak diterima
+        </div>
+        <div v-if="notice" class="judge-break-note judge-notice font-mono" role="alert">
+          {{ notice }}
         </div>
         <div v-if="isBreak" class="judge-break-note font-mono">
           Babak berikutnya dimulai otomatis dalam {{ timer.formattedTime.value }}
@@ -484,12 +614,15 @@ onMounted(() => {
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Red -->
         <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
+          <p v-if="!techniques.length" class="judge-buttons-loading font-mono">
+            MEMUAT TOMBOL SKOR...
+          </p>
           <button
             v-for="tech in techniques"
             :key="tech.type"
             class="judge-btn judge-btn--red"
             :class="{ 'judge-btn--active': activeBtn === 'red-' + tech.type }"
-            :disabled="isBreak"
+            :disabled="scoringLocked"
             @click="handleScoreTap('red', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
@@ -608,12 +741,15 @@ onMounted(() => {
 
         <!-- 3 Extra-Large Ergonomic Scoring Buttons Blue -->
         <div class="judge-buttons-list" :class="{ 'judge-buttons-list--dense': denseButtons }">
+          <p v-if="!techniques.length" class="judge-buttons-loading font-mono">
+            MEMUAT TOMBOL SKOR...
+          </p>
           <button
             v-for="tech in techniques"
             :key="tech.type"
             class="judge-btn judge-btn--blue"
             :class="{ 'judge-btn--active': activeBtn === 'blue-' + tech.type }"
-            :disabled="isBreak"
+            :disabled="scoringLocked"
             @click="handleScoreTap('blue', tech.type, tech.points, tech.label)"
           >
             <div class="judge-btn__icon-box">
@@ -791,17 +927,24 @@ onMounted(() => {
    ========================================================================== */
 
 .judge-screen {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-height: 100dvh;
+  height: 100dvh;
   background-color: #050811;
   color: #f8fafc;
   display: flex;
   flex-direction: column;
-  padding: 12px 18px;
-  overflow: hidden;
+  padding: clamp(6px, 1.2vw, 14px) clamp(8px, 1.6vw, 18px);
+  padding-top: max(clamp(6px, 1.2vw, 14px), env(safe-area-inset-top));
+  padding-bottom: max(clamp(6px, 1.2vw, 14px), env(safe-area-inset-bottom));
+  padding-left: max(clamp(8px, 1.6vw, 18px), env(safe-area-inset-left));
+  padding-right: max(clamp(8px, 1.6vw, 18px), env(safe-area-inset-right));
+  overflow-x: hidden;
+  overflow-y: auto;
   user-select: none;
   -webkit-touch-callout: none;
   font-family: var(--font-sans);
+  box-sizing: border-box;
 }
 
 /* --- Topbar --- */
@@ -809,14 +952,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 10px;
+  padding-bottom: clamp(6px, 1vh, 10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .judge-topbar__left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: clamp(6px, 1vw, 12px);
+  min-width: 0;
 }
 
 .judge-online-pill {
@@ -827,10 +973,11 @@ onMounted(() => {
   border: 1px solid rgba(16, 185, 129, 0.4);
   color: #34d399;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: clamp(0.625rem, 1vw, 0.6875rem);
   font-weight: 800;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
+  flex-shrink: 0;
 }
 
 .judge-online-pill--offline {
@@ -845,6 +992,7 @@ onMounted(() => {
   background-color: #10b981;
   border-radius: 50%;
   animation: pulse 1.5s infinite;
+  flex-shrink: 0;
 }
 .judge-dot--offline {
   background-color: #f59e0b;
@@ -854,38 +1002,47 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   line-height: 1.15;
+  min-width: 0;
 }
 
 .judge-main-title {
-  font-size: 1.125rem;
+  font-size: clamp(0.875rem, 1.8vw, 1.125rem);
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .judge-sub-title {
-  font-size: 0.625rem;
+  font-size: clamp(0.5625rem, 1vw, 0.625rem);
   letter-spacing: 0.08em;
   color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .judge-topbar__center {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
+  flex-shrink: 0;
 }
 
 .judge-round-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 6px;
+  padding: clamp(4px, 0.8vh, 6px) clamp(8px, 1.2vw, 14px);
   background-color: rgba(6, 182, 212, 0.12);
   border: 1px solid rgba(6, 182, 212, 0.35);
   border-radius: var(--radius-sm);
   color: #22d3ee;
-  font-size: 0.75rem;
+  font-size: clamp(0.6875rem, 1.2vw, 0.75rem);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .judge-round-dot {
@@ -894,26 +1051,29 @@ onMounted(() => {
   background-color: #06b6d4;
   border-radius: 50%;
   animation: pulse 1.5s infinite;
+  flex-shrink: 0;
 }
 
 .judge-timer-badge {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: clamp(4px, 0.8vh, 6px) clamp(8px, 1.2vw, 14px);
   background-color: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-sm);
-  font-size: 0.9375rem;
+  font-size: clamp(0.8125rem, 1.5vw, 0.9375rem);
   font-weight: 800;
   color: #38bdf8;
+  white-space: nowrap;
 }
 
 .judge-topbar__right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
   font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
 .judge-chip-btn {
@@ -923,6 +1083,7 @@ onMounted(() => {
   border-radius: var(--radius-xs);
   color: #cbd5e1;
   font-weight: 700;
+  font-size: 0.6875rem;
 }
 
 .judge-chip-text {
@@ -940,6 +1101,7 @@ onMounted(() => {
   color: #34d399;
   font-size: 0.6875rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .judge-icon-btn {
@@ -954,6 +1116,8 @@ onMounted(() => {
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-fast);
+  touch-action: manipulation;
+  flex-shrink: 0;
 }
 .judge-icon-btn--active {
   color: #34d399;
@@ -962,7 +1126,7 @@ onMounted(() => {
 
 .judge-break-note {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #fbbf24;
   text-align: center;
@@ -981,14 +1145,18 @@ onMounted(() => {
   background-color: #b91c1c;
   color: #ffffff;
   border: none;
-  padding: 6px 14px;
+  padding: 6px 12px;
+  min-height: 32px;
   border-radius: var(--radius-xs);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: clamp(0.6875rem, 1.2vw, 0.75rem);
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(185, 28, 28, 0.4);
   transition: all var(--transition-fast);
+  touch-action: manipulation;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .judge-batal-btn:active {
   transform: scale(0.96);
@@ -1003,6 +1171,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   color: #cbd5e1;
+  cursor: pointer;
+  touch-action: manipulation;
+  flex-shrink: 0;
 }
 
 /* --- Compliance Sub-Header --- */
@@ -1010,13 +1181,14 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background-color: rgba(10, 16, 30, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-xs);
-  margin-top: 8px;
-  font-size: 0.6875rem;
+  margin-top: 6px;
+  font-size: clamp(0.625rem, 1vw, 0.6875rem);
   color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .judge-comp-left,
@@ -1024,7 +1196,8 @@ onMounted(() => {
 .judge-comp-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .text-peach-200 {
@@ -1041,17 +1214,20 @@ onMounted(() => {
 .judge-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 10px;
+  gap: clamp(8px, 1.5vw, 16px);
+  margin-top: clamp(6px, 1vh, 10px);
   flex: 1;
+  min-height: 0;
 }
 
 .judge-corner {
   display: flex;
   flex-direction: column;
-  border-radius: var(--radius-md);
-  padding: 16px;
+  border-radius: var(--radius-md, 12px);
+  padding: clamp(8px, 1.4vw, 16px);
   border: 1px solid transparent;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .judge-corner--red {
@@ -1068,17 +1244,23 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: clamp(6px, 1vh, 12px);
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.judge-athlete-info {
+  min-width: 0;
 }
 
 .judge-corner-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: var(--radius-xs);
-  font-size: 0.6875rem;
+  font-size: clamp(0.5625rem, 1vw, 0.6875rem);
   font-weight: 800;
   letter-spacing: 0.08em;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .judge-corner-badge--red {
   background-color: #dc2626;
@@ -1090,39 +1272,47 @@ onMounted(() => {
 }
 
 .judge-athlete-name {
-  font-size: 1.5rem;
+  font-size: clamp(0.95rem, 1.8vw, 1.45rem);
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.15;
   color: #ffffff;
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .judge-athlete-meta {
-  font-size: 0.6875rem;
+  font-size: clamp(0.5625rem, 0.9vw, 0.6875rem);
   color: #94a3b8;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .judge-consensus-indicator {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 .judge-consensus-indicator span {
   font-size: 0.5625rem;
   color: #64748b;
   letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .judge-dots-row {
   display: flex;
-  gap: 5px;
+  gap: 4px;
 }
 
 .judge-dot-light {
-  width: 12px;
-  height: 12px;
+  width: clamp(8px, 1.2vw, 12px);
+  height: clamp(8px, 1.2vw, 12px);
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.15);
 }
@@ -1145,11 +1335,14 @@ onMounted(() => {
   }
 }
 .judge-consensus-indicator .judge-consensus-text {
-  font-size: 0.625rem;
+  font-size: clamp(0.5625rem, 0.9vw, 0.625rem);
   color: #fbbf24;
   letter-spacing: 0.04em;
-  max-width: 190px;
+  max-width: 160px;
   text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .judge-consensus-indicator .judge-consensus-text--ok {
   color: #34d399;
@@ -1159,29 +1352,39 @@ onMounted(() => {
   box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
 }
 
-/* --- 3 Extra-Large Ergonomic Scoring Buttons --- */
+/* --- Extra-Large Ergonomic Scoring Buttons --- */
+.judge-buttons-loading {
+  margin: auto;
+  font-size: 0.75rem;
+  color: var(--color-neutral-500, #64748b);
+}
 .judge-buttons-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(6px, 1.2vh, 12px);
   flex: 1;
+  min-height: 0;
 }
 .judge-buttons-list--dense {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-auto-rows: 1fr;
-  gap: 10px;
+  gap: clamp(6px, 1vh, 10px);
 }
 .judge-buttons-list--dense .judge-btn {
-  min-height: 70px;
-  padding: 10px 14px;
+  min-height: clamp(48px, 6vh, 68px);
+  padding: clamp(6px, 1vw, 10px) clamp(8px, 1.2vw, 14px);
+}
+/* Jumlah teknik ganjil: tombol terakhir yang berdiri sendiri membentang selebar dua kolom */
+.judge-buttons-list--dense .judge-btn:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 .judge-buttons-list--dense .judge-btn__title {
-  font-size: 1.05rem;
+  font-size: clamp(0.9rem, 1.6vw, 1.15rem);
   line-height: 1.1;
 }
 .judge-buttons-list--dense .judge-btn__pts {
-  font-size: 1.6rem;
+  font-size: clamp(1.3rem, 2.4vw, 1.7rem);
 }
 .judge-buttons-list--dense .judge-btn__icon-box {
   display: none;
@@ -1192,8 +1395,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 22px;
-  border-radius: var(--radius-md);
+  padding: clamp(8px, 1.2vw, 14px) clamp(10px, 1.8vw, 20px);
+  border-radius: var(--radius-md, 12px);
   border: 1px solid transparent;
   cursor: pointer;
   position: relative;
@@ -1203,7 +1406,9 @@ onMounted(() => {
     filter 0.08s ease,
     box-shadow 0.08s ease;
   user-select: none;
-  min-height: 80px;
+  min-height: clamp(52px, 8vh, 80px);
+  touch-action: manipulation;
+  box-sizing: border-box;
 }
 
 /* Touch active tactile bevel */
@@ -1244,47 +1449,59 @@ onMounted(() => {
 }
 
 .judge-btn__icon-box {
-  width: 60px;
-  height: 60px;
-  border-radius: var(--radius-sm);
+  width: clamp(34px, 4.5vw, 56px);
+  height: clamp(34px, 4.5vw, 56px);
+  border-radius: var(--radius-sm, 8px);
   background-color: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
+.judge-btn__icon-box svg {
+  width: clamp(20px, 2.5vw, 32px);
+  height: clamp(20px, 2.5vw, 32px);
+}
 
 .judge-btn__label-group {
   display: flex;
   flex-direction: column;
   flex: 1;
-  margin-left: 20px;
+  margin-left: clamp(8px, 1.5vw, 18px);
   text-align: left;
+  min-width: 0;
 }
 
 .judge-btn__title {
-  font-size: 2.25rem;
+  font-size: clamp(1.1rem, 2.4vw, 2.1rem);
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 1;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .judge-btn__subtitle {
-  font-size: 0.6875rem;
-  letter-spacing: 0.12em;
+  font-size: clamp(0.5625rem, 0.9vw, 0.6875rem);
+  letter-spacing: 0.08em;
   opacity: 0.8;
-  margin-top: 4px;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .judge-btn__pts {
-  font-size: 3.5rem;
+  font-size: clamp(1.6rem, 3.2vw, 3.25rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.04em;
-  padding: 4px 14px;
-  border-radius: var(--radius-sm);
+  padding: clamp(2px, 0.5vh, 4px) clamp(8px, 1.2vw, 14px);
+  border-radius: var(--radius-sm, 8px);
   background-color: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
 }
 
 /* --- Touch Feedback Strip --- */
@@ -1292,17 +1509,23 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 10px;
+  padding-top: clamp(6px, 1vh, 10px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 10px;
-  font-size: 0.6875rem;
+  margin-top: clamp(6px, 1vh, 10px);
+  font-size: clamp(0.625rem, 1vw, 0.6875rem);
   color: #94a3b8;
+  flex-shrink: 0;
+  gap: 6px;
 }
 
 .judge-touch-last {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .judge-touch-last strong {
   color: #ffffff;
@@ -1314,6 +1537,7 @@ onMounted(() => {
   gap: 5px;
   color: #34d399;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 /* --- Bottom Compliance Bar --- */
@@ -1321,11 +1545,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 8px;
+  padding-top: clamp(4px, 0.8vh, 8px);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin-top: 8px;
-  font-size: 0.625rem;
+  margin-top: clamp(4px, 0.8vh, 8px);
+  font-size: clamp(0.5625rem, 0.85vw, 0.625rem);
   color: #64748b;
+  flex-shrink: 0;
 }
 
 @keyframes pulse {
@@ -1352,32 +1577,37 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 100;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .judge-pin-modal {
   background-color: #0b1120;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  padding: 24px 28px;
+  border-radius: var(--radius-lg, 16px);
+  padding: clamp(16px, 4vw, 24px) clamp(14px, 4vw, 26px);
   max-width: 380px;
-  width: 90%;
+  width: 100%;
+  max-height: 92dvh;
+  overflow-y: auto;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-sizing: border-box;
 }
 
 .judge-pin-header {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .judge-pin-icon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   background-color: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: 10px;
@@ -1388,7 +1618,7 @@ onMounted(() => {
 }
 
 .judge-pin-title {
-  font-size: 1.125rem;
+  font-size: clamp(1rem, 3.5vw, 1.125rem);
   font-weight: 800;
   color: #ffffff;
   line-height: 1.2;
@@ -1409,8 +1639,9 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 6px 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   font-size: 0.6875rem;
+  box-sizing: border-box;
 }
 
 .judge-pin-meta-item .label {
@@ -1427,9 +1658,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-bottom: 14px;
-  font-size: 1.75rem;
+  gap: clamp(8px, 2vw, 12px);
+  margin-bottom: 12px;
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
   color: #475569;
 }
 
@@ -1441,24 +1672,24 @@ onMounted(() => {
 .judge-pin-error {
   color: #ef4444;
   font-size: 0.75rem;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   text-align: center;
 }
 
 .judge-numpad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: clamp(6px, 1.5vw, 10px);
   width: 100%;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .numpad-btn {
-  height: 52px;
+  height: clamp(42px, 6vh, 52px);
   background-color: #162032;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #f8fafc;
-  font-size: 1.25rem;
+  font-size: clamp(1.1rem, 3vw, 1.25rem);
   font-weight: 700;
   border-radius: 8px;
   cursor: pointer;
@@ -1466,16 +1697,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .numpad-btn:hover {
   background-color: #1e293b;
   border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
 }
 
 .numpad-btn:active {
-  transform: translateY(1px);
+  transform: scale(0.96);
 }
 
 .numpad-btn--clear {
@@ -1513,9 +1745,228 @@ onMounted(() => {
   cursor: pointer;
   text-decoration: underline;
   transition: color 0.15s ease;
+  touch-action: manipulation;
 }
 
 .judge-link-btn:hover {
   color: #94a3b8;
+}
+
+/* ==========================================================================
+   RESPONSIVE MEDIA QUERIES (TABLET PORTRAIT & MOBILE)
+   ========================================================================== */
+
+/* Medium tablets / Small screens (< 960px) */
+@media (max-width: 960px) {
+  .judge-topbar__right .judge-chip-btn,
+  .judge-topbar__right .judge-chip-text {
+    display: none;
+  }
+  .judge-comp-center {
+    display: none;
+  }
+}
+
+/* Small tablets / Large phones (< 768px) */
+@media (max-width: 768px) {
+  .judge-compliance-strip {
+    display: none;
+  }
+  .judge-bottom-bar {
+    display: none;
+  }
+  .judge-btn__subtitle {
+    display: none;
+  }
+  .judge-btn__icon-box {
+    display: none;
+  }
+  .judge-btn__label-group {
+    margin-left: 0;
+  }
+}
+
+/* Phones Portrait (< 580px) */
+@media (max-width: 580px) {
+  .judge-topbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .judge-topbar__left {
+    order: 1;
+  }
+  .judge-topbar__right {
+    order: 2;
+  }
+  .judge-topbar__center {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .judge-touch-strip {
+    font-size: 0.5625rem;
+  }
+  .judge-athlete-meta {
+    display: none;
+  }
+  .judge-btn__title {
+    font-size: 0.95rem;
+  }
+  .judge-btn__pts {
+    font-size: 1.35rem;
+    padding: 2px 6px;
+  }
+}
+
+/* Landscape Mobile & Low-Height Screens (<= 560px height) */
+@media (max-height: 560px) {
+  .judge-screen {
+    padding: 4px 8px;
+  }
+  .judge-topbar {
+    padding-bottom: 4px;
+  }
+  .judge-compliance-strip {
+    display: none;
+  }
+  .judge-bottom-bar {
+    display: none;
+  }
+  .judge-corner {
+    padding: 6px 10px;
+  }
+  .judge-corner__header {
+    margin-bottom: 4px;
+  }
+  .judge-athlete-meta {
+    display: none;
+  }
+  .judge-touch-strip {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+  .judge-buttons-list {
+    gap: 4px;
+  }
+  .judge-btn {
+    min-height: 42px;
+    padding: 4px 10px;
+  }
+  .judge-btn__icon-box {
+    display: none;
+  }
+  .judge-btn__subtitle {
+    display: none;
+  }
+  .judge-btn__label-group {
+    margin-left: 0;
+  }
+  .judge-btn__title {
+    font-size: clamp(0.95rem, 2.5vw, 1.35rem);
+  }
+  .judge-btn__pts {
+    font-size: clamp(1.35rem, 3vw, 1.85rem);
+    padding: 2px 8px;
+  }
+}
+
+/* ==========================================================================
+   LANDSCAPE ENFORCEMENT PROMPT (WAJIB LANDSCAPE DI PERANGKAT MOBILE & TABLET)
+   ========================================================================== */
+.judge-rotate-prompt {
+  display: none;
+}
+
+@media (max-width: 1024px) and (orientation: portrait) {
+  .judge-rotate-prompt {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background-color: rgba(5, 8, 17, 0.98);
+    backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(20px, 6vw, 36px);
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .rotate-icon-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  .rotate-phone-icon {
+    color: #cbd5e1;
+    animation: rotate-device-anim 2.4s ease-in-out infinite;
+    transform-origin: center center;
+  }
+
+  .rotate-arrow-icon {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    animation: pulse 1.8s infinite;
+  }
+
+  @keyframes rotate-device-anim {
+    0%,
+    15% {
+      transform: rotate(0deg);
+    }
+    45%,
+    75% {
+      transform: rotate(90deg);
+    }
+    90%,
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+
+  .rotate-prompt-title {
+    font-size: clamp(1.2rem, 4.5vw, 1.5rem);
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .rotate-prompt-desc {
+    font-size: clamp(0.75rem, 2.8vw, 0.875rem);
+    color: #94a3b8;
+    max-width: 340px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+
+  .btn-rotate-fullscreen {
+    background-color: #10b981;
+    border: 1px solid #059669;
+    color: #0f172a;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm, 8px);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    transition:
+      transform 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .btn-rotate-fullscreen:active {
+    transform: scale(0.96);
+  }
 }
 </style>

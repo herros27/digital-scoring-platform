@@ -12,7 +12,7 @@ func (s *ArenaStore) Create(a *Arena) error {
 }
 
 func (s *ArenaStore) ListByCompetition(competitionID string) ([]Arena, error) {
-	rows, err := s.DB.Query(`SELECT id, competition_id, name, created_at FROM arenas WHERE competition_id = $1`, competitionID)
+	rows, err := s.DB.Query(`SELECT id, competition_id, name, created_at FROM arenas WHERE competition_id = $1 ORDER BY name ASC, id ASC`, competitionID)
 	if err != nil {
 		return nil, err
 	}
@@ -51,4 +51,12 @@ func (s *ArenaStore) Delete(id string) error {
 	query := `DELETE FROM arenas WHERE id = $1`
 	_, err := s.DB.Exec(query, id)
 	return err
+}
+
+// InUse true bila gelanggang masih menjadi gelanggang asal sebuah kategori atau masih dirujuk partai.
+func (s *ArenaStore) InUse(id string) (bool, error) {
+	var used bool
+	err := s.DB.QueryRow(`SELECT EXISTS (SELECT 1 FROM categories WHERE home_arena_id = $1)
+		OR EXISTS (SELECT 1 FROM matches WHERE arena_id = $1)`, id).Scan(&used)
+	return used, err
 }

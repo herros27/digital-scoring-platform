@@ -59,6 +59,11 @@ export function useConsensusFeedback(getTechniques: () => WsTechniqueKind[]) {
     },
     onProgress(p: WsConsensusProgress) {
       if (!isSide(p.target)) return
+      if (p.count <= 0) {
+        // juri membatalkan input yang menunggu: padamkan lampu sudut itu
+        clear(p.target)
+        return
+      }
       const need = p.needed || needed.value
       show(
         p.target,

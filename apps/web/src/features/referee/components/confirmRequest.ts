@@ -38,7 +38,7 @@ export function manualTieRequest(c: RefereeConsole): ConfirmRequest {
   return {
     title: 'Seri Penuh — Tentukan Pemenang',
     message:
-      'Skor, sanksi, dan teknik kedua sudut sama. Pilih dasar keputusan (babak tambahan, timbang ulang, undian koin, atau keputusan wasit) lalu pemenangnya.',
+      'Skor, sanksi, dan teknik kedua sudut sama. Pilih dasar keputusan (babak tambahan, timbang ulang, undian koin, atau keputusan operator meja) lalu pemenangnya.',
     confirmLabel: 'Tetapkan Pemenang & Selesaikan',
     methods: ['referee_decision', ...manual].map((m) => ({
       value: m,

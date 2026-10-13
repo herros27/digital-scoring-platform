@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { MatchDTO } from '@/features/matches/api/matchService'
 import type { BracketSlotRecord, ParticipantDTO } from '@/features/tournament/api/bracketService'
-import {
-  bracketCategories,
-  buildQueue,
-  classLabel,
-  competitorMap,
-  groupBracket,
-  roundLabel,
-} from './queue'
+import { buildQueue, classLabel, competitorMap, groupBracket, roundLabel } from './queue'
 
 const part = (id: string, name: string, weight: string, gender: string): ParticipantDTO => ({
   id,
@@ -91,14 +84,6 @@ describe('buildQueue', () => {
     const rows = buildQueue([match('x', 'hilang', 'p1')], comps, null)
     expect(rows[0].red).toBeNull()
     expect(rows[0].blue?.name).toBe('Eko')
-  })
-})
-
-describe('bracketCategories', () => {
-  it('mengelompokkan kelas unik, menyatukan putra/male', () => {
-    const cats = bracketCategories(people)
-    expect(cats.map((c) => c.label)).toEqual(['Kelas A Putri', 'Kelas C Putra'])
-    expect(cats[1].gender).toBe('male')
   })
 })
 

@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -52,6 +53,15 @@ func (m *mockContingentRepo) GetByEmail(email string) (*domain.Contingent, strin
 		}
 	}
 	return nil, "", nil
+}
+
+func (m *mockContingentRepo) UpdatePassword(id, hash string) error {
+	c, ok := m.contingents[id]
+	if !ok {
+		return sql.ErrNoRows
+	}
+	m.passwords[c.Email] = hash
+	return nil
 }
 
 func (m *mockContingentRepo) List() ([]domain.Contingent, error) {
@@ -391,3 +401,81 @@ func TestContingent_BracketGenerationSafeguard(t *testing.T) {
 		t.Fatalf("expected 201 Created after both verified, got %d: %s", w2.Code, w2.Body.String())
 	}
 }
+
+func TestContingent_LoginLockout(t *testing.T) {
+	repo := newMockContingentRepo()
+	svc := service.NewContingentService(repo)
+
+	_, err := svc.Register("Sleman Team", "Coach", "lockout@example.com", "0812345", "correctPass123")
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	// 5 failed login attempts
+	for i := 0; i < 5; i++ {
+		_, _, err := svc.Login("lockout@example.com", "wrongPass")
+		if err == nil {
+			t.Fatalf("attempt %d: expected error on wrong password", i+1)
+		}
+	}
+
+	// 6th attempt with CORRECT password must be rejected due to account lockout
+	_, _, err = svc.Login("lockout@example.com", "correctPass123")
+	if err == nil {
+		t.Fatalf("expected 6th attempt with correct password to be locked out")
+	}
+}
+
+func TestContingent_RegisterInviteCode(t *testing.T) {
+	repo := newMockContingentRepo()
+	svc := service.NewContingentService(repo)
+	h := &handler.ContingentHandler{Service: svc, InviteCode: "SECRET-2026"}
+
+	// 1. Without invite code -> 403 Forbidden
+	reqBody1, _ := json.Marshal(map[string]any{
+		"name":     "Tim A",
+		"pic_name": "Coach A",
+		"email":    "tima@example.com",
+		"phone":    "0812345678",
+		"password": "Password123!",
+	})
+	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/contingent/register", bytes.NewReader(reqBody1))
+	w1 := httptest.NewRecorder()
+	h.Register(w1, req1)
+	if w1.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 without invite code, got %d", w1.Code)
+	}
+
+	// 2. With wrong invite code -> 403 Forbidden
+	reqBody2, _ := json.Marshal(map[string]any{
+		"name":        "Tim B",
+		"pic_name":    "Coach B",
+		"email":       "timb@example.com",
+		"phone":       "0812345678",
+		"password":    "Password123!",
+		"invite_code": "WRONG-CODE",
+	})
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/contingent/register", bytes.NewReader(reqBody2))
+	w2 := httptest.NewRecorder()
+	h.Register(w2, req2)
+	if w2.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 with wrong invite code, got %d", w2.Code)
+	}
+
+	// 3. With correct invite code -> 201 Created
+	reqBody3, _ := json.Marshal(map[string]any{
+		"name":        "Tim C",
+		"pic_name":    "Coach C",
+		"email":       "timc@example.com",
+		"phone":       "0812345678",
+		"password":    "Password123!",
+		"invite_code": "SECRET-2026",
+	})
+	req3 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/contingent/register", bytes.NewReader(reqBody3))
+	w3 := httptest.NewRecorder()
+	h.Register(w3, req3)
+	if w3.Code != http.StatusCreated {
+		t.Fatalf("expected 201 with correct invite code, got %d: %s", w3.Code, w3.Body.String())
+	}
+}
+

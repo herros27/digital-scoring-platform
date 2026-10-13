@@ -186,3 +186,41 @@ func TestEffectiveTiebreak_DerivedOrderMatchesRegulationWithoutExplicitPriority(
 		}
 	}
 }
+
+func TestEffectivePointGap_DefaultOffAndCustom(t *testing.T) {
+	cases := []struct {
+		name string
+		gap  *PointGapRule
+		want PointGapRule
+	}{
+		{"kosong = bawaan remaja/dewasa mulai babak 2", nil, PointGapRule{Margin: 30, FromRound: 2}},
+		{"margin 0 = nonaktif", &PointGapRule{Margin: 0}, PointGapRule{Margin: 0, FromRound: 2}},
+		{"usia dini 20", &PointGapRule{Margin: 20}, PointGapRule{Margin: 20, FromRound: 2}},
+		{"babak mulai diatur", &PointGapRule{Margin: 15, FromRound: 1}, PointGapRule{Margin: 15, FromRound: 1}},
+	}
+	for _, c := range cases {
+		if got := (ScoringRule{PointGap: c.gap}).EffectivePointGap(); got != c.want {
+			t.Errorf("%s: got %+v, want %+v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestValidate_PointGap(t *testing.T) {
+	base := ScoringRule{RoundDuration: 120, BreakDuration: 60, TotalRounds: 3}
+	ok := []*PointGapRule{nil, {Margin: 0}, {Margin: 30}, {Margin: 20, FromRound: 3}}
+	for _, g := range ok {
+		s := base
+		s.PointGap = g
+		if err := s.Validate(); err != nil {
+			t.Errorf("%+v harus valid: %v", g, err)
+		}
+	}
+	bad := []*PointGapRule{{Margin: -1}, {Margin: 30, FromRound: -1}, {Margin: 30, FromRound: 4}}
+	for _, g := range bad {
+		s := base
+		s.PointGap = g
+		if err := s.Validate(); err == nil {
+			t.Errorf("%+v harus ditolak", g)
+		}
+	}
+}

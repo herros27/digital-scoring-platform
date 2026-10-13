@@ -540,7 +540,7 @@ const filteredArenas = computed(() => {
               v-if="authStore.isReferee || authStore.isAdminOrDewan"
               type="button"
               class="arena-link-btn arena-link--referee"
-              title="Buka konsol wasit / dewan juri"
+              title="Buka konsol meja / pengawas pertandingan"
               @click="openRefereeConsole"
             >
               <svg
@@ -554,7 +554,7 @@ const filteredArenas = computed(() => {
                 <path d="M12 2v20" />
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
               </svg>
-              Konsol Wasit
+              Konsol Meja
             </button>
           </div>
         </div>

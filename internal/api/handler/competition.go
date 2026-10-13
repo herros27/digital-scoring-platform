@@ -3,13 +3,27 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
+	"github.com/herros27/digital-scoring/internal/cache"
 	"github.com/herros27/digital-scoring/internal/domain"
 	"github.com/herros27/digital-scoring/internal/service"
 )
 
 type CompetitionHandler struct {
 	Service *service.CompetitionService
+	// Cache opsional: dibersihkan saat status/identitas kejuaraan berubah agar bagan publik tidak basi.
+	Cache *cache.Cache
+}
+
+// invalidatePublic membersihkan cache bagan publik. Daftar kejuaraan publik tidak memuat comp_id pada
+// kuncinya, jadi seluruh prefix /public/competitions ikut dibuang.
+func (h *CompetitionHandler) invalidatePublic(id string) {
+	if h.Cache == nil {
+		return
+	}
+	h.Cache.InvalidateCompetition(id)
+	h.Cache.InvalidateKeysContaining("/api/v1/public/competitions")
 }
 
 // GET /api/v1/competitions?page=1&limit=20&status=active
@@ -17,12 +31,25 @@ func (h *CompetitionHandler) List(w http.ResponseWriter, r *http.Request) {
 	page, limit, _ := ParsePagination(r)
 	status := r.URL.Query().Get("status")
 
-	list, total, err := h.Service.GetCompetitionsPaged(status, page, limit)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	list, total, err := h.Service.GetCompetitionsSearch(status, q, page, limit)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
 	OkPaged(w, list, page, limit, total)
+}
+
+// GET /api/v1/competitions/stats
+// Jumlah kejuaraan per status (draft, active, paused, completed, cancelled) dan total, tidak bergantung pada filter
+// atau halaman daftar. Dipakai kartu ringkasan dan angka pada tab filter.
+func (h *CompetitionHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.Service.CompetitionStats()
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
+		return
+	}
+	Ok(w, stats)
 }
 
 // GET /api/v1/competitions/{id}
@@ -73,6 +100,7 @@ func (h *CompetitionHandler) Activate(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
+	h.invalidatePublic(id)
 	Ok(w, map[string]string{"status": "active"})
 }
 
@@ -90,9 +118,14 @@ func (h *CompetitionHandler) Update(w http.ResponseWriter, r *http.Request) {
 			Fail(w, http.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 			return
 		}
+		if errors.Is(err, domain.ErrConflict) {
+			Fail(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), domain.ErrConflict.Error()+": "), nil)
+			return
+		}
 		Fail(w, http.StatusBadRequest, "BAD_REQUEST", err.Error(), nil)
 		return
 	}
+	h.invalidatePublic(id)
 	Ok(w, updated)
 }
 
@@ -107,6 +140,7 @@ func (h *CompetitionHandler) Pause(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
+	h.invalidatePublic(id)
 	Ok(w, map[string]string{"status": "paused"})
 }
 
@@ -121,6 +155,7 @@ func (h *CompetitionHandler) Finish(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
+	h.invalidatePublic(id)
 	Ok(w, map[string]string{"status": "completed"})
 }
 
@@ -135,5 +170,6 @@ func (h *CompetitionHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
+	h.invalidatePublic(id)
 	Ok(w, map[string]string{"status": "cancelled"})
 }
