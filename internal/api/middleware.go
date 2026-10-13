@@ -13,6 +13,7 @@ import (
 
 	"github.com/herros27/digital-scoring/internal/api/handler"
 	"github.com/herros27/digital-scoring/internal/auth"
+	"github.com/herros27/digital-scoring/internal/logger"
 	"github.com/herros27/digital-scoring/internal/metrics"
 )
 
@@ -245,5 +246,19 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		}
 
 		metrics.RecordHTTPRequest(r.Method, pattern, rec.statusCode, duration)
+
+		// Real-time Access Log ke stdout/console
+		if logger.Log != nil {
+			clientIP := ClientIP(r)
+			status := rec.statusCode
+			msg := r.Method + " " + r.URL.Path
+			if status >= 500 {
+				logger.Log.Error(msg, "status", status, "duration", duration.String(), "ip", clientIP)
+			} else if status >= 400 {
+				logger.Log.Warn(msg, "status", status, "duration", duration.String(), "ip", clientIP)
+			} else {
+				logger.Log.Info(msg, "status", status, "duration", duration.String(), "ip", clientIP)
+			}
+		}
 	})
 }
