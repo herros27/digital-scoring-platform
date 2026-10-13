@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/herros27/digital-scoring/internal/logger"
 )
 
 var validate *validator.Validate
